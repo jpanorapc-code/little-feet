@@ -790,14 +790,6 @@ app.post('/api/students/import', (req, res) => {
   res.status(201).json({ success: true, imported, rejected, message: `${imported} learner record${imported === 1 ? '' : 's'} imported.` });
 });
 
-// Fallback to index.html. Express 5 requires a named wildcard parameter.
-app.get('/{*path}', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
 // 1. Session and Passport Setup
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -817,53 +809,39 @@ passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
 // 2. Google Strategy Configuration (with safe fallbacks)
+// Google Strategy Configuration
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID || 'dummy-client-id',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret',
     callbackURL: "https://littlefeet.co.za/auth/google/callback"
   },
   (accessToken, refreshToken, profile, done) => {
-    return done(null, profile);
-  }
-));
-
-// 3. OAuth Routes
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/' }),
-  (req, res) => {
-    res.redirect('/');
-  }
-);
-
-// 4. Wildcard Catch-All & App Listen MUST be at the very end
-app.get('/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-  (accessToken, refreshToken, profile, done) => {
     const user = {
       googleId: profile.id,
       displayName: profile.displayName,
-      email: profile.emails[0].value,
-      photo: profile.photos[0].value
+      email: profile.emails?.[0]?.value || '',
+      photo: profile.photos?.[0]?.value || ''
     };
     return done(null, user);
   }
 ));
 
 // OAuth Endpoints
-app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     res.redirect('/dashboard');
   }
 );
+
+// Wildcard Catch-All (Serves Frontend)
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
