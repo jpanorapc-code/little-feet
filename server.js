@@ -798,3 +798,50 @@ app.get('/{*path}', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true if enforcing HTTPS strictly
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+// Google Strategy configuration
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "https://littlefeet.co.za/auth/google/callback"
+  },
+  (accessToken, refreshToken, profile, done) => {
+    const user = {
+      googleId: profile.id,
+      displayName: profile.displayName,
+      email: profile.emails[0].value,
+      photo: profile.photos[0].value
+    };
+    return done(null, user);
+  }
+));
+
+// OAuth Endpoints
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    res.redirect('/dashboard');
+  }
+);
