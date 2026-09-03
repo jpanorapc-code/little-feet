@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Set this to the public standby URL when deploying behind a load balancer. -->
+  <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <title>Little Feet | ECD Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Leaflet Maps CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <style>
+    :root {
+      --primary-color: #0d9488;
+      --primary-hover: #0f766e;
+      --dark-navy: #0f2b48;
+      --bg-dark: #0a1118;
+      --panel-bg: #132b45;
+      --text-dark: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border-color: #1e3a5f;
+      --input-bg: #0f2338;
+      --input-text: #ffffff;
+      --danger-color: #dc2626;
+      --danger-hover: #b91c1c;
+      --success-color: #16a34a;
+      --success-hover: #15803d;
+      --bubble-bg: #1e3a5f;
+    }
+
+    body.light-mode {
+      --bg-dark: #f1f5f9;
+      --panel-bg: #ffffff;
+      --text-dark: #0f172a;
+      --text-muted: #475569;
+      --border-color: #cbd5e1;
+      --input-bg: #f8fafc;
+      --input-text: #0f172a;
+      --bubble-bg: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+    
+    body { 
+      background-color: var(--bg-dark); 
+      color: var(--text-dark); 
+      min-height: 100vh; 
+      display: flex; 
+      flex-direction: column;
+      position: relative;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      width: min(560px, 72vw);
+      height: min(560px, 72vw);
+      background-image: url('logo.png');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: contain;
+      pointer-events: none;
+      z-index: 0;
+      filter: drop-shadow(0 0 30px rgba(13, 148, 136, 0.75)) brightness(1.2);
+      animation: emblemLightGlow 3.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes emblemLightGlow {
+      0% {
+        filter: drop-shadow(0 0 15px rgba(13, 148, 136, 0.4)) brightness(1);
+        opacity: 0.045;
+      }
+      100% {
+        filter: drop-shadow(0 0 45px rgba(45, 212, 191, 0.95)) brightness(1.4);
+        opacity: 0.11;
+      }
+    }
+    
+    .container { padding: 15px; max-width: 1150px; margin: 0 auto; width: 100%; flex: 1; position: relative; z-index: 1; }
+    
+    .card { 
+      position: relative; 
+      background-color: var(--panel-bg); 
+      border: 1px solid var(--border-color); 
+      border-top: 4px solid var(--primary-color); 
+      border-radius: 8px; 
+      padding: 20px; 
+      margin-bottom: 20px; 
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25); 
+      color: var(--text-dark);
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    h2 { color: var(--text-dark); font-size: 1.15rem; font-weight: 700; }
+    
+    label { font-size: 0.82rem; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; display: block; }
+    label .req { color: #e11d48; margin-left: 2px; }
+
+    input, select, textarea { 
+      width: 100%; 
+      padding: 11px; 
+      margin-bottom: 10px; 
+      border-radius: 6px; 
+      border: 1px solid var(--border-color); 
+      background-color: var(--input-bg); 
+      color: var(--input-text); 
+      font-size: 0.9rem; 
+      transition: border-color 0.15s, box-shadow 0.15s; 
+    }
+    input:focus, select:focus, textarea:focus { 
+      outline: none; 
+      border-color: var(--primary-color); 
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25); 
+    }
+    select option { background-color: var(--panel-bg); color: var(--text-dark); padding: 10px; }
+    
+    button.submit-btn { 
+      background-color: var(--primary-color); 
+      color: #ffffff; 
+      border: none; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: background-color 0.1s; 
+      font-size: 0.95rem; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 8px; 
+      padding: 11px;
+      border-radius: 6px;
+      width: 100%;
+      user-select: none;
+    }
+    button.submit-btn:hover { background-color: var(--primary-hover); }
+    button.submit-btn:active { transform: scale(0.99); }
+    
+    .action-btn { 
+      width: auto; 
+      padding: 7px 12px; 
+      margin: 4px 4px 4px 0; 
+      font-size: 0.82rem; 
+      display: inline-flex; 
+      align-items: center; 
+      gap: 6px; 
+      cursor: pointer; 
+      border-radius: 6px; 
+      border: none; 
+      font-weight: 600; 
+      text-align: center; 
+      transition: background-color 0.1s;
+      user-select: none;
+    }
+    .action-btn:active { transform: scale(0.97); }
+
+    .btn-green { background-color: var(--success-color); color: #fff; }
+    .btn-green:hover { background-color: var(--success-hover); }
+    .btn-red { background-color: var(--danger-color); color: #fff; }
+    .btn-red:hover { background-color: var(--danger-hover); }
+    .btn-blue { background-color: var(--primary-color); color: #fff; }
+    .btn-blue:hover { background-color: var(--primary-hover); }
+
+    #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; }
+    #authSection::before { content:""; position:absolute; width:min(720px,90vw); height:min(720px,90vw); border-radius:50%; background:radial-gradient(circle,rgba(13,148,136,.16),rgba(15,43,72,.10) 46%,transparent 70%); pointer-events:none; }
+    #authSection > .auth-card { position:relative; width:min(100%,470px) !important; max-width:470px !important; margin:0; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
+    .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:20px; padding-top:8px; overflow:hidden; }
+    .mascot-stage { position:relative; display:grid; place-items:center; min-height:158px; margin-bottom:2px; }
+    .mascot-stage::before { content:""; position:absolute; z-index:0; width:176px; height:176px; border:1px dashed rgba(94,234,212,.44); border-radius:50%; background:radial-gradient(circle,rgba(45,212,191,.20),rgba(13,148,136,.06) 48%,transparent 70%); box-shadow:0 0 32px rgba(45,212,191,.28), inset 0 0 28px rgba(13,148,136,.16); animation:mascotOrbit 10s linear infinite; }
+    .mascot-stage::after { content:'✦  ●  ✦  ♡'; position:absolute; z-index:1; top:30px; left:50%; width:210px; transform:translateX(-50%); color:#5eead4; letter-spacing:16px; text-shadow:0 0 12px rgba(45,212,191,.9); font-size:1rem; white-space:nowrap; animation:brandSpark 2.8s ease-in-out infinite alternate; }
+    .brand-header img { position:relative; z-index:2; height:138px; width:138px; object-fit:contain; padding:0; background:transparent; border:0; cursor:pointer; animation:logoPulse 2.8s ease-in-out infinite alternate; border-radius:18px; }
+    .nav-brand img { background: #ffffff !important; }
+    @keyframes logoPulse { from { filter: brightness(1.18) contrast(1.05) drop-shadow(0 0 5px rgba(45,212,191,.55)); } to { filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 18px rgba(45,212,191,1)); } }
+    .brand-header h2 { position:relative; z-index:3; margin-top:2px; margin-bottom:3px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
+    .brand-header p.slogan { position:relative; z-index:3; display:inline-block; margin:0; padding:5px 11px; border:1px solid rgba(45,212,191,.38); border-radius:999px; background:rgba(13,148,136,.11); color:#99f6e4; font-size:.69rem; font-style:normal; font-weight:800; letter-spacing:1.45px; text-transform:uppercase; animation:sloganLift 3s ease-in-out infinite; }
+    @keyframes mascotOrbit { to { transform:rotate(360deg); } }
+    @keyframes brandSpark { to { transform:translateX(-50%) translateY(-8px) scale(1.12); opacity:.6; } }
+    @keyframes titleShimmer { to { background-position:220% center; } }
+    @keyframes sloganLift { 50% { transform:translateY(-2px); box-shadow:0 7px 18px rgba(13,148,136,.28); } }
+
+    nav { background-color: #07111e; border-bottom: 3px solid var(--primary-color); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; position: relative; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #ffffff; font-size: 1.15rem; cursor: pointer; user-select: none; }
+    .nav-brand img { height: 42px; width: 42px; background: #ffffff; padding: 2px; border-radius:50%; filter: drop-shadow(0 0 5px rgba(45,212,191,.55)); object-fit: contain; }
+    input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus { -webkit-text-fill-color: var(--input-text); -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset; box-shadow: 0 0 0 1000px var(--input-bg) inset; caret-color: var(--input-text); }
+    .nav-brand .org-badge { font-size: 0.68rem; background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px; font-weight: normal; color: #94a3b8; vertical-align: middle; }
+
+    .nav-user-panel { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #cbd5e1; }
+    .user-switch-control { display:inline-flex; align-items:center; gap:7px; min-width:0; margin:0; padding:4px 7px 4px 4px; border:1px solid transparent; border-radius:999px; background:transparent; color:#cbd5e1; font:inherit; cursor:pointer; }
+    .user-switch-control:hover, .user-switch-control:focus-visible { border-color:rgba(45,212,191,.6); background:rgba(13,148,136,.14); color:#fff; outline:none; }
+    .user-switch-control #displayRole { white-space:nowrap; }
+    .user-avatar { background: var(--primary-color); color: white; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75rem; }
+
+    .nav-links { display: flex; list-style: none; gap: 3px; flex-wrap: wrap; width: 100%; justify-content: flex-start; margin-top: 5px; }
+    .nav-links li button { background: none; border: none; color: #cbd5e1; padding: 7px 11px; cursor: pointer; font-weight: 600; font-size: 0.82rem; margin: 0; border-radius: 4px; }
+    .nav-links li button.active, .nav-links li button:hover { color: #ffffff; background-color: var(--primary-color); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .item-row { background-color: var(--input-bg); border-radius: 6px; padding: 12px 15px; margin-bottom: 12px; border: 1px solid var(--border-color); border-left: 4px solid var(--primary-color); color: var(--text-dark); display: flex; flex-direction: column; gap: 8px; word-break: break-word; overflow: hidden; max-width: 100%; box-sizing: border-box; }
+    .post-item, .worksheet-img, .item-row img { max-width: 100% !important; height: auto !important; max-height: 280px !important; object-fit: contain !important; border-radius: 6px; margin-top: 8px; border: 1px solid var(--border-color); cursor: pointer; display: block; box-sizing: border-box; }
+    .meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .badge-tag { background-color: var(--primary-color); color: #ffffff; font-weight: 600; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; display: inline-block; margin-right: 4px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .badge-tag.urgent { background-color: var(--danger-color); }
+    .badge-tag.info { background-color: #0284c7; }
+
+    .chat-box { height: 280px; overflow-y: auto; background-color: var(--input-bg); border-radius: 6px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border-color); }
+    .msg { max-width: 85%; padding: 9px 13px; border-radius: 8px; font-size: 0.88rem; word-break: break-word; line-height: 1.35; white-space: pre-wrap; background-color: var(--bubble-bg); color: var(--text-dark); }
+    .msg.sent { align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg.received { align-self: flex-start; border-bottom-left-radius: 2px; }
+    .msg-timestamp { font-size: 0.68rem; opacity: 0.75; display: block; margin-top: 4px; text-align: right; color: var(--text-muted); }
+    .server-status { display:flex; align-items:center; gap:6px; font-size:.74rem; color:var(--text-muted); white-space:nowrap; }
+    .server-dot { width:9px; height:9px; border-radius:50%; background:#ef4444; box-shadow:0 0 0 0 rgba(239,68,68,.7); animation: statusBlink 1.5s infinite; }
+    .server-status.good .server-dot { background:#4ade80; box-shadow:0 0 10px #4ade80; }
+    .server-status.busy .server-dot { background:#facc15; box-shadow:0 0 10px #facc15; }
+    @keyframes statusBlink { 50% { opacity:.4; transform:scale(.82); } }
+    .chat-shell { max-width:1040px; margin:0 auto; overflow:hidden; }
+    .chat-toolbar { display:flex; gap:8px; padding:12px; background:rgba(15,43,72,.65); border-bottom:1px solid var(--border-color); flex-wrap:wrap; }
+    .chat-panel { padding:16px; }
+    .chat-box.modern-chat { height:360px; background:linear-gradient(180deg, var(--input-bg), rgba(15,43,72,.35)); padding:18px; }
+    .chat-compose { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; margin-top:10px; }
+    .chat-compose textarea { min-height:74px; }
+    .store-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:15px; }
+    .store-item { border:1px solid var(--border-color); border-radius:10px; padding:16px; background:linear-gradient(145deg,var(--panel-bg),rgba(13,148,136,.08)); }
+    .workspace-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
+    .workspace-card { border:1px solid var(--border-color); border-radius:10px; padding:18px; background:linear-gradient(145deg,var(--panel-bg),rgba(15,43,72,.65)); }
+    .workspace-card h3 { color:#2dd4bf; margin-bottom:7px; }
+    .workspace-card p { color:var(--text-muted); font-size:.85rem; line-height:1.5; margin-bottom:12px; }
+    .role-home-panel { margin-bottom:18px; overflow:hidden; background:linear-gradient(135deg,rgba(13,148,136,.18),rgba(15,43,72,.92)); }
+    .role-home-panel .role-home-content { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr); gap:18px; align-items:center; }
+    .role-home-panel h2 { margin:0 0 7px; color:#f8fafc; font-size:clamp(1.2rem,2.4vw,1.7rem); }
+    .role-home-panel p { margin:0; color:#cbd5e1; line-height:1.5; }
+    .role-home-panel .role-home-icon { display:grid; place-items:center; min-height:128px; border:1px solid rgba(94,234,212,.2); border-radius:14px; background:radial-gradient(circle at 50% 35%,rgba(45,212,191,.25),rgba(7,17,30,.35)); font-size:3.2rem; }
+    .role-home-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:15px; }
+    .role-home-actions button { margin:0; }
+    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } }
+    .record-list { margin-top:16px; display:grid; gap:8px; }
+    .record-list .item-row { margin:0; }
+    .footer-links a { padding:4px 7px; border-radius:5px; }
+    .footer-links a:hover { background:rgba(45,212,191,.12); }
+
+    .flex-form-row { display: flex; flex-direction: column; gap: 10px; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(10, 17, 24, 0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(4px); }
+    .modal-card { background: var(--panel-bg); padding: 24px; border-radius: 8px; max-width: 650px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; border-top: 4px solid var(--primary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+    .modal-card.subscription-modal-card { max-width: 1080px; }
+    .modal-close { position: absolute; top: 12px; right: 12px; border: none; background: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted); }
+    .user-location-pin { position: relative; width: 30px; height: 30px; border-radius: 50%; background: #f97316; border: 4px solid #ffffff; box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.35), 0 4px 10px rgba(0, 0, 0, 0.45); }
+    .user-location-pin::after { content: ''; position: absolute; inset: -12px; border: 2px solid #f97316; border-radius: 50%; animation: locationPulse 1.8s ease-out infinite; }
+    @keyframes locationPulse { 0% { transform: scale(0.35); opacity: 1; } 100% { transform: scale(1.25); opacity: 0; } }
+
+    footer { background-color: #07111e; color: var(--text-muted); border-top: 1px solid #1e293b; padding: 20px 15px; font-size: 0.78rem; position: relative; z-index: 2; margin-top: auto; }
+    .footer-container { max-width: 1150px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+    .footer-links { display: flex; gap: 15px; flex-wrap: wrap; }
+    .footer-links a { color: #94a3b8; text-decoration: none; cursor: pointer; }
+    .footer-links a:hover { color: #2dd4bf; text-decoration: underline; }
+    .compliance-text { font-size: 0.72rem; color: #475569; line-height: 1.4; border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 5px; }
+
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+      background: var(--panel-bg) !important;
+      color: var(--text-dark) !important;
+      border: 1px solid var(--border-color);
+    }
+    .leaflet-popup-content { color: var(--text-dark) !important; line-height: 1.45; }
+    .leaflet-popup-close-button { color: var(--text-muted) !important; }
+    .leaflet-popup-close-button:hover { color: var(--text-dark) !important; }
+    .school-popup h3 { color: var(--primary-color) !important; }
+    .school-popup strong { color: var(--text-dark) !important; }
+    .school-popup .school-muted { color: var(--text-muted) !important; }
+    .school-popup a { color: var(--primary-hover) !important; font-weight: 700; }
+    body.light-mode .workspace-card { background: linear-gradient(145deg, #ffffff, #eef8f7); color: var(--text-dark); }
+    body.light-mode .workspace-card h3 { color: #0f766e; }
+    body.light-mode #reportsTab .workspace-card [style*="color: #fff"],
+    body.light-mode #reportsTab .workspace-card [style*="color:#fff"] { color: var(--text-dark) !important; }
+
+    .social-signin { display:grid; grid-template-columns:repeat(3, 1fr); gap:7px; margin-top:12px; }
+    .social-signin button { border:1px solid var(--border-color); border-radius:7px; padding:8px 5px; color:var(--text-dark); background:var(--input-bg); font-size:.7rem; font-weight:700; cursor:pointer; }
+    .social-signin button:hover { border-color:var(--primary-color); background:rgba(13,148,136,.12); }
+    .wellbeing-banner { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.16),rgba(15,43,72,.5)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+    .wellbeing-banner .tip-icon { font-size:1.5rem; } .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
+    .wellbeing-banner button { background:transparent; color:var(--text-muted); border:0; font-size:1.15rem; cursor:pointer; padding:3px 6px; }
+    .portal-tour { position:relative; min-height:410px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
+    .portal-tour-slide { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.82fr); opacity:0; pointer-events:none; transform:scale(1.015); transition:opacity .55s ease, transform .55s ease; }
+    .portal-tour-slide.is-active { opacity:1; pointer-events:auto; transform:scale(1); }
+    .portal-tour-image { width:100%; height:100%; min-height:410px; object-fit:cover; filter:brightness(.56) saturate(.9); animation:tourImageDrift 12s ease-in-out infinite alternate; }
+    .portal-tour-copy { position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; gap:12px; padding:28px 30px 34px; color:#fff; background:linear-gradient(135deg,rgba(7,17,30,.96),rgba(15,43,72,.86)); }
+    .portal-tour-kicker { color:#5eead4; font-weight:800; font-size:.72rem; letter-spacing:.11em; text-transform:uppercase; }
+    .portal-tour h2 { color:#fff; font-size:clamp(1.35rem,2.6vw,2.05rem); line-height:1.12; }
+    .portal-tour p { color:#dbeafe; line-height:1.55; max-width:52ch; }
+    .portal-tour-fact { padding:9px 11px; border-left:3px solid #2dd4bf; border-radius:0 7px 7px 0; background:rgba(45,212,191,.11); color:#ccfbf1; font-size:.82rem; line-height:1.45; }
+    .portal-tour-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .portal-tour-actions button { width:auto; padding:8px 12px; border:1px solid rgba(255,255,255,.25); border-radius:8px; background:#0d9488; color:#fff; cursor:pointer; font:700 .8rem inherit; }
+    .portal-tour-actions button:hover { background:#0f766e; }
+    .tour-controls { position:absolute; z-index:3; left:18px; bottom:14px; display:flex; align-items:center; gap:8px; }
+    .tour-controls button { width:34px; height:34px; border:1px solid rgba(255,255,255,.35); border-radius:50%; background:rgba(7,17,30,.72); color:#fff; cursor:pointer; font-size:1rem; }
+    .tour-controls button:hover { background:var(--primary-color); }
+    .tour-dots { display:flex; gap:6px; }
+    .tour-dots button { width:8px; height:8px; min-height:0; padding:0; border:0; background:rgba(255,255,255,.4); }
+    .tour-dots button.is-active { width:22px; border-radius:999px; background:#5eead4; }
+    @keyframes tourImageDrift { from { transform:scale(1); } to { transform:scale(1.075); } }
+    .signature-pad { width:100%; height:140px; display:block; margin:7px 0 10px; background:#fff; border:2px dashed var(--primary-color); border-radius:8px; cursor:crosshair; touch-action:none; }
+    .form-template-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:9px; margin-bottom:12px; border:1px dashed var(--border-color); border-radius:8px; background:rgba(13,148,136,.07); }
+    .form-template-bar select { flex:1; min-width:190px; margin:0; padding:7px; } .form-template-bar .action-btn { margin:0; padding:7px 10px; } .form-template-bar span { width:100%; font-size:.72rem; color:var(--text-muted); }
+    /* Usability polish: preserves the current teal and navy palette. */
+    .container { max-width:1200px; }
+    .card { border-radius:14px; padding:22px; box-shadow:0 12px 28px rgba(2,8,23,.22); }
+    .card-header-bar { gap:12px; padding-bottom:12px; margin-bottom:18px; }
+    .card-header-bar h2 { letter-spacing:-.015em; }
+    h3 { line-height:1.3; }
+    label { margin-bottom:6px; letter-spacing:.01em; }
+    input, select, textarea { min-height:44px; padding:11px 13px; border-radius:9px; background-color:color-mix(in srgb,var(--input-bg) 92%, #ffffff 8%); }
+    textarea { min-height:96px; line-height:1.45; resize:vertical; }
+    input::placeholder, textarea::placeholder { color:color-mix(in srgb,var(--text-muted) 85%, transparent); }
+    input[type="checkbox"] { min-height:auto; accent-color:var(--primary-color); }
+    button, input, select, textarea { font-family:inherit; }
+    button.submit-btn { min-height:46px; border-radius:9px; box-shadow:0 6px 14px rgba(13,148,136,.18); }
+    .action-btn { min-height:36px; border-radius:8px; padding:8px 12px; box-shadow:0 3px 8px rgba(2,8,23,.16); }
+    .action-btn:hover, button.submit-btn:hover { transform:translateY(-1px); }
+    .action-btn:focus-visible, button:focus-visible, a:focus-visible { outline:3px solid rgba(45,212,191,.7); outline-offset:3px; }
+    .item-row { border-radius:10px; padding:14px 16px; transition:transform .15s ease, border-color .15s ease, background-color .15s ease; }
+    .item-row:hover { border-color:var(--primary-color); background-color:color-mix(in srgb,var(--input-bg) 90%, var(--primary-color) 10%); }
+    .workspace-card, .store-item { border-radius:12px; padding:18px; box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }
+    .workspace-card form > :last-child { margin-bottom:0; }
+    .record-list { gap:11px; }
+    .form-template-bar { border-radius:10px; padding:11px; }
+    .wellbeing-banner { border-radius:12px; }
+    .nav-links { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; padding:3px 1px 7px; gap:5px; }
+    .nav-links li { flex:0 0 auto; }
+    .nav-links li button { white-space:nowrap; border:1px solid transparent; border-radius:8px; padding:8px 11px; }
+    .nav-links li button.active { border-color:rgba(255,255,255,.65); box-shadow:0 3px 10px rgba(13,148,136,.28); }
+    .chat-box { border-radius:12px; }
+    .modal-card { border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.45); }
+    @media (max-width:767px) { .container { padding:14px; } .card { padding:17px; border-radius:12px; } .card-header-bar { align-items:flex-start; flex-direction:column; } .card-header-bar > * { max-width:100%; } .social-signin { grid-template-columns:1fr; } .workspace-grid, .store-grid { grid-template-columns:1fr; } .wellbeing-banner { align-items:flex-start; } }
+
+    @media (max-width:820px) { #authSection { padding:20px 14px; align-items:flex-start; } #authSection > .auth-card { max-width:500px !important; } }
+
+    /* Gentle motion gives feedback without changing the visual theme. */
+    .tab-content.active { animation:tabReveal .32s cubic-bezier(.2,.75,.25,1) both; }
+    @keyframes tabReveal { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .card { animation:cardArrival .42s ease both; }
+    @keyframes cardArrival { from { opacity:.84; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+    .card-header-bar h2::before { content:''; display:inline-block; width:7px; height:7px; margin:0 9px 2px 0; border-radius:50%; background:#2dd4bf; box-shadow:0 0 0 0 rgba(45,212,191,.6); animation:headingGlow 2.6s ease-in-out infinite; }
+    @keyframes headingGlow { 50% { box-shadow:0 0 0 6px rgba(45,212,191,0); } }
+    .workspace-card, .store-item { transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+    .workspace-card:hover, .store-item:hover { transform:translateY(-3px); border-color:var(--primary-color); box-shadow:0 12px 24px rgba(2,8,23,.18); }
+    .guide-link-card { width:100%; min-height:164px; border:1px solid var(--border-color); border-radius:12px; padding:17px; background:linear-gradient(145deg,var(--panel-bg),rgba(13,148,136,.08)); color:var(--text-dark); text-align:left; cursor:pointer; font:inherit; line-height:1.55; transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease,background-color .2s ease; }
+    .guide-link-card:hover, .guide-link-card:focus-visible { transform:translateY(-3px); border-color:var(--primary-color); background:linear-gradient(145deg,var(--panel-bg),rgba(13,148,136,.18)); box-shadow:0 12px 24px rgba(2,8,23,.18); outline:none; }
+    .guide-link-card h3 { color:var(--text-dark); margin:0 0 7px; font-size:1rem; }
+    .guide-link-card p { color:var(--text-muted); margin:0; }
+    .guide-link-card .guide-open { display:block; margin-top:12px; color:var(--primary-color); font-size:.78rem; font-weight:700; }
+    button, .nav-links li button { transition:transform .16s ease, box-shadow .16s ease, background-color .16s ease, border-color .16s ease; }
+    button.submit-btn:not(:disabled)::after { content:'→'; margin-left:3px; transition:transform .16s ease; }
+    button.submit-btn:hover::after { transform:translateX(3px); }
+    .nav-links li button.active { animation:activeTab .35s ease both; }
+    @keyframes activeTab { 0% { transform:scale(.94); } 65% { transform:scale(1.04); } 100% { transform:scale(1); } }
+    .badge-tag { animation:badgePop .35s ease both; }
+    @keyframes badgePop { from { opacity:0; transform:scale(.78); } to { opacity:1; transform:scale(1); } }
+    .wellbeing-banner:not(.hidden) { animation:bannerSlide .5s cubic-bezier(.2,.75,.25,1) both; }
+    @keyframes bannerSlide { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+    .user-avatar { box-shadow:0 0 0 0 rgba(13,148,136,.55); animation:avatarPulse 3s ease-in-out infinite; }
+    @keyframes avatarPulse { 50% { box-shadow:0 0 0 5px rgba(13,148,136,0); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+    .hidden { display: none !important; }
+
+    @media (min-width: 768px) {
+      .container { padding: 30px; }
+      .card { padding: 24px; margin-bottom: 25px; }
+      body::before { width: 550px; height: 550px; }
+      nav { padding: 10px 25px; flex-wrap: wrap; }
+      .nav-links { width: 100%; flex-basis: 100%; justify-content: flex-start; margin-top: 0; order: 3; }
+      .item-row { flex-direction: row; justify-content: space-between; align-items: center; }
+      .flex-form-row { flex-direction: row; }
+      .footer-container { flex-direction: row; justify-content: space-between; align-items: center; }
+      .compliance-text { margin-top: 0; border-top: none; padding-top: 0; max-width: 60%; text-align: right; }
+    }
+
+    /* Keep the account area separate from the full tab bar at every screen width. */
+    nav { align-items:center; }
+    .nav-brand { flex:0 1 auto; min-width:0; }
+    .nav-user-panel { flex:0 1 auto; min-width:0; flex-wrap:wrap; justify-content:flex-end; }
+    .nav-links { flex:0 0 100%; width:100%; order:3; }
+    .nav-more-toggle { display:none; }
+    @media (max-width: 900px) {
+      .nav-more-toggle { display:inline-flex; order:2; align-items:center; justify-content:center; gap:7px; min-height:38px; margin:0; padding:8px 12px; border:1px solid rgba(45,212,191,.5); border-radius:9px; background:var(--primary-color); color:#fff; font:inherit; font-size:.78rem; font-weight:700; cursor:pointer; }
+      nav .nav-links { display:none; margin:4px 0 0; padding:10px; border:1px solid var(--border-color); border-radius:12px; background:#0b1d30; overflow:visible; }
+      nav .nav-links.menu-open { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+      nav .nav-links li { min-width:0; }
+      nav .nav-links li button { width:100%; min-height:40px; text-align:left; padding:9px 10px; border:1px solid rgba(148,163,184,.18); }
+      .nav-user-panel { order:1; margin-left:auto; }
+    }
+    @media (max-width: 640px) {
+      nav { padding:9px 12px; }
+      .nav-brand { font-size:1rem; gap:7px; }
+      .nav-brand img { width:36px; height:36px; }
+      .nav-user-panel { font-size:.72rem; gap:6px; }
+      #displayRole { max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .nav-user-panel .action-btn { padding:6px 8px; font-size:.68rem !important; }
+      .portal-tour-slide { grid-template-columns:1fr; }
+      .portal-tour-image { display:none; }
+      nav .nav-links.menu-open { grid-template-columns:1fr; }
+      .nav-more-toggle { order:3; width:100%; }
+      .nav-user-panel { width:100%; justify-content:space-between; order:2; }
+    }
+    @media (min-width: 1440px) {
+      .container { max-width:1540px; padding:34px 46px; }
+      .card { padding:28px; }
+      .workspace-grid { grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
+      .portal-tour { min-height:410px; }
+      .nav-links li button { padding:9px 13px; font-size:.86rem; }
+    }
+
+    /* Application shell: grouped navigation keeps every workspace reachable
+       without turning the header into a scrolling row of tabs. */
+    html, body { max-width:100%; overflow-x:hidden; }
+    #dashboardSection { min-height:100vh; }
+    .app-sidebar {
+      position:fixed; z-index:15; top:68px; left:0; bottom:0; width:260px;
+      overflow-y:auto; overscroll-behavior:contain; padding:18px 12px 24px;
+      background:#07111e; border-right:1px solid var(--border-color);
+      box-shadow:6px 0 20px rgba(0,0,0,.16);
+    }
+    .sidebar-heading { color:#94a3b8; font-size:.68rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; margin:18px 10px 7px; }
+    .sidebar-heading:first-child { margin-top:4px; }
+    .app-sidebar [data-nav-group] { margin-top:14px; padding:9px 7px 7px; border:1px solid rgba(148,163,184,.13); border-radius:10px; background:rgba(15,43,72,.42); }
+    .app-sidebar [data-nav-group] .sidebar-heading { margin:0 4px 7px; color:#5eead4; }
+    .sidebar-links { list-style:none; display:grid; gap:4px; }
+    .sidebar-links li { min-width:0; }
+    .sidebar-links .nav-btn, .sidebar-signout {
+      width:100%; min-height:40px; display:flex; align-items:center; text-align:left;
+      border:1px solid transparent; border-radius:8px; background:transparent; color:#cbd5e1;
+      padding:9px 11px; cursor:pointer; font:600 .84rem/1.2 inherit;
+    }
+    .sidebar-links .nav-btn:hover, .sidebar-links .nav-btn.active { color:#fff; background:var(--primary-color); border-color:rgba(255,255,255,.5); box-shadow:0 4px 12px rgba(13,148,136,.22); }
+    .sidebar-signout { color:#fca5a5; margin-top:18px; }
+    .sidebar-signout:hover { background:rgba(220,38,38,.14); border-color:rgba(248,113,113,.35); }
+    .nav-more-toggle { display:none; }
+    .tab-content, .tab-content > *, .card, .workspace-card, .store-item, .item-row { min-width:0; max-width:100%; }
+    .tab-content table { width:100%; max-width:100%; table-layout:auto; font-size:clamp(.72rem, 1.8vw, .9rem); }
+    .tab-content th, .tab-content td { overflow-wrap:anywhere; white-space:normal; }
+    .workspace-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+    .store-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+    @media (min-width: 960px) {
+      nav { min-height:68px; padding:9px 22px; flex-wrap:nowrap; }
+      .nav-user-panel { margin-left:auto; }
+      .container { max-width:none; width:calc(100% - 260px); margin-left:260px; padding:26px clamp(20px, 3vw, 48px); }
+      #dashboardSection footer { margin-left:260px; }
+    }
+    @media (max-width: 959px) {
+      .app-sidebar { top:var(--mobile-header-height, 0px); width:min(86vw, 300px); transform:translateX(-105%); transition:transform .22s ease; padding-top:12px; }
+      #dashboardSection.sidebar-open .app-sidebar { transform:translateX(0); }
+      #dashboardSection.sidebar-open::after { content:""; position:fixed; inset:0; z-index:14; background:rgba(2,8,23,.58); }
+      .nav-more-toggle { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:7px 10px; border:1px solid rgba(45,212,191,.5); border-radius:8px; background:var(--primary-color); color:#fff; font:700 .78rem inherit; cursor:pointer; }
+      nav { position:sticky; top:0; z-index:20; }
+    }
+    @media (max-width: 640px) {
+      .portal-tour { min-height:470px; }
+      .portal-tour-slide { display:block; }
+      .portal-tour-image { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:470px; filter:brightness(.45) saturate(1.08); }
+      .portal-tour-copy { min-height:470px; justify-content:flex-start; padding:28px 22px 76px; background:linear-gradient(135deg,rgba(7,17,30,.91),rgba(15,43,72,.58)); }
+      .portal-tour h2 { font-size:1.48rem; }
+      .portal-tour-fact { background:rgba(7,17,30,.58); }
+      .portal-tour-actions { width:100%; }
+      .portal-tour-actions button { width:100%; min-height:44px; justify-content:center; }
+      .tour-controls { left:50%; transform:translateX(-50%); bottom:16px; }
+      .chat-compose { grid-template-columns:1fr; }
+      .chat-compose .action-btn, .form-template-bar .action-btn { width:100%; justify-content:center; }
+      .form-template-bar { align-items:stretch; }
+      .form-template-bar select { min-width:0; }
+      .card-header-bar { align-items:stretch; }
+      .card-header-bar > .action-btn, .card-header-bar > button { width:100%; justify-content:center; }
+      .card-header-bar h2 { width:100%; }
+      .item-row .action-btn, .item-row button { width:100%; justify-content:center; }
+    }
+
+    /* Header: useful context and shortcuts fill the wide centre area for every role. */
+    .nav-quickbar { display:flex; flex:1 1 auto; align-items:center; justify-content:center; gap:10px; min-width:0; }
+    .nav-welcome { display:flex; flex-direction:column; min-width:0; padding-left:12px; border-left:1px solid rgba(148,163,184,.26); }
+    .nav-welcome strong { color:#f8fafc; font-size:.8rem; line-height:1.1; white-space:nowrap; }
+    .nav-welcome span { color:#94a3b8; font-size:.68rem; line-height:1.25; white-space:nowrap; }
+    .nav-live-pill { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:6px 10px; border:1px solid rgba(45,212,191,.24); border-radius:999px; background:rgba(13,148,136,.1); color:#99f6e4; font-size:.72rem; font-weight:700; white-space:nowrap; }
+    .nav-live-pill::before { content:""; width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 0 4px rgba(52,211,153,.12); }
+    .nav-shortcut { min-height:32px; margin:0; padding:6px 10px; border:1px solid rgba(148,163,184,.23); border-radius:8px; background:rgba(15,43,72,.72); color:#dbeafe; font:700 .72rem/1.1 inherit; cursor:pointer; white-space:nowrap; }
+    .nav-shortcut:hover { border-color:#2dd4bf; color:#fff; background:rgba(13,148,136,.22); }
+    @media (min-width: 960px) { .nav-quickbar + .nav-user-panel { margin-left:0; } }
+    @media (max-width: 1150px) { .nav-welcome { display:none; } }
+    @media (max-width: 959px) {
+      .nav-quickbar { display:flex; flex:1 1 auto; justify-content:flex-end; gap:6px; }
+      .nav-quickbar .nav-welcome, .nav-quickbar .nav-live-pill { display:none; }
+      .nav-quickbar .nav-shortcut { min-height:34px; padding:7px 9px; font-size:.72rem; }
+    }
+    @media (max-width: 640px) {
+      .nav-quickbar { order:3; width:100%; justify-content:stretch; }
+      .nav-quickbar .nav-shortcut { flex:1 1 0; }
+      .nav-more-toggle { order:4; }
+    }
+
+    /* Buttons remain readable and easy to tap on narrow screens. */
+    button, .action-btn, .submit-btn {
+      max-width:100%;
+      white-space:normal;
+      overflow-wrap:anywhere;
+      line-height:1.2;
+    }
+    .action-btn, button.submit-btn { min-height:40px; }
+    .sidebar-links .nav-btn { overflow-wrap:anywhere; }
+    @media (max-width: 640px) {
+      .container { padding:18px 14px; }
+      .card { padding:18px; }
+      .card-header-bar > div[style*="display:flex"],
+      .card > div[style*="display:flex"] { width:100%; }
+      .card > div[style*="display:flex"] > .action-btn,
+      .card > div[style*="display:flex"] > button { flex:1 1 100%; width:100%; justify-content:center; }
+      .signature-pad { width:100% !important; height:auto; }
+      nav {
+        display:grid;
+        grid-template-columns:minmax(0, 1fr) auto;
+        align-items:center;
+        gap:8px;
+      }
+      .nav-brand { grid-column:1; grid-row:1; min-width:0; }
+      .nav-brand > div { min-width:0; }
+      .nav-brand .org-badge { display:none; }
+      .nav-user-panel {
+        grid-column:2;
+        grid-row:1;
+        order:initial;
+        width:auto;
+        margin:0;
+        gap:5px;
+        justify-content:flex-end;
+      }
+      .nav-user-panel #displayRole { max-width:90px; }
+      .nav-user-panel #serverStatusText { display:none; }
+      .nav-user-panel .action-btn { min-height:34px; }
+      .nav-quickbar { grid-column:1 / -1; grid-row:2; order:initial; }
+      .nav-more-toggle { grid-column:1 / -1; grid-row:3; order:initial; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Modal Component -->
+  <div id="appModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div id="modalTitle" style="font-size: 1.2rem; font-weight: 700; color: var(--primary-color); margin-bottom: 12px;">Notice</div>
+      <div id="modalBody">Body Content</div>
+    </div>
+  </div>
+
+  <!-- Auth Screen -->
+  <div id="authSection">
+    <div class="card auth-card">
+      <div class="brand-header">
+        <div class="mascot-stage">
+          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="goToMainMenu()" title="Click to go to Main Menu" onerror="this.style.display='none'">
+        </div>
+        <h2 onclick="goToMainMenu()" title="Click to go to Main Menu">Little Feet</h2>
+        <p class="slogan">Every Little Step Matters</p>
+      </div>
+      <form id="loginForm">
+        <div>
+          <label for="loginUsername">Staff ID or Parent Email <span class="req">*</span></label>
+          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or GOD" required>
+        </div>
+        <div>
+          <label for="loginPin">Security PIN / Password <span class="req">*</span></label>
+          <input type="password" id="loginPin" placeholder="••••••••" required>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+          <input type="checkbox" id="rememberLogin" style="width: auto; margin-bottom: 0;">
+          <label for="rememberLogin" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">Save login details on this device</label>
+        </div>
+        <button type="submit" class="submit-btn">🔒 Secure Account Login</button>
+        <div class="social-signin" aria-label="Additional sign-in options"><button type="button" onclick="showProviderSetup('Google sign-in')">Continue with Google</button><button type="button" onclick="showProviderSetup('Yahoo sign-in')">Continue with Yahoo</button><button type="button" onclick="showProviderSetup('Microsoft sign-in')">Continue with Microsoft</button></div>
+      </form>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);text-align:center;">
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:9px;">New to Little Feet?</p>
+        <button type="button" class="action-btn btn-blue" onclick="showSignupForm()">Create a Parent, Teacher or Principal account</button>
+      </div>
+
+      <form id="signupForm" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);">
+        <h3 style="margin-bottom:10px;color:var(--text-dark);">Create your account</h3>
+        <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px;">Teachers and principals are marked for school verification after creating an account.</p>
+        <div><label for="signupName">Full name *</label><input id="signupName" required autocomplete="name"></div>
+        <div><label for="signupUsername">Email or username *</label><input id="signupUsername" required autocomplete="username"></div>
+        <div><label for="signupPin">Password / PIN *</label><input id="signupPin" type="password" minlength="4" required autocomplete="new-password"></div>
+        <div><label for="signupRole">I am a *</label><select id="signupRole" required><option value="parent">Parent / Guardian</option><option value="teacher">Teacher / Educator</option><option value="principal">Principal</option></select></div>
+        <div><label for="signupSchool">Linked school name *</label><input id="signupSchool" required placeholder="Enter your school name"></div>
+        <div><label for="signupLinkedLearners">Learner name(s) to link <span style="font-weight:normal;">(parents only)</span></label><input id="signupLinkedLearners" placeholder="e.g. Liam Smith, Ava Smith"></div>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:.78rem;"><input id="signupTermsAccepted" type="checkbox" required style="width:auto;margin-top:3px;"> <span>I confirm I am authorised to create this account and accept the school privacy notice and terms of use. I understand that child data may only be used for authorised school purposes.</span></label>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;"><button class="submit-btn" style="margin:0;">Create account</button><button type="button" class="action-btn btn-blue" onclick="hideSignupForm()">Cancel</button></div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- Main Dashboard -->
+  <div id="dashboardSection" class="hidden">
+    <nav>
+      <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
+        <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
+        <div>
+          <span>Little Feet</span>
+          <span class="org-badge">ECD Portal v2.6</span>
+        </div>
+      </div>
+
+      <div class="nav-quickbar" aria-label="Quick access">
+        <div class="nav-welcome">
+          <strong id="navWelcomeTitle">Your school workspace</strong>
+          <span id="navWelcomeText">Learning, care and communication in one place</span>
+        </div>
+        <span id="navLivePill" class="nav-live-pill">School day in progress</span>
+        <button type="button" class="nav-shortcut" onclick="openWorkspace('homeTab')">⌂ Home</button>
+        <button type="button" class="nav-shortcut" onclick="openWorkspace('ticketsTab')">? Get help</button>
+      </div>
+
+      <div class="nav-user-panel" id="navUserPanel">
+        <button type="button" class="user-switch-control" onclick="switchUser()" title="Switch user" aria-label="Switch user">
+          <span id="userAvatar" class="user-avatar">--</span>
+          <span id="displayRole">Staff Member</span>
+        </button>
+        <span id="serverStatus" class="server-status" title="Checking server status"><span class="server-dot"></span><span id="serverStatusText">Server offline</span></span>
+        <button type="button" onclick="toggleDarkMode()" class="action-btn btn-blue" style="padding: 4px 8px; font-size: 0.72rem;">🌙 / ☀️ Theme</button>
+      </div>
+
+      <button type="button" id="navMoreToggle" class="nav-more-toggle" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation">☰ Menu</button>
+    </nav>
+
+    <aside id="mainNavigation" class="app-sidebar" aria-label="Main navigation">
+      <p class="sidebar-heading">Overview</p>
+      <ul class="sidebar-links">
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn active" onclick="switchTab('homeTab', this)">Home</button></li>
+      </ul>
+      <section data-nav-group>
+        <p class="sidebar-heading">📚 Academics</p>
+        <ul class="sidebar-links">
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('feedTab', this)">School Feed</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('scheduleTab', this)">Timetable</button></li>
+        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('worksheetsTab', this)">Learning Files</button></li>
+        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('badgesTab', this)">Achievements</button></li>
+        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('reportsTab', this)">Reports &amp; Reviews</button></li>
+        <li data-roles="parent,principal,district,admin" data-subscription="plus"><button type="button" class="nav-btn" onclick="switchTab('analyticsTab', this)">Progress Insights</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('progressTab', this)">Development</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <p class="sidebar-heading">💳 Finance</p>
+        <ul class="sidebar-links">
+        <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('financeTab', this)">Billing &amp; Finance</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('storeTab', this)">School Store</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('inventoryTab', this)">Supplies</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <p class="sidebar-heading">⚙️ Operations</p>
+        <ul class="sidebar-links">
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('attendanceTab', this)">Daily Attendance</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Team Chat</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Help Centre</button></li>
+        <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('registryTab', this)">Daily Register</button></li>
+        <li data-roles="admin"><button type="button" class="nav-btn" onclick="switchTab('accountsTab', this)">Account Management</button></li>
+        <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('dataImportTab', this)">Import School Data</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('operationsTab', this)">School Operations</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <p class="sidebar-heading">🛡️ Safety</p>
+        <ul class="sidebar-links">
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('broadcastsTab', this)">Safety Alerts</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('careTab', this)">Care Records</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('safeguardingTab', this)">Safeguarding</button></li>
+        </ul>
+      </section>
+      <button type="button" class="sidebar-signout" onclick="logout()">Sign out</button>
+    </aside>
+
+    <div class="container">
+      
+      <!-- 0. Home Page Tab Content -->
+      <div id="homeTab" class="tab-content active">
+        <div style="background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 14px; margin-bottom: 20px; font-size: 0.8rem; color: #2dd4bf; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <strong id="currentTermText">Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
+            <button type="button" class="action-btn btn-blue role-admin hidden" onclick="editTermModal()" style="padding: 2px 8px; font-size: 0.72rem; margin: 0;">✏️ Edit Term</button>
+          </div>
+          <span style="font-size: 0.72rem; opacity: 0.85;" id="liveSyncTag">Last Synced: Just now</span>
+        </div>
+        <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon">🌼</span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
+        <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon">🔒</span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
+        <section id="roleHomePanel" class="card role-home-panel" aria-live="polite"></section>
+        <div id="householdSwitcher" class="card hidden" style="margin-bottom:20px;"></div>
+        <section class="card role-admin" data-roles="admin" style="margin-bottom:18px;">
+          <div class="card-header-bar"><h2>🚀 School setup checklist</h2><span class="badge-tag info">ADMIN</span></div>
+          <p style="color:var(--text-muted);margin-bottom:12px;">Complete these essentials before inviting families and staff.</p>
+          <div class="workspace-grid">
+            <button type="button" class="guide-link-card" onclick="openWorkspace('dataImportTab')"><h3>1. Import learners</h3><p>Upload your approved learner register and check for duplicates.</p><span class="guide-open">Open data import →</span></button>
+            <button type="button" class="guide-link-card" onclick="openWorkspace('accountsTab')"><h3>2. Add people &amp; links</h3><p>Create staff and parent accounts, then link each parent to their learners.</p><span class="guide-open">Open accounts →</span></button>
+            <button type="button" class="guide-link-card" onclick="openWorkspace('safeguardingTab')"><h3>3. Record consent</h3><p>Capture media consent and approved pickup information.</p><span class="guide-open">Open safeguarding →</span></button>
+            <button type="button" class="guide-link-card" onclick="openWorkspace('financeTab')"><h3>4. Confirm finance setup</h3><p>Review billing rules and connect approved payment services when ready.</p><span class="guide-open">Open finance →</span></button>
+          </div>
+        </section>
+        <section id="updatesBoard" class="card hidden" style="margin-bottom:18px;"></section>
+
+        <div style="background: linear-gradient(135deg, #0d9488, #0f2b48); color: #ffffff; padding: 32px 24px; border-radius: 12px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
+          <h1 style="margin: 0 0 10px 0; font-size: 2rem; font-weight: 700; color: #ffffff;">Welcome to Little Feet</h1>
+          <p style="margin: 0 0 20px 0; font-size: 0.95rem; opacity: 0.9;">A secure, friendly space for learning, care, communication, and everyday school life.</p>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="openWorkspace('feedTab')" style="background: #0d9488; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; width: auto;">📱 View School Feed</button>
+            <button id="subscriptionEntryButton" onclick="openSubscriptionsModal()" style="background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; width: auto;">💎 Plans &amp; Benefits</button>
+            <button onclick="openModulesBreakdownModal()" style="background: #16a34a; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; width: auto;">⚙️ Explore Features</button>
+          </div>
+        </div>
+
+        <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
+          <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
+            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1588075592405-d3d4f0846961?auto=format&fit=crop&q=82&w=1400" alt="Decorative classroom story-time scene">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected learning</span><h2>One home for everyday school life.</h2><p>Bring schedules, learning evidence, parent updates, attendance, and daily care into role-specific workspaces.</p><div class="portal-tour-fact"><strong>Did you know?</strong> Each role sees only the tools needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
+          </article>
+          <article class="portal-tour-slide" aria-label="Slide 2 of 4">
+            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=82&w=1400" alt="Decorative study materials on a classroom desk">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Smarter school admin</span><h2>Import the register, then review it once.</h2><p>Principals and administrators can preview a school spreadsheet before importing learner records, instead of retyping a whole register.</p><div class="portal-tour-fact"><strong>Built in:</strong> Duplicate learner records are skipped, while medical, emergency, and pickup fields are encrypted when saved.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('dataImportTab')">Open Data Import</button></div></div>
+          </article>
+          <article class="portal-tour-slide" aria-label="Slide 3 of 4">
+            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=82&w=1400" alt="Decorative teacher-led classroom scene">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Family partnership</span><h2>Turn updates into meaningful conversations.</h2><p>Parents can see the learning records, reports, badges, and notices made available to their family account.</p><div class="portal-tour-fact"><strong>Helpful reminder:</strong> Parent report review records can capture teacher and parent acknowledgements before a report is marked complete.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('reportsTab')">View reports</button></div></div>
+          </article>
+          <article class="portal-tour-slide" aria-label="Slide 4 of 4">
+            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=82&w=1400" alt="Decorative child-friendly classroom learning tools">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Safety first</span><h2>Keep the right information close at hand.</h2><p>Care, safeguarding, pickup, and area-alert tools are grouped so staff can act calmly when time matters.</p><div class="portal-tour-fact"><strong>Privacy by design:</strong> Location is used only for relevant area alerts, and is not shown to other users.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('careTab')">Open Care &amp; Safety</button></div></div>
+          </article>
+          <div class="tour-controls"><button type="button" onclick="movePortalTour(-1)" aria-label="Previous slide">‹</button><div class="tour-dots" role="tablist" aria-label="Portal tour slides"><button type="button" class="is-active" onclick="showPortalTourSlide(0)" aria-label="Show slide 1"></button><button type="button" onclick="showPortalTourSlide(1)" aria-label="Show slide 2"></button><button type="button" onclick="showPortalTourSlide(2)" aria-label="Show slide 3"></button><button type="button" onclick="showPortalTourSlide(3)" aria-label="Show slide 4"></button></div><button type="button" onclick="movePortalTour(1)" aria-label="Next slide">›</button></div>
+        </section>
+
+        <!-- 20km Proximity Map Feature Card -->
+        <div class="card" style="margin-bottom: 25px;">
+          <div class="card-header-bar">
+            <h2>📍 Nearby Schools &amp; Partners · 20 km</h2>
+            <button type="button" onclick="loadSchoolProximityMap()" class="action-btn btn-green">🌍 Find schools near me</button>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            Click the button to detect your current location. The map will load live education locations within a 20Km radius. Pins are grouped for a clearer map; click a group to zoom in, or click a school pin for its coordinates, address, available contact details, and photo.
+          </p>
+          <div id="schoolMapContainer" style="width: 100%; height: 420px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
+            📍 Press "Detect My Location" to render interactive map pins.
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+          <div onclick="openWorkspace('broadcastsTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">🔔</div>
+            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Emergency Alerts</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Instant notices & campus safety notifications.</p>
+          </div>
+
+          <div onclick="openWorkspace('scheduleTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">📅</div>
+            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Class Schedule</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Daily timetables & modules.</p>
+          </div>
+
+          <div onclick="openWorkspace('worksheetsTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">📚</div>
+            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Worksheets</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Submissions & viewable files.</p>
+          </div>
+
+          <div onclick="openWorkspace('lookupTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">🔍</div>
+            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Student Lookup</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Search records & contacts.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. Activity Feed -->
+      <div id="feedTab" class="tab-content">
+        <div class="card role-admin role-teacher">
+          <div class="card-header-bar">
+            <h2>Share a School Update</h2>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Publishing as: <strong id="postAuthorTag">Authorized Staff</strong></span>
+          </div>
+          <form id="postForm" enctype="multipart/form-data">
+            <div>
+              <label for="postAudience">Target Audience <span class="req">*</span></label>
+              <select id="postAudience">
+                <option value="All">Audience: All Parents & Campus Staff</option>
+                <option value="Toddlers">Classroom: Toddler Group (Ages 1-3)</option>
+                <option value="Preschool">Classroom: Preschool Group (Ages 4-6)</option>
+                <option value="Primary">Classroom: Primary School (Ages 7-12)</option>
+                <option value="HighSchool">Classroom: High School (Ages 13-18)</option>
+              </select>
+            </div>
+            <div>
+              <label for="postCaption">Activity Update & Details <span class="req">*</span></label>
+              <textarea id="postCaption" rows="3" placeholder="Share daily activities, announcements, learning outcomes..." required></textarea>
+            </div>
+            <div>
+              <label for="postMedia">Attach Photo Proof or Event Banner (Optional)</label>
+              <input type="file" id="postMedia" accept="image/png, image/jpeg, image/webp">
+            </div>
+            <button type="submit" class="submit-btn">📢 Share update</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>School Updates</h2>
+          </div>
+          <div id="postList">Loading feed updates...</div>
+        </div>
+      </div>
+
+      <!-- 2. School Schedule -->
+      <div id="scheduleTab" class="tab-content">
+        <div class="card role-admin role-teacher">
+          <div class="card-header-bar">
+            <h2>Create a Learner Timetable</h2>
+          </div>
+          <form id="scheduleForm">
+            <div>
+              <label for="schStudentName">Full Student Name <span class="req">*</span></label>
+              <input type="text" id="schStudentName" placeholder="e.g. Liam Smith" required>
+            </div>
+            <div class="flex-form-row">
+              <div style="flex: 1;">
+                <label for="schDay">Day of Week <span class="req">*</span></label>
+                <select id="schDay" required>
+                  <option value="Monday">Monday</option>
+                  <option value="Tuesday">Tuesday</option>
+                  <option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option>
+                  <option value="Friday">Friday</option>
+                </select>
+              </div>
+              <div style="flex: 1;">
+                <label for="schTime">Time Slot Block <span class="req">*</span></label>
+                <input type="text" id="schTime" placeholder="e.g. 09:00 AM - 10:00 AM" required>
+              </div>
+            </div>
+            <div>
+              <label for="schActivity">Activity / Lesson Module <span class="req">*</span></label>
+              <input type="text" id="schActivity" placeholder="e.g. Fine Motor Skills & Painting" required>
+            </div>
+            <button type="submit" class="submit-btn">Save timetable entry</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+            <h2>Timetable Records</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" onclick="downloadScheduleTemplate()" class="action-btn btn-blue">⬇ Download template</button><button type="button" onclick="exportScheduleExcel()" class="action-btn btn-green">📊 Export timetable</button></div>
+          </div>
+          
+          <div class="role-admin role-teacher" style="margin-bottom: 15px; background-color: var(--input-bg); border: 1px dashed var(--border-color); padding: 12px; border-radius: 6px;">
+            <label>Import schedule template (Excel .xlsx or .csv)</label>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 5px;">
+            <button type="button" onclick="importScheduleExcel()" class="action-btn btn-blue">Import timetable</button>
+          </div>
+
+          <div id="scheduleList">Loading schedule...</div>
+        </div>
+      </div>
+
+      <!-- 3. Worksheets & Physical Submissions -->
+      <div id="worksheetsTab" class="tab-content">
+        <div class="card role-teacher role-admin">
+          <div class="card-header-bar">
+            <h2>Learning Evidence &amp; Grading</h2>
+          </div>
+          <form id="worksheetForm" enctype="multipart/form-data">
+            <div class="flex-form-row">
+              <div style="flex: 2;">
+                <label for="wsStudentName">Student Name <span class="req">*</span></label>
+                <input type="text" id="wsStudentName" placeholder="e.g. Emma Watson" required>
+              </div>
+              <div style="flex: 1;">
+                <label for="wsGrade">Score (%) <span class="req">*</span></label>
+                <input type="number" id="wsGrade" placeholder="e.g. 95" min="0" max="100" required>
+              </div>
+            </div>
+            <div>
+              <label for="wsTitle">Worksheet / Assessment Title <span class="req">*</span></label>
+              <input type="text" id="wsTitle" placeholder="e.g. Early Literacy & Letter Tracing #3" required>
+            </div>
+            <div>
+              <label for="wsPhoto">Attach Photo Evidence / Work File <span class="req">*</span></label>
+              <input type="file" id="wsPhoto" accept="image/*" required>
+            </div>
+            <button type="submit" class="submit-btn">📤 Save learning record</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>Learning Portfolio</h2>
+          </div>
+          <div id="worksheetList">Loading worksheets...</div>
+        </div>
+      </div>
+
+      <!-- 4. Milestone Badges -->
+      <div id="badgesTab" class="tab-content">
+        <div data-roles="teacher,principal,admin" style="background: var(--panel-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); max-width: 900px; margin: 0 auto;">
+          <h2 style="color: #fff; margin-top: 0;">Award Milestone Keepsake Badge</h2>
+          
+          <form id="badgeForm">
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+              <div style="flex: 1;">
+                <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Student Name *</label>
+                <input id="badgeStudentName" type="text" placeholder="e.g. Noah Miller" required style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;" />
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Milestone Category *</label>
+                <select id="badgeCategory" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="🏆 Athletics & Physical Motor">🏆 Athletics & Physical Motor</option>
+                  <option value="🎨 Creative & Visual Arts">🎨 Creative & Visual Arts</option>
+                  <option value="⭐ Leadership & Peer Kindness">⭐ Leadership & Peer Kindness</option>
+                  <option value="📚 Early Literacy & Cognition">📚 Early Literacy & Cognition</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Badge Award Name *</label>
+              <input id="badgeTitle" type="text" placeholder="e.g. Star Sharer & Team Helper" required style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;" />
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Educator's Evaluation Note *</label>
+              <textarea id="badgeNote" placeholder="Write why the student achieved this award..." style="width: 100%; height: 90px; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; resize: vertical;"></textarea>
+            </div>
+
+            <button type="submit" style="background: #10b981; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;">
+              🏅 Award Badge to Digital Portfolio
+            </button>
+          </form>
+        </div>
+
+        <div style="background: var(--panel-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); max-width: 900px; margin: 20px auto 0;">
+          <h3 style="margin-top: 0; color: #fff; font-size: 1.1rem;">Digital Keepsake & Badge Wall</h3>
+          <div id="badgeWallLog">Loading milestone badges...</div>
+        </div>
+      </div>
+
+      <!-- 5. Growth Analytics -->
+      <div id="analyticsTab" class="tab-content">
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>Term Progress &amp; Assessment</h2>
+          </div>
+          <form id="analyticsSearchForm" class="flex-form-row">
+            <div style="flex: 1;">
+              <label for="analyticsStudent">Learner name <span class="req">*</span></label>
+              <input type="text" id="analyticsStudent" placeholder="Enter the learner’s name" style="margin-bottom: 0;" required>
+              <select id="analyticsStudentSelect" class="hidden" aria-label="Choose your linked learner"></select>
+            </div>
+            <div style="align-self: flex-end;">
+              <button type="submit" class="submit-btn" style="margin-bottom: 0; padding: 11px 20px;">View progress</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Assessment Overview</h2>
+          <div id="analyticsOutput">Select a learner to see completed assessment results and the change from the first recorded score to the latest.</div>
+        </div>
+      </div>
+
+      <!-- 6. Attendance Tracking -->
+      <div id="attendanceTab" class="tab-content">
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>Record Daily Attendance</h2>
+          </div>
+          <form id="attendanceForm" class="flex-form-row">
+            <div style="flex: 1;">
+              <label for="attStudentName">Learner name <span class="req">*</span></label>
+              <input type="text" id="attStudentName" placeholder="Enter student name..." style="margin-bottom: 0;" required>
+            </div>
+            <div style="align-self: flex-end;">
+              <button type="submit" class="submit-btn" style="margin-bottom: 0; padding: 11px 20px;">Save attendance</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card role-admin role-teacher" style="margin-bottom: 20px; background-color: var(--input-bg); border: 1px dashed var(--border-color); padding: 15px; border-radius: 6px;">
+          <label>Import attendance roster (Excel .xlsx or .csv)</label>
+          <input type="file" id="attExcelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 8px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" onclick="downloadAttendanceTemplate()" class="action-btn btn-blue">⬇ Download template</button><button type="button" onclick="importAttendanceExcel()" class="action-btn btn-green">Import attendance</button></div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header-bar">
+            <div>
+              <h2>Today’s Attendance</h2>
+              <span style="font-size: 0.75rem; color: var(--text-muted);" id="todayDateStr">2026-08-27</span>
+            </div>
+            <button type="button" id="btnClearAttendance" class="action-btn btn-red">🗑️ Clear today’s register</button>
+          </div>
+          
+          <div id="attendanceErrorIndex" style="margin-bottom: 12px; font-size: 0.78rem; background: #fff1f2; border: 1px solid #fecdd3; padding: 10px 14px; border-radius: 6px; display: none;">
+            <strong style="color: #9f1239;">⚠️ Diagnostic Error Log & File Read Index:</strong>
+            <ul id="errorListItems" style="margin-top: 6px; padding-left: 18px; color: #be123c;"></ul>
+          </div>
+
+          <div id="attendanceList">No students checked in today.</div>
+        </div>
+      </div>
+
+      <!-- 7. Staff Chat & Direct Person-to-Person Messaging -->
+      <div id="chatTab" class="tab-content">
+        <div class="card chat-shell">
+          <div class="chat-toolbar">
+            <button type="button" id="btnGroupChatMode" class="action-btn btn-blue" onclick="switchChatMode('group')">👥 Staff Group Lounge</button>
+            <button type="button" id="btnDirectChatMode" class="action-btn btn-blue" style="opacity: 0.65;" onclick="switchChatMode('direct')">💬 Direct 1-on-1 Chat (Parent / Staff)</button>
+          </div>
+
+          <div id="groupChatSection">
+            <div class="card-header-bar">
+              <h2>Team Conversations</h2>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <select id="chatGroupSelect" onchange="loadGroupChatMessages()" style="margin-bottom: 0; padding: 5px; font-size: 0.8rem; width: auto;">
+                  <option value="general">General Staff Lounge</option>
+                  <option value="toddlers">Toddler Educators</option>
+                </select>
+                <button type="button" onclick="createNewGroupModal()" class="action-btn btn-blue" style="margin:0; padding: 5px 8px;">+ Create group</button>
+                <button type="button" id="btnDeleteGroup" onclick="deleteCurrentGroup()" class="action-btn btn-red role-admin hidden" style="margin:0; padding: 5px 8px;">🗑️ Delete Group</button>
+              </div>
+            </div>
+
+            <div class="chat-box modern-chat" id="chatMessages">
+              <div class="msg received">
+                <strong>System Administrator:</strong> Welcome to the internal group channel.
+                <span class="msg-timestamp">07:00 AM</span>
+              </div>
+            </div>
+
+            <form id="chatForm">
+              <div class="chat-compose">
+                <textarea id="chatInput" rows="2" placeholder="Type message..." style="margin-bottom: 0;" required></textarea>
+                <button type="submit" class="submit-btn" style="margin-bottom: 0; width: auto; padding: 11px 25px;">Send message</button>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; font-size: 0.78rem;">
+                <label style="margin-bottom:0;">Message Text Color:</label>
+                <input type="color" id="chatColorPicker" value="#2dd4bf" style="width: 35px; height: 25px; padding: 0; margin-bottom: 0; cursor: pointer;">
+              </div>
+            </form>
+          </div>
+
+          <div id="directChatSection" class="hidden">
+            <div class="card-header-bar">
+              <h2>Private Conversation</h2>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <label style="margin-bottom:0; font-size:0.8rem;">Chat Recipient:</label>
+                <select id="directRecipientSelect" onchange="loadDirectChatMessages()" style="margin-bottom: 0; padding: 5px; font-size: 0.8rem; width: auto;">
+                  <option value="">Select Recipient (Parent or Staff)...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="chat-box modern-chat" id="directChatMessages">
+              <p style="font-size:0.85rem; color:var(--text-muted);">Please select a target user from the dropdown menu to load direct messages.</p>
+            </div>
+
+            <form id="directChatForm">
+              <div class="chat-compose">
+                <textarea id="directChatInput" rows="2" placeholder="Type direct message to parent or teacher..." style="margin-bottom: 0;" required></textarea>
+                <button type="submit" class="submit-btn" style="margin-bottom: 0; width: auto; padding: 11px 25px;">Send message</button>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; font-size: 0.78rem;">
+                <label style="margin-bottom:0;">Message Text Color:</label>
+                <input type="color" id="directChatColorPicker" value="#2dd4bf" style="width: 35px; height: 25px; padding: 0; margin-bottom: 0; cursor: pointer;">
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 8. Emergency Broadcasts / Alerts -->
+      <div id="broadcastsTab" class="tab-content">
+        <div class="card role-admin" style="border-top-color: #dc2626;">
+          <div class="card-header-bar">
+            <h2 style="color: #ef4444;">Dispatch Emergency Campus Broadcast</h2>
+          </div>
+          <form id="broadcastForm">
+            <div>
+              <label for="bcPriority">Alert Priority & Classification <span class="req">*</span></label>
+              <select id="bcPriority" required>
+                <option value="Urgent Medical">Medical Alert / Facility Warning</option>
+                <option value="Weather Alert">Severe Weather / Early Pickup Notification</option>
+                <option value="Campus Notice" selected>General Administrative Announcement</option>
+              </select>
+            </div>
+            <div>
+              <label for="bcMessage">Broadcast Content <span class="req">*</span></label>
+              <textarea id="bcMessage" rows="3" placeholder="Type urgent notification message..." required></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div><label for="bcRadius">Alert radius (km)</label><input id="bcRadius" type="number" min="1" max="50" value="5"></div>
+              <div><label for="bcLocation">Alert centre</label><input id="bcLocation" type="text" placeholder="Use my current location" readonly></div>
+            </div>
+            <button type="button" onclick="setAlertLocation()" class="action-btn btn-blue" style="margin-bottom:12px;">📍 Use My Current Location for This Alert</button>
+            <p style="font-size:.78rem;color:var(--text-muted);margin-top:-6px;margin-bottom:12px;">Emergency alerts are delivered only to users currently inside the chosen radius.</p>
+            <button type="submit" class="submit-btn" style="background-color: #dc2626;">🚨 Dispatch Emergency Alert Now</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>Broadcast Log & Read Receipts</h2>
+          </div>
+          <div id="broadcastList">Loading active broadcasts...</div>
+        </div>
+      </div>
+
+      <!-- 9. Support Desk -->
+      <div id="ticketsTab" class="tab-content">
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>Ask for Help</h2>
+          </div>
+          <form id="ticketForm">
+            <div class="flex-form-row">
+              <div style="flex: 1;">
+                <label for="ticketDept">Department Destination <span class="req">*</span></label>
+                <select id="ticketDept" required>
+                  <option value="Admin">Administration & Admissions</option>
+                  <option value="Finance">Finance & Billing Enquiries</option>
+                  <option value="Help Desk">Help Desk</option>
+                </select>
+              </div>
+              <div style="flex: 1;">
+                <label for="ticketPriority">Ticket Urgency <span class="req">*</span></label>
+                <select id="ticketPriority" required>
+                  <option value="Low">Priority: Low / General Query</option>
+                  <option value="Medium" selected>Priority: Medium Standard</option>
+                  <option value="High">Priority: High Escalation</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label for="ticketSubject">Subject Line <span class="req">*</span></label>
+              <input type="text" id="ticketSubject" placeholder="Summary of request..." required>
+            </div>
+            <div>
+              <label for="ticketMessage">Detailed Description <span class="req">*</span></label>
+              <textarea id="ticketMessage" rows="3" placeholder="Please provide specific details..." required></textarea>
+            </div>
+            <button type="submit" class="submit-btn">📨 Send help request</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2>Help Request Queue</h2>
+            <select id="ticketDeptFilter" onchange="loadTickets()" style="width: auto; margin-bottom: 0; padding: 5px; font-size: 0.8rem;">
+              <option value="All">All Departments</option>
+              <option value="Admin">Admin</option>
+              <option value="Finance">Finance</option>
+              <option value="Help Desk">Help Desk</option>
+            </select>
+          </div>
+          <div id="ticketList">Loading ticket queue...</div>
+        </div>
+
+        <div class="card">
+          <h2>Completed Requests</h2>
+          <div id="completedTicketList">Loading completed tickets...</div>
+        </div>
+      </div>
+
+      <!-- 10. Student Lookup -->
+      <div id="lookupTab" class="tab-content">
+        <div class="card">
+          <div class="card-header-bar">
+            <h2>Find a Learner</h2>
+          </div>
+          <form id="studentLookupForm" class="flex-form-row">
+            <div style="flex: 1;">
+              <label for="lookupClass">Filter by Class Name</label>
+              <input type="text" id="lookupClass" placeholder="e.g. Preschool or Toddlers">
+            </div>
+            <div style="flex: 1;">
+              <label for="lookupChild">Search Child Name</label>
+              <input type="text" id="lookupChild" placeholder="e.g. Liam or Emma">
+            </div>
+            <div style="align-self: flex-end;">
+              <button type="submit" class="submit-btn" style="margin-bottom: 0; padding: 11px 20px;">🔍 Search learner</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Search Results</h2>
+          <div id="lookupResults">Execute a search to display student records and guardian contact details.</div>
+        </div>
+      </div>
+
+      <div id="reportsTab" class="tab-content">
+        <div class="card"><div class="card-header-bar"><h2>📝 Report Review &amp; Sign-off</h2><span class="badge-tag info">SIGNED RECORD</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">A report becomes complete only after the teacher and linked parent have both signed it. Each signer uses their own PIN to prevent a child or unauthorised person signing.</p>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Set or change signing PIN</h3><p>Choose a separate four-digit-or-longer PIN for report signatures. Never share it with a child.</p><form id="signingPinForm"><input id="reportSigningPin" type="password" minlength="4" placeholder="New signing PIN" required><button class="submit-btn">Save signing PIN</button></form></div>
+            <div id="teacherReportPublisher" class="workspace-card role-teacher role-admin"><h3>Publish a report for review</h3><form id="reportPublishForm"><input id="reportStudent" placeholder="Learner name" required><input id="reportTitle" placeholder="Report or test title" required><input id="reportPeriod" placeholder="Month and year, e.g. August 2026" required><input id="reportParentUsername" placeholder="Linked parent account email" required><input id="reportTeacherPin" type="password" placeholder="Your signing PIN" required><label>Teacher signature</label><canvas id="teacherSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('teacherSignaturePad')">Clear signature</button><button class="submit-btn">Publish for parent signature</button></form></div>
+            <div id="parentReportSigner" class="workspace-card"><h3>Parent signature</h3><p>Select an awaiting report below, sign with your finger or mouse, and enter your signing PIN.</p><input id="parentReportPin" type="password" placeholder="Your signing PIN"><label>Parent signature</label><canvas id="parentSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('parentSignaturePad')">Clear signature</button></div>
+          </div><div id="reportReviewList" class="record-list"></div>
+        </div>
+      </div>
+
+      <div id="registryTab" class="tab-content">
+        <div class="card"><div class="card-header-bar"><h2>📋 Learner Register</h2><span class="badge-tag info">STAFF ACCESS</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">Record the core enrolment and emergency information required before a learner is placed in a class.</p>
+          <form id="registryForm" class="workspace-grid">
+            <div><label>Learner full name *</label><input name="learnerName" required></div><div><label>Date of birth *</label><input name="dateOfBirth" type="date" required></div>
+            <div><label>Grade / class</label><input name="className" placeholder="e.g. Toddlers"></div><div><label>Parent / guardian name *</label><input name="guardianName" required></div>
+            <div><label>Guardian phone *</label><input name="guardianPhone" type="tel" required></div><div><label>Guardian email</label><input name="guardianEmail" type="email"></div>
+            <div><label>Home address *</label><input name="address" required></div><div><label>Emergency contact & phone</label><input name="emergencyContact" placeholder="Name · phone"></div>
+            <div><label>Medical / allergy notes</label><input name="medicalNotes" placeholder="Allergies, medication, care notes"></div><div><label>Consent status</label><select name="consent"><option>Pending verification</option><option>Parent consent received</option></select></div>
+            <div style="grid-column:1/-1;"><button class="submit-btn">Save learner record</button></div>
+          </form><div id="registryList" class="record-list"></div>
+        </div>
+      </div>
+
+      <!-- School Store -->
+      <div id="storeTab" class="tab-content">
+        <div class="card">
+          <div class="card-header-bar"><h2>🛍️ Little Feet School Store</h2><span id="storeWelcome" class="badge-tag info">Loading your school store…</span></div>
+          <p style="color:var(--text-muted); margin-bottom:16px;">Items shown are available for your school account and login role.</p>
+          <div id="storeItems" class="store-grid">Loading store items…</div>
+        </div>
+      </div>
+
+      <!-- Advanced Finance -->
+      <div id="accountsTab" class="tab-content role-admin">
+        <div class="card"><div class="card-header-bar"><h2>👤 Account & School Management</h2><span class="badge-tag urgent">ADMIN ONLY</span></div>
+          <p style="color:var(--text-muted);margin-bottom:16px;">Create and manage accounts, assign their role, and link each one to a school. The school link controls that account’s School Store status.</p>
+          <form id="accountForm" class="workspace-grid">
+            <input type="hidden" id="accountOriginalUsername">
+            <div><label for="accountName">Full name *</label><input id="accountName" required placeholder="e.g. Amina Jacobs"></div>
+            <div><label for="accountUsername">Username / email *</label><input id="accountUsername" required placeholder="e.g. amina@school.com"></div>
+            <div><label for="accountPin">Password / PIN <span id="accountPinHint">*</span></label><input id="accountPin" type="password" placeholder="Required for a new account"></div>
+            <div><label for="accountRole">Role *</label><select id="accountRole" required><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option></select></div>
+            <div><label for="accountSchoolName">Linked school name *</label><input id="accountSchoolName" required placeholder="e.g. Little Feet ECD Portal"></div>
+            <div><label for="accountStoreUrl">Official school web-store link</label><input id="accountStoreUrl" type="url" placeholder="https://... (leave empty if none)"></div>
+            <div style="grid-column:1/-1;"><label for="accountLinkedLearners">Linked learner name(s) <span style="font-weight:normal;">(parent accounts only · maximum 4)</span></label><div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="accountLinkedLearners" placeholder="Choose up to four learners" readonly style="flex:1 1 260px;margin-bottom:0;"><button type="button" class="action-btn btn-blue" onclick="openLearnerLinkPicker()">👨‍👩‍👧 Choose linked learners</button></div></div>
+            <div style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;"><button class="submit-btn" id="accountSaveButton">Create account</button><button type="button" onclick="resetAccountForm()" class="action-btn btn-blue">Clear form</button></div>
+          </form>
+          <div id="accountsList" class="record-list"></div>
+          <section id="debugModePanel" class="workspace-card" style="margin-top:18px;">
+            <h3>🧪 Administrator debug mode</h3>
+            <p>Use only while diagnosing a problem. It records safe technical details such as error code, source file, and line number; it does not include learner records or passwords.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" id="debugModeToggle" class="action-btn btn-blue" onclick="toggleDebugMode()">Enable debug mode</button><button type="button" class="action-btn btn-green" onclick="openDebugReport()">View debug report</button><button type="button" class="action-btn btn-blue" onclick="downloadDebugReport()">Download report</button><button type="button" class="action-btn btn-red" onclick="clearDebugReport()">Clear report</button></div>
+            <p id="debugModeStatus" class="meta" style="margin-top:10px;">Debug mode is off.</p>
+          </section>
+        </div>
+      </div>
+
+      <div id="dataImportTab" class="tab-content" data-roles="principal,admin">
+        <div class="card">
+          <div class="card-header-bar"><h2>📥 Import School Data</h2><span class="badge-tag info">ADMIN &amp; PRINCIPAL</span></div>
+          <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.55;">Bring an existing school register into Little Feet without manually recreating each learner. Upload an Excel or CSV export from the school system, review the detected rows, then confirm the import. Duplicate learner records are skipped and reported.</p>
+          <div class="workspace-grid">
+            <div class="workspace-card">
+              <h3>1. Upload a register</h3>
+              <p>Supported formats: <strong>.xlsx, .xls, and .csv</strong>. Use column headings such as Learner Name, Grade/Class, Parent Name, Parent Email, Medical Notes, Emergency Contact, and Authorised Pickups.</p>
+              <input id="schoolDatabaseFile" type="file" accept=".xlsx,.xls,.csv" aria-label="Upload school database spreadsheet">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="downloadLearnerImportTemplate()">Download template</button><button type="button" class="action-btn btn-green" onclick="previewLearnerDatabaseImport()">Preview import</button></div>
+            </div>
+            <div class="workspace-card">
+              <h3>Paper records and scans</h3>
+              <p>For privacy, this portal does not send child records from a photo or PDF to a public AI service. Scan paper files into a spreadsheet using your school-approved OCR or scanner, then upload the reviewed Excel/CSV export here.</p>
+              <p style="margin-top:10px;color:var(--text-muted);font-size:.82rem;">Every imported learner must be reviewed before submission. Medical, emergency-contact, and pickup details are encrypted when saved.</p>
+            </div>
+            <div class="workspace-card">
+              <h3>Duplicate protection</h3>
+              <p>Records are matched by learner name, class/grade, and parent email. A duplicate does not overwrite the existing learner record; it is listed for review after the import.</p>
+            </div>
+          </div>
+          <div id="schoolDatabasePreview" class="record-list" aria-live="polite" style="margin-top:18px;"></div>
+        </div>
+      </div>
+
+      <div id="financeTab" class="tab-content role-admin">
+        <div class="card"><div class="card-header-bar"><h2>💳 Finance & Parent Payments</h2><span class="badge-tag urgent">ADMIN</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Payment Gateway</h3><p>Recurring debit collection, Autopay, and failed-payment tracking require a connected PayFast, SnapScan, Stripe, or bank merchant account.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('Payment gateway')">Connection required</button></div>
+            <div class="workspace-card"><h3>Sibling & Subsidy Rules</h3><p>Record a discount or subsidy decision below. Payroll and payment provider calculations remain subject to school approval.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Discount / subsidy rule')"><input name="details" placeholder="e.g. 10% sibling discount for Smith family" required><button class="submit-btn">Save rule</button></form></div>
+            <div class="workspace-card"><h3>Year-End Tax Statements</h3><p>Create a request record for a parent’s tax invoice pack. The finance team can then verify payment history before issuing it.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Tax statement request')"><input name="details" placeholder="Parent name or account reference" required><button class="submit-btn">Create request</button></form></div>
+          </div><div id="financeRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <!-- Operations -->
+      <div id="operationsTab" class="tab-content role-teacher role-admin">
+        <div class="card"><div class="card-header-bar"><h2>🧑‍🏫 Staff & Classroom Operations</h2><span class="badge-tag info">LIVE WORKSPACE</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Timecard Clock-In</h3><p>Log the start or end of a shift. Geofenced payroll exports need a connected payroll provider and approved location policy.</p><button type="button" class="submit-btn" onclick="saveWorkspaceRecord(null,'operations','Timecard clock-in')">Clock in now</button></div>
+            <div class="workspace-card"><h3>Teacher-to-Child Ratio Check</h3><p>Record the current classroom staffing ratio; review exceptions immediately with a supervisor.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Ratio check')"><input name="details" placeholder="e.g. Toddlers: 2 staff / 12 children" required><button class="submit-btn">Log ratio</button></form></div>
+            <div class="workspace-card"><h3>Lesson Plan Builder</h3><p>Capture a daily learning activity and its developmental-standard link for classroom planning.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Lesson plan')"><input name="details" placeholder="Activity and NCF / ELDA standard" required><button class="submit-btn">Save lesson plan</button></form></div>
+          </div><div id="operationsRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <!-- Care and Safety -->
+      <div id="careTab" class="tab-content role-teacher role-admin">
+        <div class="card"><div class="card-header-bar"><h2>🩺 Medical, Safety & Daily Care</h2><span class="badge-tag urgent">CONFIDENTIAL</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Incident & Injury Report</h3><p>Record factual incident details and the parent-notification/sign-off status for the administrative record.</p><form onsubmit="saveWorkspaceRecord(event,'care','Incident report')"><textarea name="details" rows="3" placeholder="Learner, event, location, time, action taken, parent sign-off" required></textarea><button class="submit-btn">Save incident report</button></form></div>
+            <div class="workspace-card"><h3>Medication Authorization</h3><p>Log a medication event only after an authorised prescription and parent consent have been verified.</p><form onsubmit="saveWorkspaceRecord(event,'care','Medication log')"><input name="details" placeholder="Child, medication, dosage, time" required><button class="submit-btn">Save medication log</button></form></div>
+            <div class="workspace-card"><h3>One-tap daily routine</h3><p>Choose a routine activity, then add the child or class. This saves a timestamped activity-feed record without a long note.</p><div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;"><button type="button" class="action-btn btn-green" onclick="quickCareLog('Meal served')">🍽 Meal</button><button type="button" class="action-btn btn-blue" onclick="quickCareLog('Nap check')">🌙 Nap</button><button type="button" class="action-btn btn-blue" onclick="quickCareLog('Mood update')">🙂 Mood</button><button type="button" class="action-btn btn-blue" onclick="quickCareLog('Potty / diaper check')">🧷 Check</button></div><form onsubmit="saveWorkspaceRecord(event,'dailyCare','Daily care log')"><input name="details" placeholder="Child / class and care update" required><button class="submit-btn">Save detailed care note</button></form></div>
+          </div><h3 class="workspace-heading">Daily activity feed</h3><div id="dailyCareRecords" class="record-list"></div><h3 class="workspace-heading">Care, medication & incident records</h3><div id="careRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <!-- Engagement -->
+      <div id="engagementTab" class="tab-content">
+        <div class="card"><div class="card-header-bar"><h2>📣 Communication & Engagement</h2><span class="badge-tag info">SCHOOL COMMUNITY</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Push & SMS Notifications</h3><p>Area alerts are available in this portal. Native mobile push and SMS delivery need an approved messaging provider and consented recipient list.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('SMS and mobile push')">Connection required</button></div>
+            <div class="workspace-card"><h3>Read Receipts & Broadcasts</h3><p>Use Alerts for current area-based notifications. The current portal records deliveries locally; external SMS fallback needs provider setup.</p><button type="button" class="action-btn btn-green" onclick="openAlertsTab()">Open alerts</button></div>
+            <div class="workspace-card"><h3>Events & Order Requests</h3><p>Record a fundraiser, tuckshop, ticket, or permission-slip request for staff follow-up.</p><form onsubmit="saveWorkspaceRecord(event,'engagement','Event or order request')"><input name="details" placeholder="Event, order, or permission request" required><button class="submit-btn">Save request</button></form></div>
+          </div><div id="engagementRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <div id="inventoryTab" class="tab-content role-teacher role-admin">
+        <div class="card"><div class="card-header-bar"><h2>📦 Supplies & Stock Intake</h2><span class="badge-tag info">OPERATIONS</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Resource request</h3><p>Teachers can send an item request to the school administration queue.</p><form onsubmit="saveWorkspaceRecord(event,'supplies','Supply request')"><input name="details" placeholder="Item, quantity, classroom and reason" required><button class="submit-btn">Submit request</button></form></div>
+            <div class="workspace-card"><h3>Stock intake</h3><p>Record deliveries so stock is visible before items are issued to classes.</p><form onsubmit="saveWorkspaceRecord(event,'stock','Stock intake')"><input name="details" placeholder="Supplier, item, quantity and delivery note" required><button class="submit-btn">Record intake</button></form></div>
+            <div class="workspace-card"><h3>Approval queue</h3><p>Administrators can review, action, or remove submitted operational records from the lists below.</p></div>
+          </div><h3 class="workspace-heading">Supply requests</h3><div id="suppliesRecords" class="record-list"></div><h3 class="workspace-heading">Stock intake log</h3><div id="stockRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <div id="progressTab" class="tab-content role-teacher role-admin">
+        <div class="card"><div class="card-header-bar"><h2>🌱 Development, Portfolio & Reports</h2><span class="badge-tag info">LEARNING RECORDS</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Milestone observation</h3><p>Record a dated observation against motor, speech, social, or another framework area.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Milestone observation')"><input name="details" placeholder="Learner · framework area · observation" required><button class="submit-btn">Save observation</button></form></div>
+            <div class="workspace-card"><h3>Portfolio evidence</h3><p>Use Worksheets for photo evidence, then add the developmental context here for the learner portfolio.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Portfolio tag')"><input name="details" placeholder="Learner · evidence title · development tag" required><button class="submit-btn">Tag portfolio</button></form></div>
+            <div class="workspace-card"><h3>Term progress report</h3><p>Create a report request from the observations and assessment records saved for a learner.</p><form onsubmit="saveWorkspaceRecord(event,'reports','Progress report request')"><input name="details" placeholder="Learner · term · educator summary" required><button class="submit-btn">Create report request</button></form></div>
+          </div><h3 class="workspace-heading">Portfolio observations</h3><div id="portfolioRecords" class="record-list"></div><h3 class="workspace-heading">Report requests</h3><div id="reportsRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <div id="safeguardingTab" class="tab-content role-teacher role-admin">
+        <div class="card"><div class="card-header-bar"><h2>🛡️ Safeguarding & Privacy Controls</h2><span class="badge-tag urgent">RESTRICTED</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">Use only for authorised school duties. Confirm school policy, parental authority, and the applicable POPIA/Children’s Act process before recording sensitive information.</p>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Parental media consent</h3><p>Record separate choices for private class updates and optional marketing photography. No consent means no photo processing for that purpose.</p><form id="consentForm"><input id="consentLearner" placeholder="Learner name" required><input id="consentGuardian" placeholder="Parent / guardian name" required><label><input id="consentInternal" type="checkbox"> Allow authenticated internal class updates</label><label><input id="consentMarketing" type="checkbox"> Allow external marketing photos</label><button class="submit-btn">Save consent decision</button></form></div>
+            <div class="workspace-card"><h3>Pickup / check-in audit</h3><p>Record the responsible adult and one-time verification code at handover. Codes are stored as one-way hashes, not readable text.</p><form id="pickupForm"><input id="pickupLearner" placeholder="Learner name" required><input id="pickupAdult" placeholder="Verified pickup adult" required><input id="pickupCode" placeholder="One-time PIN" required><select id="pickupAction"><option>Check-in</option><option>Pickup / release</option></select><button class="submit-btn">Create audit record</button></form></div>
+            <div class="workspace-card"><h3>Staff child-protection checks</h3><p>Record the certificate reference and expiry only after the school has completed the official NCPR process. Never treat this screen as a substitute for a government clearance.</p><form onsubmit="saveWorkspaceRecord(event,'safeguarding','NCPR verification record')"><input name="details" placeholder="Staff member · Form 29/30 reference · verified date · expiry" required><button class="submit-btn">Record verification</button></form></div>
+            <div class="workspace-card"><h3>Medication two-step control</h3><p>Use Care & Safety to record the parent-authorisation reference, dosage, time, administering teacher, and witness. A separate school workflow must verify the approval before administration.</p></div>
+          </div><h3 class="workspace-heading">Consent register</h3><div id="consentRecords" class="record-list"></div><h3 class="workspace-heading">Pickup & check-in audit</h3><div id="pickupRecords" class="record-list"></div><h3 class="workspace-heading">Staff safeguarding register</h3><div id="safeguardingRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <!-- 11. User Guide -->
+      <div id="guideTab" class="tab-content">
+        <div class="card">
+          <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
+          <p style="color:var(--text-muted);margin-bottom:18px;">A quick guide to using Little Feet safely and effectively. Features shown may vary by your school role.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;font-size:.86rem;line-height:1.55;">
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('feedTab')"><h3>📢 Feed & Communication</h3><p>Use <strong>Feed</strong> to view school updates. Staff can publish notices and attach approved photos. Keep messages clear, child-safe, and audience-specific.</p><span class="guide-open">Open Feed →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('scheduleTab')"><h3>📅 Schedules & Results</h3><p>Open <strong>Schedule</strong> for class activities and assessments. Staff can enter records manually or use the supported Excel workflow where available.</p><span class="guide-open">Open Schedule →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('worksheetsTab')"><h3>📁 Worksheets & Badges</h3><p>Use <strong>Worksheets</strong> for learning evidence and <strong>Badges</strong> for positive recognition. Check the recipient and grade before saving.</p><span class="guide-open">Open Worksheets →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('attendanceTab')"><h3>📊 Attendance</h3><p>Staff should record arrivals and departures promptly. If an entry is incorrect, correct it immediately so the daily register stays accurate.</p><span class="guide-open">Open Attendance →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('ticketsTab')"><h3>💬 Staff Chat & Support</h3><p>Use Staff Chat for operational communication and Support Desk for requests that need follow-up. Do not post confidential child information in group chats.</p><span class="guide-open">Open Support Desk →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('broadcastsTab')"><h3>🚨 Area Alerts & Privacy</h3><p>Location alerts are shown only inside their configured area. Allow location access only when you want relevant safety notices. Your device location is not displayed to other users.</p><span class="guide-open">Open Alerts →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('careTab')"><h3>🧷 Care, allergies & routines</h3><p>Teachers can use Care & Safety for quick meal, nap, mood, diaper, medication, and incident records. Use Student Lookup to see the learner’s medical, emergency, and authorised-pickup details before acting.</p><span class="guide-open">Open Care & Safety →</span></button>
+            <button type="button" class="guide-link-card" onclick="openGuideWorkspace('inventoryTab')"><h3>📦 Classroom supplies & progress</h3><p>Use Inventory to request supplies and capture deliveries. Use Progress to link observations and portfolio tags to developmental areas, then prepare a term-report request.</p><span class="guide-open">Open Inventory →</span></button>
+          </div>
+          <div style="margin-top:18px;padding:14px;border-left:4px solid var(--primary-color);background:rgba(13,148,136,.09);border-radius:8px;"><strong>Need help?</strong> Check that the server light in the header is green, refresh once, then use Support Desk with a short description of the issue and the tab you were using.</div>
+          <div style="margin-top:16px;font-size:.8rem;color:var(--text-muted);"><strong>Role guide:</strong> Parents see child-facing information, alerts, store status, and support. Teachers manage learning, attendance, care, registry, and staff operations. Principals oversee school operations, finance records, staff workspaces, and analytics. District users see cross-school analytics, schedules, alerts, support, and permitted lookup information. Administrators have full configuration access.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      <div class="footer-container">
+        <div>
+          <p style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet Early Childhood Development Platform</p>
+          <div class="footer-links">
+            <a onclick="openLegalModal('Privacy & Safeguarding Notice', 'This portal uses role-based workspaces, consent records, encrypted sensitive fields, and audit registers to support POPIA and child-safeguarding obligations. Your school remains responsible for a documented lawful basis, staff training, retention rules, vendor agreements, incident response, access reviews, and legal review before production use.')">Privacy & Safeguarding</a> • 
+            <a onclick="openLegalModal('Terms of Service', 'Authorized personnel only. Data scraping or unauthorized logins are strictly logged.')">Terms of Service</a> • 
+            <a id="subscriptionFooterLink" onclick="openSubscriptionsModal()">School Subscriptions</a> • 
+            <a onclick="openModulesBreakdownModal()">System Modules Breakdown</a>
+          </div>
+          <p style="margin-top: 6px; font-size: 0.7rem; color: #475569;">© 2026 Little Feet Educational Holdings (Pty) Ltd. All rights reserved.</p>
+        </div>
+        <div class="compliance-text">
+          <p><strong>Regulatory Compliance Notice:</strong> Operating in full compliance with ECD & Basic Education regulations.</p>
+          <p style="margin-top: 3px; font-size: 0.68rem; color: #334155;">System Build: v2.6.0-prod • Host: localhost:5000</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="backup.js?v=20260829-responsive-controls" defer></script>
+</body>
+</html>

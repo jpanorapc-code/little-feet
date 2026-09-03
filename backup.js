@@ -1,0 +1,2320 @@
+let currentUser = null;
+const errorLog = [];
+let mapInstance = null;
+let alertLocation = null;
+let accountsCache = [];
+let broadcastsLoaded = false;
+let alertMonitorId = null;
+let reportSignaturePads = {};
+let pendingLearnerImport = [];
+let portalTourIndex = 0;
+let portalTourTimer = null;
+let debugModeEnabled = false;
+let debugEvents = [];
+let startupChimePlayed = false;
+const wellbeingTips = [
+  'Small routines create a sense of safety. A calm goodbye helps children settle into their day.',
+  'Notice effort, not only outcomes. “You kept trying” helps children build confidence.',
+  'A few minutes of child-led play can be the most meaningful part of a busy day.',
+  'Children learn emotional language from us. Naming a feeling can make it easier to manage.',
+  'Consistency is caring: predictable meals, rest, and handovers help children feel secure.',
+  'Ask one open question today: “What made you smile?” It invites a richer conversation.'
+];
+
+// Audio indicator
+function playDingSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) {
+    console.log('Audio disabled:', e);
+  }
+}
+
+// DOM Initialization
+window.addEventListener('DOMContentLoaded', () => {
+  const dateEl = document.getElementById('todayDateStr');
+  if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
+
+  const savedUser = localStorage.getItem('lf_user');
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser);
+    setupSession();
+  }
+  startHealthMonitor();
+  showWellbeingBanner();
+  if (localStorage.getItem('lf_terms_notice_acknowledged') === 'true') document.getElementById('termsNotice')?.classList.add('hidden');
+
+  const btnClearAtt = document.getElementById('btnClearAttendance');
+  if (btnClearAtt) {
+    btnClearAtt.addEventListener('click', (e) => {
+      e.preventDefault();
+      clearAttendanceRegistry();
+    });
+  }
+
+  setupFormListeners();
+  setupFormTemplates();
+  setupRuntimeErrorHelpdesk();
+  setupSignaturePads();
+  setupPortalTour();
+});
+
+function showPortalTourSlide(index) {
+  const slides = [...document.querySelectorAll('.portal-tour-slide')];
+  const dots = [...document.querySelectorAll('.tour-dots button')];
+  if (!slides.length) return;
+  portalTourIndex = (index + slides.length) % slides.length;
+  slides.forEach((slide, slideIndex) => slide.classList.toggle('is-active', slideIndex === portalTourIndex));
+  dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
+}
+
+// A short, low-volume bell motif for a welcoming start without a harsh alert tone.
+function playStartupChime() {
+  if (startupChimePlayed || sessionStorage.getItem('lf_startup_chime_played') === 'true') return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, ctx.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + 0.12);
+    master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 4);
+    master.connect(ctx.destination);
+    const notes = [523.25, 659.25, 783.99, 659.25, 587.33, 783.99];
+    notes.forEach((frequency, index) => {
+      const oscillator = ctx.createOscillator();
+      const tone = ctx.createGain();
+      const start = ctx.currentTime + (index * 0.58);
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, start);
+      tone.gain.setValueAtTime(0.0001, start);
+      tone.gain.exponentialRampToValueAtTime(0.45, start + 0.025);
+      tone.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+      oscillator.connect(tone); tone.connect(master);
+      oscillator.start(start); oscillator.stop(start + 0.54);
+    });
+    startupChimePlayed = true;
+    sessionStorage.setItem('lf_startup_chime_played', 'true');
+  } catch { /* Browser sound is optional and can be disabled by device settings. */ }
+}
+
+function movePortalTour(direction) {
+  showPortalTourSlide(portalTourIndex + direction);
+  restartPortalTour();
+}
+
+function restartPortalTour() {
+  if (portalTourTimer) window.clearInterval(portalTourTimer);
+  portalTourTimer = window.setInterval(() => showPortalTourSlide(portalTourIndex + 1), 7500);
+}
+
+function setupPortalTour() {
+  const tour = document.getElementById('portalTour');
+  if (!tour) return;
+  restartPortalTour();
+  tour.addEventListener('mouseenter', () => { if (portalTourTimer) window.clearInterval(portalTourTimer); });
+  tour.addEventListener('mouseleave', restartPortalTour);
+  tour.addEventListener('focusin', () => { if (portalTourTimer) window.clearInterval(portalTourTimer); });
+  tour.addEventListener('focusout', restartPortalTour);
+}
+
+function addFormTemplates(form, label, templates, applyTemplate) {
+  if (!form || form.dataset.templatesReady) return;
+  form.dataset.templatesReady = 'true';
+  const bar = document.createElement('div');
+  bar.className = 'form-template-bar';
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', `${label} template`);
+  select.innerHTML = `<option value="">Choose a ${label.toLowerCase()} template…</option>${templates.map((template, index) => `<option value="${index}">${template.label}</option>`).join('')}`;
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'action-btn btn-blue'; button.textContent = 'Use template';
+  button.addEventListener('click', () => { const template = templates[Number(select.value)]; if (!template) return; applyTemplate(template); });
+  const hint = document.createElement('span'); hint.textContent = 'Templates save time; review every field before saving.';
+  bar.append(select, button, hint); form.prepend(bar);
+}
+
+function setupFormTemplates() {
+  addFormTemplates(document.getElementById('scheduleForm'), 'schedule', [
+    { label: 'Morning learning block', day: 'Monday', time: '08:00 - 08:30', activity: 'Morning circle: welcome, weather, and attendance' },
+    { label: 'Literacy activity', day: 'Tuesday', time: '09:00 - 09:45', activity: 'Early literacy: story time, sounds, and name writing' },
+    { label: 'Outdoor movement', day: 'Wednesday', time: '10:00 - 10:40', activity: 'Outdoor play: gross-motor movement and cooperative games' }
+  ], template => { document.getElementById('schDay').value = template.day; document.getElementById('schTime').value = template.time; document.getElementById('schActivity').value = template.activity; });
+
+  addFormTemplates(document.getElementById('ticketForm'), 'support request', [
+    { label: 'Fee or payment question', department: 'Finance', priority: 'Normal', subject: 'Request for account assistance', message: 'Please review the account and advise on the next steps.' },
+    { label: 'Medical information update', department: 'Medical', priority: 'High', subject: 'Learner medical information update', message: 'Please contact me to confirm the correct process for updating this learner’s medical information.' },
+    { label: 'General school query', department: 'Admin', priority: 'Normal', subject: 'School administration query', message: 'Please provide guidance or arrange a suitable time to discuss this request.' }
+  ], template => { document.getElementById('ticketDept').value = template.department; document.getElementById('ticketPriority').value = template.priority; document.getElementById('ticketSubject').value = template.subject; document.getElementById('ticketMessage').value = template.message; });
+
+  addFormTemplates(document.getElementById('broadcastForm'), 'alert', [
+    { label: 'Weather closure notice', priority: 'Weather Alert', message: 'Important: The school is monitoring severe weather conditions. Please check this notice for the next update and follow school collection instructions.' },
+    { label: 'Health and safety notice', priority: 'Urgent Medical', message: 'Important safety notice: Please follow the school’s collection and access instructions. Contact the school office if you need assistance.' },
+    { label: 'General campus notice', priority: 'Campus Notice', message: 'School notice: Please review this update and contact the school office if you have questions.' }
+  ], template => { document.getElementById('bcPriority').value = template.priority; document.getElementById('bcMessage').value = template.message; });
+
+  addFormTemplates(document.getElementById('reportPublishForm'), 'report', [
+    { label: 'Monthly learning summary', title: 'Monthly learning summary', period: new Date().toLocaleString(undefined, { month: 'long', year: 'numeric' }) },
+    { label: 'Assessment feedback', title: 'Assessment feedback and next steps', period: new Date().toLocaleString(undefined, { month: 'long', year: 'numeric' }) },
+    { label: 'Term progress report', title: 'Term progress report', period: 'Term 3, 2026' }
+  ], template => { document.getElementById('reportTitle').value = template.title; document.getElementById('reportPeriod').value = template.period; });
+
+  const incidentForm = document.querySelector("form[onsubmit*=\"'care','Incident report'\"]");
+  addFormTemplates(incidentForm, 'incident report', [
+    { label: 'Minor playground incident', details: 'Learner: [name]. Time: [time]. Location: playground. Objective facts: [what was observed]. Immediate action: [first aid / supervision]. Parent notified: [yes/no].' },
+    { label: 'Behaviour observation', details: 'Learner: [name]. Time: [time]. Location: [area]. Objective facts: [what was observed]. Support provided: [action]. Parent notified: [yes/no].' }
+  ], template => { const input = incidentForm.querySelector('[name="details"]'); if (input) input.value = template.details; });
+}
+
+function setupRuntimeErrorHelpdesk() {
+  window.addEventListener('error', event => routeErrorToHelpdesk({ code: 'WEB_RUNTIME_ERROR', message: event.message || 'Unexpected browser error', line: event.lineno, column: event.colno, source: event.filename }));
+  window.addEventListener('unhandledrejection', event => routeErrorToHelpdesk({ code: 'WEB_PROMISE_ERROR', message: event.reason?.message || String(event.reason || 'Unexpected background error') }));
+}
+
+function routeErrorToHelpdesk(error) {
+  captureDebugEvent({ category: 'Browser runtime', ...error });
+  const details = `${error.code}: ${error.message}${error.source ? `\nSource: ${error.source}` : ''}${error.line ? `\nLine: ${error.line}${error.column ? `, column ${error.column}` : ''}` : ''}`;
+  console.error(details);
+  if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
+  sessionStorage.setItem(`lf_error_${details}`, '1');
+  const ticketBody = { id: `err-${Date.now()}`, department: 'Technical Support', priority: 'High', subject: `Automatic error report: ${error.code}`, message: details };
+  fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ticketBody) }).catch(() => {});
+  const supportButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes("ticketsTab"));
+  switchTab('ticketsTab', supportButton);
+  const subject = document.getElementById('ticketSubject');
+  const message = document.getElementById('ticketMessage');
+  if (subject) subject.value = `Automatic error report: ${error.code}`;
+  if (message) message.value = details;
+  alert('A technical issue was detected. You have been taken to Support Desk with the error details.');
+}
+
+function showWellbeingBanner() {
+  const banner = document.getElementById('wellbeingBanner');
+  const text = document.getElementById('wellbeingBannerText');
+  if (!banner || !text || localStorage.getItem('lf_wellbeing_banner_hidden') === 'true') return;
+  const last = Number(localStorage.getItem('lf_wellbeing_tip_index'));
+  const choices = wellbeingTips.map((_, index) => index).filter(index => index !== last);
+  const next = choices[Math.floor(Math.random() * choices.length)];
+  localStorage.setItem('lf_wellbeing_tip_index', String(next));
+  text.textContent = wellbeingTips[next];
+  banner.classList.remove('hidden');
+}
+
+function dismissWellbeingBanner() {
+  document.getElementById('wellbeingBanner')?.classList.add('hidden');
+  localStorage.setItem('lf_wellbeing_banner_hidden', 'true');
+}
+
+function dismissTermsNotice() {
+  document.getElementById('termsNotice')?.classList.add('hidden');
+  localStorage.setItem('lf_terms_notice_acknowledged', 'true');
+}
+
+async function loadReleaseNotes() {
+  const board = document.getElementById('updatesBoard');
+  if (!board) return;
+  try {
+    const response = await fetch('/api/release-notes');
+    const notes = await response.json();
+    const latest = notes[0];
+    const seen = localStorage.getItem('lf_latest_release_seen');
+    if (!latest || seen === latest.id) return;
+    board.innerHTML = `<div class="card-header-bar"><h2>✨ What’s new</h2><button type="button" class="action-btn btn-blue" onclick="dismissReleaseNotes('${latest.id}')">Mark as read</button></div>${notes.slice(0, 3).map(note => `<div class="item-row"><div><strong>Version ${escapeWorkspaceText(note.version)} · ${escapeWorkspaceText(note.title)}</strong><p style="margin-top:4px;color:var(--text-muted);">${escapeWorkspaceText(note.summary)}</p><span class="meta">${new Date(note.publishedAt).toLocaleDateString()}</span></div></div>`).join('')}`;
+    board.classList.remove('hidden');
+  } catch { board.classList.add('hidden'); }
+}
+
+function dismissReleaseNotes(id) {
+  localStorage.setItem('lf_latest_release_seen', id);
+  document.getElementById('updatesBoard')?.classList.add('hidden');
+}
+
+function setupSignaturePads() {
+  ['teacherSignaturePad', 'parentSignaturePad'].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    context.lineWidth = 2.5; context.lineCap = 'round'; context.strokeStyle = '#0f2b48';
+    let drawing = false; let hasStroke = false;
+    const position = event => { const rect = canvas.getBoundingClientRect(); const point = event.touches?.[0] || event; return { x: (point.clientX - rect.left) * (canvas.width / rect.width), y: (point.clientY - rect.top) * (canvas.height / rect.height) }; };
+    const start = event => { drawing = true; const point = position(event); context.beginPath(); context.moveTo(point.x, point.y); event.preventDefault(); };
+    const move = event => { if (!drawing) return; const point = position(event); context.lineTo(point.x, point.y); context.stroke(); hasStroke = true; event.preventDefault(); };
+    const stop = () => { drawing = false; };
+    canvas.addEventListener('pointerdown', start); canvas.addEventListener('pointermove', move); canvas.addEventListener('pointerup', stop); canvas.addEventListener('pointerleave', stop);
+    reportSignaturePads[id] = { canvas, context, hasStroke: () => hasStroke, clear: () => { context.clearRect(0, 0, canvas.width, canvas.height); hasStroke = false; } };
+  });
+}
+
+function clearSignature(id) { reportSignaturePads[id]?.clear(); }
+
+function quickFill(user, pin) {
+  document.getElementById('loginUsername').value = user;
+  document.getElementById('loginPin').value = pin;
+}
+
+function showSignupForm() {
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('signupForm').classList.remove('hidden');
+}
+
+function hideSignupForm() {
+  document.getElementById('signupForm').classList.add('hidden');
+  document.getElementById('loginForm').classList.remove('hidden');
+  document.getElementById('signupForm').reset();
+}
+
+// Authentication
+const loginForm = document.getElementById('loginForm');
+if (loginForm) {
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('loginUsername').value;
+    const pin = document.getElementById('loginPin').value;
+    const remember = document.getElementById('rememberLogin').checked;
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, pin })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        currentUser = data.user;
+        if (remember) localStorage.setItem('lf_user', JSON.stringify(currentUser));
+        setupSession();
+      } else {
+        alert(data.message || 'Login failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Unable to connect to login server.');
+    }
+  });
+}
+
+const signupForm = document.getElementById('signupForm');
+if (signupForm) {
+  signupForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = {
+      name: document.getElementById('signupName').value.trim(),
+      username: document.getElementById('signupUsername').value.trim(),
+      pin: document.getElementById('signupPin').value,
+      role: document.getElementById('signupRole').value,
+      schoolName: document.getElementById('signupSchool').value.trim(),
+      linkedLearners: document.getElementById('signupLinkedLearners').value.trim(),
+      termsAccepted: document.getElementById('signupTermsAccepted').checked
+    };
+    try {
+      const response = await fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) return alert(result.message || 'Unable to create account.');
+      document.getElementById('loginUsername').value = result.account.username;
+      document.getElementById('loginPin').value = '';
+      hideSignupForm();
+      alert(`Account created for ${result.account.name}. Enter your password to sign in.`);
+    } catch {
+      alert('Unable to reach the account service.');
+    }
+  });
+}
+
+// Diagnostic Error Log Index
+function logAppError(code, reason) {
+  captureDebugEvent({ category: 'Application', code, message: reason });
+  const errItem = { code, reason, timestamp: new Date().toLocaleTimeString() };
+  errorLog.unshift(errItem);
+
+  const errorBox = document.getElementById('attendanceErrorIndex');
+  const errorList = document.getElementById('errorListItems');
+
+  if (errorBox && errorList) {
+    errorBox.style.display = 'block';
+    errorList.innerHTML = errorLog.map(err => 
+      `<li><strong>[${err.code}]</strong> ${err.reason} <em>(${err.timestamp})</em></li>`
+    ).join('');
+  }
+}
+
+function openModal(title, contentHtml) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = contentHtml;
+  document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
+  document.getElementById('appModal').classList.remove('hidden');
+}
+
+function sanitiseDebugText(value) {
+  return String(value || 'No additional detail').replace(/(password|pin|token)\s*[:=]\s*\S+/gi, '$1: [redacted]').slice(0, 600);
+}
+
+function configureDebugMode() {
+  const isAdmin = currentUser?.role === 'admin';
+  debugModeEnabled = isAdmin && localStorage.getItem('lf_admin_debug_mode') === 'true';
+  if (isAdmin) {
+    try { debugEvents = JSON.parse(sessionStorage.getItem('lf_debug_events') || '[]'); } catch { debugEvents = []; }
+  } else {
+    debugEvents = [];
+    debugModeEnabled = false;
+  }
+  updateDebugModePanel();
+}
+
+function captureDebugEvent(event) {
+  if (!debugModeEnabled || currentUser?.role !== 'admin') return;
+  const item = {
+    id: `DBG-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    category: sanitiseDebugText(event.category || 'Application'),
+    code: sanitiseDebugText(event.code || 'UNCLASSIFIED'),
+    message: sanitiseDebugText(event.message),
+    source: sanitiseDebugText(event.source || 'Not provided'),
+    line: Number(event.line) || null,
+    column: Number(event.column) || null,
+    page: window.location.pathname
+  };
+  debugEvents.unshift(item);
+  debugEvents = debugEvents.slice(0, 50);
+  sessionStorage.setItem('lf_debug_events', JSON.stringify(debugEvents));
+  updateDebugModePanel();
+}
+
+function updateDebugModePanel() {
+  const panel = document.getElementById('debugModePanel');
+  const toggle = document.getElementById('debugModeToggle');
+  const status = document.getElementById('debugModeStatus');
+  if (!panel || currentUser?.role !== 'admin') return;
+  if (toggle) { toggle.textContent = debugModeEnabled ? 'Disable debug mode' : 'Enable debug mode'; toggle.className = `action-btn ${debugModeEnabled ? 'btn-red' : 'btn-blue'}`; }
+  if (status) status.textContent = debugModeEnabled ? `Debug mode is on. ${debugEvents.length} safe technical event${debugEvents.length === 1 ? '' : 's'} captured this session.` : 'Debug mode is off. Turn it on only while diagnosing a problem.';
+}
+
+function toggleDebugMode() {
+  if (currentUser?.role !== 'admin') return alert('Debug mode is available to administrators only.');
+  debugModeEnabled = !debugModeEnabled;
+  localStorage.setItem('lf_admin_debug_mode', String(debugModeEnabled));
+  updateDebugModePanel();
+}
+
+function openDebugReport() {
+  if (currentUser?.role !== 'admin') return;
+  const report = debugEvents.length ? debugEvents.map(event => `<div class="item-row"><strong>${escapeWorkspaceText(event.code)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(event.message)}</p><span class="meta">${escapeWorkspaceText(event.category)} · ${escapeWorkspaceText(event.source)}${event.line ? ` · Line ${event.line}${event.column ? `, column ${event.column}` : ''}` : ''}<br>${new Date(event.timestamp).toLocaleString()}</span></div>`).join('') : '<p class="meta">No debug events have been captured in this session.</p>';
+  openModal('Administrator debug report', `<p style="margin:0 0 12px;color:var(--text-muted);">This report contains safe technical context only. Do not add learner data or passwords to support requests.</p>${report}`);
+}
+
+function downloadDebugReport() {
+  if (currentUser?.role !== 'admin') return;
+  const content = JSON.stringify({ generatedAt: new Date().toISOString(), events: debugEvents }, null, 2);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+  link.download = `LittleFeet_Debug_Report_${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function clearDebugReport() {
+  if (currentUser?.role !== 'admin' || !confirm('Clear this session’s debug report?')) return;
+  debugEvents = [];
+  sessionStorage.removeItem('lf_debug_events');
+  updateDebugModePanel();
+}
+
+function closeModal() {
+  document.getElementById('appModal').classList.add('hidden');
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle('light-mode');
+}
+
+function setupSession() {
+  applyRolePermissions(currentUser.role);
+  const isParent = currentUser.role === 'parent';
+  const subscriptionEntry = document.getElementById('subscriptionEntryButton');
+  const subscriptionFooter = document.getElementById('subscriptionFooterLink');
+  const navWelcomeTitle = document.getElementById('navWelcomeTitle');
+  const navWelcomeText = document.getElementById('navWelcomeText');
+  const navLivePill = document.getElementById('navLivePill');
+  if (subscriptionEntry) subscriptionEntry.textContent = isParent ? '💎 Parent Subscription' : '💎 Plans & Benefits';
+  if (subscriptionFooter) subscriptionFooter.textContent = isParent ? 'Parent Subscription' : 'School Subscriptions';
+  if (navWelcomeTitle) navWelcomeTitle.textContent = isParent ? 'Your family school space' : 'Your school workspace';
+  if (navWelcomeText) navWelcomeText.textContent = isParent ? 'Stay close to your child’s learning and school updates' : 'Learning, care and communication in one place';
+  if (navLivePill) navLivePill.textContent = isParent ? 'Family updates ready' : 'School day in progress';
+  const displayRoleEl = document.getElementById('displayRole');
+  if (displayRoleEl) displayRoleEl.textContent = `${currentUser.name || currentUser.username} · ${currentUser.role.toUpperCase()}`;
+
+  const userAvatarEl = document.getElementById('userAvatar');
+  if (userAvatarEl) {
+    userAvatarEl.textContent = '👤';
+    userAvatarEl.title = currentUser.name || currentUser.username;
+  }
+
+  if (document.getElementById('postAuthorTag')) {
+    document.getElementById('postAuthorTag').textContent = `${currentUser.role.toUpperCase()} - ${currentUser.username}`;
+  }
+  document.getElementById('authSection').classList.add('hidden');
+  document.getElementById('dashboardSection').classList.remove('hidden');
+  renderRoleHomePanel();
+  playStartupChime();
+  requestAnimationFrame(syncMobileHeaderOffset);
+  loadAllData();
+  if (alertMonitorId) clearInterval(alertMonitorId);
+  alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
+}
+
+function applyRolePermissions(role) {
+  document.querySelectorAll('.role-admin, .role-teacher').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('[data-roles]').forEach(el => {
+    const roleAllowed = el.dataset.roles.split(',').includes(role);
+    const subscriptionAllowed = !el.dataset.subscription || role !== 'parent' || currentUser?.subscription === el.dataset.subscription;
+    el.classList.toggle('hidden', !roleAllowed || !subscriptionAllowed);
+  });
+  if (role === 'admin') {
+    document.querySelectorAll('.role-admin').forEach(el => el.classList.remove('hidden'));
+  } else if (role === 'teacher') {
+    document.querySelectorAll('.role-teacher').forEach(el => el.classList.remove('hidden'));
+  } else if (role === 'principal') {
+    document.querySelectorAll('#attendanceTab, #chatTab, #operationsTab, #careTab, #registryTab, #financeTab').forEach(el => el.classList.remove('hidden'));
+  } else if (role === 'district') {
+    document.querySelectorAll('#analyticsTab, #lookupTab').forEach(el => el.classList.remove('hidden'));
+  }
+  document.querySelectorAll('[data-nav-group]').forEach(group => {
+    group.classList.toggle('hidden', ![...group.querySelectorAll('li[data-roles]')].some(item => !item.classList.contains('hidden')));
+  });
+}
+
+function renderRoleHomePanel() {
+  const panel = document.getElementById('roleHomePanel');
+  if (!panel || !currentUser) return;
+  const experiences = {
+    parent: {
+      icon: '👨‍👩‍👧', title: `Welcome back, ${currentUser.name || 'Parent'}`,
+      message: 'Keep up with the learning, reports, achievements, and school updates that are available for your linked children.',
+      actions: [['📋 View reports', 'reportsTab'], ['🏅 View achievements', 'badgesTab'], ['📢 School feed', 'feedTab']]
+    },
+    teacher: {
+      icon: '🧑‍🏫', title: `Ready for the day, ${currentUser.name || 'Educator'}?`,
+      message: 'Start with attendance, record care updates as they happen, and keep your classroom team in sync.',
+      actions: [['✅ Take attendance', 'attendanceTab'], ['🧷 Record care', 'careTab'], ['💬 Team chat', 'chatTab'], ['📅 Timetable', 'scheduleTab']]
+    },
+    principal: {
+      icon: '🏫', title: `School overview for ${currentUser.name || 'Principal'}`,
+      message: 'Review attendance, finance tasks, reports, and day-to-day operations from the workspaces below.',
+      actions: [['✅ Attendance', 'attendanceTab'], ['💳 Finance', 'financeTab'], ['📝 Reports', 'reportsTab'], ['📥 Import data', 'dataImportTab']]
+    },
+    district: {
+      icon: '🌍', title: `District workspace`,
+      message: 'Use the approved cross-school tools to review progress, find records, and stay informed about safety notices.',
+      actions: [['📈 Progress insights', 'analyticsTab'], ['🔎 Learner search', 'lookupTab'], ['🚨 Safety alerts', 'broadcastsTab'], ['? Get help', 'ticketsTab']]
+    },
+    admin: {
+      icon: '⚙️', title: `Admin centre for ${currentUser.name || 'your school'}`,
+      message: 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.',
+      actions: [['👤 Manage accounts', 'accountsTab'], ['📥 Import data', 'dataImportTab'], ['🛡️ Safeguarding', 'safeguardingTab'], ['⚙️ Operations', 'operationsTab']]
+    }
+  };
+  const experience = experiences[currentUser.role] || experiences.parent;
+  panel.innerHTML = `<div class="role-home-content"><div><span class="portal-tour-kicker">YOUR NEXT STEPS</span><h2>${escapeWorkspaceText(experience.title)}</h2><p>${escapeWorkspaceText(experience.message)}</p><div class="role-home-actions">${experience.actions.map(([label, tab]) => `<button type="button" class="action-btn btn-blue" onclick="openWorkspace('${tab}')">${label}</button>`).join('')}</div></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
+}
+
+function logout() {
+  currentUser = null;
+  if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
+  localStorage.removeItem('lf_user');
+  document.getElementById('dashboardSection').classList.add('hidden');
+  document.getElementById('authSection').classList.remove('hidden');
+}
+
+function switchUser() {
+  logout();
+  const usernameInput = document.getElementById('loginUsername');
+  const pinInput = document.getElementById('loginPin');
+  if (usernameInput) usernameInput.value = '';
+  if (pinInput) pinInput.value = '';
+  setTimeout(() => usernameInput?.focus(), 0);
+}
+
+function syncMobileHeaderOffset() {
+  const dashboard = document.getElementById('dashboardSection');
+  const header = dashboard?.querySelector('nav');
+  if (!dashboard || dashboard.classList.contains('hidden') || !header) return;
+  document.documentElement.style.setProperty('--mobile-header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+}
+
+window.addEventListener('resize', syncMobileHeaderOffset);
+
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) {
+    targetTab.classList.remove('active');
+    // Restart the reveal animation when a user revisits a workspace.
+    void targetTab.offsetWidth;
+    targetTab.classList.add('active');
+  }
+  if (btn) btn.classList.add('active');
+  closeNavigation();
+}
+
+function openWorkspace(tabId) {
+  const navButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes(`'${tabId}'`));
+  if (!navButton || navButton.closest('li')?.classList.contains('hidden')) {
+    alert('This workspace is not available for your account. Please contact your school administrator if you need access.');
+    return;
+  }
+  switchTab(tabId, navButton);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openGuideWorkspace(tabId) {
+  const navButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes(`'${tabId}'`));
+  const targetTab = document.getElementById(tabId);
+  if (!navButton || !targetTab || navButton.closest('li')?.classList.contains('hidden')) {
+    alert('This workspace is not available for your account. Please contact your school administrator if you need access.');
+    return;
+  }
+  switchTab(tabId, navButton);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleNavigation() {
+  const dashboard = document.getElementById('dashboardSection');
+  const toggle = document.getElementById('navMoreToggle');
+  if (!dashboard || !toggle) return;
+  const isOpen = dashboard.classList.toggle('sidebar-open');
+  toggle.setAttribute('aria-expanded', String(isOpen));
+  toggle.textContent = isOpen ? '✕ Close' : '☰ Menu';
+}
+
+function closeNavigation() {
+  const dashboard = document.getElementById('dashboardSection');
+  const toggle = document.getElementById('navMoreToggle');
+  if (!dashboard || !toggle) return;
+  dashboard.classList.remove('sidebar-open');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.textContent = '☰ Menu';
+}
+
+function goToMainMenu() {
+  if (!currentUser) return alert("Please log in first.");
+  openWorkspace('homeTab');
+}
+
+async function startHealthMonitor() {
+  let consecutiveFailures = 0;
+  const configuredBackupUrl = String(window.LITTLE_FEET_BACKUP_URL || '').trim().replace(/\/$/, '');
+  const checkStatus = async () => {
+    const statusEl = document.getElementById('serverStatus');
+    const statusText = document.getElementById('serverStatusText');
+    try {
+      const res = await fetch('/api/health');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const health = await res.json();
+      consecutiveFailures = 0;
+      if (statusEl && statusText) {
+        const busy = health.status === 'BUSY';
+        statusEl.className = `server-status ${busy ? 'busy' : 'good'}`;
+        statusText.textContent = busy ? 'Server busy' : health.instance === 'STANDBY' ? 'Backup server online' : 'Server online';
+      }
+    } catch (e) {
+      consecutiveFailures += 1;
+      if (statusEl && statusText) {
+        statusEl.className = 'server-status';
+        statusText.textContent = 'Server offline';
+      }
+      logAppError('ERR_SRV_503', 'Live server connection lost to API.');
+      // A production backup URL is configured by the school host / load balancer.
+      // Local development remains manual so a missing local port never traps users in a redirect loop.
+      if (configuredBackupUrl && consecutiveFailures >= 2 && !sessionStorage.getItem('lf_failover_redirected')) {
+        sessionStorage.setItem('lf_failover_redirected', '1');
+        window.location.replace(configuredBackupUrl);
+      }
+    }
+  };
+
+  checkStatus();
+  setInterval(checkStatus, 8000);
+}
+
+function loadAllData() {
+  loadAcademicTerm();
+  loadPosts();
+  loadSchedules();
+  loadWorksheets();
+  loadBadges();
+  loadTickets();
+  loadAttendance();
+  loadBroadcasts();
+  loadChatGroups();
+  loadGroupChatMessages();
+  loadDirectChatUsers();
+  loadStoreItems();
+  loadReleaseNotes();
+  loadReportReviews();
+  loadHouseholdSwitcher();
+  loadRegistry();
+  loadAccounts();
+  loadConsentRecords();
+  loadPickupRecords();
+  ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding'].forEach(loadWorkspaceRecords);
+}
+
+async function loadHouseholdSwitcher() {
+  const box = document.getElementById('householdSwitcher');
+  if (!box || currentUser?.role !== 'parent') return;
+  try {
+    const response = await fetch(`/api/household?username=${encodeURIComponent(currentUser.username)}`);
+    const learners = await response.json();
+    if (!response.ok || !learners.length) return;
+    const analyticsInput = document.getElementById('analyticsStudent');
+    const analyticsSelect = document.getElementById('analyticsStudentSelect');
+    const storedSelection = localStorage.getItem('lf_selected_learner');
+    const selectedLearner = learners.find(learner => learner.studentName === storedSelection) || learners[0];
+    if (analyticsInput && analyticsSelect) {
+      analyticsInput.classList.add('hidden');
+      analyticsInput.required = false;
+      analyticsSelect.classList.remove('hidden');
+      analyticsSelect.required = true;
+      analyticsSelect.innerHTML = learners.map(learner => `<option value="${escapeWorkspaceText(learner.studentName)}">${escapeWorkspaceText(learner.studentName)} · ${escapeWorkspaceText(learner.className)}</option>`).join('');
+      analyticsSelect.value = selectedLearner.studentName;
+    }
+    localStorage.setItem('lf_selected_learner', selectedLearner.studentName);
+    box.classList.remove('hidden');
+    box.innerHTML = `<div class="card-header-bar"><h2>👨‍👩‍👧 Your linked learners</h2><span class="badge-tag info">PARENT</span></div><p style="color:var(--text-muted);margin-bottom:10px;">Only children linked to this parent account are shown here.</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${learners.map((learner, index) => `<button type="button" class="action-btn ${learner.studentName === selectedLearner.studentName || (!index && !selectedLearner) ? 'btn-green' : 'btn-blue'}" onclick="selectHouseholdLearner('${encodeURIComponent(learner.studentName)}')">${escapeWorkspaceText(learner.studentName)} · ${escapeWorkspaceText(learner.className)}</button>`).join('')}</div><p id="householdSelection" class="meta" style="margin-top:9px;">Selected learner: ${escapeWorkspaceText(selectedLearner.studentName)}</p>`;
+  } catch { box.classList.add('hidden'); }
+}
+
+function selectHouseholdLearner(encodedName) {
+  const name = decodeURIComponent(encodedName);
+  localStorage.setItem('lf_selected_learner', name);
+  const analyticsSelect = document.getElementById('analyticsStudentSelect');
+  if (analyticsSelect) analyticsSelect.value = name;
+  const notice = document.getElementById('householdSelection');
+  if (notice) notice.textContent = `Selected learner: ${name}`;
+}
+
+function openAlertsTab() {
+  const alertButton = [...document.querySelectorAll('.nav-btn')].find(button =>
+    (button.getAttribute('onclick') || '').includes("broadcastsTab")
+  );
+  switchTab('broadcastsTab', alertButton);
+}
+
+const toBase64 = file => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = error => reject(error);
+});
+
+// Editable Academic Term Functions
+async function loadAcademicTerm() {
+  try {
+    const res = await fetch('/api/term');
+    const data = await res.json();
+    if (data.term) {
+      document.getElementById('currentTermText').textContent = data.term;
+    }
+  } catch (err) {
+    console.error('Failed to load academic term.');
+  }
+}
+
+function editTermModal() {
+  const currentText = document.getElementById('currentTermText').textContent;
+  const html = `
+    <form id="editTermForm">
+      <label for="termInput">Academic Term Description & Status:</label>
+      <input type="text" id="termInput" value="${currentText.replace(/"/g, '&quot;')}" required>
+      <button type="submit" class="submit-btn">💾 Save Academic Term</button>
+    </form>`;
+  openModal('Edit Academic Term Ribbon', html);
+
+  document.getElementById('editTermForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newTerm = document.getElementById('termInput').value.trim();
+    if (!newTerm) return;
+
+    await fetch('/api/term', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ term: newTerm })
+    });
+    document.getElementById('currentTermText').textContent = newTerm;
+    closeModal();
+    playDingSound();
+  });
+}
+
+// Interactive 20Km Radius School Finder Map using live OpenStreetMap data.
+async function loadSchoolProximityMap() {
+  const container = document.getElementById('schoolMapContainer');
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser.');
+    return;
+  }
+
+  container.innerHTML = '📍 Requesting location permission and searching live school data…';
+  navigator.geolocation.getCurrentPosition(async (position) => {
+    const userLat = position.coords.latitude;
+    const userLng = position.coords.longitude;
+    const userPos = [userLat, userLng];
+    container.innerHTML = '<div id="interactiveMap" style="width:100%; height:100%; border-radius:8px;"></div>';
+
+    if (typeof L === 'undefined') {
+      container.textContent = 'Map service could not be loaded. Please refresh the page and try again.';
+      return;
+    }
+    if (mapInstance) mapInstance.remove();
+
+    mapInstance = L.map('interactiveMap').setView(userPos, 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
+    const userLocationIcon = L.divIcon({ className: '', html: '<div class="user-location-pin" title="Your current location"></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
+    L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`).openPopup();
+    L.circle(userPos, { color: '#f97316', fillColor: '#f97316', fillOpacity: 0.10, radius: 20000 }).addTo(mapInstance);
+    const latitudeOffset = 20000 / 111320;
+    const longitudeOffset = 20000 / (111320 * Math.cos(userLat * Math.PI / 180));
+    mapInstance.fitBounds([[userLat - latitudeOffset, userLng - longitudeOffset], [userLat + latitudeOffset, userLng + longitudeOffset]], { padding: [22, 22], maxZoom: 13 });
+
+    const status = L.control({ position: 'topright' });
+    status.onAdd = () => {
+      const element = L.DomUtil.create('div');
+      element.style.cssText = 'background:#fff; color:#0f172a; padding:8px 10px; border-radius:4px; box-shadow:0 1px 5px rgba(0,0,0,.35); font-size:12px; font-weight:600;';
+      element.textContent = 'Loading live nearby schools…';
+      return element;
+    };
+    status.addTo(mapInstance);
+
+    const escapeHtml = (value) => String(value || 'Not listed in OpenStreetMap').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    const distanceInMetres = (lat, lng) => {
+      const radians = (degrees) => degrees * Math.PI / 180;
+      const earthRadius = 6371000;
+      const latDifference = radians(lat - userLat);
+      const lngDifference = radians(lng - userLng);
+      const a = Math.sin(latDifference / 2) ** 2 + Math.cos(radians(userLat)) * Math.cos(radians(lat)) * Math.sin(lngDifference / 2) ** 2;
+      return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    try {
+      const cacheKey = `lf_nearby_school_cache_${userLat.toFixed(2)}_${userLng.toFixed(2)}`;
+      let payload;
+      let usingCachedResults = false;
+      try {
+        const schoolSearchUrl = `/api/nearby-schools?lat=${encodeURIComponent(userLat)}&lng=${encodeURIComponent(userLng)}&radius=20000`;
+        let lastSearchError;
+        // Public map providers occasionally reject a single request while they are
+        // healthy again a moment later. Retry twice before using the saved result.
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const response = await fetch(schoolSearchUrl, { cache: 'no-store' });
+            const candidate = await response.json();
+            if (!response.ok) throw new Error(candidate.message || 'Unable to load live nearby schools.');
+            payload = candidate;
+            break;
+          } catch (error) {
+            lastSearchError = error;
+            if (attempt < 2) await new Promise(resolve => window.setTimeout(resolve, 700 * (attempt + 1)));
+          }
+        }
+        if (!payload) throw lastSearchError || new Error('Unable to load live nearby schools.');
+        // Storage can be blocked in private browsing or restricted web views.
+        // Map pins must still render when caching is unavailable.
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), payload })); } catch { /* live result remains usable without a cache */ }
+      } catch (liveError) {
+        let cached = null;
+        try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch { cached = null; }
+        if (!cached?.payload?.elements?.length || Date.now() - Number(cached.savedAt || 0) > 24 * 60 * 60 * 1000) throw liveError;
+        payload = cached.payload;
+        usingCachedResults = true;
+      }
+
+      const seenSchools = new Set();
+      const nearbySchools = payload.elements.map((place) => {
+        const tags = place.tags || {};
+        const lat = Number(place.lat ?? place.center?.lat);
+        const lng = Number(place.lon ?? place.center?.lon);
+        const name = tags.name || tags['name:en'] || 'Unnamed education facility';
+        return { tags, lat, lng, name, key: `${name.toLowerCase()}|${lat.toFixed(5)}|${lng.toFixed(5)}` };
+      }).filter((school) => Number.isFinite(school.lat) && Number.isFinite(school.lng) && distanceInMetres(school.lat, school.lng) <= 20000)
+        .filter((school) => !seenSchools.has(school.key) && seenSchools.add(school.key))
+        .sort((a, b) => distanceInMetres(a.lat, a.lng) - distanceInMetres(b.lat, b.lng));
+
+      const safeExternalUrl = (value) => {
+        if (!value) return '';
+        const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+        try {
+          const url = new URL(candidate);
+          return /^https?:$/.test(url.protocol) ? url.href : '';
+        } catch {
+          return '';
+        }
+      };
+      const markerLayer = typeof L.markerClusterGroup === 'function'
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, chunkedLoading: true, chunkInterval: 80, chunkDelay: 15, animate: false, removeOutsideVisibleBounds: true })
+        : L.layerGroup();
+
+      nearbySchools.forEach((school) => {
+        const street = [school.tags['addr:housenumber'], school.tags['addr:street']].filter(Boolean).join(' ') || 'Not listed in OpenStreetMap';
+        const suburb = school.tags['addr:suburb'] || school.tags['addr:neighbourhood'] || school.tags['addr:district'] || 'Not listed in OpenStreetMap';
+        const town = school.tags['addr:city'] || school.tags['addr:town'] || school.tags['addr:village'] || 'Not listed in OpenStreetMap';
+        const category = school.tags.amenity || school.tags.building || 'education facility';
+        const phone = school.tags['contact:phone'] || school.tags.phone || school.tags['contact:mobile'] || school.tags.mobile || '';
+        const email = school.tags['contact:email'] || school.tags.email || '';
+        const website = safeExternalUrl(school.tags['contact:website'] || school.tags.website || '');
+        const imageUrl = safeExternalUrl(school.tags.image || school.tags['contact:image'] || '');
+        const contactSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${school.name} ${town} contact`)}`;
+        const photo = imageUrl
+          ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(school.name)}" style="display:block; width:100%; max-height:130px; margin:0 0 8px; object-fit:cover; border-radius:5px;">`
+          : '<p class="school-muted" style="font-size:0.75rem; margin:7px 0 0;"><strong>Photo:</strong> Not publicly listed in OpenStreetMap.</p>';
+        const contact = `<p style="font-size:0.8rem; margin:7px 0 0;"><strong>Phone:</strong> ${phone ? `<a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : 'Not publicly listed'}<br><strong>Email:</strong> ${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : `Not publicly listed · <a href="${escapeHtml(contactSearchUrl)}" target="_blank" rel="noopener noreferrer">Find official contact</a>`}</p>`;
+        const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeURIComponent(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses Google Places only when the school has configured a verified provider key. No AI-generated details are saved automatically.</p></div></div>`;
+        markerLayer.addLayer(L.marker([school.lat, school.lng]).bindPopup(content));
+      });
+      markerLayer.addTo(mapInstance);
+      status.getContainer().textContent = usingCachedResults
+        ? `${nearbySchools.length} recent school results shown - live refresh will retry next time`
+        : `${nearbySchools.length} live education facilities found within 20 km`;
+    } catch (error) {
+      console.error(error);
+      status.getContainer().textContent = 'Live school search unavailable. Please try again shortly.';
+      logAppError('ERR_MAP_SCHOOLS', 'Unable to load live nearby school data.');
+    }
+
+    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 300);
+  }, () => {
+    logAppError('ERR_MAP_GEO', 'Unable to retrieve device location for map search.');
+    alert('Unable to detect your location. Please enable browser location access.');
+  });
+}
+
+async function enrichSchoolPin(button, schoolName, latitude, longitude) {
+  const panel = button?.closest('.school-enrichment');
+  if (!panel) return;
+  button.disabled = true;
+  button.textContent = 'Checking verified details…';
+  try {
+    const response = await fetch('/api/schools/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: schoolName, latitude, longitude })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Verified public lookup was unavailable.');
+    const escape = value => escapeWorkspaceText(value || 'Not publicly listed');
+    const website = /^https:\/\//i.test(result.website || '') ? `<a href="${escape(result.website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : 'Not publicly listed';
+    panel.innerHTML = `<p style="font-size:.8rem;margin:0;"><strong>Verified public details</strong><br><strong>Address:</strong> ${escape(result.address)}<br><strong>Phone:</strong> ${result.phone ? `<a href="tel:${escape(result.phone)}">${escape(result.phone)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website}</p><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Source: ${escape(result.source)}. Review public details with the school before relying on them.</p>`;
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = 'Check verified public details';
+    const notice = document.createElement('p');
+    notice.className = 'school-muted';
+    notice.style.cssText = 'font-size:.72rem;margin:6px 0 0;';
+    notice.textContent = error.message;
+    panel.querySelector('.school-enrichment-error')?.remove();
+    notice.classList.add('school-enrichment-error');
+    panel.append(notice);
+  }
+}
+
+// Posts
+async function loadPosts() {
+  try {
+    const res = await fetch('/api/posts');
+    const posts = await res.json();
+    document.getElementById('postList').innerHTML = posts.length
+      ? posts.map(p => `
+          <div class="item-row" style="flex-direction: column; align-items: flex-start;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <span class="badge-tag info">Audience: ${p.audience || 'All'}</span>
+                <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${p.caption}</p>
+              </div>
+              <button type="button" onclick="deletePost('${p.id}')" class="action-btn btn-red">🗑️ Delete</button>
+            </div>
+            ${p.mediaUrl ? `<img src="${p.mediaUrl}" class="post-item" onclick="openModal('Media File Preview', '<img src=\\'${p.mediaUrl}\\' style=\\'max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;\\'>')">` : ''}
+            <div class="meta"><span>Posted by Staff (${p.createdAt || 'Recent'})</span></div>
+          </div>`).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No updates published yet.</p>';
+  } catch (err) {
+    logAppError('ERR_POST_001', 'Failed to retrieve Activity Feed posts.');
+  }
+}
+
+async function deletePost(id) {
+  if (!confirm('Are you sure you want to delete this activity post?')) return;
+  await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+  loadPosts();
+}
+
+const postForm = document.getElementById('postForm');
+if (postForm) {
+  postForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = document.getElementById('postMedia').files[0];
+    const mediaUrl = file ? await toBase64(file) : null;
+    const body = {
+      id: Date.now().toString(),
+      audience: document.getElementById('postAudience').value,
+      caption: document.getElementById('postCaption').value,
+      mediaUrl
+    };
+    await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    postForm.reset();
+    loadPosts();
+    playDingSound();
+  });
+}
+
+// Schedules
+async function loadSchedules() {
+  try {
+    const res = await fetch('/api/schedules');
+    const list = await res.json();
+    document.getElementById('scheduleList').innerHTML = list.length
+      ? list.map(s => `
+          <div class="item-row">
+            <div>
+              <span class="badge-tag">${s.dayOfWeek}</span>
+              <strong>${s.studentName}</strong> - <span style="color:#0d9488; font-weight:600;">${s.timeSlot}</span>
+              <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${s.activity}</p>
+            </div>
+            <button type="button" onclick="deleteSchedule('${s.id}')" class="action-btn btn-red">🗑️ Delete</button>
+          </div>`).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No active schedule records found.</p>';
+  } catch (err) {
+    logAppError('ERR_SCHED_001', 'Could not load student schedules.');
+  }
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('Delete this submitted schedule record?')) return;
+  await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+  loadSchedules();
+}
+
+const scheduleForm = document.getElementById('scheduleForm');
+if (scheduleForm) {
+  scheduleForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = {
+      studentName: document.getElementById('schStudentName').value,
+      dayOfWeek: document.getElementById('schDay').value,
+      timeSlot: document.getElementById('schTime').value,
+      activity: document.getElementById('schActivity').value
+    };
+    await fetch('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    scheduleForm.reset();
+    loadSchedules();
+  });
+}
+
+async function exportScheduleExcel() {
+  const res = await fetch('/api/schedules');
+  const list = await res.json();
+  if (!list.length) return alert('No schedules available to export.');
+
+  const exportData = list.map(s => ({
+    "ID": s.id,
+    "Student Name": s.studentName,
+    "Day of Week": s.dayOfWeek,
+    "Time Slot Block": s.timeSlot,
+    "Activity Module": s.activity
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Test Results Schedule");
+  XLSX.writeFile(workbook, "LittleFeet_TestResultsSchedule.xlsx");
+}
+
+async function importScheduleExcel() {
+  const fileInput = document.getElementById('excelFileInput');
+  const file = fileInput ? fileInput.files[0] : null;
+  if (!file) {
+    logAppError('ERR_FILE_404', 'Excel file import attempted without selecting a file.');
+    return alert('Select a valid Excel (.xlsx / .xls) or CSV file.');
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const schedules = rows.slice(1).map(row => ({
+        id: row[0] ? String(row[0]) : Date.now().toString(),
+        studentName: row[1] || '',
+        dayOfWeek: row[2] || 'Monday',
+        timeSlot: row[3] || '',
+        activity: row[4] || ''
+      })).filter(s => s.studentName.trim() !== '');
+
+      const res = await fetch('/api/schedules/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedules })
+      });
+
+      if (!res.ok) throw new Error('Backend failed to parse Excel rows.');
+
+      alert('Excel batch sync complete!');
+      fileInput.value = '';
+      loadSchedules();
+    } catch (err) {
+      logAppError('ERR_EXCEL_400', 'File cannot be read: corrupt format or invalid worksheet columns.');
+      alert('Error reading Excel spreadsheet file.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Worksheets
+async function loadWorksheets() {
+  try {
+    const res = await fetch('/api/worksheets');
+    const list = await res.json();
+    document.getElementById('worksheetList').innerHTML = list.length
+      ? list.map(w => `
+          <div class="item-row" style="flex-direction: column; align-items: flex-start;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+              <div>
+                <strong>${w.studentName}</strong> — ${w.title} 
+                <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${w.grade}%</span>
+              </div>
+              <div>
+                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${w.id}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
+                <button type="button" onclick="deleteWorksheet('${w.id}')" class="action-btn btn-red">🗑️ Delete</button>
+              </div>
+            </div>
+            
+            <div class="meta" style="margin-top:8px;">
+              <span>Submitted By: <strong style="color:var(--primary-color);">${w.submittedBy || 'Educator'}</strong></span>
+              <span>• Upload Date: ${w.uploadedAt || 'Recently'}</span>
+            </div>
+          </div>`).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No graded worksheets uploaded.</p>';
+  } catch (err) {
+    logAppError('ERR_WS_001', 'Unable to fetch worksheet submissions portfolio.');
+  }
+}
+
+async function viewWorksheetFile(id) {
+  try {
+    const res = await fetch('/api/worksheets');
+    const list = await res.json();
+    const item = list.find(w => w.id === id);
+    if (item && item.photoUrl) {
+      openModal(`Submission File View: ${item.studentName}`, `
+        <div style="text-align:center;">
+          <p style="font-size:0.85rem; margin-bottom:10px;">Submitted by: <strong>${item.submittedBy}</strong> | Title: ${item.title}</p>
+          <img src="${item.photoUrl}" style="max-width:100%; max-height:75vh; border-radius:6px; border:1px solid var(--border-color); object-fit:contain;">
+        </div>
+      `);
+    } else {
+      logAppError('ERR_FILE_404', `File content missing for ID: ${id}`);
+      alert('File payload could not be read.');
+    }
+  } catch (e) {
+    logAppError('ERR_WS_404', 'Error retrieving submission file preview.');
+  }
+}
+
+async function deleteWorksheet(id) {
+  if (!confirm('Delete this graded submission file record?')) return;
+  await fetch(`/api/worksheets/${id}`, { method: 'DELETE' });
+  loadWorksheets();
+}
+
+const worksheetForm = document.getElementById('worksheetForm');
+if (worksheetForm) {
+  worksheetForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = document.getElementById('wsPhoto').files[0];
+    if (!file) return alert('Please select a file to attach.');
+
+    const photoUrl = await toBase64(file);
+    const body = {
+      id: Date.now().toString(),
+      studentName: document.getElementById('wsStudentName').value,
+      title: document.getElementById('wsTitle').value,
+      grade: document.getElementById('wsGrade').value,
+      photoUrl,
+      submittedBy: currentUser ? currentUser.username : 'Educator'
+    };
+
+    await fetch('/api/worksheets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    worksheetForm.reset();
+    loadWorksheets();
+    playDingSound();
+  });
+}
+
+// Milestone Badges
+function canManageBadges() {
+  return ['teacher', 'principal', 'admin'].includes(currentUser?.role);
+}
+
+function downloadLearnerImportTemplate() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
+  const rows = [{
+    'Learner Name': 'Example Learner',
+    'Grade / Class': 'Preschool',
+    'Parent / Guardian Name': 'Example Guardian',
+    'Parent Email': 'parent@example.com',
+    'Medical Notes': 'None known',
+    'Emergency Contact': 'Example Guardian · 071 000 0000',
+    'Authorised Pickups': 'Example Guardian'
+  }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Learner import');
+  XLSX.writeFile(workbook, 'LittleFeet_Learner_Import_Template.xlsx');
+}
+
+function importValue(row, candidates) {
+  const normalized = Object.entries(row).reduce((fields, [key, value]) => {
+    fields[String(key).trim().toLowerCase().replace(/[^a-z0-9]/g, '')] = value;
+    return fields;
+  }, {});
+  for (const candidate of candidates) {
+    const value = normalized[candidate];
+    if (value !== undefined && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+function previewLearnerDatabaseImport() {
+  const input = document.getElementById('schoolDatabaseFile');
+  const preview = document.getElementById('schoolDatabasePreview');
+  const file = input?.files?.[0];
+  if (!file || !preview) return alert('Choose an Excel or CSV school register first.');
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const sourceRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      const rows = sourceRows.map(row => ({
+        studentName: importValue(row, ['learnername', 'studentname', 'childname', 'name']),
+        className: importValue(row, ['gradeclass', 'classname', 'class', 'grade']),
+        parentName: importValue(row, ['parentguardianname', 'parentname', 'guardianname']),
+        contactEmail: importValue(row, ['parentemail', 'guardianemail', 'contactemail', 'email']),
+        medicalNotes: importValue(row, ['medicalnotes', 'medical', 'allergies']),
+        emergencyContact: importValue(row, ['emergencycontact', 'emergencyphone', 'emergency']),
+        authorisedPickups: importValue(row, ['authorisedpickups', 'authorizedpickups', 'pickups', 'pickup'])
+      })).filter(row => row.studentName || row.className || row.parentName || row.contactEmail);
+      const validRows = rows.filter(row => row.studentName && row.className);
+      pendingLearnerImport = validRows;
+      const previewRows = validRows.slice(0, 8).map(row => `<tr><td>${escapeWorkspaceText(row.studentName)}</td><td>${escapeWorkspaceText(row.className)}</td><td>${escapeWorkspaceText(row.parentName || 'Not supplied')}</td><td>${escapeWorkspaceText(row.contactEmail || 'Not supplied')}</td></tr>`).join('');
+      preview.innerHTML = `<div class="item-row" style="display:block;"><strong>${validRows.length} valid learner record${validRows.length === 1 ? '' : 's'} detected</strong><p class="meta" style="margin:7px 0 12px;">${rows.length - validRows.length} row${rows.length - validRows.length === 1 ? '' : 's'} need a learner name and class/grade before they can be imported. Only the first eight records are shown below.</p><div style="overflow-x:auto;"><table><thead><tr><th>Learner</th><th>Class</th><th>Parent / guardian</th><th>Contact email</th></tr></thead><tbody>${previewRows || '<tr><td colspan="4">No valid learner rows found.</td></tr>'}</tbody></table></div><button type="button" class="submit-btn" style="margin-top:14px;max-width:330px;" onclick="confirmLearnerDatabaseImport()">Review and import ${validRows.length} record${validRows.length === 1 ? '' : 's'}</button></div>`;
+    } catch (error) {
+      pendingLearnerImport = [];
+      preview.textContent = 'This file could not be read. Download the template to check the expected column headings.';
+      logAppError('ERR_IMPORT_FILE_400', error.message || 'The learner import file could not be read.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmLearnerDatabaseImport() {
+  if (!pendingLearnerImport.length) return alert('Preview a valid school register before importing it.');
+  if (!confirm(`Import ${pendingLearnerImport.length} learner record${pendingLearnerImport.length === 1 ? '' : 's'}? Existing matches will not be overwritten.`)) return;
+  const response = await fetch('/api/students/import', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actorUsername: currentUser?.username, students: pendingLearnerImport })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'The learner import could not be completed.');
+  const duplicateSummary = result.rejected?.length ? ` ${result.rejected.length} duplicate or incomplete row${result.rejected.length === 1 ? ' was' : 's were'} skipped.` : '';
+  alert(`${result.message}${duplicateSummary}`);
+  document.getElementById('schoolDatabaseFile').value = '';
+  document.getElementById('schoolDatabasePreview').innerHTML = '';
+  pendingLearnerImport = [];
+  playDingSound();
+}
+
+async function loadBadges() {
+  try {
+    if (!currentUser) return;
+    const res = await fetch(`/api/badges?username=${encodeURIComponent(currentUser.username)}`);
+    if (!res.ok) throw new Error('Unable to load badges.');
+    const list = await res.json();
+    const wall = document.getElementById('badgeWallLog');
+    if (!wall) return;
+
+    wall.innerHTML = list.length
+      ? list.map(b => `
+          <div class="item-row" style="justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span class="badge-tag" style="background:#10b981;">${b.category}</span>
+              <strong style="font-size:1.05rem; color:#fff;">${b.title || b.awardName}</strong>
+              <span style="color:#a7f3d0;">— ${b.studentName}</span>
+              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${b.note}"</p>
+            </div>
+            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${b.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+          </div>`).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No milestone badges awarded yet.</p>';
+  } catch (err) {
+    logAppError('ERR_BDG_001', 'Failed to render digital badges archive.');
+  }
+}
+
+const badgeForm = document.getElementById('badgeForm');
+if (badgeForm) {
+  badgeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!canManageBadges()) return alert('Only authorised school staff can award badges.');
+    const body = {
+      id: Date.now().toString(),
+      studentName: document.getElementById('badgeStudentName').value,
+      category: document.getElementById('badgeCategory').value,
+      title: document.getElementById('badgeTitle').value,
+      note: document.getElementById('badgeNote').value,
+      actorUsername: currentUser.username
+    };
+    const response = await fetch('/api/badges', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to award this badge.');
+    badgeForm.reset();
+    loadBadges();
+    playDingSound();
+  });
+}
+
+async function deleteBadge(id) {
+  if (!canManageBadges()) return alert('Only authorised school staff can remove badges.');
+  if (!confirm('Are you sure you want to delete this awarded badge?')) return;
+  const response = await fetch(`/api/badges/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
+  if (!response.ok) {
+    const result = await response.json();
+    return alert(result.message || 'Unable to remove this badge.');
+  }
+  loadBadges();
+}
+
+// Analytics
+const analyticsSearchForm = document.getElementById('analyticsSearchForm');
+if (analyticsSearchForm) {
+  analyticsSearchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const inputEl = currentUser?.role === 'parent' ? document.getElementById('analyticsStudentSelect') : document.getElementById('analyticsStudent');
+    const studentName = inputEl.value.trim();
+
+    try {
+      const res = await fetch(`/api/analytics/${encodeURIComponent(studentName)}?username=${encodeURIComponent(currentUser?.username || '')}`);
+      const data = await res.json();
+      if (!res.ok) return alert(data.message || 'Unable to load analytics for this learner.');
+
+      if (!data.totalAssessments) {
+        document.getElementById('analyticsOutput').innerHTML = `<p class="meta">No completed scored assessments are available for ${escapeWorkspaceText(studentName)} yet. Add a worksheet or test result with a score first.</p>`;
+        return;
+      }
+      const trendColour = data.pointChange > 0 ? '#16a34a' : data.pointChange < 0 ? '#dc2626' : '#0284c7';
+      const trendText = data.percentageChange === null ? 'No percentage comparison is available because the first score was zero.' : `${data.percentageChange > 0 ? '+' : ''}${data.percentageChange}% from first to latest completed assessment (${data.pointChange > 0 ? '+' : ''}${data.pointChange} points).`;
+      const premiumDetail = data.detailedInsights
+        ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;"><div class="store-item"><strong>🏆 Best completed assessment</strong><p style="margin:5px 0 0;">${escapeWorkspaceText(data.best.title)} · <strong>${data.best.score}%</strong></p></div><div class="store-item"><strong>📌 Assessment needing support</strong><p style="margin:5px 0 0;">${escapeWorkspaceText(data.worst.title)} · <strong>${data.worst.score}%</strong></p></div></div>`
+        : `<p class="meta" style="margin-top:12px;">Detailed best/worst assessment insights are available with LittleSteps Plus.</p>`;
+
+      document.getElementById('analyticsOutput').innerHTML = `
+        <div class="item-row" style="flex-direction: column; align-items: flex-start; border-left-color:#16a34a;">
+          <h3 style="color:var(--text-dark);">Term assessment summary: ${escapeWorkspaceText(studentName)}</h3>
+          <div style="margin-top: 8px; font-size:0.9rem;">
+            <p>Average completed score: <strong>${data.averageScore}%</strong></p>
+            <p>First score: <strong>${data.baselineScore}%</strong> · Latest score: <strong>${data.latestScore}%</strong></p>
+            <p style="color:${trendColour};"><strong>${data.trend}:</strong> ${trendText}</p>
+            <p>Completed assessments: <strong>${data.totalAssessments}</strong></p>
+          </div>
+          ${premiumDetail}
+          <button type="button" onclick="window.print()" class="action-btn btn-blue" style="margin-top: 12px;">Print assessment summary</button>
+        </div>`;
+    } catch (err) {
+      logAppError('ERR_ANALYTICS_500', `Failed to generate metrics for: ${studentName}`);
+    }
+    inputEl.value = '';
+  });
+}
+
+// Attendance Registry
+async function loadAttendance() {
+  try {
+    const res = await fetch('/api/attendance');
+    if (!res.ok) throw new Error('Attendance backend unreadable');
+    const list = await res.json();
+
+    document.getElementById('attendanceList').innerHTML = list.length
+      ? list.map(a => `
+          <div class="item-row">
+            <div>
+              <strong>${a.studentName}</strong> <span class="meta" style="display:inline;">(${a.status} at ${a.timestamp || 'Today'})</span>
+            </div>
+            <div>
+              <button type="button" onclick="toggleAttendance('${a.id}', '${a.status === 'Checked In' ? 'Checked Out' : 'Checked In'}')" class="action-btn ${a.status === 'Checked In' ? 'btn-red' : 'btn-green'}">
+                ${a.status === 'Checked In' ? 'Mark Out' : 'Mark In'}
+              </button>
+              <button type="button" onclick="removeAttendance('${a.id}')" class="action-btn btn-red" style="padding: 4px 8px; font-size: 0.75rem;">🗑️ Delete</button>
+            </div>
+          </div>`).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No students checked in today.</p>';
+  } catch (err) {
+    logAppError('ERR_ATT_500', 'Failed to render Attendance Registry roster.');
+  }
+}
+
+async function importAttendanceExcel() {
+  const fileInput = document.getElementById('attExcelFileInput');
+  const file = fileInput ? fileInput.files[0] : null;
+  if (!file) {
+    logAppError('ERR_FILE_404', 'Attendance file import attempted without selecting a file.');
+    return alert('Select a valid Excel (.xlsx / .xls) or CSV file.');
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const attendanceData = rows.slice(1).map(row => ({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 4),
+        studentName: row[0] ? String(row[0]).trim() : '',
+        status: row[1] && String(row[1]).trim() ? String(row[1]).trim() : 'Checked In',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      })).filter(a => a.studentName !== '');
+
+      const res = await fetch('/api/attendance/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendance: attendanceData })
+      });
+
+      if (!res.ok) throw new Error('Backend failed to parse Excel rows.');
+
+      alert('Attendance Excel Sheet imported successfully!');
+      fileInput.value = '';
+      loadAttendance();
+    } catch (err) {
+      logAppError('ERR_EXCEL_400', 'File cannot be read: corrupt format or invalid worksheet columns.');
+      alert('Error reading Attendance Excel spreadsheet file.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const attendanceForm = document.getElementById('attendanceForm');
+if (attendanceForm) {
+  attendanceForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('attStudentName');
+    const studentName = input.value.trim();
+    if (!studentName) return;
+
+    await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: Date.now().toString(), studentName, status: 'Checked In' })
+    });
+    input.value = '';
+    loadAttendance();
+    playDingSound();
+  });
+}
+
+async function toggleAttendance(id, status) {
+  await fetch('/api/attendance/toggle', { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify({ id, status }) 
+  });
+  loadAttendance();
+}
+
+async function removeAttendance(id) {
+  if (!confirm('Are you sure you want to delete this attendance record?')) return;
+  await fetch(`/api/attendance/${id}`, { method: 'DELETE' });
+  loadAttendance();
+}
+
+async function clearAttendanceRegistry() {
+  if (!confirm("Are you sure you want to clear Today's Attendance Registry?")) return;
+  await fetch('/api/attendance/clear', { method: 'POST' });
+  loadAttendance();
+}
+
+// Support Tickets Archive & Queue
+async function loadTickets() {
+  try {
+    const res = await fetch('/api/tickets');
+    const tickets = await res.json();
+    const filter = document.getElementById('ticketDeptFilter').value;
+
+    const filtered = tickets.filter(t => filter === 'All' || t.department === filter);
+    const active = filtered.filter(t => t.status !== 'Completed');
+    const completed = filtered.filter(t => t.status === 'Completed');
+
+    document.getElementById('ticketList').innerHTML = active.length
+      ? active.map(t => `
+          <div class="item-row" style="flex-direction: column; align-items: flex-start;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <span class="badge-tag">${t.department}</span> 
+                <span class="badge-tag urgent">${t.priority} Priority</span>
+                <strong>${t.subject}</strong>
+              </div>
+              <button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>
+            </div>
+            <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${t.message}</p>
+            ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${t.updatedBy}:</strong> ${t.feedback}</div>` : ''}
+            <div style="margin-top: 8px;">
+              <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${(t.feedback || '').replace(/'/g, "\\'")}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
+            </div>
+          </div>`).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
+
+    const grouped = {};
+    completed.forEach(t => {
+      const monthKey = t.monthCategory || 'August 2026';
+      if (!grouped[monthKey]) grouped[monthKey] = [];
+      grouped[monthKey].push(t);
+    });
+
+    let completedHtml = '';
+    for (const [month, list] of Object.entries(grouped)) {
+      completedHtml += `<h3 style="font-size:0.95rem; color:var(--primary-color); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📅 Submitted Category: ${month}</h3>`;
+      completedHtml += list.map(t => `
+        <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+            <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${t.subject}</strong></div>
+            <button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>
+          </div>
+          <p style="font-size:0.85rem; margin-top:4px;">${t.message}</p>
+          ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${t.feedback}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('completedTicketList').innerHTML = completedHtml || '<p style="font-size:0.85rem; color:var(--text-muted);">No completed tickets archived.</p>';
+  } catch (err) {
+    logAppError('ERR_TCK_001', 'Failed to fetch Support Desk tickets.');
+  }
+}
+
+async function deleteTicket(id) {
+  if (!confirm('Are you sure you want to delete this support ticket?')) return;
+  await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
+  loadTickets();
+}
+
+const ticketForm = document.getElementById('ticketForm');
+if (ticketForm) {
+  ticketForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = {
+      id: Date.now().toString(),
+      department: document.getElementById('ticketDept').value,
+      priority: document.getElementById('ticketPriority').value,
+      subject: document.getElementById('ticketSubject').value,
+      message: document.getElementById('ticketMessage').value
+    };
+    await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    ticketForm.reset();
+    loadTickets();
+    playDingSound();
+  });
+}
+
+function editTicketModal(id, currentStatus, currentFeedback) {
+  const html = `
+    <form id="editTicketForm">
+      <div>
+        <label>Admin Feedback & Notes</label>
+        <textarea id="editFeedback" rows="3" required>${currentFeedback || ''}</textarea>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
+        <label for="editCompleted" style="margin-bottom:0;">Mark Ticket as Completed</label>
+      </div>
+      <button type="submit" class="submit-btn">Save Ticket Resolution</button>
+    </form>`;
+  openModal('Edit Support Ticket', html);
+
+  document.getElementById('editTicketForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const feedback = document.getElementById('editFeedback').value;
+    const status = document.getElementById('editCompleted').checked ? 'Completed' : 'Open';
+    await fetch('/api/tickets/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin' })
+    });
+    closeModal();
+    loadTickets();
+    playDingSound();
+  });
+}
+
+// Emergency Broadcasts
+async function loadBroadcasts() {
+  try {
+    const res = await fetch('/api/broadcasts');
+    const broadcasts = await res.json();
+    const listEl = document.getElementById('broadcastList');
+    if (!listEl) return;
+
+    const userPosition = await getCurrentPositionQuietly();
+    const visibleBroadcasts = broadcasts.filter((broadcast) => {
+      if (!broadcast.location || !Number(broadcast.radiusKm) || !userPosition) return currentUser?.role === 'admin';
+      return distanceInKm(userPosition.latitude, userPosition.longitude, broadcast.location.lat, broadcast.location.lng) <= Number(broadcast.radiusKm);
+    });
+
+    const knownAlertIds = new Set(JSON.parse(localStorage.getItem('lf_known_alert_ids') || '[]'));
+    const newApplicableAlerts = visibleBroadcasts.filter(alert => !knownAlertIds.has(alert.id));
+    if (broadcastsLoaded && newApplicableAlerts.length) playDingSound();
+    visibleBroadcasts.forEach(alert => knownAlertIds.add(alert.id));
+    localStorage.setItem('lf_known_alert_ids', JSON.stringify([...knownAlertIds].slice(-100)));
+    broadcastsLoaded = true;
+
+    listEl.innerHTML = visibleBroadcasts.length
+      ? visibleBroadcasts.map(b => `
+          <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
+            <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+              <span class="badge-tag urgent">${b.bcPriority || 'Urgent Notice'}</span>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${b.timestamp || 'Recent'}${b.radiusKm ? ` · ${b.radiusKm}km area` : ''}</span>${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteBroadcast('${b.id}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+            </div>
+            <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${b.bcMessage}</p>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${b.id}')" class="action-btn btn-blue" style="padding:4px 8px;display:${currentUser?.role === 'admin' ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${currentUser?.role === 'admin' ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient read receipt(s)</span></div>
+          </div>
+        `).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
+  } catch (e) {
+    logAppError('ERR_BC_001', 'Unable to fetch campus broadcast alerts.');
+  }
+}
+
+// Chat System Operations
+function switchChatMode(mode) {
+  const groupSec = document.getElementById('groupChatSection');
+  const directSec = document.getElementById('directChatSection');
+  const btnGroup = document.getElementById('btnGroupChatMode');
+  const btnDirect = document.getElementById('btnDirectChatMode');
+
+  if (mode === 'group') {
+    groupSec.classList.remove('hidden');
+    directSec.classList.add('hidden');
+    btnGroup.style.opacity = '1';
+    btnDirect.style.opacity = '0.65';
+  } else {
+    groupSec.classList.add('hidden');
+    directSec.classList.remove('hidden');
+    btnGroup.style.opacity = '0.65';
+    btnDirect.style.opacity = '1';
+    loadDirectChatUsers();
+  }
+}
+
+async function loadChatGroups() {
+  try {
+    const res = await fetch('/api/chat/groups');
+    const groups = await res.json();
+    const select = document.getElementById('chatGroupSelect');
+    if (!select) return;
+
+    select.innerHTML = groups.map(g => `<option value="${g.id}">${g.groupName}</option>`).join('');
+    
+    const delBtn = document.getElementById('btnDeleteGroup');
+    if (delBtn && currentUser && currentUser.role === 'admin') {
+      if (select.value === 'general') {
+        delBtn.classList.add('hidden');
+      } else {
+        delBtn.classList.remove('hidden');
+      }
+    }
+  } catch (e) {
+    logAppError('ERR_CHAT_GRP', 'Failed to retrieve staff chat groups.');
+  }
+}
+
+async function loadGroupChatMessages() {
+  const select = document.getElementById('chatGroupSelect');
+  if (!select) return;
+  const groupId = select.value;
+
+  const delBtn = document.getElementById('btnDeleteGroup');
+  if (delBtn && currentUser && currentUser.role === 'admin') {
+    if (groupId === 'general') {
+      delBtn.classList.add('hidden');
+    } else {
+      delBtn.classList.remove('hidden');
+    }
+  }
+
+  try {
+    const res = await fetch(`/api/chat/messages/${groupId}`);
+    const msgs = await res.json();
+    const chatBox = document.getElementById('chatMessages');
+
+    chatBox.innerHTML = msgs.length
+      ? msgs.map(m => {
+          const isMe = currentUser && m.sender === currentUser.username;
+          return `
+            <div class="msg ${isMe ? 'sent' : 'received'}">
+              <strong style="color:${m.textColor || 'inherit'};">${m.sender}:</strong> ${m.message}
+              <span class="msg-timestamp">${m.timestamp || ''}</span>
+            </div>`;
+        }).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No messages in this channel yet.</p>';
+    
+    chatBox.scrollTop = chatBox.scrollHeight;
+  } catch (e) {
+    logAppError('ERR_CHAT_MSG', 'Unable to fetch group messages.');
+  }
+}
+
+function createNewGroupModal() {
+  const html = `
+    <form id="newGroupForm">
+      <div>
+        <label for="newGroupNameInput">Group Channel Name <span class="req">*</span></label>
+        <input type="text" id="newGroupNameInput" placeholder="e.g. Primary Educators Lounge" required>
+      </div>
+      <button type="submit" class="submit-btn">Create Group</button>
+    </form>`;
+  openModal('Create New Chat Group', html);
+
+  document.getElementById('newGroupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const groupName = document.getElementById('newGroupNameInput').value.trim();
+    if (!groupName) return;
+
+    await fetch('/api/chat/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupName })
+    });
+
+    closeModal();
+    await loadChatGroups();
+    loadGroupChatMessages();
+    playDingSound();
+  });
+}
+
+async function deleteCurrentGroup() {
+  const select = document.getElementById('chatGroupSelect');
+  if (!select) return;
+  const groupId = select.value;
+  if (groupId === 'general') return alert('Cannot delete General group.');
+
+  if (!confirm('Are you sure you want to delete this group channel?')) return;
+
+  await fetch(`/api/chat/groups/${groupId}`, { method: 'DELETE' });
+  await loadChatGroups();
+  loadGroupChatMessages();
+}
+
+async function loadDirectChatUsers() {
+  try {
+    const res = await fetch('/api/chat/direct/users');
+    const users = await res.json();
+    const select = document.getElementById('directRecipientSelect');
+    if (!select) return;
+
+    const filtered = users.filter(u => !currentUser || u.username !== currentUser.username);
+    select.innerHTML = '<option value="">Select Recipient (Parent or Staff)...</option>' + 
+      filtered.map(u => `<option value="${u.username}">${u.name || u.username} (${u.role.toUpperCase()})</option>`).join('');
+  } catch (e) {
+    logAppError('ERR_DIRECT_USERS', 'Failed to retrieve direct messaging contacts.');
+  }
+}
+
+async function loadDirectChatMessages() {
+  const select = document.getElementById('directRecipientSelect');
+  if (!select || !select.value || !currentUser) {
+    document.getElementById('directChatMessages').innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">Please select a target user from the dropdown menu to load direct messages.</p>';
+    return;
+  }
+
+  const recipient = select.value;
+  try {
+    const res = await fetch(`/api/chat/direct/${encodeURIComponent(currentUser.username)}/${encodeURIComponent(recipient)}`);
+    const msgs = await res.json();
+    const box = document.getElementById('directChatMessages');
+
+    box.innerHTML = msgs.length
+      ? msgs.map(m => {
+          const isMe = m.sender === currentUser.username;
+          return `
+            <div class="msg ${isMe ? 'sent' : 'received'}">
+              <strong style="color:${m.textColor || 'inherit'};">${m.sender}:</strong> ${m.message}
+              <span class="msg-timestamp">${m.timestamp || ''}</span>
+            </div>`;
+        }).join('')
+      : '<p style="font-size:0.85rem; color:var(--text-muted);">No private messages exchange recorded yet.</p>';
+
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    logAppError('ERR_DIRECT_MSG', 'Unable to fetch private messages.');
+  }
+}
+
+// Global Form Submissions Router
+function setupFormListeners() {
+  const signingPinForm = document.getElementById('signingPinForm');
+  if (signingPinForm) signingPinForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const response = await fetch('/api/report-signing-pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser?.username, pin: document.getElementById('reportSigningPin').value }) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to save signing PIN.');
+    signingPinForm.reset(); alert('Signing PIN saved.');
+  });
+
+  const reportPublishForm = document.getElementById('reportPublishForm');
+  if (reportPublishForm) reportPublishForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const signature = reportSignaturePads.teacherSignaturePad;
+    if (!signature?.hasStroke()) return alert('Add the teacher signature before publishing.');
+    const response = await fetch('/api/report-reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentName: document.getElementById('reportStudent').value.trim(), reportTitle: document.getElementById('reportTitle').value.trim(), period: document.getElementById('reportPeriod').value.trim(), parentUsername: document.getElementById('reportParentUsername').value.trim(), teacherUsername: currentUser?.username, signingPin: document.getElementById('reportTeacherPin').value, signatureData: signature.canvas.toDataURL('image/png') }) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to publish report.');
+    reportPublishForm.reset(); clearSignature('teacherSignaturePad'); loadReportReviews(); playDingSound();
+  });
+
+  const accountForm = document.getElementById('accountForm');
+  if (accountForm) {
+    accountForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const originalUsername = document.getElementById('accountOriginalUsername').value;
+      const body = {
+        name: document.getElementById('accountName').value.trim(),
+        username: document.getElementById('accountUsername').value.trim(),
+        pin: document.getElementById('accountPin').value,
+        role: document.getElementById('accountRole').value,
+        schoolName: document.getElementById('accountSchoolName').value.trim(),
+        schoolStoreUrl: document.getElementById('accountStoreUrl').value.trim(),
+        linkedLearners: document.getElementById('accountLinkedLearners').value.trim(),
+        actorUsername: currentUser?.username
+      };
+      if (!originalUsername && !body.pin) return alert('Set a password or PIN for the new account.');
+      const response = await fetch(originalUsername ? `/api/accounts/${encodeURIComponent(originalUsername)}` : '/api/accounts', { method: originalUsername ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) return alert(result.message || 'Unable to save account.');
+      resetAccountForm();
+      loadAccounts();
+      playDingSound();
+    });
+  }
+
+  const registryForm = document.getElementById('registryForm');
+  if (registryForm) {
+    registryForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const values = Object.fromEntries(new FormData(registryForm).entries());
+      const response = await fetch('/api/registry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
+      const result = await response.json();
+      if (!response.ok) return alert(result.message || 'Unable to save learner registry record.');
+      registryForm.reset();
+      await loadRegistry();
+      playDingSound();
+    });
+  }
+
+  const consentForm = document.getElementById('consentForm');
+  if (consentForm) consentForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('/api/consents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ learnerName: document.getElementById('consentLearner').value.trim(), guardianName: document.getElementById('consentGuardian').value.trim(), internalUpdates: document.getElementById('consentInternal').checked, marketingPhotos: document.getElementById('consentMarketing').checked }) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to record consent.');
+    consentForm.reset(); loadConsentRecords(); playDingSound();
+  });
+
+  const pickupForm = document.getElementById('pickupForm');
+  if (pickupForm) pickupForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('/api/pickups/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ learnerName: document.getElementById('pickupLearner').value.trim(), pickupAdult: document.getElementById('pickupAdult').value.trim(), verificationCode: document.getElementById('pickupCode').value, action: document.getElementById('pickupAction').value, recordedBy: currentUser?.name || currentUser?.username }) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to create the audit record.');
+    pickupForm.reset(); loadPickupRecords(); playDingSound();
+  });
+
+  const chatForm = document.getElementById('chatForm');
+  if (chatForm) {
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const groupId = document.getElementById('chatGroupSelect').value;
+      const message = document.getElementById('chatInput').value;
+      const textColor = document.getElementById('chatColorPicker').value;
+
+      if (!message.trim() || !currentUser) return;
+
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, sender: currentUser.username, message, textColor })
+      });
+
+      document.getElementById('chatInput').value = '';
+      loadGroupChatMessages();
+      playDingSound();
+    });
+  }
+
+  const directForm = document.getElementById('directChatForm');
+  if (directForm) {
+    directForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const recipient = document.getElementById('directRecipientSelect').value;
+      const message = document.getElementById('directChatInput').value;
+      const textColor = document.getElementById('directChatColorPicker').value;
+
+      if (!recipient) return alert('Select a chat recipient first.');
+      if (!message.trim() || !currentUser) return;
+
+      await fetch('/api/chat/direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: currentUser.username, recipient, message, textColor })
+      });
+
+      document.getElementById('directChatInput').value = '';
+      loadDirectChatMessages();
+      playDingSound();
+    });
+  }
+
+  const bcForm = document.getElementById('broadcastForm');
+  if (bcForm) {
+    bcForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = {
+        bcPriority: document.getElementById('bcPriority').value,
+        bcMessage: document.getElementById('bcMessage').value,
+        radiusKm: Number(document.getElementById('bcRadius').value) || 5,
+        location: alertLocation
+      };
+
+      if (!alertLocation) return alert('Use your current location before dispatching an area-based alert.');
+
+      await fetch('/api/broadcasts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      bcForm.reset();
+      alertLocation = null;
+      document.getElementById('bcLocation').value = '';
+      loadBroadcasts();
+      playDingSound();
+    });
+  }
+
+  const lookupForm = document.getElementById('studentLookupForm');
+  if (lookupForm) {
+    lookupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const className = document.getElementById('lookupClass').value;
+      const childName = document.getElementById('lookupChild').value;
+
+      try {
+        const res = await fetch(`/api/students/search?className=${encodeURIComponent(className)}&childName=${encodeURIComponent(childName)}&username=${encodeURIComponent(currentUser?.username || '')}`);
+        const results = await res.json();
+        const box = document.getElementById('lookupResults');
+
+        box.innerHTML = results.length
+          ? results.map(s => `
+              <div class="item-row" style="flex-direction: column; align-items: flex-start;">
+                <strong>${s.studentName}</strong> <span class="badge-tag info">${s.className}</span>
+                <div style="font-size:0.85rem; margin-top:4px;">
+                  <p>Guardian: <strong>${s.parentName}</strong> (${s.contactEmail})</p>
+                  <p style="color:#ef4444; margin-top:2px;"><strong>⚕ Medical / allergy card:</strong> ${s.medicalNotes}</p>
+                  <p style="margin-top:2px;"><strong>Emergency:</strong> ${s.emergencyContact || 'Not recorded'}<br><strong>Authorised pickup:</strong> ${s.authorisedPickups || 'Not recorded'}</p>
+                </div>
+              </div>
+            `).join('')
+          : '<p style="font-size:0.85rem; color:var(--text-muted);">No student records matched your query parameters.</p>';
+      } catch (err) {
+        logAppError('ERR_LOOKUP_500', 'Failed to perform student information query.');
+      }
+    });
+  }
+}
+
+// Footer Info Modals
+function openLegalModal(title, text) {
+  openModal(title, `<p style="font-size:0.9rem; line-height:1.5; color:var(--text-dark);">${text}</p>`);
+}
+
+function openSubscriptionsModal() {
+  const schoolRoles = ['teacher', 'principal', 'district', 'admin'];
+  if (currentUser?.role === 'parent') {
+    const parentContent = `
+      <section style="font-size:0.9rem; line-height:1.55; color:var(--text-dark);">
+        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:4px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">FAMILY PLAN</div>
+        <h2 style="margin:10px 0 4px; color:var(--text-dark); font-size:1.5rem;">LittleSteps Plus</h2>
+        <p style="margin:0 0 16px; color:#10b981; font-size:1rem; font-weight:700;">More ways to follow and celebrate your child’s learning.</p>
+        <div style="padding:16px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:10px; background:rgba(16,185,129,0.08);">
+          <strong style="display:block; font-size:1.4rem; color:var(--text-dark);">R29 / month per child</strong>
+          <span style="display:block; margin:2px 0 13px; color:#10b981; font-size:.78rem; font-weight:700;">Optional parent subscription</span>
+          <ul style="margin:0; padding-left:20px; display:grid; gap:8px;">
+            <li>Full-quality downloads of approved school photos and videos.</li>
+            <li>Weekly learning and development highlights.</li>
+            <li>Priority handling for eligible help requests.</li>
+            <li>Extended access to your child’s learning portfolio, reports, and achievements.</li>
+            <li>Additional family access for approved caregivers.</li>
+          </ul>
+        </div>
+        <p style="margin:14px 0 0; color:var(--text-muted); font-size:.78rem;">Availability and features are set by your school and your family account permissions.</p>
+      </section>`;
+    openModal('Parent Subscription', parentContent);
+    document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
+    return;
+  }
+  if (!schoolRoles.includes(currentUser?.role)) {
+    return alert('School subscription information is available to authorised school staff only.');
+  }
+  const content = `
+    <div style="font-size:0.88rem; line-height:1.5; color:var(--text-dark);">
+      <section style="margin-bottom:26px;">
+        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">INSTITUTIONAL PRICING & BENEFITS</div>
+        <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">School Subscriptions & Operational Advantages</h2>
+        <p style="margin:0 0 12px; color:#10b981; font-size:1rem; font-weight:700;">Predictable Pricing Models Designed for Scalability</p>
+        <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:6px;">
+          <table style="width:100%; min-width:700px; border-collapse:collapse; text-align:left; font-size:0.8rem;">
+            <thead><tr style="background:#065f46; color:#fff;"><th style="padding:9px 10px;">Package Tier</th><th style="padding:9px 10px;">Target Institution</th><th style="padding:9px 10px;">Monthly Base Fee</th><th style="padding:9px 10px;">Overage / Additional Rate</th></tr></thead>
+            <tbody>
+              <tr style="background:rgba(255,255,255,0.04);"><td style="padding:8px 10px; font-weight:700;">Micro / ECD Tier</td><td style="padding:8px 10px;">Up to 30 Learners</td><td style="padding:8px 10px; font-weight:700;">R350 / month</td><td style="padding:8px 10px;">R10 / learner / month</td></tr>
+              <tr style="background:rgba(16,185,129,0.10);"><td style="padding:8px 10px; font-weight:700;">Standard Primary</td><td style="padding:8px 10px;">Up to 250 Learners</td><td style="padding:8px 10px; font-weight:700;">R1,500 / month</td><td style="padding:8px 10px;">R6 / learner / month</td></tr>
+              <tr style="background:rgba(255,255,255,0.04);"><td style="padding:8px 10px; font-weight:700;">Enterprise Campus</td><td style="padding:8px 10px;">Up to 1,000 Learners</td><td style="padding:8px 10px; font-weight:700;">R7,500 / month</td><td style="padding:8px 10px;">Flat Package (No Overage)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px; padding:12px 14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
+          <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">Key Institutional Advantages of Subscribing</h3>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:4px 22px; font-size:0.78rem;">
+            <p style="margin:0;"><strong>• 15+ Hours Saved Monthly:</strong> Automates daily administrative logs, attendance tracking, and grading uploads so teachers focus on teaching.</p>
+            <p style="margin:0;"><strong>• 100% Digital Audit Trail:</strong> Maintain verifiable records for support queries, fee receipts, and official compliance requirements.</p>
+            <p style="margin:0;"><strong>• Zero Paper & Printing Costs:</strong> Replaces physical notices, printed newsletters, and paper report covers with instant digital delivery.</p>
+            <p style="margin:0;"><strong>• Stronger Parent Retention:</strong> High-transparency communication drives parent trust and institutional reputation.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">PREMIUM PARENT UPGRADE</div>
+        <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">LittleSteps Plus & Parent Subscription Advantages</h2>
+        <p style="margin:0 0 12px; color:#10b981; font-size:1rem; font-weight:700;">Unlocking Premium Growth Insights & Keepsake Features</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px;">
+          <div style="padding:14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
+            <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">⭐ LittleSteps Plus Add-On Overview</h3>
+            <p style="margin:0 0 10px;">An optional, affordable premium subscription available directly to parents for <strong>R29 / month per child.</strong></p>
+            <div style="padding:9px; border:1px solid #10b981; border-radius:8px; background:var(--panel-bg); text-align:center; margin-bottom:10px;"><strong style="display:block; font-size:1.25rem; color:var(--text-dark);">R29 / month</strong><span style="color:#10b981; font-size:0.75rem; font-weight:700;">Direct Subscription Tier</span></div>
+            <p style="margin:0;">Serves as a high-margin value-add that turns school management software into an engaging, memory-rich parent companion app.</p>
+          </div>
+          <div style="padding:14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
+            <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">💎 Key Advantages for Subscribing Parents</h3>
+            <ul style="margin:0; padding-left:18px; font-size:0.78rem;">
+              <li style="margin-bottom:4px;"><strong>Full High-Definition Media Downloads:</strong> Download unlimited original-resolution photos and videos of daily classroom activities and school events.</li>
+              <li style="margin-bottom:4px;"><strong>AI Growth & Development Insights:</strong> Receive automated weekly summaries highlighting developmental progress, strength areas, and tailored learning tips.</li>
+              <li style="margin-bottom:4px;"><strong>Priority Ticket Queueing:</strong> Escalated response status for administrative, fee, and medical inquiries submitted to the school desk.</li>
+              <li style="margin-bottom:4px;"><strong>Permanent Digital Portfolio:</strong> Lifetime access to archived worksheets, term certificates, and milestone badges across all school years.</li>
+              <li><strong>Multi-Caregiver Family Access:</strong> Grant secondary access accounts for grandparents or guardians to follow the child's progress.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>`;
+  openModal('School Subscriptions & Advantages', content);
+  document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
+}
+
+function downloadAttendanceTemplate() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet([
+    { 'Learner Name': 'Example Learner', Status: 'Present' },
+    { 'Learner Name': 'Example Learner 2', Status: 'Absent' }
+  ]);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance import');
+  XLSX.writeFile(workbook, 'LittleFeet_Attendance_Import_Template.xlsx');
+}
+
+function downloadScheduleTemplate() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
+  const rows = [
+    { 'ID (optional)': '', 'Student Name': 'Example Learner', 'Day of Week': 'Monday', 'Time Slot Block': '08:00 - 09:00', 'Activity Module': 'Morning circle and literacy' },
+    { 'ID (optional)': '', 'Student Name': 'Example Learner', 'Day of Week': 'Monday', 'Time Slot Block': '09:00 - 10:00', 'Activity Module': 'Outdoor play' }
+  ];
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Schedule import');
+  XLSX.writeFile(workbook, 'LittleFeet_Schedule_Import_Template.xlsx');
+}
+
+async function loadAccounts() {
+  const list = document.getElementById('accountsList');
+  if (!list || currentUser?.role !== 'admin') return;
+  try {
+    const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
+    const accounts = await response.json();
+    accountsCache = accounts;
+    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Linked learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'Managed from the learner register')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'GOD' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
+  } catch { list.textContent = 'Unable to load account records.'; }
+}
+
+function resetAccountForm() {
+  const form = document.getElementById('accountForm');
+  if (!form) return;
+  form.reset();
+  document.getElementById('accountOriginalUsername').value = '';
+  document.getElementById('accountSaveButton').textContent = 'Create account';
+  document.getElementById('accountPinHint').textContent = '*';
+  document.getElementById('accountPin').placeholder = 'Required for a new account';
+}
+
+function editAccount(account) {
+  document.getElementById('accountOriginalUsername').value = account.username;
+  document.getElementById('accountName').value = account.name || '';
+  document.getElementById('accountUsername').value = account.username || '';
+  document.getElementById('accountRole').value = account.role || 'parent';
+  document.getElementById('accountSchoolName').value = account.schoolName || '';
+  document.getElementById('accountStoreUrl').value = account.schoolStoreUrl || '';
+  document.getElementById('accountLinkedLearners').value = (account.linkedLearners || []).join(', ');
+  document.getElementById('accountPin').value = '';
+  document.getElementById('accountPinHint').textContent = '(leave empty to keep password)';
+  document.getElementById('accountPin').placeholder = 'Enter only to reset password';
+  document.getElementById('accountSaveButton').textContent = 'Save account changes';
+  document.getElementById('accountsTab').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function editAccountByUsername(encodedUsername) {
+  const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
+  if (account) editAccount(account);
+}
+
+async function openLearnerLinkPicker() {
+  const role = document.getElementById('accountRole')?.value;
+  if (role !== 'parent') return alert('Linked learners can only be assigned to a parent account. Choose the Parent role first.');
+  try {
+    const response = await fetch(`/api/students/search?username=${encodeURIComponent(currentUser?.username || '')}`);
+    const learners = await response.json();
+    if (!response.ok) return alert(learners.message || 'Unable to load learner records.');
+    if (!learners.length) return alert('No learner records are available to link yet. Add or import learners first.');
+    const field = document.getElementById('accountLinkedLearners');
+    const selected = new Set((field?.value || '').split(',').map(value => value.trim().toLocaleLowerCase()).filter(Boolean));
+    const options = learners.map(learner => {
+      const name = String(learner.studentName || '');
+      return `<label style="display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--border-color);border-radius:8px;cursor:pointer;"><input type="checkbox" class="learner-link-choice" value="${escapeWorkspaceText(name)}" ${selected.has(name.toLocaleLowerCase()) ? 'checked' : ''}><span><strong>${escapeWorkspaceText(name)}</strong><br><span class="meta">${escapeWorkspaceText(learner.className || 'Class not recorded')}</span></span></label>`;
+    }).join('');
+    openModal('Choose linked learners', `<p style="margin:0 0 12px;color:var(--text-muted);">Select up to four children for this parent account.</p><div id="learnerLinkChoices" style="display:grid;gap:8px;max-height:46vh;overflow:auto;">${options}</div><button type="button" class="submit-btn" style="margin-top:14px;" onclick="saveLearnerLinks()">Save linked learners</button>`);
+  } catch {
+    alert('Unable to load learner records. Please try again.');
+  }
+}
+
+function saveLearnerLinks() {
+  const choices = [...document.querySelectorAll('.learner-link-choice:checked')];
+  if (choices.length > 4) return alert('A parent account can be linked to a maximum of four learners.');
+  const field = document.getElementById('accountLinkedLearners');
+  if (field) field.value = choices.map(choice => choice.value).join(', ');
+  closeModal();
+}
+
+async function deleteAccount(encodedUsername) {
+  if (!confirm('Delete this account? This cannot be undone.')) return;
+  const response = await fetch(`/api/accounts/${encodedUsername}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser?.username }) });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to delete account.');
+  loadAccounts();
+}
+
+async function approveAccount(encodedUsername) {
+  const response = await fetch(`/api/accounts/${encodedUsername}/approve`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser?.username })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to approve this account.');
+  loadAccounts();
+  playDingSound();
+}
+
+async function loadRegistry() {
+  const list = document.getElementById('registryList');
+  if (!list) return;
+  try {
+    const response = await fetch('/api/registry');
+    const records = await response.json();
+    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)}</strong> <span class="badge-tag info">${escapeWorkspaceText(record.className || 'Class pending')}</span><p style="margin-top:4px;">Guardian: ${escapeWorkspaceText(record.guardianName)} · ${escapeWorkspaceText(record.guardianPhone)}<br>Medical notes: ${escapeWorkspaceText(record.medicalNotes || 'None recorded')}</p><span class="meta">Registered ${escapeWorkspaceText(record.createdAt)}</span></div></div>`).join('') : '<p style="font-size:.84rem;color:var(--text-muted);">No learner registry records saved yet.</p>';
+  } catch { list.textContent = 'Unable to load learner registry.'; }
+}
+
+function distanceInKm(lat1, lng1, lat2, lng2) {
+  const radians = value => value * Math.PI / 180;
+  const a = Math.sin(radians(lat2 - lat1) / 2) ** 2 + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(radians(lng2 - lng1) / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function getCurrentPositionQuietly() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(position => resolve(position.coords), () => resolve(null), { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+  });
+}
+
+async function setAlertLocation() {
+  const position = await getCurrentPositionQuietly();
+  if (!position) return alert('Location access is required to create an area-based alert.');
+  alertLocation = { lat: position.latitude, lng: position.longitude };
+  document.getElementById('bcLocation').value = `${position.latitude.toFixed(5)}, ${position.longitude.toFixed(5)}`;
+}
+
+async function deleteBroadcast(id) {
+  if (!confirm('Delete this emergency alert?')) return;
+  await fetch(`/api/broadcasts/${id}`, { method: 'DELETE' });
+  loadBroadcasts();
+}
+
+async function markBroadcastRead(id) {
+  if (!currentUser) return;
+  await fetch(`/api/broadcasts/${id}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username }) });
+  loadBroadcasts();
+}
+
+async function loadStoreItems() {
+  const box = document.getElementById('storeItems');
+  if (!box || !currentUser) return;
+  try {
+    const response = await fetch(`/api/store?username=${encodeURIComponent(currentUser.username)}`);
+    const store = await response.json();
+    if (!response.ok) throw new Error(store.message);
+    const safeStoreUrl = typeof store.webStoreUrl === 'string' && /^https:\/\//i.test(store.webStoreUrl) ? store.webStoreUrl : '';
+    document.getElementById('storeWelcome').textContent = `${store.schoolName} store`;
+    box.innerHTML = safeStoreUrl
+      ? `<article class="store-item" style="grid-column:1/-1; text-align:center;"><span class="badge-tag info">OFFICIAL SCHOOL WEB STORE</span><h3 style="margin:12px 0 8px;">${store.schoolName}</h3><p style="color:var(--text-muted);margin-bottom:16px;">This is the official online store linked to your school account.</p><a class="submit-btn" style="display:inline-block;text-decoration:none;margin:0;" href="${safeStoreUrl}" target="_blank" rel="noopener noreferrer">Visit school web store</a></article>`
+      : `<article class="store-item" style="grid-column:1/-1; text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🏫</div><h3 style="margin-bottom:8px;">${store.schoolName} has no web store</h3><p style="color:var(--text-muted);max-width:520px;margin:0 auto;">Your school has not linked an official web store to this account. Please contact the school office for uniforms, stationery, activity packs, or payment information.</p></article>`;
+  } catch { box.textContent = 'Unable to load school store items.'; }
+}
+
+async function loadReportReviews() {
+  const list = document.getElementById('reportReviewList');
+  if (!list || !currentUser) return;
+  const parentSigner = document.getElementById('parentReportSigner');
+  if (parentSigner) parentSigner.classList.toggle('hidden', currentUser.role !== 'parent');
+  try {
+    const response = await fetch(`/api/report-reviews?username=${encodeURIComponent(currentUser.username)}`);
+    const reports = await response.json();
+    const grouped = reports.reduce((groups, report) => {
+      const month = report.period || new Date(report.createdAt).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+      (groups[month] ||= []).push(report); return groups;
+    }, {});
+    window.reportReviewCache = Object.fromEntries(reports.map(report => [report.id, report]));
+    list.innerHTML = Object.keys(grouped).length ? Object.entries(grouped).map(([month, entries]) => `<h3 class="workspace-heading">${escapeWorkspaceText(month)}</h3>${entries.map(report => `<div class="item-row"><div><strong>${escapeWorkspaceText(report.studentName)} · ${escapeWorkspaceText(report.reportTitle)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(report.period)} · <span class="badge-tag ${report.status.startsWith('Complete') ? 'info' : 'urgent'}">${escapeWorkspaceText(report.status)}</span></p><span class="meta">Teacher signed: ${new Date(report.teacherSignedAt).toLocaleString()}${report.parentSignedAt ? ` · Parent signed: ${new Date(report.parentSignedAt).toLocaleString()}` : ''}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="viewParentReport('${report.id}')">View report</button>${currentUser.role === 'parent' && !report.parentSignature ? `<button type="button" class="action-btn btn-green" onclick="signParentReport('${report.id}')">Sign report</button>` : ''}</div></div>`).join('')}`).join('') : '<p class="meta">No reports are available for this account.</p>';
+  } catch { list.textContent = 'Unable to load report reviews.'; }
+}
+
+function viewParentReport(id) {
+  const report = window.reportReviewCache?.[id];
+  if (!report) return alert('The report is no longer available. Refresh and try again.');
+  const safe = escapeWorkspaceText;
+  const teacherSignature = typeof report.teacherSignature === 'string' && report.teacherSignature.startsWith('data:image/')
+    ? `<img src="${report.teacherSignature}" alt="Teacher signature" style="width:100%;max-width:500px;border:1px solid var(--border-color);border-radius:8px;background:#fff;">`
+    : '<p class="meta">Teacher signature unavailable.</p>';
+  const parentSignature = typeof report.parentSignature === 'string' && report.parentSignature.startsWith('data:image/')
+    ? `<img src="${report.parentSignature}" alt="Parent signature" style="width:100%;max-width:500px;border:1px solid var(--border-color);border-radius:8px;background:#fff;">`
+    : '<p class="meta">Awaiting parent signature.</p>';
+  openModal(`Report: ${safe(report.reportTitle)}`, `<div style="display:grid;gap:14px;line-height:1.55;"><div><strong>Learner:</strong> ${safe(report.studentName)}<br><strong>Period:</strong> ${safe(report.period)}<br><strong>Status:</strong> ${safe(report.status)}</div><div><strong>Teacher acknowledgement</strong><br><span class="meta">Signed ${new Date(report.teacherSignedAt).toLocaleString()}</span>${teacherSignature}</div><div><strong>Parent acknowledgement</strong><br><span class="meta">${report.parentSignedAt ? `Signed ${new Date(report.parentSignedAt).toLocaleString()}` : 'Use the parent signature panel to complete this report.'}</span>${parentSignature}</div></div>`);
+}
+
+async function signParentReport(id) {
+  const signature = reportSignaturePads.parentSignaturePad;
+  const pin = document.getElementById('parentReportPin')?.value;
+  if (!signature?.hasStroke()) return alert('Add the parent signature first.');
+  if (!pin) return alert('Enter your signing PIN.');
+  const response = await fetch(`/api/report-reviews/${id}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser?.username, signingPin: pin, signatureData: signature.canvas.toDataURL('image/png') }) });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to sign report.');
+  document.getElementById('parentReportPin').value = ''; clearSignature('parentSignaturePad'); loadReportReviews(); playDingSound();
+}
+
+function escapeWorkspaceText(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function showProviderSetup(providerName) {
+  openModal(`${providerName} connection required`, `<div style="font-size:.9rem;line-height:1.6;"><p>This feature needs an approved school-owned ${providerName} account before it can operate.</p><p style="margin-top:10px;"><strong>Next steps:</strong></p><ol style="margin:6px 0 0 20px;"><li>Choose and contract an approved provider.</li><li>Obtain the provider credentials and consent documentation.</li><li>Ask an administrator to configure the connection securely.</li></ol><p style="margin-top:10px;color:var(--text-muted);">No payment, payroll, SMS, or push messages are sent by this demo portal until a provider is connected.</p></div>`);
+}
+
+function quickCareLog(activity) {
+  const learner = prompt(`Who is this ${activity.toLowerCase()} for? Enter learner or class name.`);
+  if (!learner || !learner.trim()) return;
+  saveWorkspaceRecord(null, 'dailyCare', `${activity}: ${learner.trim()}`);
+}
+
+async function loadConsentRecords() {
+  const list = document.getElementById('consentRecords');
+  if (!list) return;
+  const response = await fetch('/api/consents');
+  const records = await response.json();
+  list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)}</strong><p style="margin-top:3px;">Guardian: ${escapeWorkspaceText(record.guardianName)} · Internal updates: ${record.internalUpdates ? 'Allowed' : 'Not allowed'} · Marketing: ${record.marketingPhotos ? 'Allowed' : 'Not allowed'}</p><span class="meta">${escapeWorkspaceText(record.capturedAt)}</span></div></div>`).join('') : '<p class="meta">No consent decisions recorded.</p>';
+}
+
+async function loadPickupRecords() {
+  const list = document.getElementById('pickupRecords');
+  if (!list) return;
+  const response = await fetch('/api/pickups');
+  const records = await response.json();
+  list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.action)} · ${escapeWorkspaceText(record.learnerName)}</strong><p style="margin-top:3px;">Verified adult: ${escapeWorkspaceText(record.pickupAdult)} · Recorded by: ${escapeWorkspaceText(record.recordedBy)}</p><span class="meta">${escapeWorkspaceText(record.timestamp)}</span></div></div>`).join('') : '<p class="meta">No handover audit records recorded.</p>';
+}
+
+async function saveWorkspaceRecord(event, module, defaultDetails) {
+  if (event) event.preventDefault();
+  const detailsInput = event?.target?.querySelector('[name="details"]');
+  const details = detailsInput?.value.trim() || defaultDetails;
+  if (!details) return;
+  const response = await fetch(`/api/modules/${module}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: defaultDetails, details, recordedBy: currentUser?.name || currentUser?.username || 'User' }) });
+  if (!response.ok) return alert('Unable to save this record.');
+  if (event) event.target.reset();
+  await loadWorkspaceRecords(module);
+  playDingSound();
+}
+
+async function loadWorkspaceRecords(module) {
+  const list = document.getElementById(`${module}Records`);
+  if (!list) return;
+  try {
+    const response = await fetch(`/api/modules/${module}`);
+    const records = await response.json();
+    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${currentUser?.role === 'admin' ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : '<p style="font-size:.84rem;color:var(--text-muted);">No records saved in this workspace yet.</p>';
+  } catch { list.textContent = 'Unable to load workspace records.'; }
+}
+
+async function deleteWorkspaceRecord(module, id) {
+  if (!confirm('Delete this record?')) return;
+  await fetch(`/api/modules/${module}/${id}`, { method: 'DELETE' });
+  loadWorkspaceRecords(module);
+}
+
+function openModulesBreakdownModal() {
+  const content = `
+    <div style="font-size:.88rem;line-height:1.55;color:var(--text-dark);">
+      <p style="color:var(--text-muted);margin-bottom:14px;">Little Feet brings communication, records, learning evidence, and safety notices into one school portal.</p>
+      <div style="display:grid;gap:10px;">
+        <div style="padding:11px;border-left:4px solid #0d9488;background:rgba(13,148,136,.08);border-radius:6px;"><strong>🗺️ Nearby Schools & Campus Discovery</strong><br><span style="color:var(--text-muted);">Uses your optional device location to show mapped education facilities in a 20 km radius. Results are grouped to keep the map readable; select a pin for mapped address and public contact details.</span></div>
+        <div style="padding:11px;border-left:4px solid #0284c7;background:rgba(2,132,199,.08);border-radius:6px;"><strong>📚 Learning Records & Portfolio</strong><br><span style="color:var(--text-muted);">Schedules, worksheets, badges, and attendance support day-to-day classroom documentation. Uploaded evidence remains connected to the relevant record.</span></div>
+        <div style="padding:11px;border-left:4px solid #f97316;background:rgba(249,115,22,.08);border-radius:6px;"><strong>🚨 Location-Aware Safety Alerts</strong><br><span style="color:var(--text-muted);">Administrators can create an alert with a location and radius. A user sees it only when their device is within that area and location access is enabled.</span></div>
+        <div style="padding:11px;border-left:4px solid #8b5cf6;background:rgba(139,92,246,.08);border-radius:6px;"><strong>💬 Secure Communication Workspaces</strong><br><span style="color:var(--text-muted);">Group and direct chat support staff coordination, while Support Desk provides a separate route for issues requiring tracking and follow-up.</span></div>
+        <div style="padding:11px;border-left:4px solid #22c55e;background:rgba(34,197,94,.08);border-radius:6px;"><strong>🟢 Live Service Indicator</strong><br><span style="color:var(--text-muted);">The header light reflects whether the portal is online, busy, or unavailable. A green light means the app can reach the server.</span></div>
+      </div>
+      <p style="margin-top:14px;font-size:.78rem;color:var(--text-muted);">Data availability depends on your role, school configuration, browser permissions, and the public information supplied by the mapped school.</p>
+    </div>`;
+  openModal('System Capabilities & Architecture', content);
+}
