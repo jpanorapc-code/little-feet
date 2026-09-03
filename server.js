@@ -798,31 +798,53 @@ app.get('/{*path}', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+// 1. Session and Passport Setup
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const session = require('express-session');
 
-// Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set to true if enforcing HTTPS strictly
+  cookie: { secure: false }
 }));
 
-// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
-// Google Strategy configuration
+// 2. Google Strategy Configuration (with safe fallbacks)
 passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    clientID: process.env.GOOGLE_CLIENT_ID || 'dummy-client-id',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret',
     callbackURL: "https://littlefeet.co.za/auth/google/callback"
   },
+  (accessToken, refreshToken, profile, done) => {
+    return done(null, profile);
+  }
+));
+
+// 3. OAuth Routes
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    res.redirect('/');
+  }
+);
+
+// 4. Wildcard Catch-All & App Listen MUST be at the very end
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
   (accessToken, refreshToken, profile, done) => {
     const user = {
       googleId: profile.id,
