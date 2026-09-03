@@ -591,13 +591,14 @@
           <input type="checkbox" id="rememberLogin" style="width: auto; margin-bottom: 0;">
           <label for="rememberLogin" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">Save login details on this device</label>
         </div>
-<a href="/auth/google" style="display:inline-block; text-decoration:none;" class="action-btn">Continue with Google</a>
-</form>
+        <button type="submit" class="submit-btn">🔒 Secure Account Login</button>
+        <div class="social-signin" aria-label="Additional sign-in options"><button type="button" onclick="showProviderSetup('Google sign-in')">Continue with Google</button><button type="button" onclick="showProviderSetup('Yahoo sign-in')">Continue with Yahoo</button><button type="button" onclick="showProviderSetup('Microsoft sign-in')">Continue with Microsoft</button></div>
+      </form>
 
-<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);text-align:center;">
-  <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:9px;">New to Little Feet?</p>
-  <button type="button" class="action-btn btn-blue" onclick="showSignupForm()">Create a Parent, Teacher or Principal account</button>
-</div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);text-align:center;">
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:9px;">New to Little Feet?</p>
+        <button type="button" class="action-btn btn-blue" onclick="showSignupForm()">Create a Parent, Teacher or Principal account</button>
+      </div>
 
       <form id="signupForm" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);">
         <h3 style="margin-bottom:10px;color:var(--text-dark);">Create your account</h3>
