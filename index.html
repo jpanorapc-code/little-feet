@@ -73,6 +73,25 @@
     }
 
     body.light-mode::before { opacity: 0.12; }
+
+    /* A small, isolated flame pulse keeps the fire alive without animating the rest of the page. */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse 10% 15% at 24% 61%, rgba(255, 181, 74, 0.22) 0%, rgba(255, 112, 34, 0.09) 42%, transparent 72%);
+      mix-blend-mode: screen;
+      animation: campfireGlow 2.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes campfireGlow {
+      from { opacity: 0.42; transform: scale(0.97); }
+      to { opacity: 0.88; transform: scale(1.03); }
+    }
+
+    body.light-mode::after { opacity: 0.32; }
     
     .container { padding: 15px; max-width: 1150px; margin: 0 auto; width: 100%; flex: 1; position: relative; z-index: 1; }
     
