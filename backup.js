@@ -556,6 +556,7 @@ function setupSession() {
   }
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('dashboardSection').classList.remove('hidden');
+  document.body.classList.add('portal-active');
   renderRoleHomePanel();
   configureDebugMode();
   applyUserPreferences();
@@ -627,6 +628,7 @@ function logout() {
   localStorage.removeItem('lf_user');
   document.getElementById('dashboardSection').classList.add('hidden');
   document.getElementById('authSection').classList.remove('hidden');
+  document.body.classList.remove('portal-active');
 }
 
 function switchUser() {

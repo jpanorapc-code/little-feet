@@ -56,13 +56,14 @@
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
-    body::before {
+    /* The walking scene belongs to the signed-in portal only; the login stays clean. */
+    body.portal-active::before {
       content: "";
       position: fixed;
       inset: 0;
       width: 100%;
       height: 100%;
-      background-image: linear-gradient(rgba(5, 16, 27, 0.46), rgba(5, 16, 27, 0.64)), url('assets/little-feet-night-fire.gif');
+      background-image: linear-gradient(rgba(5, 16, 27, 0.48), rgba(5, 16, 27, 0.68)), url('assets/little-steps-walking-background.png');
       background-repeat: no-repeat;
       background-position: center;
       /* Fill the viewport without leaving unused dark margins around the animation. */
@@ -72,26 +73,39 @@
       opacity: 0.42;
     }
 
-    body.light-mode::before { opacity: 0.12; }
+    body.portal-active.light-mode::before { opacity: 0.12; }
 
     /* A small, isolated flame pulse keeps the fire alive without animating the rest of the page. */
-    body::after {
+    body.portal-active::after {
       content: "";
       position: fixed;
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      background: radial-gradient(ellipse 10% 15% at 24% 61%, rgba(255, 181, 74, 0.22) 0%, rgba(255, 112, 34, 0.09) 42%, transparent 72%);
+      background: radial-gradient(ellipse 16% 20% at 23% 74%, rgba(255, 212, 116, 0.16) 0%, rgba(13, 148, 136, 0.05) 50%, transparent 74%);
       mix-blend-mode: screen;
-      animation: campfireGlow 2.5s ease-in-out infinite alternate;
+      animation: stepsLanternGlow 2.8s ease-in-out infinite alternate;
     }
 
-    @keyframes campfireGlow {
+    @keyframes stepsLanternGlow {
       from { opacity: 0.42; transform: scale(0.97); }
       to { opacity: 0.88; transform: scale(1.03); }
     }
 
-    body.light-mode::after { opacity: 0.32; }
+    body.portal-active.light-mode::after { opacity: 0.32; }
+
+    #portalLoader { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 50% 34%,rgba(13,148,136,.22),rgba(7,17,30,.98) 58%); transition:opacity .35s ease, visibility .35s ease; }
+    #portalLoader.is-hidden { opacity:0; visibility:hidden; pointer-events:none; }
+    .walking-loader { display:flex; flex-direction:column; align-items:center; gap:12px; color:#e6fffb; text-align:center; }
+    .walking-loader-mark { position:relative; width:124px; height:92px; }
+    .walking-loader-mark img { position:absolute; left:38px; top:0; width:58px; height:58px; object-fit:contain; filter:drop-shadow(0 8px 10px rgba(0,0,0,.34)); animation:loaderWalk .72s ease-in-out infinite alternate; }
+    .walking-loader-mark span { position:absolute; bottom:0; color:#5eead4; font-size:1.7rem; filter:drop-shadow(0 0 9px rgba(45,212,191,.55)); }
+    .walking-loader-mark span:first-of-type { left:10px; animation:footstep .72s ease-in-out infinite; }
+    .walking-loader-mark span:last-of-type { right:10px; animation:footstep .72s ease-in-out .36s infinite; }
+    .walking-loader p { margin:0; font-size:.82rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    @keyframes loaderWalk { from { transform:translateX(-7px) translateY(2px) rotate(-4deg); } to { transform:translateX(7px) translateY(-2px) rotate(4deg); } }
+    @keyframes footstep { 0%,100% { opacity:.25; transform:translateY(5px) scale(.82); } 50% { opacity:1; transform:translateY(-2px) scale(1); } }
+    @media (prefers-reduced-motion: reduce) { .walking-loader-mark img, .walking-loader-mark span, body.portal-active::after { animation:none; } }
     
     .container { padding: 15px; max-width: 1150px; margin: 0 auto; width: 100%; flex: 1; position: relative; z-index: 1; }
     
@@ -577,6 +591,13 @@
   </style>
 </head>
 <body>
+
+  <div id="portalLoader" role="status" aria-live="polite" aria-label="Little Feet is loading">
+    <div class="walking-loader">
+      <div class="walking-loader-mark" aria-hidden="true"><img src="little-feet-mascot.jfif" alt=""><span>👣</span><span>👣</span></div>
+      <p>Little Feet is getting ready</p>
+    </div>
+  </div>
 
   <!-- Modal Component -->
   <div id="appModal" class="modal-overlay hidden">
@@ -1465,5 +1486,10 @@
   </div>
 
   <script src="backup.js?v=20260904-live-data" defer></script>
+  <script>
+    window.addEventListener('load', () => {
+      window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
+    });
+  </script>
 </body>
 </html>
