@@ -320,7 +320,7 @@
 
     footer { background-color: #07111e; color: var(--text-muted); border-top: 1px solid #1e293b; padding: 20px 15px; font-size: 0.78rem; position: relative; z-index: 2; margin-top: auto; }
     .footer-container { max-width: 1150px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
-    .footer-links { display: flex; gap: 15px; flex-wrap: wrap; }
+    .footer-links { display: flex; gap: 8px; flex-wrap: wrap; }
     .footer-links a { color: #94a3b8; text-decoration: none; cursor: pointer; }
     .footer-links a:hover { color: #2dd4bf; text-decoration: underline; }
     .compliance-text { font-size: 0.72rem; color: #475569; line-height: 1.4; border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 5px; }
@@ -1561,19 +1561,18 @@
     <footer>
       <div class="footer-container">
         <div>
-          <p style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet Early Childhood Development Platform</p>
+          <p id="footerSchoolName" style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet School Portal</p>
           <div class="footer-links">
-            <a onclick="openLegalModal('Privacy & Safeguarding Notice', 'This portal uses role-based workspaces, consent records, encrypted sensitive fields, and audit registers to support POPIA and child-safeguarding obligations. Your school remains responsible for a documented lawful basis, staff training, retention rules, vendor agreements, incident response, access reviews, and legal review before production use.')">Privacy & Safeguarding</a> • 
-            <a onclick="openLegalModal('Terms of Service', 'Authorized personnel only. Data scraping or unauthorized logins are strictly logged.')">Terms of Service</a> • 
-            <a id="subscriptionFooterLink" onclick="openSubscriptionsModal()">School Subscriptions</a> • 
-            <a onclick="openModulesBreakdownModal()">System Modules Breakdown</a> •
-            <a onclick="openDonationModal()">Donate to help us grow</a>
+            <a onclick="openLegalModal('Privacy & Safeguarding Notice', 'Little Feet provides role-based workspaces, consent records, audit registers, and encrypted storage for selected sensitive fields. Your school remains responsible for its lawful basis, staff training, retention, vendor agreements, incident response, access reviews, and legal review.')">Privacy & Safeguarding</a>
+            <a onclick="openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
+            <a onclick="openWorkspace('guideTab')">Help &amp; Guide</a>
+            <a onclick="openWorkspace('settingsTab')">Settings</a>
           </div>
-          <p style="margin-top: 6px; font-size: 0.7rem; color: #475569;">© 2026 Little Feet Educational Holdings (Pty) Ltd. All rights reserved.</p>
+          <p style="margin-top: 6px; font-size: 0.7rem; color: #64748b;">© 2026 Little Feet. All rights reserved.</p>
         </div>
         <div class="compliance-text">
-          <p><strong>Regulatory Compliance Notice:</strong> Designed to support ECD, education, POPIA and safeguarding compliance workflows.</p>
-          <p style="margin-top: 3px; font-size: 0.68rem; color: #334155;">System Build: v2.6.0</p>
+          <p><strong>Portal status:</strong> <span id="footerSystemStatus">Checking server connection…</span></p>
+          <p style="margin-top: 3px; font-size: 0.68rem; color: #64748b;">Designed to support ECD, education, POPIA and safeguarding workflows.</p>
         </div>
       </div>
     </footer>

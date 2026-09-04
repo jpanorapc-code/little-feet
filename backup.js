@@ -629,6 +629,8 @@ function setupSession() {
   if (subscriptionEntry) subscriptionEntry.textContent = isParent ? '💎 Parent Subscription' : '💎 Plans & Benefits';
   if (subscriptionFooter) subscriptionFooter.textContent = isParent ? 'Parent Subscription' : 'School Subscriptions';
   if (navLivePill) navLivePill.textContent = isParent ? 'Family updates ready' : 'School day in progress';
+  const footerSchoolName = document.getElementById('footerSchoolName');
+  if (footerSchoolName) footerSchoolName.textContent = `${currentUser.schoolName || 'Little Feet'} School Portal`;
   const displayRoleEl = document.getElementById('displayRole');
   if (displayRoleEl) displayRoleEl.textContent = `${currentUser.name || currentUser.username} · ${currentUser.role.toUpperCase()}`;
 
@@ -884,12 +886,16 @@ async function startHealthMonitor() {
         statusEl.className = `server-status ${busy ? 'busy' : 'good'}`;
         statusText.textContent = busy ? 'Server busy' : health.instance === 'STANDBY' ? 'Backup server online' : 'Server online';
       }
+      const footerStatus = document.getElementById('footerSystemStatus');
+      if (footerStatus) footerStatus.textContent = health.status === 'BUSY' ? 'Server busy — requests may take longer.' : health.instance === 'STANDBY' ? 'Backup server online.' : 'Server online.';
     } catch (e) {
       consecutiveFailures += 1;
       if (statusEl && statusText) {
         statusEl.className = 'server-status';
         statusText.textContent = 'Server offline';
       }
+      const footerStatus = document.getElementById('footerSystemStatus');
+      if (footerStatus) footerStatus.textContent = 'Server connection unavailable.';
       logAppError('ERR_SRV_503', 'Live server connection lost to API.');
       // A production backup URL is configured by the school host / load balancer.
       // Local development remains manual so a missing local port never traps users in a redirect loop.
