@@ -698,7 +698,7 @@ function renderRoleHomePanel() {
     }
   };
   const experience = experiences[currentUser.role] || experiences.parent;
-  panel.classList.toggle('admin-role-home', currentUser.role === 'admin');
+  panel.classList.add('mascot-role-home');
   panel.innerHTML = `<div class="role-home-content"><div><span class="portal-tour-kicker">YOUR NEXT STEPS</span><h2>${escapeWorkspaceText(experience.title)}</h2><p>${escapeWorkspaceText(experience.message)}</p><div class="role-home-actions">${experience.actions.map(([label, tab]) => `<button type="button" class="action-btn btn-blue" onclick="openWorkspace('${tab}')">${label}</button>`).join('')}</div></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
 }
 
