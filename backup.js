@@ -47,6 +47,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
 
   const oauthProvider = new URLSearchParams(window.location.search).get('oauth');
+  const oauthError = new URLSearchParams(window.location.search).get('oauthError');
   const savedUser = localStorage.getItem('lf_user');
   if (oauthProvider === 'google' || oauthProvider === 'yahoo' || oauthProvider === 'microsoft') {
     completeProviderLogin();
@@ -54,6 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
     currentUser = JSON.parse(savedUser);
     setupSession();
   }
+  if (oauthError) showOAuthSignInMessage(oauthError);
   startHealthMonitor();
   showWellbeingBanner();
   if (localStorage.getItem('lf_terms_notice_acknowledged') === 'true') document.getElementById('termsNotice')?.classList.add('hidden');
@@ -92,6 +94,20 @@ async function completeProviderLogin() {
 function startProviderSignIn(provider) {
   if (provider === 'google' || provider === 'yahoo' || provider === 'microsoft') window.location.assign(`/auth/${provider}`);
   else showProviderSetup(`${provider} sign-in`);
+}
+
+function showOAuthSignInMessage(error) {
+  const messages = {
+    'google-not-configured': ['Google sign-in is not ready yet', 'An administrator still needs to finish the Google connection.'],
+    'yahoo-not-configured': ['Yahoo sign-in is not ready yet', 'An administrator still needs to add the Yahoo connection details in Render.'],
+    'microsoft-not-configured': ['Microsoft sign-in is not ready yet', 'An administrator still needs to add the Microsoft connection details in Render.'],
+    'account-not-linked': ['Account not linked', 'This email is not linked to an approved Little Feet account. Please use your approved school, teacher, parent, principal, or district email.'],
+    'yahoo-sign-in-failed': ['Yahoo sign-in could not finish', 'Please try again. If this continues, an administrator should check the Yahoo app connection.'],
+    'microsoft-sign-in-failed': ['Microsoft sign-in could not finish', 'Please try again. If this continues, an administrator should check the Microsoft app connection.']
+  };
+  const [title, text] = messages[error] || ['Sign-in could not finish', 'Please try again or contact your school administrator.'];
+  window.history.replaceState({}, document.title, '/');
+  setTimeout(() => openModal(title, `<p style="margin:0;line-height:1.6;">${escapeWorkspaceText(text)}</p>`), 0);
 }
 
 function setupKeyboardShortcuts() {

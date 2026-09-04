@@ -889,7 +889,7 @@ app.get('/api/auth/session', (req, res) => {
 });
 
 app.get('/auth/google', (req, res, next) => {
-  if (!googleSignInConfigured) return res.status(503).send('Google sign-in is not configured for this school yet.');
+  if (!googleSignInConfigured) return res.redirect('/?oauthError=google-not-configured');
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
@@ -905,7 +905,7 @@ app.get('/auth/google/callback',
 );
 
 app.get('/auth/yahoo', (req, res) => {
-  if (!yahooSignInConfigured) return res.status(503).send('Yahoo sign-in is not configured for this school yet.');
+  if (!yahooSignInConfigured) return res.redirect('/?oauthError=yahoo-not-configured');
   const state = crypto.randomBytes(24).toString('hex');
   req.session.yahooOAuthState = state;
   const authorizationUrl = new URL('https://api.login.yahoo.com/oauth2/request_auth');
@@ -950,7 +950,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
 });
 
 app.get('/auth/microsoft', (req, res) => {
-  if (!microsoftSignInConfigured) return res.status(503).send('Microsoft sign-in is not configured for this school yet.');
+  if (!microsoftSignInConfigured) return res.redirect('/?oauthError=microsoft-not-configured');
   const state = crypto.randomBytes(24).toString('hex');
   const verifier = crypto.randomBytes(48).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
