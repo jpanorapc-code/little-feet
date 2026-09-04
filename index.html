@@ -60,29 +60,18 @@
       content: "";
       position: fixed;
       inset: 0;
-      margin: auto;
-      width: min(560px, 72vw);
-      height: min(560px, 72vw);
-      background-image: url('logo.png');
+      width: 100%;
+      height: 100%;
+      background-image: linear-gradient(rgba(5, 16, 27, 0.62), rgba(5, 16, 27, 0.78)), url('assets/little-feet-night-fire.gif');
       background-repeat: no-repeat;
       background-position: center;
-      background-size: contain;
+      background-size: cover;
       pointer-events: none;
       z-index: 0;
-      filter: drop-shadow(0 0 30px rgba(13, 148, 136, 0.75)) brightness(1.2);
-      animation: emblemLightGlow 3.5s ease-in-out infinite alternate;
+      opacity: 0.31;
     }
 
-    @keyframes emblemLightGlow {
-      0% {
-        filter: drop-shadow(0 0 15px rgba(13, 148, 136, 0.4)) brightness(1);
-        opacity: 0.045;
-      }
-      100% {
-        filter: drop-shadow(0 0 45px rgba(45, 212, 191, 0.95)) brightness(1.4);
-        opacity: 0.11;
-      }
-    }
+    body.light-mode::before { opacity: 0.12; }
     
     .container { padding: 15px; max-width: 1150px; margin: 0 auto; width: 100%; flex: 1; position: relative; z-index: 1; }
     
