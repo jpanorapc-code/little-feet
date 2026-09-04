@@ -293,9 +293,7 @@
     body.light-mode #reportsTab .workspace-card [style*="color: #fff"],
     body.light-mode #reportsTab .workspace-card [style*="color:#fff"] { color: var(--text-dark) !important; }
 
-    .social-signin { display:grid; grid-template-columns:repeat(3, 1fr); gap:7px; margin-top:12px; }
-    .social-signin button { border:1px solid var(--border-color); border-radius:7px; padding:8px 5px; color:var(--text-dark); background:var(--input-bg); font-size:.7rem; font-weight:700; cursor:pointer; }
-    .social-signin button:hover { border-color:var(--primary-color); background:rgba(13,148,136,.12); }
+    .login-account-help { margin:13px 0 0; padding:10px 12px; border:1px solid var(--border-color); border-radius:9px; color:var(--text-muted); background:rgba(15,43,72,.32); font-size:.78rem; line-height:1.45; text-align:center; }
     .wellbeing-banner { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.16),rgba(15,43,72,.5)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
     .wellbeing-banner .tip-icon { font-size:1.5rem; } .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
     .wellbeing-banner button { background:transparent; color:var(--text-muted); border:0; font-size:1.15rem; cursor:pointer; padding:3px 6px; }
@@ -350,7 +348,7 @@
     .nav-links li button.active { border-color:rgba(255,255,255,.65); box-shadow:0 3px 10px rgba(13,148,136,.28); }
     .chat-box { border-radius:12px; }
     .modal-card { border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.45); }
-    @media (max-width:767px) { .container { padding:14px; } .card { padding:17px; border-radius:12px; } .card-header-bar { align-items:flex-start; flex-direction:column; } .card-header-bar > * { max-width:100%; } .social-signin { grid-template-columns:1fr; } .workspace-grid, .store-grid { grid-template-columns:1fr; } .wellbeing-banner { align-items:flex-start; } }
+    @media (max-width:767px) { .container { padding:14px; } .card { padding:17px; border-radius:12px; } .card-header-bar { align-items:flex-start; flex-direction:column; } .card-header-bar > * { max-width:100%; } .workspace-grid, .store-grid { grid-template-columns:1fr; } .wellbeing-banner { align-items:flex-start; } }
 
     @media (max-width:820px) { #authSection { padding:20px 14px; align-items:flex-start; } #authSection > .auth-card { max-width:500px !important; } }
 
@@ -443,6 +441,13 @@
     .sidebar-heading:first-child { margin-top:4px; }
     .app-sidebar [data-nav-group] { margin-top:14px; padding:9px 7px 7px; border:1px solid rgba(148,163,184,.13); border-radius:10px; background:rgba(15,43,72,.42); }
     .app-sidebar [data-nav-group] .sidebar-heading { margin:0 4px 7px; color:#5eead4; }
+    .sidebar-group-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0; padding:7px 8px; border:0; border-radius:7px; background:transparent; color:#5eead4; font:800 .72rem/1.1 inherit; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; text-align:left; }
+    .sidebar-group-toggle::after { content:'⌄'; font-size:1rem; transition:transform .2s ease; }
+    [data-nav-group].is-collapsed .sidebar-group-toggle::after { transform:rotate(-90deg); }
+    [data-nav-group].is-collapsed .sidebar-links { display:none; }
+    .app-sidebar.is-collapsed { width:76px; padding-inline:8px; overflow-x:hidden; }
+    .app-sidebar.is-collapsed .sidebar-heading, .app-sidebar.is-collapsed .sidebar-group-toggle, .app-sidebar.is-collapsed .sidebar-links, .app-sidebar.is-collapsed .sidebar-signout { opacity:0; pointer-events:none; }
+    .app-sidebar.is-collapsed::after { content:'☰'; position:absolute; top:18px; left:25px; color:#5eead4; font-size:1.25rem; }
     .sidebar-links { list-style:none; display:grid; gap:4px; }
     .sidebar-links li { min-width:0; }
     .sidebar-links .nav-btn, .sidebar-signout {
@@ -464,6 +469,8 @@
       .nav-user-panel { margin-left:auto; }
       .container { max-width:none; width:calc(100% - 260px); margin-left:260px; padding:26px clamp(20px, 3vw, 48px); }
       #dashboardSection footer { margin-left:260px; }
+      #dashboardSection.sidebar-collapsed .container { width:calc(100% - 76px); margin-left:76px; }
+      #dashboardSection.sidebar-collapsed footer { margin-left:76px; }
     }
     @media (max-width: 959px) {
       .app-sidebar { top:var(--mobile-header-height, 0px); width:min(86vw, 300px); transform:translateX(-105%); transition:transform .22s ease; padding-top:12px; }
@@ -592,7 +599,7 @@
           <label for="rememberLogin" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">Save login details on this device</label>
         </div>
         <button type="submit" class="submit-btn">🔒 Secure Account Login</button>
-        <div class="social-signin" aria-label="Additional sign-in options"><button type="button" onclick="showProviderSetup('Google sign-in')">Continue with Google</button><button type="button" onclick="showProviderSetup('Yahoo sign-in')">Continue with Yahoo</button><button type="button" onclick="showProviderSetup('Microsoft sign-in')">Continue with Microsoft</button></div>
+        <p class="login-account-help">Use your Little Feet school account to sign in. Google, Yahoo, and Microsoft sign-in will appear here only after your school administrator has securely connected an approved provider.</p>
       </form>
 
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);text-align:center;">
@@ -634,6 +641,7 @@
         </div>
         <span id="navLivePill" class="nav-live-pill">School day in progress</span>
         <button type="button" class="nav-shortcut" onclick="openWorkspace('homeTab')">⌂ Home</button>
+        <button type="button" class="nav-shortcut" onclick="openGlobalSearch()">⌕ Search</button>
         <button type="button" class="nav-shortcut" onclick="openWorkspace('ticketsTab')">? Get help</button>
       </div>
 
@@ -649,13 +657,13 @@
       <button type="button" id="navMoreToggle" class="nav-more-toggle" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation">☰ Menu</button>
     </nav>
 
-    <aside id="mainNavigation" class="app-sidebar" aria-label="Main navigation">
+    <aside id="mainNavigation" class="app-sidebar" aria-label="Main navigation" ondblclick="toggleSidebarCollapse()">
       <p class="sidebar-heading">Overview</p>
       <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn active" onclick="switchTab('homeTab', this)">Home</button></li>
       </ul>
       <section data-nav-group>
-        <p class="sidebar-heading">📚 Academics</p>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">📚 Academics</button>
         <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('feedTab', this)">School Feed</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('scheduleTab', this)">Timetable</button></li>
@@ -667,7 +675,7 @@
         </ul>
       </section>
       <section data-nav-group>
-        <p class="sidebar-heading">💳 Finance</p>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">💳 Finance</button>
         <ul class="sidebar-links">
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('financeTab', this)">Billing &amp; Finance</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('storeTab', this)">School Store</button></li>
@@ -675,11 +683,11 @@
         </ul>
       </section>
       <section data-nav-group>
-        <p class="sidebar-heading">⚙️ Operations</p>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">⚙️ Operations</button>
         <ul class="sidebar-links">
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('attendanceTab', this)">Daily Attendance</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Team Chat</button></li>
-        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Help Centre</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('registryTab', this)">Daily Register</button></li>
         <li data-roles="admin"><button type="button" class="nav-btn" onclick="switchTab('accountsTab', this)">Account Management</button></li>
@@ -687,10 +695,11 @@
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('operationsTab', this)">School Operations</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('settingsTab', this)">Settings</button></li>
         </ul>
       </section>
       <section data-nav-group>
-        <p class="sidebar-heading">🛡️ Safety</p>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">🛡️ Safety</button>
         <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('broadcastsTab', this)">Safety Alerts</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('careTab', this)">Care Records</button></li>
@@ -769,6 +778,7 @@
           <div id="schoolMapContainer" style="width: 100%; height: 420px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
             📍 Press "Detect My Location" to render interactive map pins.
           </div>
+          <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
@@ -1320,6 +1330,9 @@
             <div class="workspace-card"><h3>Timecard Clock-In</h3><p>Log the start or end of a shift. Geofenced payroll exports need a connected payroll provider and approved location policy.</p><button type="button" class="submit-btn" onclick="saveWorkspaceRecord(null,'operations','Timecard clock-in')">Clock in now</button></div>
             <div class="workspace-card"><h3>Teacher-to-Child Ratio Check</h3><p>Record the current classroom staffing ratio; review exceptions immediately with a supervisor.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Ratio check')"><input name="details" placeholder="e.g. Toddlers: 2 staff / 12 children" required><button class="submit-btn">Log ratio</button></form></div>
             <div class="workspace-card"><h3>Lesson Plan Builder</h3><p>Capture a daily learning activity and its developmental-standard link for classroom planning.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Lesson plan')"><input name="details" placeholder="Activity and NCF / ELDA standard" required><button class="submit-btn">Save lesson plan</button></form></div>
+            <div class="workspace-card"><h3>Visitor &amp; meeting request</h3><p>Log a parent or visitor request for a teacher or principal. The recipient can respond through Tickets and agree a new time if needed.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Visitor / meeting request')"><input name="details" placeholder="Visitor name · learner · reason · preferred date/time" required><button class="submit-btn">Send request</button></form></div>
+            <div class="workspace-card"><h3>Asset &amp; sanitisation check</h3><p>Record equipment, cleaning, or maintenance items that require attention.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Asset / sanitisation check')"><input name="details" placeholder="Area · item · condition · action needed" required><button class="submit-btn">Save check</button></form></div>
+            <div class="workspace-card"><h3>Waitlist &amp; capacity note</h3><p>Record an opening, age group, or waitlist follow-up for administration.</p><form onsubmit="saveWorkspaceRecord(event,'operations','Capacity / waitlist note')"><input name="details" placeholder="Age group · available space · family or follow-up" required><button class="submit-btn">Save capacity note</button></form></div>
           </div><div id="operationsRecords" class="record-list"></div>
         </div>
       </div>
@@ -1378,6 +1391,18 @@
         </div>
       </div>
 
+      <div id="settingsTab" class="tab-content">
+        <div class="card"><div class="card-header-bar"><h2>⚙️ Personal settings</h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
+          <p style="color:var(--text-muted);margin-bottom:16px;">These settings apply only to this device and account session.</p>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. English is currently the complete interface; Afrikaans labels will expand as translations are reviewed.</p><select id="languagePreference" onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans (in progress)</option></select></div>
+            <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without reloading the map or interrupting your work.</p><select id="refreshPreference" onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="60000">Every minute</option><option value="120000">Every 2 minutes</option><option value="300000">Every 5 minutes</option></select></div>
+            <div class="workspace-card"><h3>Two-step verification</h3><p>Protect your sign-in with a verification app or email code once a school-owned identity provider is connected.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('two-step verification')">Set up 2FA</button></div>
+            <div class="workspace-card"><h3>Navigation</h3><p>On desktop, double-click the left sidebar to collapse or expand it. Use the category headings to show or hide each group.</p><button type="button" class="action-btn btn-green" onclick="toggleSidebarCollapse()">Toggle sidebar</button></div>
+          </div>
+        </div>
+      </div>
+
       <!-- 11. User Guide -->
       <div id="guideTab" class="tab-content">
         <div class="card">
@@ -1394,6 +1419,7 @@
             <button type="button" class="guide-link-card" onclick="openGuideWorkspace('inventoryTab')"><h3>📦 Classroom supplies & progress</h3><p>Use Inventory to request supplies and capture deliveries. Use Progress to link observations and portfolio tags to developmental areas, then prepare a term-report request.</p><span class="guide-open">Open Inventory →</span></button>
           </div>
           <div style="margin-top:18px;padding:14px;border-left:4px solid var(--primary-color);background:rgba(13,148,136,.09);border-radius:8px;"><strong>Need help?</strong> Check that the server light in the header is green, refresh once, then use Support Desk with a short description of the issue and the tab you were using.</div>
+          <div style="margin-top:14px;padding:14px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>⌨️ Keyboard shortcuts</strong><p style="margin:7px 0 0;color:var(--text-muted);">Press <strong>H</strong> for Home, <strong>T</strong> for Tickets, <strong>F</strong> for the School Feed, <strong>S</strong> for the Timetable, <strong>G</strong> for this guide, or <strong>/</strong> to search available workspaces. Shortcuts do not run while you are typing in a form.</p></div>
           <div style="margin-top:16px;font-size:.8rem;color:var(--text-muted);"><strong>Role guide:</strong> Parents see child-facing information, alerts, store status, and support. Teachers manage learning, attendance, care, registry, and staff operations. Principals oversee school operations, finance records, staff workspaces, and analytics. District users see cross-school analytics, schedules, alerts, support, and permitted lookup information. Administrators have full configuration access.</div>
         </div>
       </div>
@@ -1408,7 +1434,8 @@
             <a onclick="openLegalModal('Privacy & Safeguarding Notice', 'This portal uses role-based workspaces, consent records, encrypted sensitive fields, and audit registers to support POPIA and child-safeguarding obligations. Your school remains responsible for a documented lawful basis, staff training, retention rules, vendor agreements, incident response, access reviews, and legal review before production use.')">Privacy & Safeguarding</a> • 
             <a onclick="openLegalModal('Terms of Service', 'Authorized personnel only. Data scraping or unauthorized logins are strictly logged.')">Terms of Service</a> • 
             <a id="subscriptionFooterLink" onclick="openSubscriptionsModal()">School Subscriptions</a> • 
-            <a onclick="openModulesBreakdownModal()">System Modules Breakdown</a>
+            <a onclick="openModulesBreakdownModal()">System Modules Breakdown</a> •
+            <a onclick="openDonationModal()">Donate to help us grow</a>
           </div>
           <p style="margin-top: 6px; font-size: 0.7rem; color: #475569;">© 2026 Little Feet Educational Holdings (Pty) Ltd. All rights reserved.</p>
         </div>
@@ -1420,6 +1447,6 @@
     </footer>
   </div>
 
-  <script src="backup.js?v=20260829-responsive-controls" defer></script>
+  <script src="backup.js?v=20260904-live-data" defer></script>
 </body>
 </html>

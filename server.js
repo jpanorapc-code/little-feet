@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+const Database = require('better-sqlite3');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -55,6 +56,7 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     activeRequestCount = Math.max(0, activeRequestCount - 1);
     if (!req.method || req.method === 'GET' || replicaMode) return;
+    saveDatabaseState();
     scheduleReplicaSnapshot();
   });
   next();
@@ -114,12 +116,57 @@ const db = {
   ]
 };
 
-// Local standby replication. The primary snapshots app data after writes; a
-// backup process reads the latest snapshot so it can be promoted if required.
+// Local database and standby replication. SQLite is the source of truth for a
+// single Little Feet deployment; the JSON replica remains a portable standby
+// snapshot for the backup service.
 const replicaMode = process.env.LF_REPLICA_MODE === '1';
+const databaseFile = path.join(__dirname, 'littlefeet.db');
 const replicaFile = path.join(__dirname, 'littlefeet-replica.json');
 let replicaTimer = null;
 let replicaSnapshotTimer = null;
+let stateDatabase = null;
+
+function openStateDatabase() {
+  if (replicaMode) return;
+  stateDatabase = new Database(databaseFile);
+  stateDatabase.pragma('journal_mode = WAL');
+  stateDatabase.exec(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      state_key TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+}
+
+function loadDatabaseState() {
+  if (!stateDatabase) return false;
+  try {
+    const row = stateDatabase.prepare('SELECT payload FROM app_state WHERE state_key = ?').get('primary');
+    if (!row) return false;
+    const saved = JSON.parse(row.payload);
+    Object.keys(db).forEach(key => { if (Object.hasOwn(saved, key)) db[key] = saved[key]; });
+    return true;
+  } catch (error) {
+    console.error('Unable to load SQLite application state:', error.message);
+    return false;
+  }
+}
+
+function saveDatabaseState() {
+  if (!stateDatabase || replicaMode) return;
+  try {
+    stateDatabase.prepare(`
+      INSERT INTO app_state (state_key, payload, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(state_key) DO UPDATE SET
+        payload = excluded.payload,
+        updated_at = excluded.updated_at
+    `).run('primary', JSON.stringify(db), new Date().toISOString());
+  } catch (error) {
+    console.error('Unable to save SQLite application state:', error.message);
+  }
+}
 function loadReplicaSnapshot() {
   try {
     if (!fs.existsSync(replicaFile)) return;
@@ -146,10 +193,14 @@ function scheduleReplicaSnapshot() {
     writeReplicaSnapshot();
   }, 250);
 }
-loadReplicaSnapshot();
 if (replicaMode) {
+  loadReplicaSnapshot();
   replicaTimer = setInterval(loadReplicaSnapshot, 2000);
 } else {
+  openStateDatabase();
+  const restoredFromDatabase = loadDatabaseState();
+  if (!restoredFromDatabase) loadReplicaSnapshot();
+  saveDatabaseState();
   writeReplicaSnapshot();
 }
 

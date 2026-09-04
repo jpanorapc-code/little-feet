@@ -1,6 +1,7 @@
 let currentUser = null;
 const errorLog = [];
 let mapInstance = null;
+let nearbySchoolRecords = [];
 let alertLocation = null;
 let accountsCache = [];
 let broadcastsLoaded = false;
@@ -67,7 +68,20 @@ window.addEventListener('DOMContentLoaded', () => {
   setupRuntimeErrorHelpdesk();
   setupSignaturePads();
   setupPortalTour();
+  setupKeyboardShortcuts();
 });
+
+function setupKeyboardShortcuts() {
+  window.addEventListener('keydown', event => {
+    if (!currentUser || event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    if (target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
+    const key = event.key.toLowerCase();
+    const shortcuts = { h: 'homeTab', t: 'ticketsTab', f: 'feedTab', s: 'scheduleTab', g: 'guideTab' };
+    if (shortcuts[key]) { event.preventDefault(); openWorkspace(shortcuts[key]); }
+    if (key === '/') { event.preventDefault(); openGlobalSearch(); }
+  });
+}
 
 function showPortalTourSlide(index) {
   const slides = [...document.querySelectorAll('.portal-tour-slide')];
@@ -433,6 +447,49 @@ function toggleDarkMode() {
   document.body.classList.toggle('light-mode');
 }
 
+let dashboardRefreshTimer = null;
+function applyUserPreferences() {
+  const preferences = JSON.parse(localStorage.getItem('lf_user_preferences') || '{}');
+  const language = document.getElementById('languagePreference');
+  const refresh = document.getElementById('refreshPreference');
+  if (language) language.value = preferences.language || 'en';
+  if (refresh) refresh.value = preferences.refresh || '0';
+  document.documentElement.lang = preferences.language || 'en';
+  const sidebarCollapsed = localStorage.getItem('lf_sidebar_collapsed') === 'true';
+  document.getElementById('dashboardSection')?.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  document.getElementById('mainNavigation')?.classList.toggle('is-collapsed', sidebarCollapsed);
+  restoreSidebarGroups();
+  if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
+  const interval = Number(preferences.refresh || 0);
+  if (interval > 0) dashboardRefreshTimer = setInterval(() => { if (currentUser && !document.hidden) loadAllData(); }, interval);
+}
+
+function saveUserPreferences() {
+  const preferences = {
+    language: document.getElementById('languagePreference')?.value || 'en',
+    refresh: document.getElementById('refreshPreference')?.value || '0'
+  };
+  localStorage.setItem('lf_user_preferences', JSON.stringify(preferences));
+  applyUserPreferences();
+  if (preferences.language === 'af') alert('Afrikaans has been saved as your preference. Full text translation will become available as the approved translation catalogue is completed.');
+}
+
+function openGlobalSearch() {
+  if (!currentUser) return;
+  const buttons = [...document.querySelectorAll('.nav-btn')].filter(button => !button.closest('li')?.classList.contains('hidden'));
+  const choices = buttons.map((button, index) => `<option value="${index}">${escapeWorkspaceText(button.textContent.trim())}</option>`).join('');
+  openModal('Search workspaces', `<p style="margin:0 0 12px;color:var(--text-muted);">Choose a workspace available to your role.</p><select id="globalWorkspaceSearch">${choices}</select><button type="button" class="submit-btn" style="margin-top:12px;" onclick="openSelectedWorkspace()">Open workspace</button>`);
+}
+
+function openSelectedWorkspace() {
+  const index = Number(document.getElementById('globalWorkspaceSearch')?.value);
+  const buttons = [...document.querySelectorAll('.nav-btn')].filter(button => !button.closest('li')?.classList.contains('hidden'));
+  const button = buttons[index];
+  if (!button) return;
+  closeModal();
+  button.click();
+}
+
 function setupSession() {
   applyRolePermissions(currentUser.role);
   const isParent = currentUser.role === 'parent';
@@ -461,6 +518,8 @@ function setupSession() {
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('dashboardSection').classList.remove('hidden');
   renderRoleHomePanel();
+  configureDebugMode();
+  applyUserPreferences();
   playStartupChime();
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
@@ -591,6 +650,30 @@ function toggleNavigation() {
   const isOpen = dashboard.classList.toggle('sidebar-open');
   toggle.setAttribute('aria-expanded', String(isOpen));
   toggle.textContent = isOpen ? '✕ Close' : '☰ Menu';
+}
+
+function toggleSidebarGroup(button) {
+  const group = button?.closest('[data-nav-group]');
+  if (!group) return;
+  group.classList.toggle('is-collapsed');
+  const collapsed = [...document.querySelectorAll('[data-nav-group].is-collapsed')].map(section => section.querySelector('.sidebar-group-toggle')?.textContent.trim()).filter(Boolean);
+  localStorage.setItem('lf_collapsed_nav_groups', JSON.stringify(collapsed));
+}
+
+function restoreSidebarGroups() {
+  let collapsed = [];
+  try { collapsed = JSON.parse(localStorage.getItem('lf_collapsed_nav_groups') || '[]'); } catch { collapsed = []; }
+  document.querySelectorAll('[data-nav-group]').forEach(group => group.classList.toggle('is-collapsed', collapsed.includes(group.querySelector('.sidebar-group-toggle')?.textContent.trim())));
+}
+
+function toggleSidebarCollapse() {
+  if (window.innerWidth < 960) return;
+  const dashboard = document.getElementById('dashboardSection');
+  const sidebar = document.getElementById('mainNavigation');
+  if (!dashboard || !sidebar) return;
+  const collapsed = dashboard.classList.toggle('sidebar-collapsed');
+  sidebar.classList.toggle('is-collapsed', collapsed);
+  localStorage.setItem('lf_sidebar_collapsed', String(collapsed));
 }
 
 function closeNavigation() {
@@ -874,10 +957,13 @@ async function loadSchoolProximityMap() {
           ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(school.name)}" style="display:block; width:100%; max-height:130px; margin:0 0 8px; object-fit:cover; border-radius:5px;">`
           : '<p class="school-muted" style="font-size:0.75rem; margin:7px 0 0;"><strong>Photo:</strong> Not publicly listed in OpenStreetMap.</p>';
         const contact = `<p style="font-size:0.8rem; margin:7px 0 0;"><strong>Phone:</strong> ${phone ? `<a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : 'Not publicly listed'}<br><strong>Email:</strong> ${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : `Not publicly listed · <a href="${escapeHtml(contactSearchUrl)}" target="_blank" rel="noopener noreferrer">Find official contact</a>`}</p>`;
-        const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeURIComponent(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses Google Places only when the school has configured a verified provider key. No AI-generated details are saved automatically.</p></div></div>`;
+        school.details = { street, suburb, town, category, phone, email, website, imageUrl };
+        const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-green" style="margin:0 0 7px;" onclick="openSchoolDetail(${nearbySchools.indexOf(school)})">View details / apply</button><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeURIComponent(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses verified public details only. No AI-generated school details are saved automatically.</p></div></div>`;
         markerLayer.addLayer(L.marker([school.lat, school.lng]).bindPopup(content));
       });
       markerLayer.addTo(mapInstance);
+      nearbySchoolRecords = nearbySchools;
+      renderNearbySchoolPicker();
       status.getContainer().textContent = usingCachedResults
         ? `${nearbySchools.length} recent school results shown - live refresh will retry next time`
         : `${nearbySchools.length} live education facilities found within 20 km`;
@@ -892,6 +978,31 @@ async function loadSchoolProximityMap() {
     logAppError('ERR_MAP_GEO', 'Unable to retrieve device location for map search.');
     alert('Unable to detect your location. Please enable browser location access.');
   });
+}
+
+function renderNearbySchoolPicker() {
+  const panel = document.getElementById('schoolPickerPanel');
+  const picker = document.getElementById('nearbySchoolPicker');
+  if (!panel || !picker || !nearbySchoolRecords.length) return;
+  picker.innerHTML = nearbySchoolRecords.map((school, index) => `<option value="${index}">${escapeWorkspaceText(school.name)} · ${school.lat.toFixed(5)}, ${school.lng.toFixed(5)}</option>`).join('');
+  panel.classList.remove('hidden');
+}
+
+function openSelectedSchoolDetail() { openSchoolDetail(Number(document.getElementById('nearbySchoolPicker')?.value)); }
+function openSchoolDetail(index) {
+  const school = nearbySchoolRecords[index];
+  if (!school) return;
+  const detail = school.details || {};
+  const coordinates = `${school.lat.toFixed(5)}, ${school.lng.toFixed(5)}`;
+  openModal('School details', `<div style="display:grid;gap:12px;"><div><h3 style="margin:0 0 5px;">${escapeWorkspaceText(school.name)}</h3><p style="margin:0;color:var(--text-muted);">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(detail.street || 'Address not listed')}, ${escapeWorkspaceText(detail.suburb || '')}, ${escapeWorkspaceText(detail.town || '')}</p></div><div><label>Coordinates</label><input id="schoolCoordinates" readonly value="${coordinates}"><button type="button" class="action-btn btn-blue" style="margin-top:8px;" onclick="navigator.clipboard?.writeText(document.getElementById('schoolCoordinates').value); this.textContent='Copied'">Copy coordinates</button></div><form onsubmit="submitSchoolConnectionRequest(event, ${index})"><label>Your reason for contacting or applying to this school</label><textarea name="details" required placeholder="Briefly explain your request. Do not include sensitive child information."></textarea><button class="submit-btn">Send school connection request</button></form></div>`);
+}
+function submitSchoolConnectionRequest(event, index) {
+  event.preventDefault();
+  const school = nearbySchoolRecords[index];
+  if (!school) return;
+  const details = new FormData(event.target).get('details');
+  saveWorkspaceRecord(null, 'engagement', `School connection request · ${school.name} · ${details}`);
+  closeModal();
 }
 
 async function enrichSchoolPin(button, schoolName, latitude, longitude) {
@@ -1954,6 +2065,10 @@ function openLegalModal(title, text) {
   openModal(title, `<p style="font-size:0.9rem; line-height:1.5; color:var(--text-dark);">${text}</p>`);
 }
 
+function openDonationModal() {
+  openModal('Donate to help Little Feet grow', `<div style="font-size:.9rem;line-height:1.6;"><p>Your contribution can help support accessible tools and continued improvements for early-learning communities.</p><div style="padding:14px;border:1px solid var(--border-color);border-radius:9px;background:var(--input-bg);"><strong>Payflex donation connection</strong><p style="margin:6px 0;color:var(--text-muted);">Donations are not processed until Little Feet has a verified Payflex merchant account, approved payment page, and published donor terms.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('Payflex donations')">Payflex setup required</button></div></div>`);
+}
+
 function openSubscriptionsModal() {
   const schoolRoles = ['teacher', 'principal', 'district', 'admin'];
   if (currentUser?.role === 'parent') {
@@ -1984,6 +2099,16 @@ function openSubscriptionsModal() {
   }
   const content = `
     <div style="font-size:0.88rem; line-height:1.5; color:var(--text-dark);">
+      <section style="margin-bottom:22px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);">
+        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">MIGRATION &amp; LAUNCH</div>
+        <h2 style="margin:8px 0 6px;color:var(--text-dark);font-size:1.25rem;">Move to Little Feet with a guided setup</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+          <div><strong>Week 1: Integration</strong><br><span style="color:var(--text-muted);">Import learner, family, class, and approved school data; review roles and consent records.</span></div>
+          <div><strong>Two-week trial</strong><br><span style="color:var(--text-muted);">Use the agreed plan with real workflows before the contract starts.</span></div>
+          <div><strong>Launch support</strong><br><span style="color:var(--text-muted);">Confirm staff training, parent access, and go-live checks together.</span></div>
+        </div>
+        <p style="margin:12px 0 0;color:var(--text-muted);font-size:.78rem;">Commercial terms: 30-day money-back guarantee, 36-month agreement, cancellation and post-contract customisation fees are fixed in the signed school quotation based on the selected plan. No fee is charged or agreement created by this portal.</p>
+      </section>
       <section style="margin-bottom:26px;">
         <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">INSTITUTIONAL PRICING & BENEFITS</div>
         <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">School Subscriptions & Operational Advantages</h2>
