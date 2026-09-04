@@ -95,7 +95,7 @@ const db = {
   attendance: [],
   broadcasts: [],
   registry: [],
-  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [] },
+  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [] },
   consentRecords: [],
   pickupLogs: [],
   reportReviews: [],
@@ -160,7 +160,11 @@ async function openPostgresDatabase() {
 
 function applySavedState(saved) {
   if (!saved || typeof saved !== 'object') return false;
-  Object.keys(db).forEach(key => { if (Object.hasOwn(saved, key)) db[key] = saved[key]; });
+  const moduleDefaults = db.moduleRecords;
+  Object.keys(db).forEach(key => {
+    if (key !== 'moduleRecords' && Object.hasOwn(saved, key)) db[key] = saved[key];
+  });
+  if (Object.hasOwn(saved, 'moduleRecords')) db.moduleRecords = { ...moduleDefaults, ...(saved.moduleRecords || {}) };
   return true;
 }
 
@@ -218,7 +222,7 @@ function loadReplicaSnapshot() {
   try {
     if (!fs.existsSync(replicaFile)) return;
     const saved = JSON.parse(fs.readFileSync(replicaFile, 'utf8'));
-    Object.keys(db).forEach(key => { if (Object.hasOwn(saved, key)) db[key] = saved[key]; });
+    applySavedState(saved);
   } catch (error) {
     console.error('Unable to load standby snapshot:', error.message);
   }

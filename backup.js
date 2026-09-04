@@ -603,7 +603,7 @@ function applyRolePermissions(role) {
   } else if (role === 'teacher') {
     document.querySelectorAll('.role-teacher').forEach(el => el.classList.remove('hidden'));
   } else if (role === 'principal') {
-    document.querySelectorAll('#attendanceTab, #chatTab, #operationsTab, #careTab, #registryTab, #financeTab').forEach(el => el.classList.remove('hidden'));
+    document.querySelectorAll('#attendanceTab, #schoolDayTab, #chatTab, #operationsTab, #careTab, #registryTab, #financeTab').forEach(el => el.classList.remove('hidden'));
   } else if (role === 'district') {
     document.querySelectorAll('#analyticsTab, #lookupTab').forEach(el => el.classList.remove('hidden'));
   }
@@ -811,7 +811,7 @@ function loadAllData() {
   loadAccounts();
   loadConsentRecords();
   loadPickupRecords();
-  ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding'].forEach(loadWorkspaceRecords);
+  ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding', 'absences', 'handovers'].forEach(loadWorkspaceRecords);
 }
 
 async function loadHouseholdSwitcher() {

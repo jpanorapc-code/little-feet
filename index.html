@@ -731,6 +731,7 @@
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">⚙️ Operations</button>
         <ul class="sidebar-links">
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('attendanceTab', this)">Daily Attendance</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('schoolDayTab', this)">School Day Hub</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Team Chat</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
@@ -1083,6 +1084,20 @@
           </div>
 
           <div id="attendanceList">No students checked in today.</div>
+        </div>
+      </div>
+
+      <div id="schoolDayTab" class="tab-content role-teacher role-admin">
+        <div class="card">
+          <div class="card-header-bar"><div><h2>🌤️ School Day Hub</h2><p style="margin:4px 0 0;color:var(--text-muted);font-size:.85rem;">Keep the day organised from the first classroom check to the final handover.</p></div><span class="badge-tag info">STAFF</span></div>
+          <div class="workspace-grid">
+            <div class="workspace-card"><h3>📝 Learner absence note</h3><p>Record a parent-reported absence for the teaching team to follow up.</p><form onsubmit="saveWorkspaceRecord(event,'absences','Learner absence note')"><input name="details" placeholder="Learner · date · reason / expected return" required><button class="submit-btn">Record absence</button></form></div>
+            <div class="workspace-card"><h3>🤝 Classroom handover</h3><p>Leave a concise handover for the next educator or closing team.</p><form onsubmit="saveWorkspaceRecord(event,'handovers','Classroom handover')"><textarea name="details" rows="3" placeholder="Class · key events · follow-up needed" required></textarea><button class="submit-btn">Save handover</button></form></div>
+            <div class="workspace-card"><h3>✅ Opening checklist</h3><p>Before children arrive: check the register, allergies, room safety, supplies, and the day’s timetable.</p><button type="button" class="action-btn btn-blue" onclick="openWorkspace('attendanceTab')">Open attendance</button></div>
+            <div class="workspace-card"><h3>🌙 Closing checklist</h3><p>Before leaving: complete handovers, check pick-up records, record incidents, and secure learning spaces.</p><button type="button" class="action-btn btn-green" onclick="openWorkspace('safeguardingTab')">Open safeguarding</button></div>
+          </div>
+          <h3 class="workspace-heading">Today’s absence notes</h3><div id="absencesRecords" class="record-list"></div>
+          <h3 class="workspace-heading">Classroom handovers</h3><div id="handoversRecords" class="record-list"></div>
         </div>
       </div>
 
