@@ -352,7 +352,7 @@
     .portal-tour { position:relative; min-height:350px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
     .portal-tour-slide { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.82fr); opacity:0; pointer-events:none; transform:scale(1.015); transition:opacity .55s ease, transform .55s ease; }
     .portal-tour-slide.is-active { opacity:1; pointer-events:auto; transform:scale(1); }
-    .portal-tour-image { width:100%; height:100%; min-height:350px; object-fit:cover; filter:brightness(.56) saturate(.9); animation:tourImageDrift 12s ease-in-out infinite alternate; }
+    .portal-tour-image { width:100%; height:100%; min-height:350px; object-fit:cover; filter:brightness(.88) saturate(1.08) contrast(1.02); animation:tourImageDrift 12s ease-in-out infinite alternate; }
     .portal-tour-copy { position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; gap:10px; padding:24px 28px 30px; color:#fff; background:linear-gradient(135deg,rgba(7,17,30,.96),rgba(15,43,72,.86)); }
     .portal-tour-kicker { color:#5eead4; font-weight:800; font-size:.72rem; letter-spacing:.11em; text-transform:uppercase; }
     .portal-tour h2 { color:#fff; font-size:clamp(1.35rem,2.6vw,2.05rem); line-height:1.12; }
@@ -540,7 +540,7 @@
     @media (max-width: 640px) {
       .portal-tour { min-height:380px; }
       .portal-tour-slide { display:block; }
-      .portal-tour-image { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:380px; filter:brightness(.45) saturate(1.08); }
+      .portal-tour-image { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:380px; filter:brightness(.76) saturate(1.1); }
       .portal-tour-copy { min-height:380px; justify-content:flex-start; padding:23px 22px 68px; background:linear-gradient(135deg,rgba(7,17,30,.91),rgba(15,43,72,.58)); }
       .portal-tour h2 { font-size:1.48rem; }
       .portal-tour-fact { background:rgba(7,17,30,.58); }
@@ -822,19 +822,19 @@
 
         <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
           <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
-            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1588075592405-d3d4f0846961?auto=format&fit=crop&q=82&w=1400" alt="Decorative classroom story-time scene">
+            <img class="portal-tour-image" loading="lazy" src="assets/tour-connected-learning.png" alt="Little Feet mascot guiding connected school life">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected learning</span><h2>One home for everyday school life.</h2><p>Bring schedules, learning evidence, parent updates, attendance, and daily care into role-specific workspaces.</p><div class="portal-tour-fact"><strong>Did you know?</strong> Each role sees only the tools needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 2 of 4">
-            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=82&w=1400" alt="Decorative study materials on a classroom desk">
+            <img class="portal-tour-image" loading="lazy" src="assets/tour-school-admin.png" alt="Little Feet mascot reviewing secure learner records">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Smarter school admin</span><h2>Import the register, then review it once.</h2><p>Principals and administrators can preview a school spreadsheet before importing learner records, instead of retyping a whole register.</p><div class="portal-tour-fact"><strong>Built in:</strong> Duplicate learner records are skipped, while medical, emergency, and pickup fields are encrypted when saved.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('dataImportTab')">Open Data Import</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 3 of 4">
-            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=82&w=1400" alt="Decorative teacher-led classroom scene">
+            <img class="portal-tour-image" loading="lazy" src="assets/tour-family-partnership.png" alt="Little Feet penguin mascots sharing family learning updates">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Family partnership</span><h2>Turn updates into meaningful conversations.</h2><p>Parents can see the learning records, reports, badges, and notices made available to their family account.</p><div class="portal-tour-fact"><strong>Helpful reminder:</strong> Parent report review records can capture teacher and parent acknowledgements before a report is marked complete.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('reportsTab')">View reports</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 4 of 4">
-            <img class="portal-tour-image" loading="lazy" referrerpolicy="no-referrer" src="https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=82&w=1400" alt="Decorative child-friendly classroom learning tools">
+            <img class="portal-tour-image" loading="lazy" src="assets/tour-safety-first.png" alt="Little Feet mascot supporting calm care and safeguarding">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Safety first</span><h2>Keep the right information close at hand.</h2><p>Care, safeguarding, pickup, and area-alert tools are grouped so staff can act calmly when time matters.</p><div class="portal-tour-fact"><strong>Privacy by design:</strong> Location is used only for relevant area alerts, and is not shown to other users.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('careTab')">Open Care &amp; Safety</button></div></div>
           </article>
           <div class="tour-controls"><button type="button" onclick="movePortalTour(-1)" aria-label="Previous slide">‹</button><div class="tour-dots" role="tablist" aria-label="Portal tour slides"><button type="button" class="is-active" onclick="showPortalTourSlide(0)" aria-label="Show slide 1"></button><button type="button" onclick="showPortalTourSlide(1)" aria-label="Show slide 2"></button><button type="button" onclick="showPortalTourSlide(2)" aria-label="Show slide 3"></button><button type="button" onclick="showPortalTourSlide(3)" aria-label="Show slide 4"></button></div><button type="button" onclick="movePortalTour(1)" aria-label="Next slide">›</button></div>
