@@ -687,33 +687,28 @@ function renderRoleHomePanel() {
   const experiences = {
     parent: {
       icon: '👨‍👩‍👧', title: `Welcome back, ${currentUser.name || 'Parent'}`,
-      message: 'Keep up with the learning, reports, achievements, and school updates that are available for your linked children.',
-      actions: [['📋 View reports', 'reportsTab'], ['🏅 View achievements', 'badgesTab'], ['📢 School feed', 'feedTab']]
+      message: 'Keep up with the learning, reports, achievements, and school updates that are available for your linked children.'
     },
     teacher: {
       icon: '🧑‍🏫', title: `Ready for the day, ${currentUser.name || 'Educator'}?`,
-      message: 'Start with attendance, record care updates as they happen, and keep your classroom team in sync.',
-      actions: [['✅ Take attendance', 'attendanceTab'], ['🧷 Record care', 'careTab'], ['💬 Team chat', 'chatTab'], ['📅 Timetable', 'scheduleTab']]
+      message: 'Start with attendance, record care updates as they happen, and keep your classroom team in sync.'
     },
     principal: {
       icon: '🏫', title: `School overview for ${currentUser.name || 'Principal'}`,
-      message: 'Review attendance, finance tasks, reports, and day-to-day operations from the workspaces below.',
-      actions: [['✅ Attendance', 'attendanceTab'], ['💳 Finance', 'financeTab'], ['📝 Reports', 'reportsTab'], ['📥 Import data', 'dataImportTab']]
+      message: 'Review attendance, finance tasks, reports, and day-to-day operations from the workspaces below.'
     },
     district: {
       icon: '🌍', title: `District workspace`,
-      message: 'Use the approved cross-school tools to review progress, find records, and stay informed about safety notices.',
-      actions: [['📈 Progress insights', 'analyticsTab'], ['🔎 Learner search', 'lookupTab'], ['🚨 Safety alerts', 'broadcastsTab'], ['? Get help', 'ticketsTab']]
+      message: 'Use the approved cross-school tools to review progress, find records, and stay informed about safety notices.'
     },
     admin: {
       icon: '🐧', title: `Admin centre for ${currentUser.name || 'your school'}`,
-      message: 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.',
-      actions: [['👤 Manage accounts', 'accountsTab'], ['📥 Import data', 'dataImportTab'], ['🛡️ Safeguarding', 'safeguardingTab'], ['⚙️ Operations', 'operationsTab']]
+      message: 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.'
     }
   };
   const experience = experiences[currentUser.role] || experiences.parent;
   panel.classList.add('mascot-role-home');
-  panel.innerHTML = `<div class="role-home-content"><div><span class="portal-tour-kicker">YOUR NEXT STEPS</span><h2>${escapeWorkspaceText(experience.title)}</h2><p>${escapeWorkspaceText(experience.message)}</p><div class="role-home-actions">${experience.actions.map(([label, tab]) => `<button type="button" class="action-btn btn-blue" onclick="openWorkspace('${tab}')">${label}</button>`).join('')}</div></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
+  panel.innerHTML = `<div class="role-home-content"><div><span class="portal-tour-kicker">YOUR WORKSPACE</span><h2>${escapeWorkspaceText(experience.title)}</h2><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
 }
 
 function logout() {

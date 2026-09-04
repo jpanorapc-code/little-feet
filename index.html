@@ -282,27 +282,20 @@
     .role-home-panel h2 { margin:0 0 7px; color:#f8fafc; font-size:clamp(1.2rem,2.4vw,1.7rem); }
     .role-home-panel p { margin:0; color:#cbd5e1; line-height:1.5; }
     .role-home-panel .role-home-icon { display:grid; place-items:center; min-height:128px; border:1px solid rgba(94,234,212,.2); border-radius:14px; background:radial-gradient(circle at 50% 35%,rgba(45,212,191,.25),rgba(7,17,30,.35)); font-size:3.2rem; }
-    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:218px; background-image:linear-gradient(90deg,rgba(5,16,31,.97) 0%,rgba(6,24,42,.93) 43%,rgba(6,24,42,.5) 68%,rgba(6,24,42,.12) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover,auto 172%; background-position:center,right 42%; background-repeat:no-repeat; }
+    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:174px; background-image:linear-gradient(90deg,rgba(5,16,31,.97) 0%,rgba(6,24,42,.93) 43%,rgba(6,24,42,.5) 68%,rgba(6,24,42,.12) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover,auto 172%; background-position:center,right 42%; background-repeat:no-repeat; }
     .role-home-panel.mascot-role-home::before { content:""; position:absolute; z-index:0; inset:-28%; pointer-events:none; background:radial-gradient(ellipse at 77% 53%,rgba(255,190,92,.28) 0%,rgba(45,212,191,.18) 23%,rgba(45,212,191,.04) 42%,transparent 64%); filter:blur(12px); animation:adminMascotGlow 4.8s ease-in-out infinite alternate; }
-    .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:178px; max-width:62%; }
+    .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:134px; max-width:62%; }
     .role-home-panel.mascot-role-home .role-home-icon { display:none; }
     @keyframes adminMascotGlow { from { opacity:.58; transform:scale(.94); } to { opacity:1; transform:scale(1.07); } }
     @media (prefers-reduced-motion:reduce) { .role-home-panel.mascot-role-home::before { animation:none; opacity:.78; } }
-    .role-home-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:15px; }
-    .role-home-actions button { margin:0; }
-    .portal-welcome-banner { position:relative; isolation:isolate; overflow:hidden; min-height:176px; margin:0 0 18px; padding:26px clamp(20px,4vw,42px); border:1px solid rgba(94,234,212,.38); border-radius:16px; background-image:linear-gradient(90deg,rgba(4,18,34,.96) 0%,rgba(7,29,47,.84) 46%,rgba(5,26,46,.18) 100%),url('assets/welcome-footsteps-banner.png'); background-size:cover; background-position:center; box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08); }
+    .portal-welcome-banner { position:relative; isolation:isolate; overflow:hidden; min-height:142px; margin:0 0 18px; padding:22px clamp(20px,4vw,42px); border:1px solid rgba(94,234,212,.38); border-radius:16px; background-image:linear-gradient(90deg,rgba(4,18,34,.96) 0%,rgba(7,29,47,.84) 46%,rgba(5,26,46,.18) 100%),url('assets/welcome-footsteps-banner.png'); background-size:cover; background-position:center; box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08); }
     .portal-welcome-banner::before { content:""; position:absolute; z-index:0; inset:-32%; pointer-events:none; background:radial-gradient(ellipse at 78% 60%,rgba(255,190,92,.3),rgba(45,212,191,.16) 27%,transparent 62%); filter:blur(12px); animation:adminMascotGlow 5.2s ease-in-out infinite alternate; }
     .portal-welcome-copy { position:relative; z-index:1; max-width:min(660px,70%); }
     .portal-welcome-kicker { display:inline-flex; align-items:center; gap:7px; margin-bottom:7px; color:#99f6e4; font-size:.72rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
     .portal-welcome-kicker::before { content:""; width:8px; height:8px; border-radius:50%; background:#fbbf24; box-shadow:0 0 16px rgba(251,191,36,.8); }
     .portal-welcome-banner h1 { margin:0 0 7px; color:#fff; font-size:clamp(1.45rem,3vw,2.2rem); }
     .portal-welcome-banner p { margin:0; max-width:580px; color:#dbeafe; line-height:1.5; }
-    .portal-welcome-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
-    .portal-welcome-actions button { width:auto; margin:0; border:1px solid rgba(255,255,255,.2); border-radius:9px; padding:9px 13px; background:rgba(13,148,136,.84); color:#fff; font:700 .8rem/1.1 inherit; cursor:pointer; }
-    .portal-welcome-actions button:hover { transform:translateY(-1px); background:#14b8a6; }
-    .portal-welcome-actions .welcome-secondary { background:rgba(2,132,199,.82); }
-    .portal-welcome-actions .welcome-tertiary { background:rgba(22,163,74,.82); }
-    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:304px; background-size:cover,auto 150%; background-position:center,right 38%; } .role-home-panel.mascot-role-home .role-home-content { min-height:264px; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:21px; padding-bottom:21px; background-position:70% center; } .portal-welcome-copy { max-width:100%; } }
+    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:214px; background-size:cover,auto 150%; background-position:center,right 38%; } .role-home-panel.mascot-role-home .role-home-content { min-height:174px; max-width:100%; } .portal-welcome-banner { min-height:166px; padding-top:21px; padding-bottom:21px; background-position:70% center; } .portal-welcome-copy { max-width:100%; } }
     .record-list { margin-top:16px; display:grid; gap:8px; }
     .record-list .item-row { margin:0; }
     .footer-links a { padding:4px 7px; border-radius:5px; }
@@ -813,11 +806,6 @@
             <span class="portal-welcome-kicker">Your Little Feet space</span>
             <h1>Welcome to Little Feet</h1>
             <p>A secure, friendly home for learning, care, communication, and everyday school life.</p>
-            <div class="portal-welcome-actions">
-              <button type="button" onclick="openWorkspace('feedTab')">📱 View School Feed</button>
-              <button type="button" id="subscriptionEntryButton" class="welcome-secondary" onclick="openSubscriptionsModal()">💎 Plans &amp; Benefits</button>
-              <button type="button" class="welcome-tertiary" onclick="openModulesBreakdownModal()">✨ Explore Features</button>
-            </div>
           </div>
         </section>
         <section id="roleHomePanel" class="card role-home-panel" aria-live="polite"></section>
