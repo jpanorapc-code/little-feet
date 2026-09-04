@@ -861,6 +861,8 @@ passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
 const googleSignInConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+const yahooSignInConfigured = Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET);
+const yahooCallbackUrl = 'https://littlefeet.co.za/auth/yahoo/callback';
 if (googleSignInConfigured) passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -877,7 +879,7 @@ if (googleSignInConfigured) passport.use(new GoogleStrategy({
   }
 ));
 
-app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured }));
+app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured, yahoo: yahooSignInConfigured }));
 app.get('/api/auth/session', (req, res) => {
   const account = req.session?.littleFeetUser;
   if (!account) return res.status(401).json({ message: 'No provider sign-in session found.' });
@@ -899,6 +901,51 @@ app.get('/auth/google/callback',
     res.redirect('/?oauth=google');
   }
 );
+
+app.get('/auth/yahoo', (req, res) => {
+  if (!yahooSignInConfigured) return res.status(503).send('Yahoo sign-in is not configured for this school yet.');
+  const state = crypto.randomBytes(24).toString('hex');
+  req.session.yahooOAuthState = state;
+  const authorizationUrl = new URL('https://api.login.yahoo.com/oauth2/request_auth');
+  authorizationUrl.search = new URLSearchParams({
+    client_id: process.env.YAHOO_CLIENT_ID,
+    redirect_uri: yahooCallbackUrl,
+    response_type: 'code',
+    scope: 'openid profile email',
+    state
+  }).toString();
+  res.redirect(authorizationUrl.toString());
+});
+
+app.get('/auth/yahoo/callback', async (req, res) => {
+  if (!yahooSignInConfigured || req.query.error || !req.query.code || req.query.state !== req.session.yahooOAuthState) {
+    return res.redirect('/?oauthError=yahoo-sign-in-failed');
+  }
+  delete req.session.yahooOAuthState;
+  try {
+    const tokenResponse = await fetch('https://api.login.yahoo.com/oauth2/get_token', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${process.env.YAHOO_CLIENT_ID}:${process.env.YAHOO_CLIENT_SECRET}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({ grant_type: 'authorization_code', code: req.query.code, redirect_uri: yahooCallbackUrl })
+    });
+    const tokens = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Yahoo token exchange failed');
+    const profileResponse = await fetch('https://api.login.yahoo.com/openid/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` }
+    });
+    const profile = await profileResponse.json();
+    const account = findAccountByUsername(profile.email);
+    if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
+    req.session.littleFeetUser = safeAccount(account);
+    res.redirect('/?oauth=yahoo');
+  } catch (error) {
+    console.error('Yahoo sign-in failed:', error.message);
+    res.redirect('/?oauthError=yahoo-sign-in-failed');
+  }
+});
 
 // Wildcard Catch-All (Serves Frontend)
 app.get(/(.*)/, (req, res) => {
