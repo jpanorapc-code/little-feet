@@ -41,6 +41,18 @@ const isParentLinkedToLearner = (parent, learner) => {
   return normalizeUsername(learner.contactEmail) === normalizeUsername(parent.username)
     || normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName));
 };
+const normaliseAssignedClasses = (value) => [...new Set((Array.isArray(value) ? value : String(value || '').split(',')).map(normalizeComparableText).filter(Boolean))];
+const isSameSchool = (first, second) => normalizeComparableText(first?.schoolName) && normalizeComparableText(first?.schoolName) === normalizeComparableText(second?.schoolName);
+const canUseDirectChat = (first, second) => {
+  if (!first || !second || first.username === second.username || !isSameSchool(first, second)) return false;
+  const parent = first.role === 'parent' ? first : second.role === 'parent' ? second : null;
+  if (!parent) return true;
+  const staffMember = parent === first ? second : first;
+  if (staffMember.role === 'principal') return true;
+  if (staffMember.role !== 'teacher') return false;
+  const learnerClasses = new Set(db.students.filter(learner => isParentLinkedToLearner(parent, learner)).map(learner => normalizeComparableText(learner.className)).filter(Boolean));
+  return normaliseAssignedClasses(staffMember.assignedClasses).some(className => learnerClasses.has(className));
+};
 const encryptField = (value) => { const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', fieldKey, iv); const content = Buffer.concat([cipher.update(String(value || ''), 'utf8'), cipher.final()]); return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${content.toString('base64')}`; };
 const decryptField = (value) => { try { const [iv, tag, content] = String(value || '').split('.').map(part => Buffer.from(part, 'base64')); const decipher = crypto.createDecipheriv('aes-256-gcm', fieldKey, iv); decipher.setAuthTag(tag); return Buffer.concat([decipher.update(content), decipher.final()]).toString('utf8'); } catch { return ''; } };
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
@@ -74,7 +86,7 @@ const db = {
   term: "Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST",
   users: [
     { username: "admin@gmail.com", pin: "Test", role: "admin", name: "System Admin", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
-    { username: "Teacher@gmail.com", pin: "Test", role: "teacher", name: "Sarah Educator", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
+    { username: "Teacher@gmail.com", pin: "Test", role: "teacher", name: "Sarah Educator", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "", assignedClasses: ["Preschool", "Toddlers"] },
     { username: "Parent@gmail.com", pin: "Test", role: "parent", name: "John Parent", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "", subscription: "plus" },
     { username: "Principle@gmail.com", pin: "Test", role: "principal", name: "Maya Principal", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
     { username: "District@gmail.com", pin: "Test", role: "district", name: "District Officer", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" }
@@ -165,6 +177,8 @@ function applySavedState(saved) {
     if (key !== 'moduleRecords' && Object.hasOwn(saved, key)) db[key] = saved[key];
   });
   if (Object.hasOwn(saved, 'moduleRecords')) db.moduleRecords = { ...moduleDefaults, ...(saved.moduleRecords || {}) };
+  const demoTeacher = db.users.find(user => normalizeUsername(user.username) === 'teacher@gmail.com');
+  if (demoTeacher && !normaliseAssignedClasses(demoTeacher.assignedClasses).length) demoTeacher.assignedClasses = ['Preschool', 'Toddlers'];
   return true;
 }
 
@@ -319,14 +333,14 @@ app.get('/api/accounts', (req, res) => {
   res.json(db.users.map(safeAccount));
 });
 app.post('/api/accounts', (req, res) => {
-  const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, actorUsername } = req.body;
+  const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses, actorUsername } = req.body;
   if (!requireAdmin(actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (!username || !pin || !name || !schoolName || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, role, and school name are required.' });
   if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: String(schoolName).trim(), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links };
+  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: String(schoolName).trim(), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links, assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
   db.users.push(account);
   res.status(201).json({ success: true, account: safeAccount(account) });
 });
@@ -334,7 +348,7 @@ app.put('/api/accounts/:username', (req, res) => {
   if (!requireAdmin(req.body.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
   const account = db.users.find(entry => entry.username === req.params.username);
   if (!account) return res.status(404).json({ message: 'Account not found.' });
-  const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners } = req.body;
+  const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (username && username !== account.username && db.users.some(entry => entry.username.toLowerCase() === String(username).toLowerCase())) return res.status(409).json({ message: 'That username is already in use.' });
   if (username) account.username = String(username).trim();
@@ -346,6 +360,7 @@ app.put('/api/accounts/:username', (req, res) => {
   const linkValidation = account.role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   account.linkedLearners = linkValidation.links;
+  account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [];
   res.json({ success: true, account: safeAccount(account) });
 });
 app.delete('/api/accounts/:username', (req, res) => {
@@ -660,24 +675,57 @@ app.post('/api/attendance/clear', (req, res) => {
 
 // Tickets
 app.get('/api/tickets', (req, res) => {
-  res.json(db.tickets);
+  const viewer = findAccountByUsername(req.query.username);
+  if (!viewer) return res.status(401).json({ message: 'Sign in to view your support tickets.' });
+  if (viewer.role === 'admin') return res.json(db.tickets);
+  const visibleTickets = db.tickets.filter(ticket =>
+    normalizeUsername(ticket.createdBy) === normalizeUsername(viewer.username) ||
+    normalizeUsername(ticket.assignedTo) === normalizeUsername(viewer.username)
+  );
+  res.json(visibleTickets);
 });
 app.post('/api/tickets', (req, res) => {
-  const item = { ...req.body, status: "Open", monthCategory: "August 2026" };
+  const { createdBy, assignedTo, ...ticketDetails } = req.body;
+  const creator = findAccountByUsername(createdBy);
+  if (!creator) return res.status(401).json({ message: 'Sign in to create a support ticket.' });
+  const assignedAccount = creator.role === 'admin' ? findAccountByUsername(assignedTo) : null;
+  if (assignedTo && (!assignedAccount || !isSameSchool(creator, assignedAccount))) {
+    return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
+  }
+  const item = {
+    ...ticketDetails,
+    id: String(ticketDetails.id || crypto.randomUUID()),
+    createdBy: creator.username,
+    createdByName: creator.name || creator.username,
+    assignedTo: assignedAccount?.username || '',
+    status: 'Open',
+    monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }),
+    createdAt: new Date().toISOString()
+  };
   db.tickets.unshift(item);
   res.json({ success: true, item });
 });
 app.post('/api/tickets/update', (req, res) => {
-  const { id, status, feedback, updatedBy } = req.body;
+  const { id, status, feedback, updatedBy, assignedTo } = req.body;
+  const actor = findAccountByUsername(updatedBy);
+  if (!actor) return res.status(401).json({ message: 'Sign in to update a support ticket.' });
   const ticket = db.tickets.find(t => t.id === id);
-  if (ticket) {
-    if (status) ticket.status = status;
-    if (feedback !== undefined) ticket.feedback = feedback;
-    if (updatedBy) ticket.updatedBy = updatedBy;
+  if (!ticket) return res.status(404).json({ message: 'Support ticket not found.' });
+  const canManage = actor.role === 'admin' || normalizeUsername(ticket.assignedTo) === normalizeUsername(actor.username);
+  if (!canManage) return res.status(403).json({ message: 'Only the assigned account or an administrator can update this ticket.' });
+  if (assignedTo !== undefined) {
+    if (actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can change ticket assignments.' });
+    const assignedAccount = assignedTo ? findAccountByUsername(assignedTo) : null;
+    if (assignedTo && (!assignedAccount || !isSameSchool(actor, assignedAccount))) return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
+    ticket.assignedTo = assignedAccount?.username || '';
   }
-  res.json({ success: true });
+  if (status) ticket.status = status;
+  if (feedback !== undefined) ticket.feedback = feedback;
+  ticket.updatedBy = actor.username;
+  res.json({ success: true, ticket });
 });
 app.delete('/api/tickets/:id', (req, res) => {
+  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
   db.tickets = db.tickets.filter(t => t.id !== req.params.id);
   res.json({ success: true });
 });
@@ -710,6 +758,7 @@ app.post('/api/chat/messages', (req, res) => {
   const { groupId, sender, message, textColor } = req.body;
   if (!db.groupMessages[groupId]) db.groupMessages[groupId] = [];
   const msgObj = {
+    id: crypto.randomUUID(),
     sender,
     message,
     textColor: textColor || "#2dd4bf",
@@ -718,13 +767,27 @@ app.post('/api/chat/messages', (req, res) => {
   db.groupMessages[groupId].push(msgObj);
   res.json({ success: true, msgObj });
 });
+app.delete('/api/chat/messages/:groupId/:messageId', (req, res) => {
+  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const messages = db.groupMessages[req.params.groupId];
+  if (!messages) return res.status(404).json({ message: 'Chat group not found.' });
+  const previousLength = messages.length;
+  db.groupMessages[req.params.groupId] = messages.filter(message => message.id !== req.params.messageId);
+  if (db.groupMessages[req.params.groupId].length === previousLength) return res.status(404).json({ message: 'Message not found.' });
+  res.json({ success: true });
+});
 
 // Chat - Direct
 app.get('/api/chat/direct/users', (req, res) => {
-  res.json(db.users);
+  const viewer = findAccountByUsername(req.query.username);
+  if (!viewer) return res.status(401).json({ message: 'A valid signed-in account is required.' });
+  res.json(db.users.filter(user => canUseDirectChat(viewer, user)).map(safeAccount));
 });
 app.get('/api/chat/direct/:user1/:user2', (req, res) => {
   const { user1, user2 } = req.params;
+  const viewer = findAccountByUsername(user1);
+  const contact = findAccountByUsername(user2);
+  if (!canUseDirectChat(viewer, contact)) return res.status(403).json({ message: 'This private conversation is not available for these accounts.' });
   const msgs = db.directMessages.filter(
     m => (m.sender === user1 && m.recipient === user2) || (m.sender === user2 && m.recipient === user1)
   );
@@ -732,7 +795,12 @@ app.get('/api/chat/direct/:user1/:user2', (req, res) => {
 });
 app.post('/api/chat/direct', (req, res) => {
   const { sender, recipient, message, textColor } = req.body;
+  const senderAccount = findAccountByUsername(sender);
+  const recipientAccount = findAccountByUsername(recipient);
+  if (!canUseDirectChat(senderAccount, recipientAccount)) return res.status(403).json({ message: 'You can only message approved contacts at your school.' });
+  if (!String(message || '').trim()) return res.status(400).json({ message: 'A message is required.' });
   const msgObj = {
+    id: crypto.randomUUID(),
     sender,
     recipient,
     message,
@@ -741,6 +809,13 @@ app.post('/api/chat/direct', (req, res) => {
   };
   db.directMessages.push(msgObj);
   res.json({ success: true, msgObj });
+});
+app.delete('/api/chat/direct/:messageId', (req, res) => {
+  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const previousLength = db.directMessages.length;
+  db.directMessages = db.directMessages.filter(message => message.id !== req.params.messageId);
+  if (db.directMessages.length === previousLength) return res.status(404).json({ message: 'Message not found.' });
+  res.json({ success: true });
 });
 
 // Emergency Broadcasts

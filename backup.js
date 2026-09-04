@@ -6,6 +6,9 @@ let alertLocation = null;
 let accountsCache = [];
 let broadcastsLoaded = false;
 let alertMonitorId = null;
+let ticketMonitorId = null;
+let knownTicketIds = new Set();
+let ticketsLoaded = false;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
 let portalTourIndex = 0;
@@ -40,6 +43,30 @@ function playDingSound() {
   } catch (e) {
     console.log('Audio disabled:', e);
   }
+}
+
+function playTicketAlert() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, ctx.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.04, ctx.currentTime + 0.03);
+    master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 6.4);
+    master.connect(ctx.destination);
+    const pattern = [659.25, 783.99, 987.77, 783.99, 659.25, 523.25, 659.25, 880];
+    Array.from({ length: 25 }, (_, index) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = ctx.currentTime + index * 0.25;
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(pattern[index % pattern.length], start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
+      oscillator.connect(gain); gain.connect(master);
+      oscillator.start(start); oscillator.stop(start + 0.22);
+    });
+  } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
 
 // DOM Initialization
@@ -155,31 +182,30 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
-// A short, low-volume bell motif for a welcoming start without a harsh alert tone.
+// A short original pixel-style welcome motif, played once for each sign-in.
 function playStartupChime() {
-  if (startupChimePlayed || sessionStorage.getItem('lf_startup_chime_played') === 'true') return;
+  if (startupChimePlayed) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + 0.12);
-    master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 4);
+    master.gain.exponentialRampToValueAtTime(0.035, ctx.currentTime + 0.04);
+    master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 6.9);
     master.connect(ctx.destination);
-    const notes = [523.25, 659.25, 783.99, 659.25, 587.33, 783.99];
+    const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 587.33, 698.46, 880, 1046.5, 880, 783.99, 659.25, 523.25, 587.33, 698.46, 783.99, 880, 1046.5, 1174.66, 1046.5, 880, 783.99, 698.46, 659.25, 587.33, 523.25, 659.25, 783.99, 880, 783.99, 1046.5];
     notes.forEach((frequency, index) => {
       const oscillator = ctx.createOscillator();
       const tone = ctx.createGain();
-      const start = ctx.currentTime + (index * 0.58);
-      oscillator.type = 'sine';
+      const start = ctx.currentTime + (index * 0.21);
+      oscillator.type = 'square';
       oscillator.frequency.setValueAtTime(frequency, start);
       tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(0.45, start + 0.025);
-      tone.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+      tone.gain.exponentialRampToValueAtTime(0.16, start + 0.012);
+      tone.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
       oscillator.connect(tone); tone.connect(master);
-      oscillator.start(start); oscillator.stop(start + 0.54);
+      oscillator.start(start); oscillator.stop(start + 0.21);
     });
     startupChimePlayed = true;
-    sessionStorage.setItem('lf_startup_chime_played', 'true');
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
 
@@ -261,7 +287,7 @@ function routeErrorToHelpdesk(error) {
   console.error(details);
   if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
   sessionStorage.setItem(`lf_error_${details}`, '1');
-  const ticketBody = { id: `err-${Date.now()}`, department: 'Technical Support', priority: 'High', subject: `Automatic error report: ${error.code}`, message: details };
+  const ticketBody = { id: `err-${Date.now()}`, department: 'Technical Support', priority: 'High', subject: `Automatic error report: ${error.code}`, message: details, createdBy: currentUser?.username };
   fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ticketBody) }).catch(() => {});
   const supportButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes("ticketsTab"));
   switchTab('ticketsTab', supportButton);
@@ -585,10 +611,13 @@ function setupSession() {
   configureDebugMode();
   applyUserPreferences();
   playStartupChime();
+  if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
+  if (ticketMonitorId) clearInterval(ticketMonitorId);
+  ticketMonitorId = setInterval(() => { if (currentUser) loadTickets(true); }, 20000);
 }
 
 function applyRolePermissions(role) {
@@ -648,7 +677,11 @@ function renderRoleHomePanel() {
 
 function logout() {
   currentUser = null;
+  startupChimePlayed = false;
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
+  if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
+  knownTicketIds = new Set();
+  ticketsLoaded = false;
   localStorage.removeItem('lf_user');
   document.getElementById('dashboardSection').classList.add('hidden');
   document.getElementById('authSection').classList.remove('hidden');
@@ -798,6 +831,7 @@ function loadAllData() {
   loadWorksheets();
   loadBadges();
   loadTickets();
+  loadTicketAssignees();
   loadAttendance();
   loadBroadcasts();
   loadChatGroups();
@@ -1628,10 +1662,43 @@ async function clearAttendanceRegistry() {
 }
 
 // Support Tickets Archive & Queue
-async function loadTickets() {
+function ticketCanBeManaged(ticket) {
+  return currentUser?.role === 'admin' || String(ticket.assignedTo || '').toLowerCase() === String(currentUser?.username || '').toLowerCase();
+}
+
+function showTicketNotification(ticket) {
+  const notice = document.createElement('div');
+  notice.className = 'ticket-toast';
+  notice.setAttribute('role', 'status');
+  notice.innerHTML = `<strong>🎫 New ticket assigned</strong><span>${escapeWorkspaceText(ticket.subject || 'Support request')}</span>`;
+  document.body.appendChild(notice);
+  window.setTimeout(() => notice.remove(), 8000);
+}
+
+async function loadTicketAssignees() {
+  const select = document.getElementById('ticketAssignee');
+  if (!select || currentUser?.role !== 'admin') return;
   try {
-    const res = await fetch('/api/tickets');
+    const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
+    const accounts = await response.json();
+    if (!response.ok) return;
+    const selected = select.value;
+    select.innerHTML = `<option value="">Unassigned</option>${accounts.filter(account => account.username !== currentUser.username && account.schoolName === currentUser.schoolName).map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.role)}</option>`).join('')}`;
+    select.value = [...select.options].some(option => option.value === selected) ? selected : '';
+  } catch { /* The ticket form remains available without preloading assignees. */ }
+}
+
+async function loadTickets(checkForNew = false) {
+  try {
+    if (!currentUser) return;
+    const res = await fetch(`/api/tickets?username=${encodeURIComponent(currentUser.username)}`);
     const tickets = await res.json();
+    if (!res.ok) throw new Error('Unable to fetch tickets.');
+    const assignedTickets = tickets.filter(ticket => String(ticket.assignedTo || '').toLowerCase() === String(currentUser.username).toLowerCase());
+    const newTickets = assignedTickets.filter(ticket => !knownTicketIds.has(ticket.id));
+    if (ticketsLoaded && checkForNew && newTickets.length) { showTicketNotification(newTickets[0]); playTicketAlert(); }
+    tickets.forEach(ticket => knownTicketIds.add(ticket.id));
+    ticketsLoaded = true;
     const filter = document.getElementById('ticketDeptFilter').value;
 
     const filtered = tickets.filter(t => filter === 'All' || t.department === filter);
@@ -1646,14 +1713,15 @@ async function loadTickets() {
                 <span class="badge-tag">${t.department}</span> 
                 <span class="badge-tag urgent">${t.priority} Priority</span>
                 <strong>${t.subject}</strong>
+                <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              <button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>
+              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${t.message}</p>
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${t.updatedBy}:</strong> ${t.feedback}</div>` : ''}
-            <div style="margin-top: 8px;">
-              <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${(t.feedback || '').replace(/'/g, "\\'")}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
-            </div>
+            ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
+              <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
+            </div>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
 
@@ -1671,7 +1739,7 @@ async function loadTickets() {
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
             <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${t.subject}</strong></div>
-            <button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>
+            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
           <p style="font-size:0.85rem; margin-top:4px;">${t.message}</p>
           ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${t.feedback}</p>` : ''}
@@ -1686,8 +1754,10 @@ async function loadTickets() {
 }
 
 async function deleteTicket(id) {
+  if (currentUser?.role !== 'admin') return alert('Only an administrator can delete support tickets.');
   if (!confirm('Are you sure you want to delete this support ticket?')) return;
-  await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
+  const response = await fetch(`/api/tickets/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
+  if (!response.ok) return alert('Unable to delete this ticket.');
   loadTickets();
 }
 
@@ -1700,16 +1770,23 @@ if (ticketForm) {
       department: document.getElementById('ticketDept').value,
       priority: document.getElementById('ticketPriority').value,
       subject: document.getElementById('ticketSubject').value,
-      message: document.getElementById('ticketMessage').value
+      message: document.getElementById('ticketMessage').value,
+      createdBy: currentUser?.username,
+      assignedTo: currentUser?.role === 'admin' ? document.getElementById('ticketAssignee')?.value : ''
     };
-    await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const response = await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to create the support ticket.');
     ticketForm.reset();
+    loadTicketAssignees();
     loadTickets();
     playDingSound();
   });
 }
 
-function editTicketModal(id, currentStatus, currentFeedback) {
+function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
+  const currentFeedback = decodeURIComponent(encodedFeedback || '');
+  const currentAssignee = decodeURIComponent(encodedAssignee || '');
   const html = `
     <form id="editTicketForm">
       <div>
@@ -1720,19 +1797,27 @@ function editTicketModal(id, currentStatus, currentFeedback) {
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
         <label for="editCompleted" style="margin-bottom:0;">Mark Ticket as Completed</label>
       </div>
+      ${currentUser?.role === 'admin' ? '<div><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
       <button type="submit" class="submit-btn">Save Ticket Resolution</button>
     </form>`;
   openModal('Edit Support Ticket', html);
+  if (currentUser?.role === 'admin') loadTicketAssignees().then(() => {
+    const source = document.getElementById('ticketAssignee');
+    const target = document.getElementById('editTicketAssignee');
+    if (source && target) { target.innerHTML = source.innerHTML; target.value = currentAssignee; }
+  });
 
   document.getElementById('editTicketForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const feedback = document.getElementById('editFeedback').value;
     const status = document.getElementById('editCompleted').checked ? 'Completed' : 'Open';
-    await fetch('/api/tickets/update', {
+    const response = await fetch('/api/tickets/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin' })
+      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin', assignedTo: currentUser?.role === 'admin' ? document.getElementById('editTicketAssignee')?.value : undefined })
     });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to update this ticket.');
     closeModal();
     loadTickets();
     playDingSound();
@@ -1779,6 +1864,7 @@ async function loadBroadcasts() {
 
 // Chat System Operations
 function switchChatMode(mode) {
+  if (currentUser?.role === 'parent' && mode === 'group') mode = 'direct';
   const groupSec = document.getElementById('groupChatSection');
   const directSec = document.getElementById('directChatSection');
   const btnGroup = document.getElementById('btnGroupChatMode');
@@ -1842,10 +1928,12 @@ async function loadGroupChatMessages() {
     chatBox.innerHTML = msgs.length
       ? msgs.map(m => {
           const isMe = currentUser && m.sender === currentUser.username;
+          const moderation = currentUser?.role === 'admin' && m.id
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${groupId}','${m.id}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${m.textColor || 'inherit'};">${m.sender}:</strong> ${m.message}
-              <span class="msg-timestamp">${m.timestamp || ''}</span>
+              <strong style="color:${m.textColor || 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
+              <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
             </div>`;
         }).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No messages in this channel yet.</p>';
@@ -1854,6 +1942,14 @@ async function loadGroupChatMessages() {
   } catch (e) {
     logAppError('ERR_CHAT_MSG', 'Unable to fetch group messages.');
   }
+}
+
+async function deleteGroupChatMessage(groupId, messageId) {
+  if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this chat message?')) return;
+  const response = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to delete this message.');
+  loadGroupChatMessages();
 }
 
 function createNewGroupModal() {
@@ -1900,13 +1996,16 @@ async function deleteCurrentGroup() {
 
 async function loadDirectChatUsers() {
   try {
-    const res = await fetch('/api/chat/direct/users');
+    if (!currentUser) return;
+    const res = await fetch(`/api/chat/direct/users?username=${encodeURIComponent(currentUser.username)}`);
     const users = await res.json();
     const select = document.getElementById('directRecipientSelect');
     if (!select) return;
 
-    const filtered = users.filter(u => !currentUser || u.username !== currentUser.username);
-    select.innerHTML = '<option value="">Select Recipient (Parent or Staff)...</option>' + 
+    if (!res.ok) throw new Error(users.message || 'Unable to load approved contacts.');
+    const filtered = users.filter(u => u.username !== currentUser.username);
+    const prompt = currentUser.role === 'parent' ? 'Select your child\'s teacher or principal...' : 'Select approved school contact...';
+    select.innerHTML = `<option value="">${prompt}</option>` +
       filtered.map(u => `<option value="${u.username}">${u.name || u.username} (${u.role.toUpperCase()})</option>`).join('');
   } catch (e) {
     logAppError('ERR_DIRECT_USERS', 'Failed to retrieve direct messaging contacts.');
@@ -1929,10 +2028,12 @@ async function loadDirectChatMessages() {
     box.innerHTML = msgs.length
       ? msgs.map(m => {
           const isMe = m.sender === currentUser.username;
+          const moderation = currentUser?.role === 'admin' && m.id
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${m.id}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${m.textColor || 'inherit'};">${m.sender}:</strong> ${m.message}
-              <span class="msg-timestamp">${m.timestamp || ''}</span>
+              <strong style="color:${m.textColor || 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
+              <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
             </div>`;
         }).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No private messages exchange recorded yet.</p>';
@@ -1941,6 +2042,14 @@ async function loadDirectChatMessages() {
   } catch (e) {
     logAppError('ERR_DIRECT_MSG', 'Unable to fetch private messages.');
   }
+}
+
+async function deleteDirectChatMessage(messageId) {
+  if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this private message?')) return;
+  const response = await fetch(`/api/chat/direct/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to delete this message.');
+  loadDirectChatMessages();
 }
 
 // Global Form Submissions Router
@@ -1977,6 +2086,7 @@ function setupFormListeners() {
         role: document.getElementById('accountRole').value,
         schoolName: document.getElementById('accountSchoolName').value.trim(),
         schoolStoreUrl: document.getElementById('accountStoreUrl').value.trim(),
+        assignedClasses: document.getElementById('accountAssignedClasses').value.trim(),
         linkedLearners: document.getElementById('accountLinkedLearners').value.trim(),
         actorUsername: currentUser?.username
       };
@@ -2278,6 +2388,7 @@ function editAccount(account) {
   document.getElementById('accountRole').value = account.role || 'parent';
   document.getElementById('accountSchoolName').value = account.schoolName || '';
   document.getElementById('accountStoreUrl').value = account.schoolStoreUrl || '';
+  document.getElementById('accountAssignedClasses').value = (account.assignedClasses || []).join(', ');
   document.getElementById('accountLinkedLearners').value = (account.linkedLearners || []).join(', ');
   document.getElementById('accountPin').value = '';
   document.getElementById('accountPinHint').textContent = '(leave empty to keep password)';

@@ -322,6 +322,11 @@
     .social-signin { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:9px; width:min(100%, 360px); margin:12px auto 0; }
     .social-signin button { min-height:44px; border:1px solid var(--border-color); border-radius:8px; padding:9px 10px; color:var(--text-dark); background:var(--input-bg); font-size:.78rem; font-weight:700; line-height:1.2; cursor:pointer; }
     .social-signin button:hover, .social-signin button:focus-visible { border-color:var(--primary-color); background:rgba(13,148,136,.12); outline:none; }
+    .chat-delete-btn { margin-left:9px; border:1px solid rgba(248,113,113,.55); border-radius:5px; background:rgba(127,29,29,.2); color:#fecaca; padding:3px 6px; font-size:.68rem; font-weight:700; cursor:pointer; }
+    .chat-delete-btn:hover { background:rgba(220,38,38,.34); }
+    .ticket-toast { position:fixed; right:22px; bottom:22px; z-index:10050; width:min(330px,calc(100vw - 44px)); padding:14px 16px; border:1px solid #2dd4bf; border-radius:12px; background:#102b41; color:#f8fafc; box-shadow:0 16px 42px rgba(0,0,0,.4); display:grid; gap:4px; animation:ticketToastIn .28s ease-out; }
+    .ticket-toast span { color:#b9d5e7; font-size:.88rem; }
+    @keyframes ticketToastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     .login-account-help { margin:10px 0 0; color:var(--text-muted); font-size:.74rem; line-height:1.4; text-align:center; }
     .wellbeing-banner { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.16),rgba(15,43,72,.5)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
     .wellbeing-banner .tip-icon { font-size:1.5rem; } .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
@@ -732,7 +737,7 @@
         <ul class="sidebar-links">
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('attendanceTab', this)">Daily Attendance</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('schoolDayTab', this)">School Day Hub</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Team Chat</button></li>
+        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Messages</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('registryTab', this)">Daily Register</button></li>
@@ -1145,9 +1150,9 @@
             <div class="card-header-bar">
               <h2>Private Conversation</h2>
               <div style="display: flex; gap: 8px; align-items: center;">
-                <label style="margin-bottom:0; font-size:0.8rem;">Chat Recipient:</label>
+                <label style="margin-bottom:0; font-size:0.8rem;">Approved Contact:</label>
                 <select id="directRecipientSelect" onchange="loadDirectChatMessages()" style="margin-bottom: 0; padding: 5px; font-size: 0.8rem; width: auto;">
-                  <option value="">Select Recipient (Parent or Staff)...</option>
+                  <option value="">Select an approved school contact...</option>
                 </select>
               </div>
             </div>
@@ -1158,7 +1163,7 @@
 
             <form id="directChatForm">
               <div class="chat-compose">
-                <textarea id="directChatInput" rows="2" placeholder="Type direct message to parent or teacher..." style="margin-bottom: 0;" required></textarea>
+                <textarea id="directChatInput" rows="2" placeholder="Type a private message to your approved contact..." style="margin-bottom: 0;" required></textarea>
                 <button type="submit" class="submit-btn" style="margin-bottom: 0; width: auto; padding: 11px 25px;">Send message</button>
               </div>
               <div style="display: flex; gap: 10px; align-items: center; font-size: 0.78rem;">
@@ -1230,6 +1235,10 @@
                   <option value="Medium" selected>Priority: Medium Standard</option>
                   <option value="High">Priority: High Escalation</option>
                 </select>
+              </div>
+              <div class="role-admin" style="flex: 1;">
+                <label for="ticketAssignee">Assign to account</label>
+                <select id="ticketAssignee"><option value="">Unassigned</option></select>
               </div>
             </div>
             <div>
@@ -1335,6 +1344,7 @@
             <div><label for="accountRole">Role *</label><select id="accountRole" required><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option></select></div>
             <div><label for="accountSchoolName">Linked school name *</label><input id="accountSchoolName" required placeholder="e.g. Little Feet ECD Portal"></div>
             <div><label for="accountStoreUrl">Official school web-store link</label><input id="accountStoreUrl" type="url" placeholder="https://... (leave empty if none)"></div>
+            <div><label for="accountAssignedClasses">Assigned classroom(s)</label><input id="accountAssignedClasses" placeholder="Teachers only · e.g. Preschool, Toddlers"></div>
             <div style="grid-column:1/-1;"><label for="accountLinkedLearners">Linked learner name(s) <span style="font-weight:normal;">(parent accounts only · maximum 4)</span></label><div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="accountLinkedLearners" placeholder="Choose up to four learners" readonly style="flex:1 1 260px;margin-bottom:0;"><button type="button" class="action-btn btn-blue" onclick="openLearnerLinkPicker()">👨‍👩‍👧 Choose linked learners</button></div></div>
             <div style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;"><button class="submit-btn" id="accountSaveButton">Create account</button><button type="button" onclick="resetAccountForm()" class="action-btn btn-blue">Clear form</button></div>
           </form>
