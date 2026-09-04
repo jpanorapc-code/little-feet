@@ -9,6 +9,7 @@ let alertMonitorId = null;
 let ticketMonitorId = null;
 let knownTicketIds = new Set();
 let ticketsLoaded = false;
+let ticketAssigneeAccounts = [];
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
 let portalTourIndex = 0;
@@ -1675,27 +1676,38 @@ function showTicketNotification(ticket) {
   window.setTimeout(() => notice.remove(), 8000);
 }
 
+function renderTicketAssigneeOptions(selectId, query = '', selected = '') {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const search = String(query || '').trim().toLowerCase();
+  const schoolAccounts = ticketAssigneeAccounts.filter(account => {
+    const matchesSearch = !search || `${account.name || ''} ${account.username || ''}`.toLowerCase().includes(search);
+    return account.username !== currentUser?.username && account.schoolName === currentUser?.schoolName && matchesSearch;
+  });
+  const roleGroups = [['teacher', 'Teachers'], ['principal', 'Principals'], ['parent', 'Parents']];
+  const groupedOptions = roleGroups.map(([role, label]) => {
+    const people = schoolAccounts.filter(account => account.role === role);
+    return people.length ? `<optgroup label="${label}">${people.map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+  select.innerHTML = `<option value="">Unassigned</option>${groupedOptions}`;
+  select.value = [...select.options].some(option => option.value === selected) ? selected : '';
+}
+
+function filterTicketAssignees(searchId, selectId) {
+  const search = document.getElementById(searchId)?.value || '';
+  const selected = document.getElementById(selectId)?.value || '';
+  renderTicketAssigneeOptions(selectId, search, selected);
+}
+
 async function loadTicketAssignees() {
-  const select = document.getElementById('ticketAssignee');
-  if (!select || currentUser?.role !== 'admin') return;
+  if (!document.getElementById('ticketAssignee') || currentUser?.role !== 'admin') return;
   try {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
     if (!response.ok) return;
-    const selected = select.value;
-    const schoolAccounts = accounts.filter(account => account.username !== currentUser.username && account.schoolName === currentUser.schoolName);
-    const roleGroups = [
-      ['teacher', 'Teachers'],
-      ['principal', 'Principals'],
-      ['parent', 'Parents']
-    ];
-    const groupedOptions = roleGroups.map(([role, label]) => {
-      const people = schoolAccounts.filter(account => account.role === role);
-      if (!people.length) return '';
-      return `<optgroup label="${label}">${people.map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)}</option>`).join('')}</optgroup>`;
-    }).join('');
-    select.innerHTML = `<option value="">Unassigned</option>${groupedOptions}`;
-    select.value = [...select.options].some(option => option.value === selected) ? selected : '';
+    const selected = document.getElementById('ticketAssignee').value;
+    ticketAssigneeAccounts = accounts;
+    renderTicketAssigneeOptions('ticketAssignee', document.getElementById('ticketAssigneeSearch')?.value || '', selected);
   } catch { /* The ticket form remains available without preloading assignees. */ }
 }
 
@@ -1808,15 +1820,11 @@ function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
         <label for="editCompleted" style="margin-bottom:0;">Mark Ticket as Completed</label>
       </div>
-      ${currentUser?.role === 'admin' ? '<div><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
+      ${currentUser?.role === 'admin' ? '<div><label for="editTicketAssigneeSearch">Find an account</label><input id="editTicketAssigneeSearch" type="search" placeholder="Search a teacher, principal, or parent" oninput="filterTicketAssignees(\'editTicketAssigneeSearch\', \'editTicketAssignee\')"><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
       <button type="submit" class="submit-btn">Save Ticket Resolution</button>
     </form>`;
   openModal('Edit Support Ticket', html);
-  if (currentUser?.role === 'admin') loadTicketAssignees().then(() => {
-    const source = document.getElementById('ticketAssignee');
-    const target = document.getElementById('editTicketAssignee');
-    if (source && target) { target.innerHTML = source.innerHTML; target.value = currentAssignee; }
-  });
+  if (currentUser?.role === 'admin') loadTicketAssignees().then(() => renderTicketAssigneeOptions('editTicketAssignee', '', currentAssignee));
 
   document.getElementById('editTicketForm').addEventListener('submit', async (e) => {
     e.preventDefault();

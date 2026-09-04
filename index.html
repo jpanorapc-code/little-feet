@@ -1237,6 +1237,8 @@
                 </select>
               </div>
               <div class="role-admin" style="flex: 1;">
+                <label for="ticketAssigneeSearch">Find an account</label>
+                <input id="ticketAssigneeSearch" type="search" placeholder="Search a teacher, principal, or parent" oninput="filterTicketAssignees('ticketAssigneeSearch', 'ticketAssignee')">
                 <label for="ticketAssignee">Assign to account</label>
                 <select id="ticketAssignee"><option value="">Unassigned</option></select>
               </div>
