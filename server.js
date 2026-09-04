@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -11,6 +12,7 @@ const loginAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 let activeRequestCount = 0;
+let persistenceReady = Promise.resolve();
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
 if (!process.env.LF_FIELD_ENCRYPTION_KEY) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
 const hashPin = (pin) => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
@@ -52,14 +54,16 @@ const activeLoginAttempt = (key) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use((req, res, next) => {
-  activeRequestCount += 1;
-  res.on('finish', () => {
-    activeRequestCount = Math.max(0, activeRequestCount - 1);
-    if (!req.method || req.method === 'GET' || replicaMode) return;
-    saveDatabaseState();
-    scheduleReplicaSnapshot();
-  });
-  next();
+  persistenceReady.then(() => {
+    activeRequestCount += 1;
+    res.on('finish', () => {
+      activeRequestCount = Math.max(0, activeRequestCount - 1);
+      if (!req.method || req.method === 'GET' || replicaMode) return;
+      void saveDatabaseState();
+      scheduleReplicaSnapshot();
+    });
+    next();
+  }).catch(next);
 });
 
 // Serve static files from current directory
@@ -116,15 +120,16 @@ const db = {
   ]
 };
 
-// Local database and standby replication. SQLite is the source of truth for a
-// single Little Feet deployment; the JSON replica remains a portable standby
-// snapshot for the backup service.
+// PostgreSQL is used whenever DATABASE_URL is configured (the production path).
+// SQLite remains a local-development fallback; the JSON replica is a portable
+// standby snapshot for the backup service.
 const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const databaseFile = path.join(__dirname, 'littlefeet.db');
 const replicaFile = path.join(__dirname, 'littlefeet-replica.json');
 let replicaTimer = null;
 let replicaSnapshotTimer = null;
 let stateDatabase = null;
+let postgresPool = null;
 
 function openStateDatabase() {
   if (replicaMode) return;
@@ -139,22 +144,64 @@ function openStateDatabase() {
   `);
 }
 
-function loadDatabaseState() {
+async function openPostgresDatabase() {
+  postgresPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false }
+  });
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS little_feet_app_state (
+      state_key TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+function applySavedState(saved) {
+  if (!saved || typeof saved !== 'object') return false;
+  Object.keys(db).forEach(key => { if (Object.hasOwn(saved, key)) db[key] = saved[key]; });
+  return true;
+}
+
+async function loadDatabaseState() {
+  if (postgresPool) {
+    try {
+      const result = await postgresPool.query('SELECT payload FROM little_feet_app_state WHERE state_key = $1', ['primary']);
+      return result.rowCount ? applySavedState(result.rows[0].payload) : false;
+    } catch (error) {
+      console.error('Unable to load PostgreSQL application state:', error.message);
+      throw error;
+    }
+  }
   if (!stateDatabase) return false;
   try {
     const row = stateDatabase.prepare('SELECT payload FROM app_state WHERE state_key = ?').get('primary');
     if (!row) return false;
-    const saved = JSON.parse(row.payload);
-    Object.keys(db).forEach(key => { if (Object.hasOwn(saved, key)) db[key] = saved[key]; });
-    return true;
+    return applySavedState(JSON.parse(row.payload));
   } catch (error) {
     console.error('Unable to load SQLite application state:', error.message);
     return false;
   }
 }
 
-function saveDatabaseState() {
-  if (!stateDatabase || replicaMode) return;
+async function saveDatabaseState() {
+  if (replicaMode) return;
+  if (postgresPool) {
+    try {
+      await postgresPool.query(`
+        INSERT INTO little_feet_app_state (state_key, payload, updated_at)
+        VALUES ($1, $2::jsonb, NOW())
+        ON CONFLICT (state_key) DO UPDATE SET
+          payload = EXCLUDED.payload,
+          updated_at = NOW()
+      `, ['primary', JSON.stringify(db)]);
+    } catch (error) {
+      console.error('Unable to save PostgreSQL application state:', error.message);
+    }
+    return;
+  }
+  if (!stateDatabase) return;
   try {
     stateDatabase.prepare(`
       INSERT INTO app_state (state_key, payload, updated_at)
@@ -193,16 +240,21 @@ function scheduleReplicaSnapshot() {
     writeReplicaSnapshot();
   }, 250);
 }
-if (replicaMode) {
-  loadReplicaSnapshot();
-  replicaTimer = setInterval(loadReplicaSnapshot, 2000);
-} else {
-  openStateDatabase();
-  const restoredFromDatabase = loadDatabaseState();
+async function initialisePersistence() {
+  if (replicaMode) {
+    loadReplicaSnapshot();
+    replicaTimer = setInterval(loadReplicaSnapshot, 2000);
+    return;
+  }
+  if (process.env.DATABASE_URL) await openPostgresDatabase();
+  else openStateDatabase();
+  const restoredFromDatabase = await loadDatabaseState();
   if (!restoredFromDatabase) loadReplicaSnapshot();
-  saveDatabaseState();
+  await saveDatabaseState();
   writeReplicaSnapshot();
 }
+
+persistenceReady = initialisePersistence();
 
 // API Endpoints
 // Auth
@@ -1013,6 +1065,11 @@ app.get(/(.*)/, (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+persistenceReady.then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch(error => {
+  console.error('Database startup failed:', error.message);
+  process.exit(1);
 });
