@@ -610,13 +610,9 @@ function setupSession() {
   const isParent = currentUser.role === 'parent';
   const subscriptionEntry = document.getElementById('subscriptionEntryButton');
   const subscriptionFooter = document.getElementById('subscriptionFooterLink');
-  const navWelcomeTitle = document.getElementById('navWelcomeTitle');
-  const navWelcomeText = document.getElementById('navWelcomeText');
   const navLivePill = document.getElementById('navLivePill');
   if (subscriptionEntry) subscriptionEntry.textContent = isParent ? '💎 Parent Subscription' : '💎 Plans & Benefits';
   if (subscriptionFooter) subscriptionFooter.textContent = isParent ? 'Parent Subscription' : 'School Subscriptions';
-  if (navWelcomeTitle) navWelcomeTitle.textContent = isParent ? 'Your family school space' : 'Your school workspace';
-  if (navWelcomeText) navWelcomeText.textContent = isParent ? 'Stay close to your child’s learning and school updates' : 'Learning, care and communication in one place';
   if (navLivePill) navLivePill.textContent = isParent ? 'Family updates ready' : 'School day in progress';
   const displayRoleEl = document.getElementById('displayRole');
   if (displayRoleEl) displayRoleEl.textContent = `${currentUser.name || currentUser.username} · ${currentUser.role.toUpperCase()}`;

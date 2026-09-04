@@ -556,7 +556,7 @@
     }
 
     /* Header: useful context and shortcuts fill the wide centre area for every role. */
-    .nav-quickbar { display:flex; flex:1 1 auto; align-items:center; justify-content:center; gap:10px; min-width:0; }
+    .nav-quickbar { display:flex; flex:1 1 auto; align-items:center; justify-content:flex-start; gap:10px; min-width:0; }
     .nav-welcome { display:flex; flex-direction:column; min-width:0; padding-left:12px; border-left:1px solid rgba(148,163,184,.26); }
     .nav-welcome strong { color:#f8fafc; font-size:.8rem; line-height:1.1; white-space:nowrap; }
     .nav-welcome span { color:#94a3b8; font-size:.68rem; line-height:1.25; white-space:nowrap; }
@@ -710,10 +710,6 @@
       </div>
 
       <div class="nav-quickbar" aria-label="Quick access">
-        <div class="nav-welcome">
-          <strong id="navWelcomeTitle">Your school workspace</strong>
-          <span id="navWelcomeText">Learning, care and communication in one place</span>
-        </div>
         <span id="navLivePill" class="nav-live-pill">School day in progress</span>
         <div class="nav-term-panel" aria-label="Current academic term">
           <strong id="currentTermText">Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
