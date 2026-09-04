@@ -316,8 +316,11 @@
     body.light-mode #reportsTab .workspace-card [style*="color: #fff"],
     body.light-mode #reportsTab .workspace-card [style*="color:#fff"] { color: var(--text-dark) !important; }
 
-    .social-signin { display:grid; grid-template-columns:repeat(3, 1fr); gap:7px; margin-top:12px; }
-    .social-signin button { min-height:42px; border:1px solid var(--border-color); border-radius:8px; padding:8px 6px; color:var(--text-dark); background:var(--input-bg); font-size:.72rem; font-weight:700; line-height:1.2; cursor:pointer; }
+    #loginForm { display:flex; flex-direction:column; align-items:center; }
+    #loginForm > div:not(.social-signin) { align-self:stretch; }
+    #loginForm > .submit-btn { width:min(100%, 360px); align-self:center; margin-top:2px; }
+    .social-signin { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:9px; width:min(100%, 360px); margin:12px auto 0; }
+    .social-signin button { min-height:44px; border:1px solid var(--border-color); border-radius:8px; padding:9px 10px; color:var(--text-dark); background:var(--input-bg); font-size:.78rem; font-weight:700; line-height:1.2; cursor:pointer; }
     .social-signin button:hover, .social-signin button:focus-visible { border-color:var(--primary-color); background:rgba(13,148,136,.12); outline:none; }
     .login-account-help { margin:10px 0 0; color:var(--text-muted); font-size:.74rem; line-height:1.4; text-align:center; }
     .wellbeing-banner { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.16),rgba(15,43,72,.5)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
@@ -377,6 +380,7 @@
     @media (max-width:767px) { .container { padding:14px; } .card { padding:17px; border-radius:12px; } .card-header-bar { align-items:flex-start; flex-direction:column; } .card-header-bar > * { max-width:100%; } .social-signin { grid-template-columns:1fr; } .workspace-grid, .store-grid { grid-template-columns:1fr; } .wellbeing-banner { align-items:flex-start; } }
 
     @media (max-width:820px) { #authSection { padding:20px 14px; align-items:flex-start; } #authSection > .auth-card { max-width:500px !important; } }
+    @media (max-width:820px) and (min-height:800px) { #authSection { align-items:center; } }
 
     /* Gentle motion gives feedback without changing the visual theme. */
     .tab-content.active { animation:tabReveal .32s cubic-bezier(.2,.75,.25,1) both; }
