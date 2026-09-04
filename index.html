@@ -235,6 +235,15 @@
     .nav-links li button { background: none; border: none; color: #cbd5e1; padding: 7px 11px; cursor: pointer; font-weight: 600; font-size: 0.82rem; margin: 0; border-radius: 4px; }
     .nav-links li button.active, .nav-links li button:hover { color: #ffffff; background-color: var(--primary-color); }
 
+    .wallpaper-overlay { position:fixed; inset:0; z-index:5000; display:none; align-items:center; justify-content:center; background:#04101a; color:#fff; cursor:pointer; overflow:hidden; }
+    .wallpaper-overlay.is-visible { display:flex; }
+    .wallpaper-overlay img { width:100%; height:100%; object-fit:cover; }
+    .wallpaper-overlay::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at center, transparent 34%, rgba(1,8,16,.56) 100%); pointer-events:none; }
+    .wallpaper-overlay-copy { position:absolute; z-index:1; bottom:clamp(22px,6vh,68px); left:50%; transform:translateX(-50%); width:min(92vw,640px); text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.85); }
+    .wallpaper-overlay-copy h2 { margin:0 0 8px; font-size:clamp(1.4rem,3vw,2.45rem); }
+    .wallpaper-overlay-copy p { margin:0; color:#d8f5ef; font-size:clamp(.8rem,1.5vw,1rem); }
+    .wallpaper-exit { position:absolute; z-index:2; top:18px; right:18px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
+
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -468,6 +477,7 @@
       .nav-user-panel .action-btn { padding:6px 8px; font-size:.68rem !important; }
       .portal-tour-slide { grid-template-columns:1fr; }
       .portal-tour-image { display:none; }
+      .wallpaper-overlay-copy { bottom:32px; }
       nav .nav-links.menu-open { grid-template-columns:1fr; }
       .nav-more-toggle { order:3; width:100%; }
       .nav-user-panel { width:100%; justify-content:space-between; order:2; }
@@ -775,6 +785,7 @@
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('settingsTab', this)">Settings</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('wallpaperTab', this)">🖼️ Wallpaper Mode</button></li>
         </ul>
       </section>
       <section data-nav-group>
@@ -849,37 +860,12 @@
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
             Click the button to detect your current location. The map will load live education locations within a 20Km radius. Pins are grouped for a clearer map; click a group to zoom in, or click a school pin for its coordinates, address, available contact details, and photo.
           </p>
-          <div id="schoolMapContainer" style="width: 100%; height: 420px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
+          <div id="schoolMapContainer" style="width: 100%; height: clamp(250px, 34vw, 320px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
             📍 Press "Detect My Location" to render interactive map pins.
           </div>
           <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
-          <div onclick="openWorkspace('broadcastsTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
-            <div style="font-size: 2rem; margin-bottom: 8px;">🔔</div>
-            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Emergency Alerts</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Instant notices & campus safety notifications.</p>
-          </div>
-
-          <div onclick="openWorkspace('scheduleTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
-            <div style="font-size: 2rem; margin-bottom: 8px;">📅</div>
-            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Class Schedule</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Daily timetables & modules.</p>
-          </div>
-
-          <div onclick="openWorkspace('worksheetsTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
-            <div style="font-size: 2rem; margin-bottom: 8px;">📚</div>
-            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Worksheets</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Submissions & viewable files.</p>
-          </div>
-
-          <div onclick="openWorkspace('lookupTab')" style="background: var(--panel-bg); color: var(--text-dark); padding: 20px; border-radius: 10px; cursor: pointer; text-align: center; border: 1px solid var(--border-color);">
-            <div style="font-size: 2rem; margin-bottom: 8px;">🔍</div>
-            <h3 style="margin: 0 0 6px 0; color: #0d9488; font-size: 1.1rem;">Student Lookup</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Search records & contacts.</p>
-          </div>
-        </div>
       </div>
 
       <!-- 1. Activity Feed -->
@@ -1498,6 +1484,18 @@
         </div>
       </div>
 
+      <div id="wallpaperTab" class="tab-content">
+        <section class="card" style="max-width:860px;">
+          <div class="card-header-bar"><h2>🖼️ Wallpaper Mode</h2><span class="badge-tag info">SCREEN SAVER</span></div>
+          <p style="color:var(--text-muted);line-height:1.6;max-width:680px;">When the portal has been idle for one hour, it will switch to the Little Feet campfire wallpaper. Nothing is signed out or lost, and any normal interaction returns to your work.</p>
+          <div class="workspace-grid" style="margin-top:16px;">
+            <div class="workspace-card"><h3>Start now</h3><p>Show the animated campfire wallpaper immediately.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
+            <div class="workspace-card"><h3>How to return</h3><p>Click anywhere, press any key, touch the screen, or use the visible Exit button.</p><button type="button" class="action-btn btn-blue" onclick="startWallpaperMode()">Preview exit options</button></div>
+            <div class="workspace-card"><h3>Automatic start</h3><p>Enabled for this device after <strong>one hour</strong> with no activity.</p><span class="badge-tag">ON</span></div>
+          </div>
+        </section>
+      </div>
+
       <!-- 11. User Guide -->
       <div id="guideTab" class="tab-content">
         <div class="card">
@@ -1541,6 +1539,12 @@
       </div>
     </footer>
   </div>
+
+  <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
+    <img src="assets/little-feet-original-background.gif" alt="Animated Little Feet penguin resting beside a campfire">
+    <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Click, touch, or press any key to return.</p></div>
+    <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
+  </section>
 
   <script src="backup.js?v=20260904-live-data" defer></script>
   <script>

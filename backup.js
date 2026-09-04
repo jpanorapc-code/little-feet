@@ -20,6 +20,8 @@ let debugModeEnabled = false;
 let debugEvents = [];
 let startupChimePlayed = false;
 let connectedSignInProviders = {};
+let wallpaperIdleTimer = null;
+const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 const wellbeingTips = [
   'Small routines create a sense of safety. A calm goodbye helps children settle into their day.',
   'Notice effort, not only outcomes. “You kept trying” helps children build confidence.',
@@ -124,6 +126,7 @@ window.addEventListener('DOMContentLoaded', () => {
   setupSignaturePads();
   setupPortalTour();
   setupKeyboardShortcuts();
+  setupWallpaperMode();
 });
 
 async function completeProviderLogin() {
@@ -637,6 +640,7 @@ function setupSession() {
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('dashboardSection').classList.remove('hidden');
   document.body.classList.add('portal-active');
+  resetWallpaperTimer();
   renderRoleHomePanel();
   configureDebugMode();
   applyUserPreferences();
@@ -707,7 +711,9 @@ function renderRoleHomePanel() {
 }
 
 function logout() {
+  clearTimeout(wallpaperIdleTimer);
   currentUser = null;
+  exitWallpaperMode();
   startupChimePlayed = false;
   startupChimePending = false;
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
@@ -750,6 +756,44 @@ function switchTab(tabId, btn) {
   }
   if (btn) btn.classList.add('active');
   closeNavigation();
+}
+
+function setupWallpaperMode() {
+  const noteActivity = (event) => {
+    const overlay = document.getElementById('wallpaperOverlay');
+    if (overlay?.classList.contains('is-visible')) {
+      exitWallpaperMode();
+      return;
+    }
+    resetWallpaperTimer();
+  };
+  ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'scroll'].forEach(eventName => {
+    document.addEventListener(eventName, noteActivity, { passive: eventName !== 'keydown' });
+  });
+}
+
+function resetWallpaperTimer() {
+  clearTimeout(wallpaperIdleTimer);
+  const dashboard = document.getElementById('dashboardSection');
+  if (!currentUser || !dashboard || dashboard.classList.contains('hidden')) return;
+  wallpaperIdleTimer = window.setTimeout(() => startWallpaperMode(), WALLPAPER_IDLE_MS);
+}
+
+function startWallpaperMode() {
+  const overlay = document.getElementById('wallpaperOverlay');
+  if (!currentUser || !overlay) return;
+  clearTimeout(wallpaperIdleTimer);
+  overlay.classList.add('is-visible');
+  overlay.setAttribute('aria-hidden', 'false');
+  overlay.querySelector('.wallpaper-exit')?.focus({ preventScroll: true });
+}
+
+function exitWallpaperMode() {
+  const overlay = document.getElementById('wallpaperOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('is-visible');
+  overlay.setAttribute('aria-hidden', 'true');
+  resetWallpaperTimer();
 }
 
 function openWorkspace(tabId) {
