@@ -32,6 +32,13 @@ const accountMatchesUsername = (account, value) => {
 };
 const findAccountByUsername = (username) => db.users.find(account => accountMatchesUsername(account, username));
 const normalizeComparableText = (value) => String(value || '').trim().toLocaleLowerCase('en-US');
+const learnerRecordKey = (learner) => [learner?.studentName, learner?.className, learner?.contactEmail].map(normalizeComparableText).join('|');
+const normaliseAccessCode = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+const generateLearnerAccessCode = () => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const segment = () => Array.from(crypto.randomBytes(4), byte => alphabet[byte % alphabet.length]).join('');
+  return `LF-${segment()}-${segment()}`;
+};
 const normaliseLearnerLinks = (value) => [...new Set((Array.isArray(value) ? value : String(value || '').split(',')).map(normalizeComparableText).filter(Boolean))];
 const validateLearnerLinks = (value) => {
   const links = normaliseLearnerLinks(value);
@@ -113,7 +120,8 @@ const db = {
   groupMessages: {},
   directMessages: [],
   importAudit: [],
-  students: []
+  students: [],
+  learnerAccessCodes: []
 };
 
 // PostgreSQL is used whenever DATABASE_URL is configured (the production path).
@@ -978,6 +986,99 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
   report.parentSignedAt = new Date().toISOString();
   report.status = 'Complete - teacher and parent signed';
   res.json({ success: true, report });
+});
+
+// School-controlled learner access codes. Codes are encrypted at rest and are
+// available only to the school roles that issue or print the physical handout.
+const findLearnerAccessCodeActor = (req) => {
+  const actor = getSessionAccount(req);
+  return actor && ['admin', 'principal'].includes(actor.role) ? actor : null;
+};
+
+const learnerAccessCodeView = (learner) => {
+  const key = learnerRecordKey(learner);
+  const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === key && entry.status === 'active');
+  return {
+    learnerKey: key,
+    learnerName: learner.studentName,
+    className: learner.className,
+    parentName: learner.parentName || '',
+    contactEmail: learner.contactEmail || '',
+    codeRecordId: activeCode?.id || null,
+    accessCode: activeCode ? decryptField(activeCode.codeEncrypted) : null,
+    issuedAt: activeCode?.issuedAt || null,
+    issuedBy: activeCode?.issuedBy || null
+  };
+};
+
+app.get('/api/learner-access-codes', (req, res) => {
+  const actor = findLearnerAccessCodeActor(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator may manage codes, and a principal may print them.' });
+  res.json(db.students.map(learnerAccessCodeView));
+});
+
+app.post('/api/learner-access-codes', (req, res) => {
+  const actor = findLearnerAccessCodeActor(req);
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can issue learner access codes.' });
+  const learner = db.students.find(entry => learnerRecordKey(entry) === String(req.body?.learnerKey || ''));
+  if (!learner) return res.status(404).json({ message: 'Learner record not found.' });
+  const learnerKey = learnerRecordKey(learner);
+  if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active')) return res.status(409).json({ message: 'This learner already has an active code. Replace it instead.' });
+  let accessCode = normaliseAccessCode(req.body?.manualCode);
+  if (accessCode && !/^LF-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(accessCode)) return res.status(400).json({ message: 'Use the format LF-AB12-CD34, or leave the field blank to generate a code.' });
+  const codeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === candidate);
+  if (accessCode && codeInUse(accessCode)) return res.status(409).json({ message: 'That access code is already in use. Choose another code or generate one.' });
+  while (!accessCode || codeInUse(accessCode)) accessCode = generateLearnerAccessCode();
+  const record = { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username };
+  db.learnerAccessCodes.unshift(record);
+  res.status(201).json({ success: true, learner: learnerAccessCodeView(learner) });
+});
+
+app.post('/api/learner-access-codes/:id/replace', (req, res) => {
+  const actor = findLearnerAccessCodeActor(req);
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can replace learner access codes.' });
+  const previous = db.learnerAccessCodes.find(entry => entry.id === req.params.id && entry.status === 'active');
+  if (!previous) return res.status(404).json({ message: 'The active code was not found.' });
+  previous.status = 'replaced';
+  previous.replacedAt = new Date().toISOString();
+  previous.replacedBy = actor.username;
+  let accessCode;
+  do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === accessCode));
+  db.learnerAccessCodes.unshift({ id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id });
+  const learner = db.students.find(entry => learnerRecordKey(entry) === previous.learnerKey);
+  res.json({ success: true, learner: learner ? learnerAccessCodeView(learner) : null });
+});
+
+app.post('/api/learner-access-codes/:id/revoke', (req, res) => {
+  const actor = findLearnerAccessCodeActor(req);
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can invalidate learner access codes.' });
+  const record = db.learnerAccessCodes.find(entry => entry.id === req.params.id && entry.status === 'active');
+  if (!record) return res.status(404).json({ message: 'The active code was not found.' });
+  record.status = 'revoked';
+  record.revokedAt = new Date().toISOString();
+  record.revokedBy = actor.username;
+  res.json({ success: true });
+});
+
+app.post('/api/learner-access-codes/redeem', (req, res) => {
+  const parent = getSessionAccount(req);
+  if (!parent || parent.role !== 'parent') return res.status(403).json({ message: 'Only a signed-in parent or guardian can use a learner access code.' });
+  const suppliedCode = normaliseAccessCode(req.body?.accessCode);
+  const codeRecord = db.learnerAccessCodes.find(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === suppliedCode);
+  if (!codeRecord) return res.status(404).json({ message: 'That learner access code is invalid, has already been used, or has been replaced. Ask the school administrator for a new form.' });
+  const learner = db.students.find(entry => learnerRecordKey(entry) === codeRecord.learnerKey);
+  if (!learner) return res.status(404).json({ message: 'The learner record linked to this code is no longer available.' });
+  if (normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName))) return res.status(409).json({ message: 'This learner is already linked to your account.' });
+  const requested = Array.isArray(parent.requestedLearnerLinks) ? parent.requestedLearnerLinks : [];
+  if (!requested.some(name => normalizeComparableText(name) === normalizeComparableText(learner.studentName))) requested.push(learner.studentName);
+  const linkValidation = validateLearnerLinks(requested);
+  if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
+  parent.requestedLearnerLinks = requested;
+  parent.parentRelationshipStatus = 'Pending administrator approval';
+  codeRecord.status = 'redeemed';
+  codeRecord.redeemedAt = new Date().toISOString();
+  codeRecord.redeemedBy = parent.username;
+  res.json({ success: true, learnerName: learner.studentName, message: 'Learner link request sent to the school administrator for approval.' });
 });
 
 // Student Search

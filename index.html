@@ -780,6 +780,7 @@
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('registryTab', this)">Daily Register</button></li>
         <li data-roles="admin"><button type="button" class="nav-btn" onclick="switchTab('accountsTab', this)">Account Management</button></li>
+        <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('learnerCodesTab', this)">Learner Code Forms</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('dataImportTab', this)">Import School Data</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('operationsTab', this)">School Operations</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
@@ -1369,6 +1370,14 @@
         </div>
       </div>
 
+      <div id="learnerCodesTab" class="tab-content" data-roles="principal,admin">
+        <div class="card">
+          <div class="card-header-bar"><h2>🔐 Learner Code Forms</h2><span class="badge-tag info">SCHOOL CONTROLLED</span></div>
+          <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.55;">Each printed handout carries a code tied to one learner. Administrators can issue, replace, or invalidate codes. Principals can print the prepared handout only.</p>
+          <div id="learnerCodeList" class="record-list"><p style="font-size:.84rem;color:var(--text-muted);">Loading learner code forms…</p></div>
+        </div>
+      </div>
+
       <div id="dataImportTab" class="tab-content" data-roles="principal,admin">
         <div class="card">
           <div class="card-header-bar"><h2>📥 Import School Data</h2><span class="badge-tag info">ADMIN &amp; PRINCIPAL</span></div>
@@ -1479,6 +1488,7 @@
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. English is currently the complete interface; Afrikaans labels will expand as translations are reviewed.</p><select id="languagePreference" onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans (in progress)</option></select></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without reloading the map or interrupting your work.</p><select id="refreshPreference" onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="60000">Every minute</option><option value="120000">Every 2 minutes</option><option value="300000">Every 5 minutes</option></select></div>
             <div class="workspace-card"><h3>Two-step verification</h3><p>Protect your sign-in with a verification app or email code once a school-owned identity provider is connected.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('two-step verification')">Set up 2FA</button></div>
+            <div class="workspace-card" data-roles="parent"><h3>Link a learner with a school code</h3><p>Enter the code from the printed school form. Your request stays pending until an administrator approves the relationship.</p><input id="parentLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><button type="button" class="action-btn btn-green" onclick="redeemLearnerAccessCode()">Request learner link</button></div>
             <div class="workspace-card"><h3>Navigation</h3><p>On desktop, double-click the left sidebar to collapse or expand it. Use the category headings to show or hide each group.</p><button type="button" class="action-btn btn-green" onclick="toggleSidebarCollapse()">Toggle sidebar</button></div>
           </div>
         </div>

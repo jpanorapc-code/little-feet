@@ -20,6 +20,7 @@ let debugModeEnabled = false;
 let debugEvents = [];
 let startupChimePlayed = false;
 let connectedSignInProviders = {};
+let learnerAccessCodeRecords = [];
 let wallpaperIdleTimer = null;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 const wellbeingTips = [
@@ -919,6 +920,7 @@ function loadAllData() {
   loadHouseholdSwitcher();
   loadRegistry();
   loadAccounts();
+  loadLearnerAccessCodes();
   loadConsentRecords();
   loadPickupRecords();
   ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding', 'absences', 'handovers'].forEach(loadWorkspaceRecords);
@@ -2461,8 +2463,101 @@ async function loadAccounts() {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
     accountsCache = accounts;
-    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
+    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve account</button>` : ''}${account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeURIComponent(account.username)}')">Approve learner request</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
   } catch { list.textContent = 'Unable to load account records.'; }
+}
+
+async function loadLearnerAccessCodes() {
+  const list = document.getElementById('learnerCodeList');
+  if (!list || !['admin', 'principal'].includes(currentUser?.role)) return;
+  try {
+    const response = await fetch(`/api/learner-access-codes?actorUsername=${encodeURIComponent(currentUser.username)}`);
+    const records = await response.json();
+    if (!response.ok) throw new Error(records.message || 'Unable to load learner code forms.');
+    learnerAccessCodeRecords = records;
+    if (!records.length) {
+      list.innerHTML = '<p style="font-size:.84rem;color:var(--text-muted);">No learners are available yet. Import or register learners first.</p>';
+      return;
+    }
+    const canManage = currentUser.role === 'admin';
+    list.innerHTML = records.map(record => {
+      const encodedKey = encodeURIComponent(record.learnerKey);
+      const details = `${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}`;
+      if (!record.accessCode) return `<div class="item-row"><div><strong>${details}</strong><p class="meta" style="margin-top:5px;">No active learner code issued.</p></div>${canManage ? `<button type="button" class="action-btn btn-green" onclick="openLearnerCodeIssue('${encodedKey}')">Generate or enter code</button>` : '<span class="badge-tag info">Awaiting administrator</span>'}</div>`;
+      return `<div class="item-row"><div><strong>${details}</strong><p style="margin-top:5px;">Access code: <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(record.accessCode)}</strong></p><span class="meta">Issued ${new Date(record.issuedAt).toLocaleString()} by ${escapeWorkspaceText(record.issuedBy || 'school administrator')}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="printLearnerCodeForm('${encodedKey}')">🖨️ Print form</button>${canManage ? `<button type="button" class="action-btn btn-green" onclick="replaceLearnerAccessCode('${record.codeRecordId}')">♻️ Replace code</button><button type="button" class="action-btn btn-red" onclick="revokeLearnerAccessCode('${record.codeRecordId}')">Invalidate</button>` : ''}</div></div>`;
+    }).join('');
+  } catch (error) {
+    list.textContent = error.message || 'Unable to load learner code forms.';
+  }
+}
+
+function learnerCodeRecord(encodedKey) {
+  return learnerAccessCodeRecords.find(record => record.learnerKey === decodeURIComponent(encodedKey));
+}
+
+function openLearnerCodeIssue(encodedKey) {
+  if (currentUser?.role !== 'admin') return alert('Only an administrator can issue a learner access code.');
+  const record = learnerCodeRecord(encodedKey);
+  if (!record) return alert('Learner record not found. Refresh the code list and try again.');
+  openModal('Issue learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Issue a physical code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Leave the field blank to generate a secure school code automatically, or enter a school-approved code in the shown format.</p><label for="manualLearnerAccessCode">Manual code (optional)</label><input id="manualLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}')">Issue code</button>`);
+}
+
+async function issueLearnerAccessCode(encodedKey) {
+  const response = await fetch('/api/learner-access-codes', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actorUsername: currentUser?.username, learnerKey: decodeURIComponent(encodedKey), manualCode: document.getElementById('manualLearnerAccessCode')?.value || '' })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to issue this learner code.');
+  closeModal();
+  playDingSound();
+  await loadLearnerAccessCodes();
+}
+
+async function replaceLearnerAccessCode(id) {
+  if (currentUser?.role !== 'admin' || !confirm('Replace this code? The existing physical copy will stop working immediately.')) return;
+  const response = await fetch(`/api/learner-access-codes/${encodeURIComponent(id)}/replace`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to replace this learner code.');
+  playDingSound();
+  await loadLearnerAccessCodes();
+}
+
+async function revokeLearnerAccessCode(id) {
+  if (currentUser?.role !== 'admin' || !confirm('Invalidate this code? Its printed copy will no longer work.')) return;
+  const response = await fetch(`/api/learner-access-codes/${encodeURIComponent(id)}/revoke`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to invalidate this learner code.');
+  await loadLearnerAccessCodes();
+}
+
+function printLearnerCodeForm(encodedKey) {
+  const record = learnerCodeRecord(encodedKey);
+  if (!record?.accessCode || !['admin', 'principal'].includes(currentUser?.role)) return alert('An active learner code is required before this form can be printed.');
+  const printWindow = window.open('', '_blank', 'width=820,height=980');
+  if (!printWindow) return alert('Allow pop-ups for Little Feet to print this learner form.');
+  const safe = escapeWorkspaceText;
+  printWindow.document.write(`<!doctype html><html><head><title>Learner Access Code</title><style>body{font-family:Arial,sans-serif;color:#102a43;margin:0;padding:34px;background:#f6fbfb}.sheet{max-width:720px;margin:auto;background:#fff;border:2px solid #0d9488;border-radius:18px;padding:34px}.brand{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d8f3ef;padding-bottom:18px}.brand h1{margin:0;font-size:28px;color:#0f766e}.tag{font-size:12px;letter-spacing:1.4px;font-weight:bold;color:#0f766e}.code{margin:28px 0;padding:24px;text-align:center;border-radius:14px;background:#e6fffb;border:2px dashed #0d9488;font-size:30px;font-weight:bold;letter-spacing:4px;color:#0f766e}.details{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:22px 0}.field{padding:12px;border:1px solid #d8e5ea;border-radius:10px}.field span{display:block;color:#627d98;font-size:12px;margin-bottom:4px}.notice{font-size:13px;line-height:1.5;padding:14px;background:#fff7df;border-radius:10px}.sign{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:38px}.line{border-top:1px solid #526d82;padding-top:8px;font-size:12px;color:#526d82}@media print{body{padding:0;background:#fff}.sheet{border:none;border-radius:0;max-width:none}}</style></head><body><main class="sheet"><div class="brand"><div><div class="tag">LITTLE FEET · SCHOOL-ISSUED FORM</div><h1>Learner Access Code</h1></div></div><p>This handout is tied to one learner. Keep it with the approved family record.</p><div class="code">${safe(record.accessCode)}</div><div class="details"><div class="field"><span>Learner</span><strong>${safe(record.learnerName)}</strong></div><div class="field"><span>Class / grade</span><strong>${safe(record.className || 'Not recorded')}</strong></div><div class="field"><span>Parent / guardian</span><strong>${safe(record.parentName || 'To be completed by school')}</strong></div><div class="field"><span>Issued</span><strong>${safe(new Date(record.issuedAt).toLocaleDateString())}</strong></div></div><div class="notice"><strong>For the family:</strong> This code was issued by the school for the learner shown above. Do not share it publicly. If it is lost or needs to be replaced, contact the school administrator; the old code will be invalidated.</div><div class="sign"><div class="line">School representative</div><div class="line">Parent / guardian acknowledgement</div></div></main><script>window.onload=()=>window.print();<\/script></body></html>`);
+  printWindow.document.close();
+}
+
+async function redeemLearnerAccessCode() {
+  if (currentUser?.role !== 'parent') return alert('Only a parent or guardian can use a learner access code.');
+  const field = document.getElementById('parentLearnerAccessCode');
+  const accessCode = field?.value?.trim();
+  if (!accessCode) return alert('Enter the learner access code from the school form.');
+  const response = await fetch('/api/learner-access-codes/redeem', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessCode })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to use this learner access code.');
+  if (field) field.value = '';
+  alert(result.message || `A link request for ${result.learnerName} has been sent to the school administrator.`);
+  playDingSound();
 }
 
 function resetAccountForm() {
@@ -2539,6 +2634,22 @@ async function approveAccount(encodedUsername) {
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to approve this account.');
   loadAccounts();
+  playDingSound();
+}
+
+async function approveRequestedLearnerLinks(encodedUsername) {
+  if (currentUser?.role !== 'admin') return alert('Only an administrator can approve learner relationships.');
+  const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
+  if (!account?.requestedLearnerLinks?.length) return alert('There are no pending learner requests for this account.');
+  const requested = account.requestedLearnerLinks.join(', ');
+  if (!confirm(`Approve ${requested} for ${account.name || account.username}?`)) return;
+  const response = await fetch(`/api/accounts/${encodeURIComponent(account.username)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: account.username, name: account.name, role: account.role, schoolName: account.schoolName, schoolStoreUrl: account.schoolStoreUrl, assignedClasses: (account.assignedClasses || []).join(', '), linkedLearners: requested })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to approve the learner relationship.');
+  await loadAccounts();
   playDingSound();
 }
 
