@@ -2601,7 +2601,7 @@ function escapeWorkspaceText(value) {
 }
 
 function showProviderSetup(providerName) {
-  openModal(`${providerName} connection required`, `<div style="font-size:.9rem;line-height:1.6;"><p>This feature needs an approved school-owned ${providerName} account before it can operate.</p><p style="margin-top:10px;"><strong>Next steps:</strong></p><ol style="margin:6px 0 0 20px;"><li>Choose and contract an approved provider.</li><li>Obtain the provider credentials and consent documentation.</li><li>Ask an administrator to configure the connection securely.</li></ol><p style="margin-top:10px;color:var(--text-muted);">No payment, payroll, SMS, or push messages are sent by this demo portal until a provider is connected.</p></div>`);
+  openModal(`${providerName} connection required`, `<div style="font-size:.9rem;line-height:1.6;"><p>This feature needs an approved school-owned ${providerName} account before it can operate.</p><p style="margin-top:10px;"><strong>Next steps:</strong></p><ol style="margin:6px 0 0 20px;"><li>Choose and contract an approved provider.</li><li>Obtain the provider credentials and consent documentation.</li><li>Ask an administrator to configure the connection securely.</li></ol><p style="margin-top:10px;color:var(--text-muted);">No payment, payroll, SMS, or push messages are sent until a provider is connected.</p></div>`);
 }
 
 function quickCareLog(activity) {

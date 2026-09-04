@@ -92,22 +92,8 @@ app.use(express.static(__dirname));
 // In-Memory Database Store
 const db = {
   term: "Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST",
-  users: process.env.LF_DEMO_MODE === 'true' ? [
-    { username: "admin@gmail.com", pin: "Test", role: "admin", name: "System Admin", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
-    { username: "Teacher@gmail.com", pin: "Test", role: "teacher", name: "Sarah Educator", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "", assignedClasses: ["Preschool", "Toddlers"] },
-    { username: "Parent@gmail.com", pin: "Test", role: "parent", name: "John Parent", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "", subscription: "plus" },
-    { username: "Principle@gmail.com", pin: "Test", role: "principal", name: "Maya Principal", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
-    { username: "District@gmail.com", pin: "Test", role: "district", name: "District Officer", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" }
-  ].map(user => ({ ...user, pinHash: hashPin(user.pin), pin: undefined })) : [],
-  posts: process.env.LF_DEMO_MODE === 'true' ? [
-    {
-      id: "1",
-      audience: "All",
-      caption: "Welcome to our updated Little Feet ECD & High School Learning Portal!",
-      mediaUrl: null,
-      createdAt: "Today at 08:00 AM"
-    }
-  ] : [],
+  users: [],
+  posts: [],
   schedules: [],
   worksheets: [],
   badges: [],
@@ -123,21 +109,11 @@ const db = {
     { id: '2026-08-safeguarding', version: '2.8', title: 'Safeguarding and family records', summary: 'Added consent, pickup audit, staff verification, parent report review, and digital signing controls.', publishedAt: '2026-08-28T08:00:00.000Z' },
     { id: '2026-08-workflows', version: '2.7', title: 'Daily classroom workflows', summary: 'Added care logging, progress records, stock intake, and spreadsheet templates.', publishedAt: '2026-08-27T08:00:00.000Z' }
   ],
-  chatGroups: process.env.LF_DEMO_MODE === 'true' ? [
-    { id: "general", groupName: "General Staff Lounge" },
-    { id: "toddlers", groupName: "Toddler Educators" }
-  ] : [],
-  groupMessages: process.env.LF_DEMO_MODE === 'true' ? {
-    general: [
-      { sender: "System Administrator", message: "Welcome to the internal group channel.", timestamp: "07:00 AM", textColor: "#2dd4bf" }
-    ]
-  } : {},
+  chatGroups: [],
+  groupMessages: {},
   directMessages: [],
   importAudit: [],
-  students: process.env.LF_DEMO_MODE === 'true' ? [
-    { studentName: "Liam Smith", className: "Preschool", parentName: "John Parent", contactEmail: "Parent@gmail.com", medicalNotes: encryptField("Peanut Allergy"), emergencyContact: encryptField("John Parent · 071 000 0000"), authorisedPickups: encryptField("John Parent, Sam Smith") },
-    { studentName: "Emma Watson", className: "Toddlers", parentName: "Sarah Educator", contactEmail: "Teacher@gmail.com", medicalNotes: encryptField("None"), emergencyContact: encryptField("Sarah Educator · 072 000 0000"), authorisedPickups: encryptField("Sarah Educator") }
-  ] : []
+  students: []
 };
 
 // PostgreSQL is used whenever DATABASE_URL is configured (the production path).
@@ -185,7 +161,7 @@ function applySavedState(saved) {
     if (key !== 'moduleRecords' && Object.hasOwn(saved, key)) db[key] = saved[key];
   });
   if (Object.hasOwn(saved, 'moduleRecords')) db.moduleRecords = { ...moduleDefaults, ...(saved.moduleRecords || {}) };
-  if (process.env.NODE_ENV === 'production' && process.env.LF_DEMO_MODE !== 'true') removeLegacyDemoRecords();
+  removeLegacyDemoRecords();
   return true;
 }
 
@@ -200,6 +176,7 @@ function removeLegacyDemoRecords() {
   db.chatGroups = db.chatGroups.filter(group => !['general', 'toddlers'].includes(group.id));
   delete db.groupMessages.general;
   delete db.groupMessages.toddlers;
+  db.directMessages = db.directMessages.filter(message => !demoUsernames.has(normalizeUsername(message.sender)) && !demoUsernames.has(normalizeUsername(message.recipient)));
 }
 
 async function loadDatabaseState() {
@@ -786,7 +763,7 @@ app.post('/api/tickets/update', (req, res) => {
   res.json({ success: true, ticket });
 });
 app.delete('/api/tickets/:id', (req, res) => {
-  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   db.tickets = db.tickets.filter(t => t.id !== req.params.id);
   res.json({ success: true });
 });
@@ -829,7 +806,7 @@ app.post('/api/chat/messages', (req, res) => {
   res.json({ success: true, msgObj });
 });
 app.delete('/api/chat/messages/:groupId/:messageId', (req, res) => {
-  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   const messages = db.groupMessages[req.params.groupId];
   if (!messages) return res.status(404).json({ message: 'Chat group not found.' });
   const previousLength = messages.length;
@@ -872,7 +849,7 @@ app.post('/api/chat/direct', (req, res) => {
   res.json({ success: true, msgObj });
 });
 app.delete('/api/chat/direct/:messageId', (req, res) => {
-  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   const previousLength = db.directMessages.length;
   db.directMessages = db.directMessages.filter(message => message.id !== req.params.messageId);
   if (db.directMessages.length === previousLength) return res.status(404).json({ message: 'Message not found.' });
