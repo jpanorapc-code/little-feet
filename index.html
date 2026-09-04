@@ -473,6 +473,7 @@
     .sidebar-group-toggle::after { content:'⌄'; font-size:1rem; transition:transform .2s ease; }
     [data-nav-group].is-collapsed .sidebar-group-toggle::after { transform:rotate(-90deg); }
     [data-nav-group].is-collapsed .sidebar-links { display:none; }
+    [data-nav-group].is-collapsed::before { opacity:0; }
     .app-sidebar.is-collapsed { width:76px; padding-inline:8px; overflow-x:hidden; }
     .app-sidebar.is-collapsed .sidebar-heading, .app-sidebar.is-collapsed .sidebar-group-toggle, .app-sidebar.is-collapsed .sidebar-links, .app-sidebar.is-collapsed .sidebar-signout, .app-sidebar.is-collapsed [data-nav-group]::before { opacity:0; pointer-events:none; }
     .app-sidebar.is-collapsed::after { content:'☰'; position:absolute; top:18px; left:25px; color:#5eead4; font-size:1.25rem; }
