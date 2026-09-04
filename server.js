@@ -107,6 +107,8 @@ const db = {
   tickets: [],
   attendance: [],
   broadcasts: [],
+  campusVisitors: [],
+  visitorMeetings: [],
   registry: [],
   moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [] },
   consentRecords: [],
@@ -864,14 +866,41 @@ app.delete('/api/chat/direct/:messageId', (req, res) => {
   res.json({ success: true });
 });
 
-// Emergency Broadcasts
+// Location-aware emergency broadcasts. Exact incident coordinates remain visible
+// only to authorised safety staff; recipients receive only applicable alerts.
+const requireSafetyStaff = (req) => {
+  const account = getSessionAccount(req);
+  return account && ['admin', 'principal'].includes(account.role) ? account : null;
+};
 app.get('/api/broadcasts', (req, res) => {
-  res.json(db.broadcasts);
+  const requester = getSessionAccount(req);
+  if (!requester) return res.status(401).json({ message: 'Sign in to view safety alerts.' });
+  const latitude = Number(req.query.lat);
+  const longitude = Number(req.query.lng);
+  const hasLocation = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const canSeeAll = ['admin', 'principal'].includes(requester.role);
+  const visible = db.broadcasts.filter(item => {
+    if (canSeeAll || !item.location || !Number(item.radiusKm)) return true;
+    if (!hasLocation) return false;
+    const latDistance = (latitude - Number(item.location.lat)) * 111.32;
+    const lngDistance = (longitude - Number(item.location.lng)) * 111.32 * Math.cos(latitude * Math.PI / 180);
+    return Math.hypot(latDistance, lngDistance) <= Number(item.radiusKm);
+  }).map(item => {
+    if (canSeeAll) return item;
+    const { location, readBy, ...safeAlert } = item;
+    return safeAlert;
+  });
+  res.json(visible);
 });
 app.post('/api/broadcasts', (req, res) => {
+  const actor = requireSafetyStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
+  if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
   const item = {
     id: Date.now().toString(),
     ...req.body,
+    issuedBy: actor.username,
+    issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     readBy: []
   };
@@ -879,14 +908,121 @@ app.post('/api/broadcasts', (req, res) => {
   res.json({ success: true, item });
 });
 app.post('/api/broadcasts/:id/read', (req, res) => {
+  const requester = getSessionAccount(req);
+  if (!requester) return res.status(401).json({ message: 'Sign in to acknowledge an alert.' });
   const item = db.broadcasts.find(entry => entry.id === req.params.id);
   if (!item) return res.status(404).json({ message: 'Alert not found.' });
-  const username = String(req.body.username || '').trim();
-  if (username && !item.readBy.includes(username)) item.readBy.push(username);
+  if (!item.readBy.includes(requester.username)) item.readBy.push(requester.username);
   res.json({ success: true, readCount: item.readBy.length });
 });
 app.delete('/api/broadcasts/:id', (req, res) => {
+  if (!requireSafetyStaff(req)) return res.status(403).json({ message: 'Only authorised safety staff can remove a broadcast.' });
   db.broadcasts = db.broadcasts.filter(item => item.id !== req.params.id);
+  res.json({ success: true });
+});
+
+app.get('/api/safety-network', (req, res) => {
+  if (!requireSafetyStaff(req)) return res.status(403).json({ message: 'Safety Network is available to authorised school safety staff.' });
+  const presentLearners = db.attendance.filter(entry => /present|checked.?in/i.test(String(entry.status || ''))).length;
+  const visitorsOnCampus = db.campusVisitors.filter(visitor => visitor.status === 'checked-in');
+  const activeBroadcasts = db.broadcasts.filter(broadcast => !broadcast.closedAt);
+  res.json({
+    presentLearners,
+    visitorsOnCampus: visitorsOnCampus.length,
+    activeBroadcasts: activeBroadcasts.length,
+    acknowledgements: activeBroadcasts.reduce((total, broadcast) => total + (broadcast.readBy?.length || 0), 0),
+    visitors: visitorsOnCampus.map(({ passCodeHash, ...visitor }) => visitor)
+  });
+});
+
+app.get('/api/campus-visitors', (req, res) => {
+  if (!requireSafetyStaff(req)) return res.status(403).json({ message: 'Only authorised safety staff can view campus visitors.' });
+  res.json(db.campusVisitors.map(({ passCodeHash, ...visitor }) => visitor));
+});
+
+app.get('/api/visitor-meetings/recipients', (req, res) => {
+  const parent = getSessionAccount(req);
+  if (!parent || parent.role !== 'parent') return res.status(403).json({ message: 'Only a signed-in parent can request a meeting.' });
+  res.json(db.users.filter(account => ['teacher', 'principal'].includes(account.role) && isSameSchool(parent, account) && !String(account.verificationStatus || '').includes('pending')).map(safeAccount));
+});
+
+app.get('/api/visitor-meetings', (req, res) => {
+  const user = getSessionAccount(req);
+  if (!user || !['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'You are not authorised to view meeting requests.' });
+  const meetings = db.visitorMeetings.filter(meeting => {
+    if (user.role === 'parent') return normalizeUsername(meeting.parentUsername) === normalizeUsername(user.username);
+    if (user.role === 'teacher') return normalizeUsername(meeting.hostUsername) === normalizeUsername(user.username);
+    return normalizeComparableText(meeting.schoolName) === normalizeComparableText(user.schoolName);
+  });
+  res.json(meetings);
+});
+
+app.post('/api/visitor-meetings', (req, res) => {
+  const parent = getSessionAccount(req);
+  const host = findAccountByUsername(req.body?.hostUsername);
+  const proposedAt = String(req.body?.proposedAt || '').trim();
+  const purpose = String(req.body?.purpose || '').trim();
+  if (!parent || parent.role !== 'parent' || !host || !['teacher', 'principal'].includes(host.role) || !isSameSchool(parent, host) || !proposedAt || !purpose) return res.status(400).json({ message: 'Choose an authorised teacher or principal, a proposed time, and a meeting purpose.' });
+  const meeting = { id: crypto.randomUUID(), schoolName: parent.schoolName, parentUsername: parent.username, parentName: parent.name || parent.username, hostUsername: host.username, hostName: host.name || host.username, proposedAt, agreedAt: null, purpose, status: 'awaiting-teacher-response', requestedAt: new Date().toISOString() };
+  db.visitorMeetings.unshift(meeting);
+  res.status(201).json({ success: true, meeting });
+});
+
+app.post('/api/visitor-meetings/:id/respond', (req, res) => {
+  const staff = getSessionAccount(req);
+  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id);
+  const action = String(req.body?.action || '');
+  const agreedAt = String(req.body?.agreedAt || '').trim();
+  if (!staff || !meeting || !['teacher', 'principal'].includes(staff.role) || normalizeUsername(meeting.hostUsername) !== normalizeUsername(staff.username) || meeting.status !== 'awaiting-teacher-response' || !['accept', 'counter'].includes(action)) return res.status(403).json({ message: 'This meeting cannot be updated by this account.' });
+  meeting.agreedAt = action === 'accept' ? meeting.proposedAt : agreedAt;
+  if (!meeting.agreedAt) return res.status(400).json({ message: 'Provide an alternative meeting time.' });
+  meeting.status = 'awaiting-parent-confirmation';
+  meeting.respondedAt = new Date().toISOString();
+  res.json({ success: true, meeting });
+});
+
+app.post('/api/visitor-meetings/:id/confirm', (req, res) => {
+  const parent = getSessionAccount(req);
+  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id);
+  if (!parent || !meeting || parent.role !== 'parent' || normalizeUsername(meeting.parentUsername) !== normalizeUsername(parent.username) || meeting.status !== 'awaiting-parent-confirmation') return res.status(403).json({ message: 'This meeting cannot be confirmed by this account.' });
+  meeting.status = 'awaiting-principal-approval';
+  meeting.parentConfirmedAt = new Date().toISOString();
+  res.json({ success: true, meeting });
+});
+
+app.post('/api/visitor-meetings/:id/approve-visitor', (req, res) => {
+  const principal = getSessionAccount(req);
+  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id);
+  if (!principal || !meeting || !['principal', 'admin'].includes(principal.role) || !isSameSchool(principal, meeting) || meeting.status !== 'awaiting-principal-approval') return res.status(403).json({ message: 'Only the principal or administrator can issue visitor authorisation after both parties agree.' });
+  const passCode = `LFV-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  const visitor = { id: crypto.randomUUID(), meetingId: meeting.id, visitorName: meeting.parentName, purpose: meeting.purpose, host: meeting.hostName, expectedDate: meeting.agreedAt, status: 'approved', approvedBy: principal.username, approvedAt: new Date().toISOString(), passCodeHash: hashPin(passCode) };
+  db.campusVisitors.unshift(visitor);
+  meeting.status = 'visitor-authorised';
+  meeting.visitorId = visitor.id;
+  meeting.principalApprovedAt = new Date().toISOString();
+  res.json({ success: true, visitor: { ...visitor, passCodeHash: undefined }, passCode });
+});
+
+app.post('/api/campus-visitors/check-in', (req, res) => {
+  const actor = requireSafetyStaff(req);
+  const passCode = String(req.body?.passCode || '').trim().toUpperCase();
+  if (!actor || !passCode) return res.status(403).json({ message: 'An authorised staff member and visitor pass are required.' });
+  const visitor = db.campusVisitors.find(entry => entry.status === 'approved' && matchesPin(passCode, entry.passCodeHash));
+  if (!visitor) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
+  visitor.status = 'checked-in';
+  visitor.checkedInAt = new Date().toISOString();
+  visitor.checkedInBy = actor.username;
+  res.json({ success: true, visitor: { ...visitor, passCodeHash: undefined } });
+});
+
+app.post('/api/campus-visitors/:id/check-out', (req, res) => {
+  const actor = requireSafetyStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Only authorised safety staff can check out a visitor.' });
+  const visitor = db.campusVisitors.find(entry => entry.id === req.params.id && entry.status === 'checked-in');
+  if (!visitor) return res.status(404).json({ message: 'Checked-in visitor not found.' });
+  visitor.status = 'checked-out';
+  visitor.checkedOutAt = new Date().toISOString();
+  visitor.checkedOutBy = actor.username;
   res.json({ success: true });
 });
 

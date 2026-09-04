@@ -21,6 +21,7 @@ let debugEvents = [];
 let startupChimePlayed = false;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
+let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 const wellbeingTips = [
@@ -567,6 +568,8 @@ function clearDebugReport() {
 }
 
 function closeModal() {
+  visitorScannerStream?.getTracks().forEach(track => track.stop());
+  visitorScannerStream = null;
   document.getElementById('appModal').classList.add('hidden');
 }
 
@@ -921,6 +924,9 @@ function loadAllData() {
   loadRegistry();
   loadAccounts();
   loadLearnerAccessCodes();
+  loadSafetyNetwork();
+  loadVisitorMeetingRecipients();
+  loadVisitorMeetings();
   loadConsentRecords();
   loadPickupRecords();
   ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding', 'absences', 'handovers'].forEach(loadWorkspaceRecords);
@@ -1923,16 +1929,15 @@ function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
 // Emergency Broadcasts
 async function loadBroadcasts() {
   try {
-    const res = await fetch('/api/broadcasts');
+    const userPosition = await getCurrentPositionQuietly();
+    const locationQuery = userPosition ? `?lat=${encodeURIComponent(userPosition.latitude)}&lng=${encodeURIComponent(userPosition.longitude)}` : '';
+    const res = await fetch(`/api/broadcasts${locationQuery}`);
     const broadcasts = await res.json();
     const listEl = document.getElementById('broadcastList');
     if (!listEl) return;
 
-    const userPosition = await getCurrentPositionQuietly();
-    const visibleBroadcasts = broadcasts.filter((broadcast) => {
-      if (!broadcast.location || !Number(broadcast.radiusKm) || !userPosition) return currentUser?.role === 'admin';
-      return distanceInKm(userPosition.latitude, userPosition.longitude, broadcast.location.lat, broadcast.location.lng) <= Number(broadcast.radiusKm);
-    });
+    if (!res.ok) throw new Error(broadcasts.message || 'Unable to load safety alerts.');
+    const visibleBroadcasts = broadcasts;
 
     const knownAlertIds = new Set(JSON.parse(localStorage.getItem('lf_known_alert_ids') || '[]'));
     const newApplicableAlerts = visibleBroadcasts.filter(alert => !knownAlertIds.has(alert.id));
@@ -1946,15 +1951,144 @@ async function loadBroadcasts() {
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
               <span class="badge-tag urgent">${b.bcPriority || 'Urgent Notice'}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${b.timestamp || 'Recent'}${b.radiusKm ? ` · ${b.radiusKm}km area` : ''}</span>${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteBroadcast('${b.id}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${b.timestamp || 'Recent'}${b.radiusKm ? ` · ${b.radiusKm}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${b.id}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
             </div>
             <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${b.bcMessage}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${b.id}')" class="action-btn btn-blue" style="padding:4px 8px;display:${currentUser?.role === 'admin' ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${currentUser?.role === 'admin' ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient read receipt(s)</span></div>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${b.id}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
           </div>
         `).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
   } catch (e) {
     logAppError('ERR_BC_001', 'Unable to fetch campus broadcast alerts.');
+  }
+}
+
+async function loadSafetyNetwork() {
+  const summary = document.getElementById('safetyNetworkSummary');
+  const visitorList = document.getElementById('safetyNetworkVisitors');
+  if (!summary || !['admin', 'principal'].includes(currentUser?.role)) return;
+  try {
+    const response = await fetch('/api/safety-network');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load campus safety status.');
+    summary.innerHTML = [["Learners marked present", data.presentLearners], ["Visitors on campus", data.visitorsOnCampus], ["Active broadcasts", data.activeBroadcasts], ["Alert acknowledgements", data.acknowledgements]].map(([label, value]) => `<div class="workspace-card"><h3>${value}</h3><p>${label}</p></div>`).join('');
+    visitorList.innerHTML = data.visitors.length ? `<h3 class="workspace-heading">Currently on campus</h3>${data.visitors.map(visitor => `<div class="item-row"><div><strong>${escapeWorkspaceText(visitor.visitorName)}</strong><p style="margin-top:4px;">Host: ${escapeWorkspaceText(visitor.host || 'School office')} · ${escapeWorkspaceText(visitor.purpose)}</p><span class="meta">Checked in ${new Date(visitor.checkedInAt).toLocaleString()}</span></div><button type="button" class="action-btn btn-blue" onclick="checkOutCampusVisitor('${visitor.id}')">Check out</button></div>`).join('')}` : '<p class="meta">No approved visitors are currently checked in.</p>';
+  } catch (error) { summary.innerHTML = `<p class="meta">${escapeWorkspaceText(error.message)}</p>`; }
+}
+
+async function loadVisitorMeetingRecipients() {
+  const select = document.getElementById('visitorMeetingHost');
+  if (!select || currentUser?.role !== 'parent') return;
+  try {
+    const response = await fetch('/api/visitor-meetings/recipients');
+    const people = await response.json();
+    if (!response.ok) throw new Error(people.message || 'Unable to load meeting recipients.');
+    select.innerHTML = '<option value="">Choose teacher or principal</option>' + people.map(person => `<option value="${escapeWorkspaceText(person.username)}">${escapeWorkspaceText(person.name || person.username)} · ${escapeWorkspaceText(person.role)}</option>`).join('');
+  } catch { select.innerHTML = '<option value="">No authorised staff available</option>'; }
+}
+
+async function loadVisitorMeetings() {
+  const list = document.getElementById('visitorMeetingList');
+  if (!list || !['parent','teacher','principal','admin'].includes(currentUser?.role)) return;
+  try {
+    const response = await fetch('/api/visitor-meetings');
+    const meetings = await response.json();
+    if (!response.ok) throw new Error(meetings.message || 'Unable to load meeting requests.');
+    list.innerHTML = meetings.length ? meetings.map(meeting => {
+      const status = String(meeting.status || '').replaceAll('-', ' ');
+      let actions = '';
+      if (currentUser.role === 'teacher' && meeting.status === 'awaiting-teacher-response') actions = `<button type="button" class="action-btn btn-green" onclick="respondVisitorMeeting('${meeting.id}','accept')">Accept time</button><button type="button" class="action-btn btn-blue" onclick="respondVisitorMeeting('${meeting.id}','counter')">Counter-offer</button>`;
+      if (currentUser.role === 'parent' && meeting.status === 'awaiting-parent-confirmation') actions = `<button type="button" class="action-btn btn-green" onclick="confirmVisitorMeeting('${meeting.id}')">Confirm agreed time</button>`;
+      if (['principal','admin'].includes(currentUser.role) && meeting.status === 'awaiting-principal-approval') actions = `<button type="button" class="action-btn btn-green" onclick="approveVisitorMeeting('${meeting.id}')">Approve & issue QR pass</button>`;
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(meeting.parentName)} → ${escapeWorkspaceText(meeting.hostName)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(meeting.purpose)}<br>Meeting: ${escapeWorkspaceText(meeting.agreedAt || meeting.proposedAt)}</p><span class="meta">Status: ${escapeWorkspaceText(status)}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}</div></div>`;
+    }).join('') : '<p class="meta">No meeting requests are waiting for your action.</p>';
+  } catch (error) { list.textContent = error.message || 'Unable to load meeting requests.'; }
+}
+
+async function respondVisitorMeeting(id, action) {
+  let agreedAt = '';
+  if (action === 'counter') { agreedAt = prompt('Enter the alternative meeting date and time (for example 2026-09-05 14:30):') || ''; if (!agreedAt) return; }
+  const response = await fetch(`/api/visitor-meetings/${encodeURIComponent(id)}/respond`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action, agreedAt }) });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to update this meeting.');
+  playDingSound(); loadVisitorMeetings();
+}
+
+async function confirmVisitorMeeting(id) {
+  const response = await fetch(`/api/visitor-meetings/${encodeURIComponent(id)}/confirm`, { method:'POST' });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to confirm this meeting.');
+  playDingSound(); loadVisitorMeetings();
+}
+
+async function approveVisitorMeeting(id) {
+  const response = await fetch(`/api/visitor-meetings/${encodeURIComponent(id)}/approve-visitor`, { method:'POST' });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to approve visitor entry.');
+  playDingSound(); loadVisitorMeetings(); loadSafetyNetwork(); printVisitorPass(result.visitor, result.passCode);
+}
+
+async function checkInCampusVisitor() {
+  const field = document.getElementById('visitorPassCode');
+  const response = await fetch('/api/campus-visitors/check-in', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ passCode: field?.value || '' }) });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Visitor entry could not be validated.');
+  if (field) field.value = ''; playDingSound(); loadSafetyNetwork(); alert(`${result.visitor.visitorName} is checked in.`);
+}
+
+async function checkOutCampusVisitor(id) {
+  const response = await fetch(`/api/campus-visitors/${encodeURIComponent(id)}/check-out`, { method:'POST' });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Visitor check-out failed.');
+  loadSafetyNetwork();
+}
+
+async function printVisitorPass(visitor, passCode) {
+  const safe = escapeWorkspaceText;
+  let qrImage = '';
+  if (window.QRCode) {
+    const holder = document.createElement('div');
+    new window.QRCode(holder, { text: passCode, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M });
+    await new Promise(resolve => setTimeout(resolve, 80));
+    qrImage = holder.querySelector('canvas')?.toDataURL('image/png') || holder.querySelector('img')?.src || '';
+  }
+  const popup = window.open('', '_blank', 'width=760,height=900');
+  if (!popup) return alert('Allow pop-ups for Little Feet to print the visitor ticket.');
+  popup.document.write(`<!doctype html><title>Little Feet Visitor Pass</title><style>body{font-family:Arial;padding:36px;color:#102a43}.pass{max-width:620px;border:3px solid #0d9488;border-radius:18px;padding:30px}.code{font-size:28px;letter-spacing:3px;font-weight:bold;color:#0f766e;padding:18px 0;border-top:1px dashed #0d9488;border-bottom:1px dashed #0d9488}.qr{width:180px;height:180px;display:block;margin:20px auto}.meta{color:#526d82;line-height:1.6}@media print{body{padding:0}}</style><main class="pass"><p> LITTLE FEET · AUTHORISED VISITOR</p><h1>Campus visitor ticket</h1><p><strong>${safe(visitor.visitorName)}</strong><br>${safe(visitor.purpose)}<br>Host: ${safe(visitor.host || 'School office')}<br>Meeting: ${safe(visitor.expectedDate)}</p>${qrImage ? `<img class="qr" src="${qrImage}" alt="QR visitor pass">` : ''}<div class="code">${safe(passCode)}</div><p class="meta">Present this QR ticket at the gate. Security validates it with Little Feet before admitting the visitor. It is single-use and becomes invalid once checked in.</p></main><script>window.onload=()=>window.print();<\/script>`); popup.document.close();
+}
+
+function stopVisitorQrScan() {
+  visitorScannerStream?.getTracks().forEach(track => track.stop());
+  visitorScannerStream = null;
+  closeModal();
+}
+
+async function scanVisitorPassCode() {
+  if (!window.BarcodeDetector || !navigator.mediaDevices?.getUserMedia) return alert('This device does not support camera QR scanning. Enter the visitor pass code shown beneath the QR image instead.');
+  try {
+    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    openModal('Scan visitor QR ticket', '<p class="meta" style="margin:0 0 10px;">Hold the school-issued QR ticket inside the frame. The server will still validate it before entry is recorded.</p><video id="visitorScannerVideo" autoplay playsinline style="width:100%;border-radius:10px;background:#07111e;"></video><button type="button" class="action-btn btn-blue" style="margin-top:12px;" onclick="stopVisitorQrScan()">Cancel scan</button>');
+    visitorScannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+    const video = document.getElementById('visitorScannerVideo');
+    if (!video) return stopVisitorQrScan();
+    video.srcObject = visitorScannerStream;
+    const scanFrame = async () => {
+      if (!visitorScannerStream || !video.videoWidth) return visitorScannerStream && requestAnimationFrame(scanFrame);
+      try {
+        const codes = await detector.detect(video);
+        if (codes[0]?.rawValue) {
+          const field = document.getElementById('visitorPassCode');
+          if (field) field.value = codes[0].rawValue.trim().toUpperCase();
+          stopVisitorQrScan();
+          return;
+        }
+      } catch { /* Continue scanning while the camera frame settles. */ }
+      if (visitorScannerStream) requestAnimationFrame(scanFrame);
+    };
+    video.onloadedmetadata = () => requestAnimationFrame(scanFrame);
+  } catch {
+    stopVisitorQrScan();
+    alert('Camera access was unavailable. Enter the visitor pass code manually.');
   }
 }
 
@@ -2299,6 +2433,17 @@ function setupFormListeners() {
       playDingSound();
     });
   }
+
+  const visitorMeetingForm = document.getElementById('visitorMeetingRequestForm');
+  if (visitorMeetingForm) visitorMeetingForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const response = await fetch('/api/visitor-meetings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ hostUsername: document.getElementById('visitorMeetingHost').value, proposedAt: document.getElementById('visitorMeetingTime').value, purpose: document.getElementById('visitorMeetingPurpose').value.trim() }) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to submit the meeting request.');
+    visitorMeetingForm.reset();
+    playDingSound();
+    loadVisitorMeetings();
+  });
 
   const lookupForm = document.getElementById('studentLookupForm');
   if (lookupForm) {

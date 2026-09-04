@@ -8,6 +8,7 @@
   <meta name="referrer" content="no-referrer-when-downgrade">
   <title>Little Feet | ECD Portal</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <!-- Leaflet Maps CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
@@ -793,6 +794,7 @@
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">🛡️ Safety</button>
         <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('broadcastsTab', this)">Safety Alerts</button></li>
+        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('safetyNetworkTab', this)">Safety Network</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('careTab', this)">Care Records</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('safeguardingTab', this)">Safeguarding</button></li>
         </ul>
@@ -1184,6 +1186,33 @@
           </div>
 
         </div>
+      </div>
+
+      <div id="safetyNetworkTab" class="tab-content" data-roles="parent,teacher,principal,admin">
+        <section class="card" data-roles="principal,admin">
+          <div class="card-header-bar"><h2>🛡️ Campus Safety Network</h2><span class="badge-tag urgent">AUTHORISED STAFF</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">A live overview of campus presence, active emergency broadcasts, and acknowledgement activity. Exact incident locations remain restricted to authorised safety staff.</p>
+          <div id="safetyNetworkSummary" class="workspace-grid"><p class="meta">Loading current safety status…</p></div>
+          <div id="safetyNetworkVisitors" class="record-list" style="margin-top:16px;"></div>
+        </section>
+
+        <section class="card" data-roles="parent">
+          <div class="card-header-bar"><h2>📅 Request a school meeting</h2><span class="badge-tag info">PARENT</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">Request a meeting with a teacher or principal. A campus visitor pass is created only after the teacher agrees, you confirm the time, and the principal approves entry.</p>
+          <form id="visitorMeetingRequestForm" class="workspace-grid"><div><label for="visitorMeetingHost">Teacher or principal</label><select id="visitorMeetingHost" required><option value="">Loading authorised staff…</option></select></div><div><label for="visitorMeetingTime">Requested meeting time</label><input id="visitorMeetingTime" type="datetime-local" required></div><div style="grid-column:1/-1;"><label for="visitorMeetingPurpose">Meeting purpose</label><input id="visitorMeetingPurpose" maxlength="240" placeholder="e.g. Discussing learning progress" required></div><div style="grid-column:1/-1;"><button class="submit-btn">Send meeting request</button></div></form>
+        </section>
+
+        <section class="card" data-roles="parent,teacher,principal,admin">
+          <div class="card-header-bar"><h2>🤝 Meeting & visitor approvals</h2><span class="badge-tag info">ROLE-BASED</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">Teachers respond to their own requests. Parents confirm the agreed time. Principals then issue the QR visitor pass.</p>
+          <div id="visitorMeetingList" class="record-list"><p class="meta">Loading meeting requests…</p></div>
+        </section>
+
+        <section class="card" data-roles="principal,admin">
+          <div class="card-header-bar"><h2>🚪 Security gate check-in</h2><span class="badge-tag info">CAMPUS ENTRY</span></div>
+          <p style="color:var(--text-muted);margin-bottom:14px;">Scan a school-issued QR visitor ticket where your device supports it, or enter the pass code. Little Feet validates the pass with the server before recording entry.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="visitorPassCode" placeholder="LFV-XXXXXXXX" style="flex:1 1 230px;margin-bottom:0;text-transform:uppercase;"><button type="button" class="action-btn btn-blue" onclick="scanVisitorPassCode()">Scan QR</button><button type="button" class="submit-btn" style="margin:0;max-width:220px;" onclick="checkInCampusVisitor()">Validate & check in</button></div>
+        </section>
       </div>
 
       <!-- 8. Emergency Broadcasts / Alerts -->
