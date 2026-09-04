@@ -206,15 +206,15 @@
 
     #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; isolation:isolate; }
     #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background-image:linear-gradient(rgba(5,16,27,.42),rgba(5,16,27,.64)),url('assets/little-feet-original-background.gif'); background-position:center; background-size:100% 100%; background-repeat:no-repeat; opacity:.48; pointer-events:none; z-index:-1; }
-    #authSection > .auth-card { position:relative; z-index:1; width:min(100%,470px) !important; max-width:470px !important; margin:0; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
-    .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:20px; padding-top:8px; overflow:hidden; }
-    .mascot-stage { position:relative; display:grid; place-items:center; min-height:158px; margin-bottom:2px; }
-    .mascot-stage::before { content:""; position:absolute; z-index:0; width:146px; height:146px; border:2px solid rgba(94,234,212,.70); border-radius:20px; background:transparent; box-shadow:0 0 18px rgba(45,212,191,.30); }
+    #authSection > .auth-card { position:relative; z-index:1; width:min(100%,560px) !important; max-width:560px !important; margin:0; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
+    .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:24px; padding-top:10px; overflow:hidden; }
+    .mascot-stage { position:relative; display:grid; place-items:center; min-height:180px; margin-bottom:4px; }
+    .mascot-stage::before { content:""; position:absolute; z-index:0; width:164px; height:164px; border:2px solid rgba(94,234,212,.70); border-radius:20px; background:transparent; box-shadow:0 0 22px rgba(45,212,191,.34); }
     .mascot-stage::after { display:none; }
-    .brand-header img { position:relative; z-index:2; height:138px; width:138px; object-fit:contain; padding:0; background:transparent; border:0; cursor:pointer; animation:logoPulse 2.8s ease-in-out infinite alternate; border-radius:18px; }
+    .brand-header img { position:relative; z-index:2; height:156px; width:156px; object-fit:contain; padding:0; background:transparent; border:0; cursor:pointer; animation:logoPulse 2.8s ease-in-out infinite alternate; border-radius:18px; }
     .nav-brand img { background: #ffffff !important; }
     @keyframes logoPulse { from { filter: brightness(1.18) contrast(1.05) drop-shadow(0 0 5px rgba(45,212,191,.55)); } to { filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 18px rgba(45,212,191,1)); } }
-    .brand-header h2 { position:relative; z-index:3; margin-top:2px; margin-bottom:3px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
+    .brand-header h2 { position:relative; z-index:3; margin-top:2px; margin-bottom:4px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2.25rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
     .brand-header p.slogan { position:relative; z-index:3; display:inline-block; margin:0; padding:5px 11px; border:1px solid rgba(45,212,191,.38); border-radius:999px; background:rgba(13,148,136,.11); color:#99f6e4; font-size:.69rem; font-style:normal; font-weight:800; letter-spacing:1.45px; text-transform:uppercase; animation:sloganLift 3s ease-in-out infinite; }
     @keyframes mascotOrbit { to { transform:rotate(360deg); } }
     @keyframes brandSpark { to { transform:translateX(-50%) translateY(-8px) scale(1.12); opacity:.6; } }
@@ -336,8 +336,8 @@
 
     #loginForm { display:flex; flex-direction:column; align-items:center; }
     #loginForm > div:not(.social-signin) { align-self:stretch; }
-    #loginForm > .submit-btn { width:min(100%, 360px); align-self:center; margin-top:2px; }
-    .social-signin { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:9px; width:min(100%, 360px); margin:12px auto 0; }
+    #loginForm > .submit-btn { width:min(100%, 420px); align-self:center; margin-top:2px; }
+    .social-signin { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:9px; width:min(100%, 420px); margin:12px auto 0; }
     .social-signin button { min-height:44px; border:1px solid var(--border-color); border-radius:8px; padding:9px 10px; color:var(--text-dark); background:var(--input-bg); font-size:.78rem; font-weight:700; line-height:1.2; cursor:pointer; }
     .social-signin button:hover, .social-signin button:focus-visible { border-color:var(--primary-color); background:rgba(13,148,136,.12); outline:none; }
     .chat-delete-btn { margin-left:9px; border:1px solid rgba(248,113,113,.55); border-radius:5px; background:rgba(127,29,29,.2); color:#fecaca; padding:3px 6px; font-size:.68rem; font-weight:700; cursor:pointer; }
