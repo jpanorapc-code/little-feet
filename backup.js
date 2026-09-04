@@ -692,7 +692,7 @@ function renderRoleHomePanel() {
       actions: [['📈 Progress insights', 'analyticsTab'], ['🔎 Learner search', 'lookupTab'], ['🚨 Safety alerts', 'broadcastsTab'], ['? Get help', 'ticketsTab']]
     },
     admin: {
-      icon: '⚙️', title: `Admin centre for ${currentUser.name || 'your school'}`,
+      icon: '🐧', title: `Admin centre for ${currentUser.name || 'your school'}`,
       message: 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.',
       actions: [['👤 Manage accounts', 'accountsTab'], ['📥 Import data', 'dataImportTab'], ['🛡️ Safeguarding', 'safeguardingTab'], ['⚙️ Operations', 'operationsTab']]
     }
