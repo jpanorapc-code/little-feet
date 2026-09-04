@@ -99,12 +99,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const oauthProvider = new URLSearchParams(window.location.search).get('oauth');
   const oauthError = new URLSearchParams(window.location.search).get('oauthError');
-  const savedUser = localStorage.getItem('lf_user');
   if (oauthProvider === 'google' || oauthProvider === 'yahoo' || oauthProvider === 'microsoft') {
     completeProviderLogin();
-  } else if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    setupSession();
+  } else {
+    restoreAuthenticatedSession();
   }
   if (oauthError) showOAuthSignInMessage(oauthError);
   syncProviderButtons();
@@ -134,13 +132,22 @@ async function completeProviderLogin() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to complete provider sign-in.');
     currentUser = data.user;
-    localStorage.setItem('lf_user', JSON.stringify(currentUser));
     window.history.replaceState({}, document.title, '/');
     setupSession();
   } catch (error) {
     alert(error.message || 'Provider sign-in could not be completed.');
     window.history.replaceState({}, document.title, '/');
   }
+}
+
+async function restoreAuthenticatedSession() {
+  try {
+    const response = await fetch('/api/auth/session', { cache: 'no-store' });
+    if (!response.ok) return;
+    const data = await response.json();
+    currentUser = data.user;
+    setupSession();
+  } catch { /* The sign-in screen remains available if the session check is unavailable. */ }
 }
 
 async function syncProviderButtons() {
@@ -406,7 +413,6 @@ if (loginForm) {
     unlockPortalAudio();
     const username = document.getElementById('loginUsername').value;
     const pin = document.getElementById('loginPin').value;
-    const remember = document.getElementById('rememberLogin').checked;
 
     try {
       const res = await fetch('/api/login', {
@@ -417,7 +423,6 @@ if (loginForm) {
       const data = await res.json();
       if (res.ok) {
         currentUser = data.user;
-        if (remember) localStorage.setItem('lf_user', JSON.stringify(currentUser));
         setupSession();
       } else {
         alert(data.message || 'Login failed.');
@@ -449,7 +454,10 @@ if (signupForm) {
       document.getElementById('loginUsername').value = result.account.username;
       document.getElementById('loginPin').value = '';
       hideSignupForm();
-      alert(`Account created for ${result.account.name}. Enter your password to sign in.`);
+      const parentMessage = result.account.role === 'parent'
+        ? ' Your school must approve your account and learner relationship before learner information is available.'
+        : ' Your school must approve your account before sign-in.';
+      alert(`Account request created for ${result.account.name}.${parentMessage}`);
     } catch {
       alert('Unable to reach the account service.');
     }
@@ -706,7 +714,7 @@ function logout() {
   if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
   knownTicketIds = new Set();
   ticketsLoaded = false;
-  localStorage.removeItem('lf_user');
+  void fetch('/api/auth/logout', { method: 'POST' });
   document.getElementById('dashboardSection').classList.add('hidden');
   document.getElementById('authSection').classList.remove('hidden');
   document.body.classList.remove('portal-active');
@@ -2409,7 +2417,7 @@ async function loadAccounts() {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
     accountsCache = accounts;
-    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Linked learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'Managed from the learner register')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
+    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
   } catch { list.textContent = 'Unable to load account records.'; }
 }
 

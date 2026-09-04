@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 const { Pool } = require('pg');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,8 +39,8 @@ const validateLearnerLinks = (value) => {
 };
 const isParentLinkedToLearner = (parent, learner) => {
   if (!parent || !learner) return false;
-  return normalizeUsername(learner.contactEmail) === normalizeUsername(parent.username)
-    || normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName));
+  if (parent.role !== 'parent' || parent.parentRelationshipStatus !== 'Administrator approved') return false;
+  return normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName));
 };
 const normaliseAssignedClasses = (value) => [...new Set((Array.isArray(value) ? value : String(value || '').split(',')).map(normalizeComparableText).filter(Boolean))];
 const isSameSchool = (first, second) => normalizeComparableText(first?.schoolName) && normalizeComparableText(first?.schoolName) === normalizeComparableText(second?.schoolName);
@@ -65,6 +66,13 @@ const activeLoginAttempt = (key) => {
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.set('trust proxy', 1);
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'lax' }
+}));
 app.use((req, res, next) => {
   persistenceReady.then(() => {
     activeRequestCount += 1;
@@ -84,14 +92,14 @@ app.use(express.static(__dirname));
 // In-Memory Database Store
 const db = {
   term: "Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST",
-  users: [
+  users: process.env.LF_DEMO_MODE === 'true' ? [
     { username: "admin@gmail.com", pin: "Test", role: "admin", name: "System Admin", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
     { username: "Teacher@gmail.com", pin: "Test", role: "teacher", name: "Sarah Educator", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "", assignedClasses: ["Preschool", "Toddlers"] },
     { username: "Parent@gmail.com", pin: "Test", role: "parent", name: "John Parent", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "", subscription: "plus" },
     { username: "Principle@gmail.com", pin: "Test", role: "principal", name: "Maya Principal", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" },
     { username: "District@gmail.com", pin: "Test", role: "district", name: "District Officer", schoolName: "Little Feet ECD Portal", schoolStoreUrl: "" }
-  ].map(user => ({ ...user, pinHash: hashPin(user.pin), pin: undefined })),
-  posts: [
+  ].map(user => ({ ...user, pinHash: hashPin(user.pin), pin: undefined })) : [],
+  posts: process.env.LF_DEMO_MODE === 'true' ? [
     {
       id: "1",
       audience: "All",
@@ -99,7 +107,7 @@ const db = {
       mediaUrl: null,
       createdAt: "Today at 08:00 AM"
     }
-  ],
+  ] : [],
   schedules: [],
   worksheets: [],
   badges: [],
@@ -115,21 +123,21 @@ const db = {
     { id: '2026-08-safeguarding', version: '2.8', title: 'Safeguarding and family records', summary: 'Added consent, pickup audit, staff verification, parent report review, and digital signing controls.', publishedAt: '2026-08-28T08:00:00.000Z' },
     { id: '2026-08-workflows', version: '2.7', title: 'Daily classroom workflows', summary: 'Added care logging, progress records, stock intake, and spreadsheet templates.', publishedAt: '2026-08-27T08:00:00.000Z' }
   ],
-  chatGroups: [
+  chatGroups: process.env.LF_DEMO_MODE === 'true' ? [
     { id: "general", groupName: "General Staff Lounge" },
     { id: "toddlers", groupName: "Toddler Educators" }
-  ],
-  groupMessages: {
+  ] : [],
+  groupMessages: process.env.LF_DEMO_MODE === 'true' ? {
     general: [
       { sender: "System Administrator", message: "Welcome to the internal group channel.", timestamp: "07:00 AM", textColor: "#2dd4bf" }
     ]
-  },
+  } : {},
   directMessages: [],
   importAudit: [],
-  students: [
+  students: process.env.LF_DEMO_MODE === 'true' ? [
     { studentName: "Liam Smith", className: "Preschool", parentName: "John Parent", contactEmail: "Parent@gmail.com", medicalNotes: encryptField("Peanut Allergy"), emergencyContact: encryptField("John Parent · 071 000 0000"), authorisedPickups: encryptField("John Parent, Sam Smith") },
     { studentName: "Emma Watson", className: "Toddlers", parentName: "Sarah Educator", contactEmail: "Teacher@gmail.com", medicalNotes: encryptField("None"), emergencyContact: encryptField("Sarah Educator · 072 000 0000"), authorisedPickups: encryptField("Sarah Educator") }
-  ]
+  ] : []
 };
 
 // PostgreSQL is used whenever DATABASE_URL is configured (the production path).
@@ -177,9 +185,21 @@ function applySavedState(saved) {
     if (key !== 'moduleRecords' && Object.hasOwn(saved, key)) db[key] = saved[key];
   });
   if (Object.hasOwn(saved, 'moduleRecords')) db.moduleRecords = { ...moduleDefaults, ...(saved.moduleRecords || {}) };
-  const demoTeacher = db.users.find(user => normalizeUsername(user.username) === 'teacher@gmail.com');
-  if (demoTeacher && !normaliseAssignedClasses(demoTeacher.assignedClasses).length) demoTeacher.assignedClasses = ['Preschool', 'Toddlers'];
+  if (process.env.NODE_ENV === 'production' && process.env.LF_DEMO_MODE !== 'true') removeLegacyDemoRecords();
   return true;
+}
+
+function removeLegacyDemoRecords() {
+  const demoUsernames = new Set(['admin@gmail.com', 'teacher@gmail.com', 'parent@gmail.com', 'principle@gmail.com', 'district@gmail.com']);
+  db.users = db.users.filter(account => !demoUsernames.has(normalizeUsername(account.username)));
+  db.students = db.students.filter(student => !(
+    (student.studentName === 'Liam Smith' && normalizeUsername(student.contactEmail) === 'parent@gmail.com')
+    || (student.studentName === 'Emma Watson' && normalizeUsername(student.contactEmail) === 'teacher@gmail.com')
+  ));
+  db.posts = db.posts.filter(post => post.caption !== 'Welcome to our updated Little Feet ECD & High School Learning Portal!');
+  db.chatGroups = db.chatGroups.filter(group => !['general', 'toddlers'].includes(group.id));
+  delete db.groupMessages.general;
+  delete db.groupMessages.toddlers;
 }
 
 async function loadDatabaseState() {
@@ -251,6 +271,25 @@ function writeReplicaSnapshot() {
     console.error('Unable to write standby snapshot:', error.message);
   }
 }
+function ensureBootstrapAdministrator() {
+  if (db.users.some(account => account.role === 'admin')) return;
+  const username = String(process.env.LF_BOOTSTRAP_ADMIN_USERNAME || '').trim();
+  const pin = String(process.env.LF_BOOTSTRAP_ADMIN_PIN || '');
+  if (!username || !pin) {
+    console.warn('No administrator account exists. Set LF_BOOTSTRAP_ADMIN_USERNAME and LF_BOOTSTRAP_ADMIN_PIN to create the first real school administrator.');
+    return;
+  }
+  db.users.push({
+    username,
+    pinHash: hashPin(pin),
+    name: String(process.env.LF_BOOTSTRAP_ADMIN_NAME || 'School Administrator').trim(),
+    role: 'admin',
+    schoolName: String(process.env.LF_BOOTSTRAP_SCHOOL_NAME || 'Your School').trim(),
+    schoolStoreUrl: '',
+    verificationStatus: 'Active',
+    createdAt: new Date().toISOString()
+  });
+}
 function scheduleReplicaSnapshot() {
   if (replicaMode || replicaSnapshotTimer) return;
   replicaSnapshotTimer = setTimeout(() => {
@@ -268,6 +307,7 @@ async function initialisePersistence() {
   else openStateDatabase();
   const restoredFromDatabase = await loadDatabaseState();
   if (!restoredFromDatabase) loadReplicaSnapshot();
+  ensureBootstrapAdministrator();
   await saveDatabaseState();
   writeReplicaSnapshot();
 }
@@ -291,7 +331,11 @@ app.post('/api/login', (req, res) => {
     }
     loginAttempts.delete(attemptKey);
     const { pin: _pin, pinHash: _pinHash, ...safeUser } = user;
-    res.json({ user: safeUser });
+    req.session.littleFeetUser = safeUser;
+    req.session.save(error => {
+      if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
+      res.json({ user: safeUser });
+    });
   } else {
     loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
@@ -316,36 +360,47 @@ app.post('/api/signup', (req, res) => {
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   const requestedLinks = linkValidation.links;
-  const verifiedLinks = requestedLinks.filter(link => db.students.some(student => normalizeComparableText(student.studentName) === link && normalizeComparableText(student.parentName) === normalizeComparableText(name)));
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: String(schoolName).trim(), schoolStoreUrl: '', linkedLearners: verifiedLinks, subscription: role === 'parent' ? 'basic' : 'school', verificationStatus: role === 'parent' ? 'Active' : 'Self-registered — school verification pending', termsAcceptedAt: new Date().toISOString(), termsVersion: '2026-08' };
+  const account = {
+    username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role,
+    schoolName: String(schoolName).trim(), schoolStoreUrl: '', linkedLearners: [],
+    requestedLearnerLinks: role === 'parent' ? requestedLinks : [],
+    parentRelationshipStatus: role === 'parent' ? 'Pending administrator approval' : undefined,
+    subscription: role === 'parent' ? 'basic' : 'school',
+    verificationStatus: 'Self-registered — school verification pending',
+    termsAcceptedAt: new Date().toISOString(), termsVersion: '2026-08'
+  };
   db.users.push(account);
   const { pin: _pin, pinHash: _pinHash, ...safeAccount } = account;
   res.status(201).json({ success: true, account: safeAccount });
 });
 
 const safeAccount = ({ pin, pinHash, ...account }) => account;
-const requireAdmin = (username) => {
-  const account = findAccountByUsername(username);
+const getSessionAccount = (req) => {
+  const username = req.session?.littleFeetUser?.username;
+  return username ? findAccountByUsername(username) : null;
+};
+const requireAdmin = (req) => {
+  const account = getSessionAccount(req);
   return account?.role === 'admin' ? account : null;
 };
 app.get('/api/accounts', (req, res) => {
-  if (!requireAdmin(req.query.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   res.json(db.users.map(safeAccount));
 });
 app.post('/api/accounts', (req, res) => {
-  const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses, actorUsername } = req.body;
-  if (!requireAdmin(actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (!username || !pin || !name || !schoolName || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, role, and school name are required.' });
   if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: String(schoolName).trim(), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links, assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
+  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: String(schoolName).trim(), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
   db.users.push(account);
   res.status(201).json({ success: true, account: safeAccount(account) });
 });
 app.put('/api/accounts/:username', (req, res) => {
-  if (!requireAdmin(req.body.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   const account = db.users.find(entry => entry.username === req.params.username);
   if (!account) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
@@ -360,22 +415,28 @@ app.put('/api/accounts/:username', (req, res) => {
   const linkValidation = account.role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   account.linkedLearners = linkValidation.links;
+  if (account.role === 'parent') {
+    account.parentRelationshipStatus = linkValidation.links.length ? 'Administrator approved' : 'Pending administrator approval';
+    account.requestedLearnerLinks = [];
+  }
   account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [];
   res.json({ success: true, account: safeAccount(account) });
 });
 app.delete('/api/accounts/:username', (req, res) => {
-  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
-  if (normalizeUsername(req.params.username) === 'admin@gmail.com') return res.status(400).json({ message: 'The primary system admin cannot be deleted.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const target = findAccountByUsername(req.params.username);
+  if (target?.role === 'admin' && db.users.filter(account => account.role === 'admin').length <= 1) return res.status(400).json({ message: 'Create another administrator before removing the final administrator account.' });
   const previousLength = db.users.length;
   db.users = db.users.filter(account => account.username !== req.params.username);
   if (db.users.length === previousLength) return res.status(404).json({ message: 'Account not found.' });
   res.json({ success: true });
 });
 app.post('/api/accounts/:username/approve', (req, res) => {
-  if (!requireAdmin(req.body?.actorUsername)) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   const account = findAccountByUsername(req.params.username);
   if (!account) return res.status(404).json({ message: 'Account not found.' });
   account.verificationStatus = 'Active';
+  if (account.role === 'parent' && !account.linkedLearners?.length) account.parentRelationshipStatus = 'Pending administrator approval';
   account.approvedAt = new Date().toISOString();
   scheduleReplicaSnapshot();
   res.json({ success: true, account: safeAccount(account) });
@@ -1017,15 +1078,6 @@ app.post('/api/students/import', (req, res) => {
 // 1. Session and Passport Setup
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const session = require('express-session');
-
-app.set('trust proxy', 1);
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'lax' }
-}));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -1056,9 +1108,12 @@ if (googleSignInConfigured) passport.use(new GoogleStrategy({
 
 app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured, yahoo: yahooSignInConfigured, microsoft: microsoftSignInConfigured }));
 app.get('/api/auth/session', (req, res) => {
-  const account = req.session?.littleFeetUser;
-  if (!account) return res.status(401).json({ message: 'No provider sign-in session found.' });
-  res.json({ user: account });
+  const account = getSessionAccount(req);
+  if (!account) return res.status(401).json({ message: 'No active sign-in session.' });
+  res.json({ user: safeAccount(account) });
+});
+app.post('/api/auth/logout', (req, res) => {
+  req.session?.destroy(() => res.json({ success: true }));
 });
 
 app.get('/auth/google', (req, res, next) => {
