@@ -62,13 +62,14 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      background-image: linear-gradient(rgba(5, 16, 27, 0.62), rgba(5, 16, 27, 0.78)), url('assets/little-feet-night-fire.gif');
+      background-image: linear-gradient(rgba(5, 16, 27, 0.46), rgba(5, 16, 27, 0.64)), url('assets/little-feet-night-fire.gif');
       background-repeat: no-repeat;
       background-position: center;
-      background-size: cover;
+      /* Fill the viewport without leaving unused dark margins around the animation. */
+      background-size: 100% 100%;
       pointer-events: none;
       z-index: 0;
-      opacity: 0.31;
+      opacity: 0.42;
     }
 
     body.light-mode::before { opacity: 0.12; }
