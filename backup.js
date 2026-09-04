@@ -46,8 +46,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const dateEl = document.getElementById('todayDateStr');
   if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
 
+  const oauthProvider = new URLSearchParams(window.location.search).get('oauth');
   const savedUser = localStorage.getItem('lf_user');
-  if (savedUser) {
+  if (oauthProvider === 'google') {
+    completeProviderLogin();
+  } else if (savedUser) {
     currentUser = JSON.parse(savedUser);
     setupSession();
   }
@@ -70,6 +73,26 @@ window.addEventListener('DOMContentLoaded', () => {
   setupPortalTour();
   setupKeyboardShortcuts();
 });
+
+async function completeProviderLogin() {
+  try {
+    const response = await fetch('/api/auth/session');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to complete provider sign-in.');
+    currentUser = data.user;
+    localStorage.setItem('lf_user', JSON.stringify(currentUser));
+    window.history.replaceState({}, document.title, '/');
+    setupSession();
+  } catch (error) {
+    alert(error.message || 'Provider sign-in could not be completed.');
+    window.history.replaceState({}, document.title, '/');
+  }
+}
+
+function startProviderSignIn(provider) {
+  if (provider === 'google') window.location.assign('/auth/google');
+  else showProviderSetup(`${provider} sign-in`);
+}
 
 function setupKeyboardShortcuts() {
   window.addEventListener('keydown', event => {

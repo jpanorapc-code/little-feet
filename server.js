@@ -846,11 +846,12 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const session = require('express-session');
 
+app.set('trust proxy', 1);
 app.use(session({
   secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }
+  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'lax' }
 }));
 
 app.use(passport.initialize());
@@ -859,11 +860,10 @@ app.use(passport.session());
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
-// 2. Google Strategy Configuration (with safe fallbacks)
-// Google Strategy Configuration
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID || 'dummy-client-id',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret',
+const googleSignInConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+if (googleSignInConfigured) passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: "https://littlefeet.co.za/auth/google/callback"
   },
   (accessToken, refreshToken, profile, done) => {
@@ -877,13 +877,26 @@ passport.use(new GoogleStrategy({
   }
 ));
 
-// OAuth Endpoints
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured }));
+app.get('/api/auth/session', (req, res) => {
+  const account = req.session?.littleFeetUser;
+  if (!account) return res.status(401).json({ message: 'No provider sign-in session found.' });
+  res.json({ user: account });
+});
+
+app.get('/auth/google', (req, res, next) => {
+  if (!googleSignInConfigured) return res.status(503).send('Google sign-in is not configured for this school yet.');
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
 
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    res.redirect('/dashboard');
+    const email = req.user?.email;
+    const account = findAccountByUsername(email);
+    if (!account) return res.redirect('/?oauthError=account-not-linked');
+    req.session.littleFeetUser = safeAccount(account);
+    res.redirect('/?oauth=google');
   }
 );
 
