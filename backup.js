@@ -10,6 +10,8 @@ let ticketMonitorId = null;
 let knownTicketIds = new Set();
 let ticketsLoaded = false;
 let ticketAssigneeAccounts = [];
+let portalAudioContext = null;
+let startupChimePending = false;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
 let portalTourIndex = 0;
@@ -27,10 +29,28 @@ const wellbeingTips = [
   'Ask one open question today: “What made you smile?” It invites a richer conversation.'
 ];
 
+// Audio indicator. Mobile browsers require the audio engine to be unlocked by a tap.
+function getPortalAudioContext() {
+  if (!portalAudioContext || portalAudioContext.state === 'closed') portalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  return portalAudioContext;
+}
+
+function unlockPortalAudio() {
+  try {
+    const ctx = getPortalAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => { if (startupChimePending) playStartupChime(); }).catch(() => {});
+    } else if (startupChimePending) {
+      playStartupChime();
+    }
+  } catch { /* Sound remains optional when unavailable on a device. */ }
+}
+
 // Audio indicator
 function playDingSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getPortalAudioContext();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -48,10 +68,11 @@ function playDingSound() {
 
 function playTicketAlert() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getPortalAudioContext();
+    if (ctx.state === 'suspended') return;
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.04, ctx.currentTime + 0.03);
+    master.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.03);
     master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 6.4);
     master.connect(ctx.destination);
     const pattern = [659.25, 783.99, 987.77, 783.99, 659.25, 523.25, 659.25, 880];
@@ -62,7 +83,7 @@ function playTicketAlert() {
       oscillator.type = 'square';
       oscillator.frequency.setValueAtTime(pattern[index % pattern.length], start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.42, start + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
       oscillator.connect(gain); gain.connect(master);
       oscillator.start(start); oscillator.stop(start + 0.22);
@@ -72,6 +93,7 @@ function playTicketAlert() {
 
 // DOM Initialization
 window.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
   const dateEl = document.getElementById('todayDateStr');
   if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
 
@@ -187,10 +209,12 @@ function showPortalTourSlide(index) {
 function playStartupChime() {
   if (startupChimePlayed) return;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getPortalAudioContext();
+    if (ctx.state === 'suspended') { startupChimePending = true; return; }
+    startupChimePending = false;
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.035, ctx.currentTime + 0.04);
+    master.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.04);
     master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 6.9);
     master.connect(ctx.destination);
     const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 587.33, 698.46, 880, 1046.5, 880, 783.99, 659.25, 523.25, 587.33, 698.46, 783.99, 880, 1046.5, 1174.66, 1046.5, 880, 783.99, 698.46, 659.25, 587.33, 523.25, 659.25, 783.99, 880, 783.99, 1046.5];
@@ -201,7 +225,7 @@ function playStartupChime() {
       oscillator.type = 'square';
       oscillator.frequency.setValueAtTime(frequency, start);
       tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(0.16, start + 0.012);
+      tone.gain.exponentialRampToValueAtTime(0.45, start + 0.012);
       tone.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
       oscillator.connect(tone); tone.connect(master);
       oscillator.start(start); oscillator.stop(start + 0.21);
@@ -379,6 +403,7 @@ const loginForm = document.getElementById('loginForm');
 if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    unlockPortalAudio();
     const username = document.getElementById('loginUsername').value;
     const pin = document.getElementById('loginPin').value;
     const remember = document.getElementById('rememberLogin').checked;
@@ -679,6 +704,7 @@ function renderRoleHomePanel() {
 function logout() {
   currentUser = null;
   startupChimePlayed = false;
+  startupChimePending = false;
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
   if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
   knownTicketIds = new Set();
