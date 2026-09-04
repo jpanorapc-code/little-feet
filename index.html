@@ -272,7 +272,7 @@
     .role-home-panel h2 { margin:0 0 7px; color:#f8fafc; font-size:clamp(1.2rem,2.4vw,1.7rem); }
     .role-home-panel p { margin:0; color:#cbd5e1; line-height:1.5; }
     .role-home-panel .role-home-icon { display:grid; place-items:center; min-height:128px; border:1px solid rgba(94,234,212,.2); border-radius:14px; background:radial-gradient(circle at 50% 35%,rgba(45,212,191,.25),rgba(7,17,30,.35)); font-size:3.2rem; }
-    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:218px; background-image:linear-gradient(90deg,rgba(5,16,31,.97) 0%,rgba(6,24,42,.93) 43%,rgba(6,24,42,.5) 68%,rgba(6,24,42,.12) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover; background-position:center; }
+    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:218px; background-image:linear-gradient(90deg,rgba(5,16,31,.97) 0%,rgba(6,24,42,.93) 43%,rgba(6,24,42,.5) 68%,rgba(6,24,42,.12) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover,auto 172%; background-position:center,right 42%; background-repeat:no-repeat; }
     .role-home-panel.mascot-role-home::before { content:""; position:absolute; z-index:0; inset:-28%; pointer-events:none; background:radial-gradient(ellipse at 77% 53%,rgba(255,190,92,.28) 0%,rgba(45,212,191,.18) 23%,rgba(45,212,191,.04) 42%,transparent 64%); filter:blur(12px); animation:adminMascotGlow 4.8s ease-in-out infinite alternate; }
     .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:178px; max-width:62%; }
     .role-home-panel.mascot-role-home .role-home-icon { display:none; }
@@ -292,7 +292,7 @@
     .portal-welcome-actions button:hover { transform:translateY(-1px); background:#14b8a6; }
     .portal-welcome-actions .welcome-secondary { background:rgba(2,132,199,.82); }
     .portal-welcome-actions .welcome-tertiary { background:rgba(22,163,74,.82); }
-    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:304px; background-position:67% center; } .role-home-panel.mascot-role-home .role-home-content { min-height:264px; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:21px; padding-bottom:21px; background-position:70% center; } .portal-welcome-copy { max-width:100%; } }
+    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:304px; background-size:cover,auto 150%; background-position:center,right 38%; } .role-home-panel.mascot-role-home .role-home-content { min-height:264px; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:21px; padding-bottom:21px; background-position:70% center; } .portal-welcome-copy { max-width:100%; } }
     .record-list { margin-top:16px; display:grid; gap:8px; }
     .record-list .item-row { margin:0; }
     .footer-links a { padding:4px 7px; border-radius:5px; }
