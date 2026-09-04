@@ -415,8 +415,49 @@ app.get('/api/nearby-schools', async (req, res) => {
     schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
     res.json(data);
   } catch (error) {
-    console.error('Nearby school search failed:', error.message);
-    res.status(502).json({ message: 'Live school data is temporarily unavailable. Please try again shortly.' });
+    // If the shared Overpass network is busy, use Nominatim's independent
+    // OpenStreetMap search as a fallback. The result is cached above for 30
+    // minutes, so repeated map opens do not repeatedly send location lookups.
+    try {
+      const fallbackUrl = new URL('https://nominatim.openstreetmap.org/search');
+      fallbackUrl.search = new URLSearchParams({
+        format: 'jsonv2',
+        addressdetails: '1',
+        limit: '100',
+        bounded: '1',
+        viewbox: `${west},${north},${east},${south}`,
+        q: 'school'
+      }).toString();
+      const fallbackResponse = await fetch(fallbackUrl, {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'LittleFeetSchoolFinder/1.0' },
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!fallbackResponse.ok) throw new Error(`Nominatim returned ${fallbackResponse.status}`);
+      const places = await fallbackResponse.json();
+      if (!Array.isArray(places)) throw new Error('Nominatim returned an invalid map result');
+      const data = {
+        elements: places.map((place, index) => ({
+          type: 'node',
+          id: `nominatim-${index}`,
+          lat: Number(place.lat),
+          lon: Number(place.lon),
+          tags: {
+            name: place.name || String(place.display_name || '').split(',')[0] || 'Nearby school',
+            amenity: 'school',
+            'addr:street': place.address?.road || '',
+            'addr:suburb': place.address?.suburb || place.address?.neighbourhood || '',
+            'addr:city': place.address?.city || place.address?.town || place.address?.village || ''
+          }
+        })).filter(place => Number.isFinite(place.lat) && Number.isFinite(place.lon)),
+        source: 'OpenStreetMap fallback'
+      };
+      if (!data.elements.length) throw new Error('No nearby schools were returned by the fallback');
+      schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
+      res.json(data);
+    } catch (fallbackError) {
+      console.error('Nearby school search failed:', error.message, '| fallback failed:', fallbackError.message);
+      res.status(502).json({ message: 'Live school data is temporarily unavailable. Please try again shortly.' });
+    }
   }
 });
 
