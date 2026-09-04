@@ -562,6 +562,10 @@
     .nav-welcome span { color:#94a3b8; font-size:.68rem; line-height:1.25; white-space:nowrap; }
     .nav-live-pill { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:6px 10px; border:1px solid rgba(45,212,191,.24); border-radius:999px; background:rgba(13,148,136,.1); color:#99f6e4; font-size:.72rem; font-weight:700; white-space:nowrap; }
     .nav-live-pill::before { content:""; width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 0 4px rgba(52,211,153,.12); }
+    .nav-term-panel { display:flex; align-items:center; gap:7px; min-width:0; max-width:310px; padding:5px 8px; border:1px solid rgba(45,212,191,.28); border-radius:9px; background:rgba(5,31,49,.72); color:#99f6e4; }
+    .nav-term-panel strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.67rem; line-height:1.15; }
+    .nav-term-panel .nav-term-edit { min-height:26px; margin:0; padding:4px 7px; border:1px solid rgba(94,234,212,.42); border-radius:6px; background:rgba(13,148,136,.74); color:#fff; font:700 .65rem/1 inherit; cursor:pointer; white-space:nowrap; }
+    .nav-term-status { color:#94a3b8; font-size:.62rem; white-space:nowrap; }
     .nav-shortcut { min-height:32px; margin:0; padding:6px 10px; border:1px solid rgba(148,163,184,.23); border-radius:8px; background:rgba(15,43,72,.72); color:#dbeafe; font:700 .72rem/1.1 inherit; cursor:pointer; white-space:nowrap; }
     .nav-shortcut:hover { border-color:#2dd4bf; color:#fff; background:rgba(13,148,136,.22); }
     @media (min-width: 960px) { .nav-quickbar + .nav-user-panel { margin-left:0; } }
@@ -569,10 +573,13 @@
     @media (max-width: 959px) {
       .nav-quickbar { display:flex; flex:1 1 auto; justify-content:flex-end; gap:6px; }
       .nav-quickbar .nav-welcome, .nav-quickbar .nav-live-pill { display:none; }
+      .nav-term-panel { max-width:240px; }
       .nav-quickbar .nav-shortcut { min-height:34px; padding:7px 9px; font-size:.72rem; }
     }
     @media (max-width: 640px) {
       .nav-quickbar { order:3; width:100%; justify-content:stretch; }
+      .nav-term-panel { order:-1; flex:0 0 100%; max-width:none; justify-content:space-between; }
+      .nav-term-status { display:none; }
       .nav-quickbar .nav-shortcut { flex:1 1 0; }
       .nav-more-toggle { order:4; }
     }
@@ -708,6 +715,11 @@
           <span id="navWelcomeText">Learning, care and communication in one place</span>
         </div>
         <span id="navLivePill" class="nav-live-pill">School day in progress</span>
+        <div class="nav-term-panel" aria-label="Current academic term">
+          <strong id="currentTermText">Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
+          <button type="button" class="nav-term-edit role-admin hidden" onclick="editTermModal()">✏️ Edit</button>
+          <span id="liveSyncTag" class="nav-term-status">Last synced: Just now</span>
+        </div>
         <button type="button" class="nav-shortcut" onclick="openWorkspace('homeTab')">⌂ Home</button>
         <button type="button" class="nav-shortcut" onclick="openGlobalSearch()">⌕ Search</button>
         <button type="button" class="nav-shortcut" onclick="openWorkspace('ticketsTab')">? Get help</button>
@@ -782,13 +794,8 @@
       
       <!-- 0. Home Page Tab Content -->
       <div id="homeTab" class="tab-content active">
-        <div style="background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 14px; margin-bottom: 20px; font-size: 0.8rem; color: #2dd4bf; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong id="currentTermText">Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
-            <button type="button" class="action-btn btn-blue role-admin hidden" onclick="editTermModal()" style="padding: 2px 8px; font-size: 0.72rem; margin: 0;">✏️ Edit Term</button>
-          </div>
-          <span style="font-size: 0.72rem; opacity: 0.85;" id="liveSyncTag">Last Synced: Just now</span>
-        </div>
+        <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon">🌼</span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
+        <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon">🔒</span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
         <section class="portal-welcome-banner" aria-label="Welcome to Little Feet">
           <div class="portal-welcome-copy">
             <span class="portal-welcome-kicker">Your Little Feet space</span>
@@ -801,8 +808,6 @@
             </div>
           </div>
         </section>
-        <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon">🌼</span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
-        <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon">🔒</span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
         <section id="roleHomePanel" class="card role-home-panel" aria-live="polite"></section>
         <div id="householdSwitcher" class="card hidden" style="margin-bottom:20px;"></div>
         <section class="card role-admin" data-roles="admin" style="margin-bottom:18px;">
