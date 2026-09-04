@@ -387,29 +387,30 @@ app.get('/api/nearby-schools', async (req, res) => {
   const west = (longitude - longitudeOffset).toFixed(6);
   const north = (latitude + latitudeOffset).toFixed(6);
   const east = (longitude + longitudeOffset).toFixed(6);
-  const query = `[out:json][timeout:12];nwr[\"amenity\"~\"^(school|kindergarten|childcare|college|university)$\"][\"name\"](${south},${west},${north},${east});out center tags;`;
+  const query = `[out:json][timeout:30];nwr[\"amenity\"~\"^(school|kindergarten|childcare|college|university)$\"][\"name\"](${south},${west},${north},${east});out center qt;`;
 
   try {
     const overpassServices = [
-      'https://overpass.kumi.systems/api/interpreter',
       'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
       'https://overpass.private.coffee/api/interpreter',
       'https://overpass.nchc.org.tw/api/interpreter'
     ];
     // Public providers vary in availability. Use the first successful response
     // rather than making the user wait for a slow service to time out.
-    const response = await Promise.any(overpassServices.map(async serviceUrl => {
+    const payload = await Promise.any(overpassServices.map(async serviceUrl => {
       const candidate = await fetch(serviceUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': 'LittleFeetSchoolFinder/1.0' },
           body: new URLSearchParams({ data: query }),
-          signal: AbortSignal.timeout(12000)
+          signal: AbortSignal.timeout(25000)
       });
       if (!candidate.ok) throw new Error(`${new URL(serviceUrl).host} returned ${candidate.status}`);
-      return candidate;
+      const result = await candidate.json();
+      if (!Array.isArray(result.elements)) throw new Error(`${new URL(serviceUrl).host} returned an invalid map result`);
+      return result;
     }));
 
-    const payload = await response.json();
     const data = { elements: Array.isArray(payload.elements) ? payload.elements : [], source: 'OpenStreetMap' };
     schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
     res.json(data);
