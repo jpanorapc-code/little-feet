@@ -48,7 +48,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const oauthProvider = new URLSearchParams(window.location.search).get('oauth');
   const savedUser = localStorage.getItem('lf_user');
-  if (oauthProvider === 'google' || oauthProvider === 'yahoo') {
+  if (oauthProvider === 'google' || oauthProvider === 'yahoo' || oauthProvider === 'microsoft') {
     completeProviderLogin();
   } else if (savedUser) {
     currentUser = JSON.parse(savedUser);
@@ -90,7 +90,7 @@ async function completeProviderLogin() {
 }
 
 function startProviderSignIn(provider) {
-  if (provider === 'google' || provider === 'yahoo') window.location.assign(`/auth/${provider}`);
+  if (provider === 'google' || provider === 'yahoo' || provider === 'microsoft') window.location.assign(`/auth/${provider}`);
   else showProviderSetup(`${provider} sign-in`);
 }
 

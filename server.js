@@ -862,7 +862,9 @@ passport.deserializeUser((obj, done) => done(null, obj));
 
 const googleSignInConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 const yahooSignInConfigured = Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET);
+const microsoftSignInConfigured = Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
 const yahooCallbackUrl = 'https://littlefeet.co.za/auth/yahoo/callback';
+const microsoftCallbackUrl = 'https://littlefeet.co.za/auth/microsoft/callback';
 if (googleSignInConfigured) passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -879,7 +881,7 @@ if (googleSignInConfigured) passport.use(new GoogleStrategy({
   }
 ));
 
-app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured, yahoo: yahooSignInConfigured }));
+app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured, yahoo: yahooSignInConfigured, microsoft: microsoftSignInConfigured }));
 app.get('/api/auth/session', (req, res) => {
   const account = req.session?.littleFeetUser;
   if (!account) return res.status(401).json({ message: 'No provider sign-in session found.' });
@@ -944,6 +946,64 @@ app.get('/auth/yahoo/callback', async (req, res) => {
   } catch (error) {
     console.error('Yahoo sign-in failed:', error.message);
     res.redirect('/?oauthError=yahoo-sign-in-failed');
+  }
+});
+
+app.get('/auth/microsoft', (req, res) => {
+  if (!microsoftSignInConfigured) return res.status(503).send('Microsoft sign-in is not configured for this school yet.');
+  const state = crypto.randomBytes(24).toString('hex');
+  const verifier = crypto.randomBytes(48).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  req.session.microsoftOAuthState = state;
+  req.session.microsoftCodeVerifier = verifier;
+  const authorizationUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+  authorizationUrl.search = new URLSearchParams({
+    client_id: process.env.MICROSOFT_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: microsoftCallbackUrl,
+    response_mode: 'query',
+    scope: 'openid profile email User.Read',
+    state,
+    code_challenge: challenge,
+    code_challenge_method: 'S256'
+  }).toString();
+  res.redirect(authorizationUrl.toString());
+});
+
+app.get('/auth/microsoft/callback', async (req, res) => {
+  const verifier = req.session.microsoftCodeVerifier;
+  if (!microsoftSignInConfigured || req.query.error || !req.query.code || !verifier || req.query.state !== req.session.microsoftOAuthState) {
+    return res.redirect('/?oauthError=microsoft-sign-in-failed');
+  }
+  delete req.session.microsoftOAuthState;
+  delete req.session.microsoftCodeVerifier;
+  try {
+    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.MICROSOFT_CLIENT_ID,
+        client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code: req.query.code,
+        redirect_uri: microsoftCallbackUrl,
+        code_verifier: verifier,
+        scope: 'openid profile email User.Read'
+      })
+    });
+    const tokens = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Microsoft token exchange failed');
+    const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` }
+    });
+    const profile = await profileResponse.json();
+    const account = findAccountByUsername(profile.mail || profile.userPrincipalName);
+    if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
+    req.session.littleFeetUser = safeAccount(account);
+    res.redirect('/?oauth=microsoft');
+  } catch (error) {
+    console.error('Microsoft sign-in failed:', error.message);
+    res.redirect('/?oauthError=microsoft-sign-in-failed');
   }
 });
 
