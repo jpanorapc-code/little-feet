@@ -636,9 +636,9 @@
         </div>
         <button type="submit" class="submit-btn">🔒 Secure Account Login</button>
         <div class="social-signin" aria-label="Sign in with a connected provider">
-          <button type="button" onclick="startProviderSignIn('google')">Continue with Google</button>
-          <button type="button" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
-          <button type="button" onclick="startProviderSignIn('microsoft')">Continue with Microsoft</button>
+          <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')">Continue with Google</button>
+          <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
+          <button type="button" data-provider-signin="microsoft" onclick="startProviderSignIn('microsoft')">Continue with Microsoft</button>
         </div>
         <p class="login-account-help">Your school can enable one or more sign-in providers. Use your Little Feet account until your provider connection is approved.</p>
       </form>

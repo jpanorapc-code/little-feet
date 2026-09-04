@@ -13,6 +13,7 @@ let portalTourTimer = null;
 let debugModeEnabled = false;
 let debugEvents = [];
 let startupChimePlayed = false;
+let connectedSignInProviders = {};
 const wellbeingTips = [
   'Small routines create a sense of safety. A calm goodbye helps children settle into their day.',
   'Notice effort, not only outcomes. “You kept trying” helps children build confidence.',
@@ -56,6 +57,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupSession();
   }
   if (oauthError) showOAuthSignInMessage(oauthError);
+  syncProviderButtons();
   startHealthMonitor();
   showWellbeingBanner();
   if (localStorage.getItem('lf_terms_notice_acknowledged') === 'true') document.getElementById('termsNotice')?.classList.add('hidden');
@@ -91,7 +93,29 @@ async function completeProviderLogin() {
   }
 }
 
+async function syncProviderButtons() {
+  const buttons = [...document.querySelectorAll('[data-provider-signin]')];
+  if (!buttons.length) return;
+  try {
+    const response = await fetch('/api/auth/providers', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Provider status could not be loaded.');
+    connectedSignInProviders = await response.json();
+    buttons.forEach(button => {
+      const enabled = connectedSignInProviders[button.dataset.providerSignin] === true;
+      button.hidden = !enabled;
+      button.disabled = !enabled;
+    });
+    const providerPanel = buttons[0].closest('.social-signin');
+    if (providerPanel) providerPanel.hidden = !buttons.some(button => !button.hidden);
+  } catch {
+    // Keep the account sign-in form available even when the optional provider
+    // status check is temporarily unavailable.
+    buttons.forEach(button => { button.hidden = true; button.disabled = true; });
+  }
+}
+
 function startProviderSignIn(provider) {
+  if (connectedSignInProviders[provider] === false) return showProviderSetup(`${provider} sign-in`);
   if (provider === 'google' || provider === 'yahoo' || provider === 'microsoft') window.location.assign(`/auth/${provider}`);
   else showProviderSetup(`${provider} sign-in`);
 }
