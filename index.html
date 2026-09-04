@@ -274,9 +274,9 @@
     .role-home-panel h2 { margin:0 0 7px; color:#f8fafc; font-size:clamp(1.2rem,2.4vw,1.7rem); }
     .role-home-panel p { margin:0; color:#cbd5e1; line-height:1.5; }
     .role-home-panel .role-home-icon { display:grid; place-items:center; min-height:128px; border:1px solid rgba(94,234,212,.2); border-radius:14px; background:radial-gradient(circle at 50% 35%,rgba(45,212,191,.25),rgba(7,17,30,.35)); font-size:3.2rem; }
-    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:238px; background-image:linear-gradient(90deg,rgba(5,16,31,.97) 0%,rgba(6,24,42,.93) 43%,rgba(6,24,42,.5) 68%,rgba(6,24,42,.12) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover; background-position:center; }
+    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:218px; background-image:linear-gradient(90deg,rgba(5,16,31,.97) 0%,rgba(6,24,42,.93) 43%,rgba(6,24,42,.5) 68%,rgba(6,24,42,.12) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover; background-position:center; }
     .role-home-panel.mascot-role-home::before { content:""; position:absolute; z-index:0; inset:-28%; pointer-events:none; background:radial-gradient(ellipse at 77% 53%,rgba(255,190,92,.28) 0%,rgba(45,212,191,.18) 23%,rgba(45,212,191,.04) 42%,transparent 64%); filter:blur(12px); animation:adminMascotGlow 4.8s ease-in-out infinite alternate; }
-    .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:198px; max-width:62%; }
+    .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:178px; max-width:62%; }
     .role-home-panel.mascot-role-home .role-home-icon { display:none; }
     @keyframes adminMascotGlow { from { opacity:.58; transform:scale(.94); } to { opacity:1; transform:scale(1.07); } }
     @media (prefers-reduced-motion:reduce) { .role-home-panel.mascot-role-home::before { animation:none; opacity:.78; } }
@@ -294,7 +294,7 @@
     .portal-welcome-actions button:hover { transform:translateY(-1px); background:#14b8a6; }
     .portal-welcome-actions .welcome-secondary { background:rgba(2,132,199,.82); }
     .portal-welcome-actions .welcome-tertiary { background:rgba(22,163,74,.82); }
-    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:390px; background-position:67% center; } .role-home-panel.mascot-role-home .role-home-content { min-height:350px; max-width:100%; } .portal-welcome-banner { min-height:260px; background-position:70% center; } .portal-welcome-copy { max-width:100%; } }
+    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:304px; background-position:67% center; } .role-home-panel.mascot-role-home .role-home-content { min-height:264px; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:21px; padding-bottom:21px; background-position:70% center; } .portal-welcome-copy { max-width:100%; } }
     .record-list { margin-top:16px; display:grid; gap:8px; }
     .record-list .item-row { margin:0; }
     .footer-links a { padding:4px 7px; border-radius:5px; }
@@ -346,14 +346,16 @@
     .ticket-toast span { color:#b9d5e7; font-size:.88rem; }
     @keyframes ticketToastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     .login-account-help { margin:10px 0 0; color:var(--text-muted); font-size:.74rem; line-height:1.4; text-align:center; }
-    .wellbeing-banner { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.16),rgba(15,43,72,.5)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+    .wellbeing-banner { position:relative; isolation:isolate; overflow:hidden; display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.2),rgba(15,43,72,.66)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+    .wellbeing-banner > * { position:relative; z-index:1; }
+    .wellbeing-banner::after { content:""; position:absolute; z-index:0; inset:0 0 0 auto; width:190px; pointer-events:none; opacity:.26; background:linear-gradient(90deg,transparent,rgba(7,17,30,.15)),url('assets/welcome-footsteps-banner.png') center/cover; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,.92) 44%); }
     .wellbeing-banner .tip-icon { font-size:1.5rem; } .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
     .wellbeing-banner button { background:transparent; color:var(--text-muted); border:0; font-size:1.15rem; cursor:pointer; padding:3px 6px; }
-    .portal-tour { position:relative; min-height:410px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
+    .portal-tour { position:relative; min-height:350px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
     .portal-tour-slide { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.82fr); opacity:0; pointer-events:none; transform:scale(1.015); transition:opacity .55s ease, transform .55s ease; }
     .portal-tour-slide.is-active { opacity:1; pointer-events:auto; transform:scale(1); }
-    .portal-tour-image { width:100%; height:100%; min-height:410px; object-fit:cover; filter:brightness(.56) saturate(.9); animation:tourImageDrift 12s ease-in-out infinite alternate; }
-    .portal-tour-copy { position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; gap:12px; padding:28px 30px 34px; color:#fff; background:linear-gradient(135deg,rgba(7,17,30,.96),rgba(15,43,72,.86)); }
+    .portal-tour-image { width:100%; height:100%; min-height:350px; object-fit:cover; filter:brightness(.56) saturate(.9); animation:tourImageDrift 12s ease-in-out infinite alternate; }
+    .portal-tour-copy { position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; gap:10px; padding:24px 28px 30px; color:#fff; background:linear-gradient(135deg,rgba(7,17,30,.96),rgba(15,43,72,.86)); }
     .portal-tour-kicker { color:#5eead4; font-weight:800; font-size:.72rem; letter-spacing:.11em; text-transform:uppercase; }
     .portal-tour h2 { color:#fff; font-size:clamp(1.35rem,2.6vw,2.05rem); line-height:1.12; }
     .portal-tour p { color:#dbeafe; line-height:1.55; max-width:52ch; }
@@ -476,7 +478,7 @@
       .container { max-width:1540px; padding:34px 46px; }
       .card { padding:28px; }
       .workspace-grid { grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
-      .portal-tour { min-height:410px; }
+      .portal-tour { min-height:350px; }
       .nav-links li button { padding:9px 13px; font-size:.86rem; }
     }
 
@@ -536,10 +538,10 @@
       nav { position:sticky; top:0; z-index:20; }
     }
     @media (max-width: 640px) {
-      .portal-tour { min-height:470px; }
+      .portal-tour { min-height:380px; }
       .portal-tour-slide { display:block; }
-      .portal-tour-image { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:470px; filter:brightness(.45) saturate(1.08); }
-      .portal-tour-copy { min-height:470px; justify-content:flex-start; padding:28px 22px 76px; background:linear-gradient(135deg,rgba(7,17,30,.91),rgba(15,43,72,.58)); }
+      .portal-tour-image { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:380px; filter:brightness(.45) saturate(1.08); }
+      .portal-tour-copy { min-height:380px; justify-content:flex-start; padding:23px 22px 68px; background:linear-gradient(135deg,rgba(7,17,30,.91),rgba(15,43,72,.58)); }
       .portal-tour h2 { font-size:1.48rem; }
       .portal-tour-fact { background:rgba(7,17,30,.58); }
       .portal-tour-actions { width:100%; }
