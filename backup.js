@@ -2486,7 +2486,7 @@ function openDonationModal() {
   openModal('Donate to help Little Feet grow', `<div style="font-size:.9rem;line-height:1.6;"><p>Your contribution can help support accessible tools and continued improvements for early-learning communities.</p><div style="padding:14px;border:1px solid var(--border-color);border-radius:9px;background:var(--input-bg);"><strong>Payflex donation connection</strong><p style="margin:6px 0;color:var(--text-muted);">Donations are not processed until Little Feet has a verified Payflex merchant account, approved payment page, and published donor terms.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('Payflex donations')">Payflex setup required</button></div></div>`);
 }
 
-function openSubscriptionsModal() {
+async function openSubscriptionsModal() {
   const schoolRoles = ['teacher', 'principal', 'district', 'admin'];
   if (currentUser?.role === 'parent') {
     const parentContent = `
@@ -2514,6 +2514,15 @@ function openSubscriptionsModal() {
   if (!schoolRoles.includes(currentUser?.role)) {
     return alert('School subscription information is available to authorised school staff only.');
   }
+  let billing = null;
+  try {
+    const response = await fetch('/api/subscription-billing');
+    const result = await response.json();
+    if (response.ok) billing = result;
+  } catch { /* The page still explains the service when billing is temporarily unavailable. */ }
+  const subscriptionPricingOverview = billing
+    ? `<div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:6px;"><table style="width:100%; min-width:620px; border-collapse:collapse; text-align:left; font-size:0.8rem;"><thead><tr style="background:#065f46; color:#fff;"><th style="padding:9px 10px;">Monthly school plan</th><th style="padding:9px 10px;">Extra learner capacity</th><th style="padding:9px 10px;">Monthly add-on price</th></tr></thead><tbody><tr><td style="padding:9px 10px;font-weight:700;">${formatSubscriptionMoney(billing.pricing.baseMonthly)} / month</td><td style="padding:9px 10px;">Included by your selected school plan</td><td style="padding:9px 10px;">Choose a bundle below if needed</td></tr>${billing.pricing.bundles.map(bundle => `<tr style="background:rgba(16,185,129,0.08);"><td style="padding:8px 10px;">School capacity add-on</td><td style="padding:8px 10px;font-weight:700;">+${bundle.capacity} children</td><td style="padding:8px 10px;font-weight:700;">${formatSubscriptionMoney(bundle.sellingPrice)} / month</td></tr>`).join('')}</tbody></table></div>${billing.pricing.lateFeeEnabled ? `<p style="margin:10px 0 0;color:var(--text-muted);font-size:.78rem;">Late-payment term: ${formatSubscriptionMoney(billing.pricing.lateFee)} applies only when accepted during checkout.</p>` : ''}`
+    : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);color:var(--text-muted);">Live pricing is temporarily unavailable. Please try again shortly.</div>`;
   const content = `
     <div style="font-size:0.88rem; line-height:1.5; color:var(--text-dark);">
       <section style="margin-bottom:22px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);">
@@ -2530,16 +2539,7 @@ function openSubscriptionsModal() {
         <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">INSTITUTIONAL PRICING & BENEFITS</div>
         <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">School Subscriptions & Operational Advantages</h2>
         <p style="margin:0 0 12px; color:#10b981; font-size:1rem; font-weight:700;">Predictable Pricing Models Designed for Scalability</p>
-        <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:6px;">
-          <table style="width:100%; min-width:700px; border-collapse:collapse; text-align:left; font-size:0.8rem;">
-            <thead><tr style="background:#065f46; color:#fff;"><th style="padding:9px 10px;">Package Tier</th><th style="padding:9px 10px;">Target Institution</th><th style="padding:9px 10px;">Monthly Base Fee</th><th style="padding:9px 10px;">Overage / Additional Rate</th></tr></thead>
-            <tbody>
-              <tr style="background:rgba(255,255,255,0.04);"><td style="padding:8px 10px; font-weight:700;">Micro / ECD Tier</td><td style="padding:8px 10px;">Up to 30 Learners</td><td style="padding:8px 10px; font-weight:700;">R350 / month</td><td style="padding:8px 10px;">R10 / learner / month</td></tr>
-              <tr style="background:rgba(16,185,129,0.10);"><td style="padding:8px 10px; font-weight:700;">Standard Primary</td><td style="padding:8px 10px;">Up to 250 Learners</td><td style="padding:8px 10px; font-weight:700;">R1,500 / month</td><td style="padding:8px 10px;">R6 / learner / month</td></tr>
-              <tr style="background:rgba(255,255,255,0.04);"><td style="padding:8px 10px; font-weight:700;">Enterprise Campus</td><td style="padding:8px 10px;">Up to 1,000 Learners</td><td style="padding:8px 10px; font-weight:700;">R7,500 / month</td><td style="padding:8px 10px;">Flat Package (No Overage)</td></tr>
-            </tbody>
-          </table>
-        </div>
+        ${subscriptionPricingOverview}
         <div style="margin-top:10px; padding:12px 14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
           <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">Key Institutional Advantages of Subscribing</h3>
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:4px 22px; font-size:0.78rem;">
@@ -2574,9 +2574,86 @@ function openSubscriptionsModal() {
           </div>
         </div>
       </section>
+      ${['principal', 'admin'].includes(currentUser?.role) ? `<section style="margin-top:24px;padding:16px;border:1px solid #2dd4bf;border-radius:10px;background:rgba(13,148,136,.1);"><h3 style="margin:0 0 6px;color:var(--text-dark);">Ready to subscribe?</h3><p style="margin:0 0 12px;color:var(--text-muted);">Choose your learner capacity, accept the late-payment terms if enabled, and receive a unique payment reference.</p><button type="button" class="submit-btn" onclick="openSubscriptionCheckout()">Choose plan &amp; pay</button></section>` : ''}
     </div>`;
   openModal('School Subscriptions & Advantages', content);
   document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
+}
+
+function formatSubscriptionMoney(value) {
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(Number(value || 0));
+}
+
+async function openSubscriptionBillingAdmin() {
+  if (currentUser?.role !== 'admin') return alert('Only an administrator can manage subscription pricing and payment details.');
+  let data;
+  try {
+    const response = await fetch('/api/subscription-billing');
+    data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load subscription billing.');
+  } catch (error) { return alert(error.message || 'Unable to load subscription billing.'); }
+  const bundle = (capacity, field) => data.pricing.bundles.find(item => item.capacity === capacity)?.[field] || 0;
+  const payment = data.payment || {};
+  const orders = (data.orders || []).slice(0, 8).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(order.status)}</li>`).join('') || '<li>No subscription payment requests yet.</li>';
+  openModal('Subscription pricing & payment account', `
+    <form id="subscriptionBillingForm" onsubmit="saveSubscriptionBillingConfig(event)" style="display:grid;gap:14px;">
+      <p style="margin:0;color:var(--text-muted);">Set what schools pay and your underlying cost. The portal calculates the margin on each learner add-on privately for administrators.</p>
+      <div class="workspace-grid"><label>Base monthly school price<input name="baseMonthly" type="number" min="0" step="0.01" value="${data.pricing.baseMonthly}"></label><label>Late-payment fee<input name="lateFee" type="number" min="0" step="0.01" value="${data.pricing.lateFee}"></label></div>
+      <label style="display:flex;align-items:center;gap:8px;"><input name="lateFeeEnabled" type="checkbox" ${data.pricing.lateFeeEnabled ? 'checked' : ''}> Apply the late-payment fee only when the school accepts this term.</label>
+      <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:540px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px;">Extra learners</th><th style="padding:9px;">Your cost</th><th style="padding:9px;">School price</th><th style="padding:9px;">Your margin</th></tr></thead><tbody>${[5,20,100].map(capacity => `<tr><td style="padding:9px;"><strong>+${capacity} children</strong></td><td style="padding:9px;"><input name="cost${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'costPrice')}"></td><td style="padding:9px;"><input name="price${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'sellingPrice')}"></td><td style="padding:9px;color:#2dd4bf;">Calculated after saving</td></tr>`).join('')}</tbody></table></div>
+      <fieldset style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><legend style="padding:0 5px;font-weight:700;">Where schools pay</legend><label>Payment method<select name="paymentMethod" onchange="toggleSubscriptionPaymentFields(this.value)"><option value="payment_link" ${payment.method === 'payment_link' ? 'selected' : ''}>Secure payment link</option><option value="bank_transfer" ${payment.method === 'bank_transfer' ? 'selected' : ''}>Bank transfer</option></select></label><div id="subscriptionPaymentLinkFields" style="margin-top:10px;"><label>HTTPS payment link<input name="paymentLink" type="url" placeholder="https://..." value="${escapeWorkspaceText(payment.paymentLink || '')}"></label></div><div id="subscriptionBankFields" style="display:none;margin-top:10px;" class="workspace-grid"><label>Account name<input name="accountName" value="${escapeWorkspaceText(payment.accountName || '')}"></label><label>Bank name<input name="bankName" value="${escapeWorkspaceText(payment.bankName || '')}"></label><label>Account number<input name="accountNumber" inputmode="numeric" value="${escapeWorkspaceText(payment.accountNumber || '')}"></label><label>Branch code<input name="branchCode" inputmode="numeric" value="${escapeWorkspaceText(payment.branchCode || '')}"></label></div><label style="margin-top:10px;display:block;">Payment reference prefix<input name="referencePrefix" maxlength="16" value="${escapeWorkspaceText(payment.referencePrefix || 'LF')}"></label></fieldset>
+      <button class="submit-btn">Save subscription billing</button>
+    </form>
+    <section style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:12px;"><h3 style="margin:0 0 8px;">Recent payment requests</h3><ul style="margin:0;padding-left:20px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></section>`);
+  toggleSubscriptionPaymentFields(payment.method || 'payment_link');
+}
+
+function toggleSubscriptionPaymentFields(method) {
+  const link = document.getElementById('subscriptionPaymentLinkFields');
+  const bank = document.getElementById('subscriptionBankFields');
+  if (link) link.style.display = method === 'payment_link' ? 'block' : 'none';
+  if (bank) bank.style.display = method === 'bank_transfer' ? 'grid' : 'none';
+}
+
+async function saveSubscriptionBillingConfig(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const value = name => form.elements[name]?.value || '';
+  const payload = { baseMonthly: value('baseMonthly'), lateFee: value('lateFee'), lateFeeEnabled: form.elements.lateFeeEnabled.checked, bundles: {}, payment: { method: value('paymentMethod'), paymentLink: value('paymentLink'), accountName: value('accountName'), bankName: value('bankName'), accountNumber: value('accountNumber'), branchCode: value('branchCode'), referencePrefix: value('referencePrefix') } };
+  [5,20,100].forEach(capacity => { payload.bundles[capacity] = { costPrice: value(`cost${capacity}`), sellingPrice: value(`price${capacity}`) }; });
+  try {
+    const response = await fetch('/api/subscription-billing', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to save subscription billing.');
+    alert('Subscription pricing and payment details saved.');
+    openSubscriptionBillingAdmin();
+  } catch (error) { alert(error.message || 'Unable to save subscription billing.'); }
+}
+
+async function openSubscriptionCheckout() {
+  if (!['principal', 'admin'].includes(currentUser?.role)) return alert('Only a principal or administrator can create a subscription payment request.');
+  let data;
+  try {
+    const response = await fetch('/api/subscription-billing');
+    data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load subscription pricing.');
+  } catch (error) { return alert(error.message || 'Unable to load subscription pricing.'); }
+  if (!data.paymentConfigured || Number(data.pricing.baseMonthly) <= 0) return alert('An administrator still needs to configure the subscription price and payment destination.');
+  const options = [{ capacity:0, sellingPrice:0 }, ...data.pricing.bundles].map(bundle => `<option value="${bundle.capacity}">${bundle.capacity ? `+${bundle.capacity} children — ${formatSubscriptionMoney(bundle.sellingPrice)}/month` : 'No extra learner bundle'}</option>`).join('');
+  openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Base school subscription: <strong>${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong>. Select extra learner capacity if needed.</p><label>Extra learner bundle<select name="bundleCapacity">${options}</select></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
+}
+
+async function createSubscriptionOrder(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/subscription-billing/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ bundleCapacity: form.elements.bundleCapacity.value, lateFeeAccepted: Boolean(form.elements.lateFeeAccepted?.checked) }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to create payment request.');
+    const payment = result.payment;
+    const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Pay securely now</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
+  } catch (error) { alert(error.message || 'Unable to create payment request.'); }
 }
 
 function downloadAttendanceTemplate() {

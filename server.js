@@ -123,7 +123,12 @@ const db = {
   directMessages: [],
   importAudit: [],
   students: [],
-  learnerAccessCodes: []
+  learnerAccessCodes: [],
+  subscriptionBilling: {
+    pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
+    payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
+    orders: []
+  }
 };
 
 // PostgreSQL is used whenever DATABASE_URL is configured (the production path).
@@ -370,6 +375,125 @@ const requireAdmin = (req) => {
   const account = getSessionAccount(req);
   return account?.role === 'admin' ? account : null;
 };
+
+const billingBundleSizes = [5, 20, 100];
+const billingDefaults = () => ({
+  pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
+  payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
+  orders: []
+});
+const subscriptionBillingState = () => {
+  const defaults = billingDefaults();
+  const existing = db.subscriptionBilling || {};
+  db.subscriptionBilling = {
+    ...defaults,
+    ...existing,
+    pricing: {
+      ...defaults.pricing,
+      ...(existing.pricing || {}),
+      bundles: { ...defaults.pricing.bundles, ...((existing.pricing || {}).bundles || {}) }
+    },
+    payment: { ...defaults.payment, ...(existing.payment || {}) },
+    orders: Array.isArray(existing.orders) ? existing.orders : []
+  };
+  return db.subscriptionBilling;
+};
+const billingAmount = (value) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 && amount <= 1000000 ? Math.round(amount * 100) / 100 : null;
+};
+const publicBillingPricing = (billing, includeCosts = false) => ({
+  baseMonthly: billing.pricing.baseMonthly,
+  lateFeeEnabled: Boolean(billing.pricing.lateFeeEnabled),
+  lateFee: billing.pricing.lateFee,
+  bundles: billingBundleSizes.map(capacity => ({
+    capacity,
+    sellingPrice: billing.pricing.bundles[capacity]?.sellingPrice || 0,
+    ...(includeCosts ? { costPrice: billing.pricing.bundles[capacity]?.costPrice || 0 } : {})
+  }))
+});
+const billingPaymentConfigured = (payment) => payment.method === 'payment_link'
+  ? Boolean(payment.paymentLink)
+  : Boolean(payment.accountName && payment.bankName && payment.accountNumberEncrypted);
+const paymentInstructions = (billing, reference) => {
+  const payment = billing.payment;
+  if (payment.method === 'payment_link') return { method: 'Online payment', paymentLink: payment.paymentLink, reference };
+  return {
+    method: 'Bank transfer', accountName: payment.accountName, bankName: payment.bankName,
+    accountNumber: decryptField(payment.accountNumberEncrypted), branchCode: payment.branchCode, reference
+  };
+};
+
+app.get('/api/subscription-billing', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
+  const billing = subscriptionBillingState();
+  const isAdmin = actor.role === 'admin';
+  const { accountNumberEncrypted, ...adminPayment } = billing.payment;
+  res.json({
+    pricing: publicBillingPricing(billing, isAdmin),
+    paymentConfigured: billingPaymentConfigured(billing.payment),
+    payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted) } : undefined,
+    orders: (isAdmin ? billing.orders : billing.orders.filter(order => normalizeComparableText(order.schoolName) === normalizeComparableText(actor.schoolName))).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
+  });
+});
+
+app.put('/api/subscription-billing', (req, res) => {
+  if (!requireAdmin(req)) return res.status(403).json({ message: 'Only an administrator can change subscription pricing or payment details.' });
+  const baseMonthly = billingAmount(req.body?.baseMonthly);
+  const lateFee = billingAmount(req.body?.lateFee);
+  const bundles = {};
+  for (const capacity of billingBundleSizes) {
+    const costPrice = billingAmount(req.body?.bundles?.[capacity]?.costPrice);
+    const sellingPrice = billingAmount(req.body?.bundles?.[capacity]?.sellingPrice);
+    if (costPrice === null || sellingPrice === null || sellingPrice < costPrice) return res.status(400).json({ message: `Set a valid selling price at or above the cost price for the ${capacity}-learner bundle.` });
+    bundles[capacity] = { costPrice, sellingPrice };
+  }
+  if (baseMonthly === null || lateFee === null) return res.status(400).json({ message: 'Enter valid non-negative pricing amounts.' });
+  const paymentMethod = req.body?.payment?.method === 'bank_transfer' ? 'bank_transfer' : 'payment_link';
+  const paymentLink = String(req.body?.payment?.paymentLink || '').trim();
+  const accountName = String(req.body?.payment?.accountName || '').trim();
+  const bankName = String(req.body?.payment?.bankName || '').trim();
+  const accountNumber = String(req.body?.payment?.accountNumber || '').trim();
+  const branchCode = String(req.body?.payment?.branchCode || '').trim();
+  const referencePrefix = String(req.body?.payment?.referencePrefix || 'LF').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 16) || 'LF';
+  if (paymentMethod === 'payment_link') {
+    try {
+      const parsed = new URL(paymentLink);
+      if (parsed.protocol !== 'https:') throw new Error('Unsafe protocol');
+    } catch { return res.status(400).json({ message: 'Enter a valid HTTPS payment link.' }); }
+  } else if (!accountName || !bankName || !accountNumber) {
+    return res.status(400).json({ message: 'Account name, bank name, and account number are required for bank transfers.' });
+  }
+  const billing = subscriptionBillingState();
+  billing.pricing = { baseMonthly, bundles, lateFeeEnabled: Boolean(req.body?.lateFeeEnabled), lateFee };
+  billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
+  billing.updatedAt = new Date().toISOString();
+  res.json({ success: true, pricing: publicBillingPricing(billing, true), paymentConfigured: true });
+});
+
+app.post('/api/subscription-billing/orders', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can create a school subscription payment request.' });
+  const requestedBundle = Number(req.body?.bundleCapacity || 0);
+  if (![0, ...billingBundleSizes].includes(requestedBundle)) return res.status(400).json({ message: 'Choose a valid extra-learner bundle.' });
+  const billing = subscriptionBillingState();
+  if (billing.pricing.baseMonthly <= 0 || !billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'Subscription pricing and the payment destination must be configured by an administrator first.' });
+  const bundle = requestedBundle ? billing.pricing.bundles[requestedBundle] : { costPrice: 0, sellingPrice: 0 };
+  if (requestedBundle && bundle.sellingPrice <= 0) return res.status(409).json({ message: 'That learner bundle is not available yet. Ask an administrator to set its selling price.' });
+  const reference = `${billing.payment.referencePrefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+  const monthlyTotal = Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
+  const order = {
+    id: crypto.randomUUID(), reference, schoolName: actor.schoolName, requestedBy: actor.username,
+    baseMonthly: billing.pricing.baseMonthly, bundleCapacity: requestedBundle, bundlePrice: bundle.sellingPrice,
+    monthlyTotal, lateFeeAccepted: Boolean(req.body?.lateFeeAccepted), lateFee: Boolean(req.body?.lateFeeAccepted) && billing.pricing.lateFeeEnabled ? billing.pricing.lateFee : 0,
+    profitMargin: Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
+    status: 'awaiting payment', createdAt: new Date().toISOString()
+  };
+  billing.orders.unshift(order);
+  res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
+});
+
 app.get('/api/accounts', (req, res) => {
   if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
   res.json(db.users.map(safeAccount));
