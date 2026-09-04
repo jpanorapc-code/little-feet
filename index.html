@@ -56,7 +56,7 @@
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
-    /* The walking scene belongs to the signed-in portal only; the login stays clean. */
+    /* The walking scene belongs to the signed-in portal only. */
     body.portal-active::before {
       content: "";
       position: fixed;
@@ -75,21 +75,23 @@
 
     body.portal-active.light-mode::before { opacity: 0.12; }
 
-    /* A small, isolated flame pulse keeps the fire alive without animating the rest of the page. */
+    /* The next walking pose fades in briefly, making the portal scene step forward. */
     body.portal-active::after {
       content: "";
       position: fixed;
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      background: radial-gradient(ellipse 16% 20% at 23% 74%, rgba(255, 212, 116, 0.16) 0%, rgba(13, 148, 136, 0.05) 50%, transparent 74%);
-      mix-blend-mode: screen;
-      animation: stepsLanternGlow 2.8s ease-in-out infinite alternate;
+      background-image: linear-gradient(rgba(5, 16, 27, 0.48), rgba(5, 16, 27, 0.68)), url('assets/little-steps-walking-step-two.png');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 100% 100%;
+      animation: walkingStepFrame 1.5s steps(1, end) infinite;
     }
 
-    @keyframes stepsLanternGlow {
-      from { opacity: 0.42; transform: scale(0.97); }
-      to { opacity: 0.88; transform: scale(1.03); }
+    @keyframes walkingStepFrame {
+      0%, 49% { opacity: 0; }
+      50%, 100% { opacity: 0.42; }
     }
 
     body.portal-active.light-mode::after { opacity: 0.32; }
@@ -204,9 +206,9 @@
     .btn-blue { background-color: var(--primary-color); color: #fff; }
     .btn-blue:hover { background-color: var(--primary-hover); }
 
-    #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; }
-    #authSection::before { content:""; position:absolute; width:min(720px,90vw); height:min(720px,90vw); border-radius:50%; background:radial-gradient(circle,rgba(13,148,136,.16),rgba(15,43,72,.10) 46%,transparent 70%); pointer-events:none; }
-    #authSection > .auth-card { position:relative; width:min(100%,470px) !important; max-width:470px !important; margin:0; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
+    #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; isolation:isolate; }
+    #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background:linear-gradient(rgba(5,16,27,.56),rgba(5,16,27,.74)),url('assets/little-feet-night-fire.gif'); background-position:center; background-size:100% 100%; background-repeat:no-repeat; opacity:.40; pointer-events:none; z-index:-1; }
+    #authSection > .auth-card { position:relative; z-index:1; width:min(100%,470px) !important; max-width:470px !important; margin:0; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
     .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:20px; padding-top:8px; overflow:hidden; }
     .mascot-stage { position:relative; display:grid; place-items:center; min-height:158px; margin-bottom:2px; }
     .mascot-stage::before { content:""; position:absolute; z-index:0; width:176px; height:176px; border:1px dashed rgba(94,234,212,.44); border-radius:50%; background:radial-gradient(circle,rgba(45,212,191,.20),rgba(13,148,136,.06) 48%,transparent 70%); box-shadow:0 0 32px rgba(45,212,191,.28), inset 0 0 28px rgba(13,148,136,.16); animation:mascotOrbit 10s linear infinite; }
