@@ -1683,7 +1683,18 @@ async function loadTicketAssignees() {
     const accounts = await response.json();
     if (!response.ok) return;
     const selected = select.value;
-    select.innerHTML = `<option value="">Unassigned</option>${accounts.filter(account => account.username !== currentUser.username && account.schoolName === currentUser.schoolName).map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.role)}</option>`).join('')}`;
+    const schoolAccounts = accounts.filter(account => account.username !== currentUser.username && account.schoolName === currentUser.schoolName);
+    const roleGroups = [
+      ['teacher', 'Teachers'],
+      ['principal', 'Principals'],
+      ['parent', 'Parents']
+    ];
+    const groupedOptions = roleGroups.map(([role, label]) => {
+      const people = schoolAccounts.filter(account => account.role === role);
+      if (!people.length) return '';
+      return `<optgroup label="${label}">${people.map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)}</option>`).join('')}</optgroup>`;
+    }).join('');
+    select.innerHTML = `<option value="">Unassigned</option>${groupedOptions}`;
     select.value = [...select.options].some(option => option.value === selected) ? selected : '';
   } catch { /* The ticket form remains available without preloading assignees. */ }
 }
