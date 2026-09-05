@@ -1559,9 +1559,9 @@
       <div id="wallpaperTab" class="tab-content">
         <section class="card" style="max-width:860px;">
           <div class="card-header-bar"><h2>🖼️ Wallpaper Mode</h2><span class="badge-tag info">SCREEN SAVER</span></div>
-          <p style="color:var(--text-muted);line-height:1.6;max-width:680px;">When the portal has been idle for one hour, it will switch to the Little Feet campfire wallpaper with a looping, original Little Feet guitar theme. Nothing is signed out or lost, and any normal interaction returns to your work.</p>
+          <p style="color:var(--text-muted);line-height:1.6;max-width:680px;">When the portal has been idle for one hour, it will switch to the Little Feet campfire wallpaper with a short looping jingle. Nothing is signed out or lost, and any normal interaction returns to your work.</p>
           <div class="workspace-grid" style="margin-top:16px;">
-            <div class="workspace-card"><h3>Start now</h3><p>Show the animated campfire wallpaper with its looping theme immediately.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
+            <div class="workspace-card"><h3>Start now</h3><p>Show the animated campfire wallpaper with its short looping jingle immediately.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
             <div class="workspace-card"><h3>How to return</h3><p>Click anywhere, press any key, touch the screen, or use the visible Exit button.</p><button type="button" class="action-btn btn-blue" onclick="startWallpaperMode()">Preview exit options</button></div>
             <div class="workspace-card"><h3>Automatic start</h3><p>Enabled for this device after <strong>one hour</strong> with no activity.</p><span class="badge-tag">ON</span></div>
           </div>
@@ -1618,7 +1618,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-recorded-guitar-theme" defer></script>
+  <script src="backup.js?v=20260905-five-second-jingle" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

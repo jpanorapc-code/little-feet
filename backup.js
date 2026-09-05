@@ -26,15 +26,6 @@ let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let wallpaperThemeTimer = null;
 let wallpaperThemeMaster = null;
-let windtLegacyThemeTimer = null;
-let windtLegacyThemeMaster = null;
-const guitarSampleBuffers = new Map();
-const guitarSamplePromises = new Map();
-const guitarSamples = [
-  [73.42, 'D2.ogg'], [110, 'A2.ogg'], [130.81, 'C3.ogg'], [146.83, 'D3.ogg'],
-  [174.61, 'F3.ogg'], [196, 'G3.ogg'], [220, 'A3.ogg'], [233.08, 'A#3.ogg'],
-  [261.63, 'C4.ogg'], [293.66, 'D4.ogg'], [329.63, 'E4.ogg']
-];
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 let windtLegacyTapCount = 0;
 let windtLegacyTapTimer = null;
@@ -89,70 +80,23 @@ function showStartupChimePrompt() {
   }, 12000);
 }
 
-function loadGuitarSample(ctx, fileName) {
-  if (guitarSampleBuffers.has(fileName)) return Promise.resolve(guitarSampleBuffers.get(fileName));
-  if (guitarSamplePromises.has(fileName)) return guitarSamplePromises.get(fileName);
-  const pending = fetch(`assets/audio/guitar/${encodeURIComponent(fileName)}`)
-    .then(response => {
-      if (!response.ok) throw new Error(`Unable to load ${fileName}`);
-      return response.arrayBuffer();
-    })
-    .then(bytes => ctx.decodeAudioData(bytes))
-    .then(buffer => { guitarSampleBuffers.set(fileName, buffer); return buffer; })
-    .finally(() => guitarSamplePromises.delete(fileName));
-  guitarSamplePromises.set(fileName, pending);
-  return pending;
-}
-
-function preloadGuitarSamples() {
-  try {
-    const ctx = getPortalAudioContext();
-    guitarSamples.forEach(([, fileName]) => loadGuitarSample(ctx, fileName).catch(() => {}));
-  } catch { /* Audio samples will retry after the user's first interaction. */ }
-}
-
-// Play a real CC0 nylon-string guitar recording at the closest sampled pitch.
-function playGuitarPluck(ctx, output, frequency, start, length = 1.6, volume = 0.2) {
-  const [sampleFrequency, fileName] = guitarSamples.reduce((nearest, sample) => Math.abs(sample[0] - frequency) < Math.abs(nearest[0] - frequency) ? sample : nearest, guitarSamples[0]);
-  loadGuitarSample(ctx, fileName).then(buffer => {
-    const source = ctx.createBufferSource();
-    const body = ctx.createBiquadFilter();
+function scheduleLittleFeetJingle(ctx, output, startedAt, volume = 0.16) {
+  const notes = [
+    [0.08, 523.25, 0.72], [0.64, 659.25, 0.72], [1.2, 783.99, 0.82],
+    [1.96, 659.25, 0.68], [2.58, 880, 0.78], [3.28, 783.99, 0.78], [4.02, 1046.5, 0.9]
+  ];
+  notes.forEach(([offset, frequency, length], index) => {
+    const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
-    const scheduledStart = Math.max(start, ctx.currentTime + 0.012);
-    const playbackRate = frequency / sampleFrequency;
-    const audibleLength = Math.min(length, buffer.duration / playbackRate);
-    source.buffer = buffer;
-    source.playbackRate.setValueAtTime(playbackRate, scheduledStart);
-    body.type = 'lowpass'; body.frequency.setValueAtTime(5200, scheduledStart); body.Q.setValueAtTime(0.45, scheduledStart);
-    gain.gain.setValueAtTime(0.0001, scheduledStart);
-    gain.gain.exponentialRampToValueAtTime(volume * 1.35, scheduledStart + 0.008);
-    gain.gain.setValueAtTime(volume, scheduledStart + Math.min(0.12, audibleLength * 0.12));
-    gain.gain.exponentialRampToValueAtTime(0.0001, scheduledStart + audibleLength);
-    source.connect(body); body.connect(gain); gain.connect(output);
-    source.start(scheduledStart); source.stop(scheduledStart + audibleLength + 0.02);
-  }).catch(() => {});
-}
-
-function playWarmSynth(ctx, output, frequency, start, length = 3.2, volume = 0.045) {
-  const fundamental = ctx.createOscillator();
-  const shimmer = ctx.createOscillator();
-  const filter = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-  fundamental.type = 'sine';
-  shimmer.type = 'triangle';
-  fundamental.frequency.setValueAtTime(frequency, start);
-  shimmer.frequency.setValueAtTime(frequency * 2, start);
-  shimmer.detune.setValueAtTime(5, start);
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(1250, start);
-  filter.Q.setValueAtTime(0.5, start);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + Math.min(0.75, length * 0.22));
-  gain.gain.setValueAtTime(volume, start + Math.max(0.8, length - 1.1));
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-  fundamental.connect(filter); shimmer.connect(filter); filter.connect(gain); gain.connect(output);
-  fundamental.start(start); shimmer.start(start);
-  fundamental.stop(start + length + 0.03); shimmer.stop(start + length + 0.03);
+    const start = startedAt + offset;
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(volume * (index === notes.length - 1 ? 1.12 : 1), start + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    oscillator.connect(gain); gain.connect(output);
+    oscillator.start(start); oscillator.stop(start + length + 0.03);
+  });
 }
 
 // Audio indicator
@@ -234,7 +178,6 @@ window.addEventListener('DOMContentLoaded', () => {
   setupPortalTour();
   setupKeyboardShortcuts();
   setupWallpaperMode();
-  preloadGuitarSamples();
 });
 
 async function completeProviderLogin() {
@@ -340,76 +283,6 @@ function handleMascotLegacyTap(event) {
 function openWindtLegacy() {
   if (!currentUser) return;
   openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p><details style="border-top:1px solid rgba(45,212,191,.35);padding-top:12px;"><summary style="cursor:pointer;color:#99f6e4;font-weight:800;">’n Brief van Pa</summary><div style="display:grid;gap:12px;margin-top:12px;color:var(--text-dark);"><p style="margin:0;">My seun ek is so trots op jou so ver as wat jy gekom het, as ek nie daar meer is nie ek is jammer jy is die beste ding wat in my lewe gebeur het en ek weet jy gan n success wees in lewe pa glo vas jy sal kan beter doen as wat ek sou kon, asseblief kyk mooi na jou ma as ek nie meer daar is nie.</p><p style="margin:0;">Btw jou middle naam is based op my child hood game hero Marcus Fenix jou ma wou nie hê ek moes jou dit noem nie maar pa het inageval want jy deserve die beste.</p><p style="margin:0;">Die Windt Legacy gan nie oor wat gedoen was nie en aan gaan met dit nie dit gaan oor wat jy voor sit vir jou familie sodat die volgende generation kan streef en nog beter doen as die laaste.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Christiaan Windt in and out, love you my Potato.</p></div></details></article>`);
-  startWindtLegacyTheme();
-}
-
-// An original one-minute acoustic piece for the private Windt Legacy note.
-// It is intentionally not based on a protected song or another artist's melody.
-function startWindtLegacyTheme() {
-  if (windtLegacyThemeTimer || windtLegacyThemeMaster) return;
-  try {
-    const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(startWindtLegacyTheme).catch(showStartupChimePrompt);
-      return;
-    }
-    const startedAt = ctx.currentTime;
-    const master = ctx.createGain();
-    windtLegacyThemeMaster = master;
-    master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.34, startedAt + 0.12);
-    master.gain.setValueAtTime(0.34, startedAt + 57.5);
-    master.gain.exponentialRampToValueAtTime(0.0001, startedAt + 60);
-    const warmth = ctx.createBiquadFilter();
-    const echo = ctx.createDelay(0.55);
-    const echoGain = ctx.createGain();
-    const reverb = ctx.createConvolver();
-    const reverbGain = ctx.createGain();
-    warmth.type = 'lowpass'; warmth.frequency.setValueAtTime(2800, startedAt); warmth.Q.setValueAtTime(0.75, startedAt);
-    echo.delayTime.setValueAtTime(0.31, startedAt); echoGain.gain.setValueAtTime(0.18, startedAt);
-    const impulse = ctx.createBuffer(2, Math.ceil(ctx.sampleRate * 3.4), ctx.sampleRate);
-    for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
-      const samples = impulse.getChannelData(channel);
-      for (let index = 0; index < samples.length; index += 1) samples[index] = (Math.random() * 2 - 1) * Math.pow(1 - index / samples.length, 2.35);
-    }
-    reverb.buffer = impulse; reverbGain.gain.setValueAtTime(0.14, startedAt);
-    master.connect(warmth); warmth.connect(ctx.destination);
-    warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
-    warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
-    const pluck = (frequency, start, length = 2.2, volume = 0.18) => playGuitarPluck(ctx, master, frequency, start, length, volume);
-    const phrases = [
-      [146.83, 220, 293.66, 220, 130.81, 196, 261.63, 196],
-      [116.54, 174.61, 233.08, 174.61, 130.81, 196, 246.94, 196],
-      [146.83, 220, 329.63, 246.94, 130.81, 196, 293.66, 220],
-      [110, 164.81, 220, 164.81, 116.54, 174.61, 233.08, 174.61],
-      [130.81, 196, 261.63, 196, 146.83, 220, 293.66, 220],
-      [116.54, 174.61, 246.94, 196, 146.83, 220, 293.66, 146.83]
-    ];
-    phrases.forEach((phrase, phraseIndex) => phrase.forEach((frequency, noteIndex) => {
-      const start = startedAt + phraseIndex * 10 + 0.2 + noteIndex * 1.18;
-      const finalNote = phraseIndex === phrases.length - 1 && noteIndex === phrase.length - 1;
-      pluck(frequency, start, finalNote ? 1.42 : 2.1, finalNote ? 0.25 : (noteIndex % 4 === 0 ? 0.22 : 0.16));
-    }));
-    [146.83, 130.81, 116.54, 110, 130.81, 146.83].forEach((frequency, section) => {
-      playWarmSynth(ctx, master, frequency, startedAt + section * 10 + 0.08, 9.72, 0.075);
-    });
-    windtLegacyThemeTimer = window.setTimeout(() => stopWindtLegacyTheme(), 60200);
-  } catch { /* The private note remains readable when a device has sound disabled. */ }
-}
-
-function stopWindtLegacyTheme() {
-  if (windtLegacyThemeTimer) window.clearTimeout(windtLegacyThemeTimer);
-  windtLegacyThemeTimer = null;
-  const master = windtLegacyThemeMaster;
-  windtLegacyThemeMaster = null;
-  if (!master) return;
-  try {
-    const now = getPortalAudioContext().currentTime;
-    master.gain.cancelScheduledValues(now);
-    master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-    window.setTimeout(() => master.disconnect(), 420);
-  } catch { try { master.disconnect(); } catch {} }
 }
 
 function showPortalTourSlide(index) {
@@ -421,8 +294,7 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
-// An original ten-second, gently fingerpicked welcome motif, played once per sign-in.
-// It is browser synthesis, not a copied or licensed recording.
+// A short original five-second welcome jingle, played once per sign-in.
 function playStartupChime() {
   if (startupChimePlayed) return;
   try {
@@ -434,49 +306,14 @@ function playStartupChime() {
     }
     startupChimePending = false;
     const startedAt = ctx.currentTime;
-    const duration = 10;
+    const duration = 5;
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.56, startedAt + 0.06);
-    master.gain.setValueAtTime(0.56, startedAt + 8.8);
+    master.gain.exponentialRampToValueAtTime(0.48, startedAt + 0.04);
+    master.gain.setValueAtTime(0.48, startedAt + 4.25);
     master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
-    const warmth = ctx.createBiquadFilter();
-    warmth.type = 'lowpass';
-    warmth.frequency.setValueAtTime(3200, startedAt);
-    warmth.Q.setValueAtTime(0.7, startedAt);
-    const echo = ctx.createDelay(0.35);
-    const echoGain = ctx.createGain();
-    const reverb = ctx.createConvolver();
-    const reverbGain = ctx.createGain();
-    echo.delayTime.setValueAtTime(0.21, startedAt);
-    echoGain.gain.setValueAtTime(0.16, startedAt);
-    const impulse = ctx.createBuffer(2, Math.ceil(ctx.sampleRate * 2.6), ctx.sampleRate);
-    for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
-      const samples = impulse.getChannelData(channel);
-      for (let index = 0; index < samples.length; index += 1) {
-        const decay = Math.pow(1 - index / samples.length, 2.6);
-        samples[index] = (Math.random() * 2 - 1) * decay;
-      }
-    }
-    reverb.buffer = impulse;
-    reverbGain.gain.setValueAtTime(0.06, startedAt);
-    master.connect(warmth); warmth.connect(ctx.destination);
-    warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
-    warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
-
-    const pluck = (frequency, start, length = 1.15, volume = 0.24) => playGuitarPluck(ctx, master, frequency, start, length, volume);
-
-    // An original, deliberately sparse ten-second fingerpicked phrase.
-    const notes = [
-      [0.15, 146.83, 1.72, 0.27], [0.96, 220, 1.36, 0.19], [1.90, 293.66, 1.30, 0.17],
-      [3.00, 130.81, 1.68, 0.25], [3.82, 196, 1.32, 0.18], [4.78, 261.63, 1.26, 0.16],
-      [5.92, 116.54, 1.64, 0.24], [6.76, 174.61, 1.30, 0.18], [7.70, 233.08, 1.22, 0.16],
-      [8.58, 146.83, 1.28, 0.25], [9.28, 220, 0.66, 0.20]
-    ];
-    notes.forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
-    [[0.06, 73.42, 3.1], [3.12, 65.41, 3.05], [6.18, 58.27, 3.72]].forEach(([offset, frequency, length]) => {
-      playWarmSynth(ctx, master, frequency * 2, startedAt + offset, length, 0.085);
-    });
+    master.connect(ctx.destination);
+    scheduleLittleFeetJingle(ctx, master, startedAt, 0.18);
     startupChimePlayed = true;
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
@@ -722,7 +559,6 @@ function logAppError(code, reason) {
 }
 
 function openModal(title, contentHtml) {
-  stopWindtLegacyTheme();
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = contentHtml;
   document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
@@ -804,7 +640,6 @@ function clearDebugReport() {
 }
 
 function closeModal() {
-  stopWindtLegacyTheme();
   visitorScannerStream?.getTracks().forEach(track => track.stop());
   visitorScannerStream = null;
   document.getElementById('appModal').classList.add('hidden');
@@ -953,7 +788,6 @@ function logout() {
   clearTimeout(wallpaperIdleTimer);
   currentUser = null;
   exitWallpaperMode();
-  stopWindtLegacyTheme();
   startupChimePlayed = false;
   startupChimePending = false;
   startupChimePrompt?.remove();
@@ -1040,8 +874,7 @@ function exitWallpaperMode() {
   resetWallpaperTimer();
 }
 
-// Wallpaper mode uses an original, quiet loop of the portal's guitar motif.
-// Keeping it separate from the login cue lets it stop cleanly on exit.
+// Wallpaper mode quietly repeats the same five-second Little Feet jingle.
 function startWallpaperTheme() {
   if (wallpaperThemeTimer || wallpaperThemeMaster) return;
   const overlay = document.getElementById('wallpaperOverlay');
@@ -1053,39 +886,21 @@ function startWallpaperTheme() {
       return;
     }
     const startedAt = ctx.currentTime;
-    const duration = 10;
+    const duration = 5;
     const master = ctx.createGain();
     wallpaperThemeMaster = master;
     master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.22, startedAt + 0.1);
-    master.gain.setValueAtTime(0.22, startedAt + 8.8);
+    master.gain.exponentialRampToValueAtTime(0.16, startedAt + 0.06);
+    master.gain.setValueAtTime(0.16, startedAt + 4.25);
     master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
-    const warmth = ctx.createBiquadFilter();
-    warmth.type = 'lowpass';
-    warmth.frequency.setValueAtTime(2850, startedAt);
-    warmth.Q.setValueAtTime(0.58, startedAt);
-    const echo = ctx.createDelay(0.32);
-    const echoGain = ctx.createGain();
-    echo.delayTime.setValueAtTime(0.23, startedAt);
-    echoGain.gain.setValueAtTime(0.12, startedAt);
-    master.connect(warmth); warmth.connect(ctx.destination);
-    warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
-    const pluck = (frequency, start, length, volume) => playGuitarPluck(ctx, master, frequency, start, length, volume);
-    [
-      [0.15, 146.83, 1.72, 0.23], [0.96, 220, 1.36, 0.17], [1.90, 293.66, 1.30, 0.15],
-      [3.00, 130.81, 1.68, 0.22], [3.82, 196, 1.32, 0.16], [4.78, 261.63, 1.26, 0.14],
-      [5.92, 116.54, 1.64, 0.21], [6.76, 174.61, 1.30, 0.16], [7.70, 233.08, 1.22, 0.14],
-      [8.58, 146.83, 1.28, 0.22], [9.28, 220, 0.66, 0.17]
-    ].forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
-    [[0.06, 73.42, 3.1], [3.12, 65.41, 3.05], [6.18, 58.27, 3.72]].forEach(([offset, frequency, length]) => {
-      playWarmSynth(ctx, master, frequency * 2, startedAt + offset, length, 0.065);
-    });
+    master.connect(ctx.destination);
+    scheduleLittleFeetJingle(ctx, master, startedAt, 0.14);
     wallpaperThemeTimer = window.setTimeout(() => {
       wallpaperThemeTimer = null;
       if (wallpaperThemeMaster === master) wallpaperThemeMaster = null;
       master.disconnect();
       startWallpaperTheme();
-    }, 10020);
+    }, 5020);
   } catch { /* Wallpaper remains available even when a device has sound disabled. */ }
 }
 
