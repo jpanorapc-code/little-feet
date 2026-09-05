@@ -28,6 +28,13 @@ let wallpaperThemeTimer = null;
 let wallpaperThemeMaster = null;
 let windtLegacyThemeTimer = null;
 let windtLegacyThemeMaster = null;
+const guitarSampleBuffers = new Map();
+const guitarSamplePromises = new Map();
+const guitarSamples = [
+  [73.42, 'D2.ogg'], [110, 'A2.ogg'], [130.81, 'C3.ogg'], [146.83, 'D3.ogg'],
+  [174.61, 'F3.ogg'], [196, 'G3.ogg'], [220, 'A3.ogg'], [233.08, 'A#3.ogg'],
+  [261.63, 'C4.ogg'], [293.66, 'D4.ogg'], [329.63, 'E4.ogg']
+];
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 let windtLegacyTapCount = 0;
 let windtLegacyTapTimer = null;
@@ -82,37 +89,48 @@ function showStartupChimePrompt() {
   }, 12000);
 }
 
-// Karplus-Strong picked-string synthesis: a short pick impulse excites a
-// damped string rather than sustaining an electronic oscillator.
-function playGuitarPluck(ctx, output, frequency, start, length = 1.6, volume = 0.2) {
-  const sampleRate = ctx.sampleRate;
-  const sampleCount = Math.max(1, Math.ceil(sampleRate * length));
-  const delaySamples = Math.max(2, Math.round(sampleRate / frequency));
-  const buffer = ctx.createBuffer(1, sampleCount, sampleRate);
-  const samples = buffer.getChannelData(0);
-  for (let index = 0; index < Math.min(delaySamples, sampleCount); index += 1) {
-    const pickPosition = index / delaySamples;
-    samples[index] = (Math.random() * 2 - 1) * (0.82 + Math.sin(Math.PI * pickPosition) * 0.18);
-  }
-  const damping = frequency < 150 ? 0.9972 : 0.9962;
-  for (let index = delaySamples; index < sampleCount; index += 1) {
-    samples[index] = damping * 0.5 * (samples[index - delaySamples] + samples[index - delaySamples + 1]);
-  }
-  const fadeStart = Math.floor(sampleCount * 0.78);
-  for (let index = fadeStart; index < sampleCount; index += 1) samples[index] *= 1 - (index - fadeStart) / Math.max(1, sampleCount - fadeStart);
+function loadGuitarSample(ctx, fileName) {
+  if (guitarSampleBuffers.has(fileName)) return Promise.resolve(guitarSampleBuffers.get(fileName));
+  if (guitarSamplePromises.has(fileName)) return guitarSamplePromises.get(fileName);
+  const pending = fetch(`assets/audio/guitar/${encodeURIComponent(fileName)}`)
+    .then(response => {
+      if (!response.ok) throw new Error(`Unable to load ${fileName}`);
+      return response.arrayBuffer();
+    })
+    .then(bytes => ctx.decodeAudioData(bytes))
+    .then(buffer => { guitarSampleBuffers.set(fileName, buffer); return buffer; })
+    .finally(() => guitarSamplePromises.delete(fileName));
+  guitarSamplePromises.set(fileName, pending);
+  return pending;
+}
 
-  const source = ctx.createBufferSource();
-  const body = ctx.createBiquadFilter();
-  const presence = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-  source.buffer = buffer;
-  body.type = 'lowpass'; body.frequency.setValueAtTime(3600, start); body.Q.setValueAtTime(0.72, start);
-  presence.type = 'peaking'; presence.frequency.setValueAtTime(190, start); presence.Q.setValueAtTime(0.9, start); presence.gain.setValueAtTime(3.2, start);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-  source.connect(body); body.connect(presence); presence.connect(gain); gain.connect(output);
-  source.start(start); source.stop(start + length + 0.02);
+function preloadGuitarSamples() {
+  try {
+    const ctx = getPortalAudioContext();
+    guitarSamples.forEach(([, fileName]) => loadGuitarSample(ctx, fileName).catch(() => {}));
+  } catch { /* Audio samples will retry after the user's first interaction. */ }
+}
+
+// Play a real CC0 nylon-string guitar recording at the closest sampled pitch.
+function playGuitarPluck(ctx, output, frequency, start, length = 1.6, volume = 0.2) {
+  const [sampleFrequency, fileName] = guitarSamples.reduce((nearest, sample) => Math.abs(sample[0] - frequency) < Math.abs(nearest[0] - frequency) ? sample : nearest, guitarSamples[0]);
+  loadGuitarSample(ctx, fileName).then(buffer => {
+    const source = ctx.createBufferSource();
+    const body = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    const scheduledStart = Math.max(start, ctx.currentTime + 0.012);
+    const playbackRate = frequency / sampleFrequency;
+    const audibleLength = Math.min(length, buffer.duration / playbackRate);
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(playbackRate, scheduledStart);
+    body.type = 'lowpass'; body.frequency.setValueAtTime(5200, scheduledStart); body.Q.setValueAtTime(0.45, scheduledStart);
+    gain.gain.setValueAtTime(0.0001, scheduledStart);
+    gain.gain.exponentialRampToValueAtTime(volume * 1.35, scheduledStart + 0.008);
+    gain.gain.setValueAtTime(volume, scheduledStart + Math.min(0.12, audibleLength * 0.12));
+    gain.gain.exponentialRampToValueAtTime(0.0001, scheduledStart + audibleLength);
+    source.connect(body); body.connect(gain); gain.connect(output);
+    source.start(scheduledStart); source.stop(scheduledStart + audibleLength + 0.02);
+  }).catch(() => {});
 }
 
 function playWarmSynth(ctx, output, frequency, start, length = 3.2, volume = 0.045) {
@@ -216,6 +234,7 @@ window.addEventListener('DOMContentLoaded', () => {
   setupPortalTour();
   setupKeyboardShortcuts();
   setupWallpaperMode();
+  preloadGuitarSamples();
 });
 
 async function completeProviderLogin() {
@@ -371,8 +390,8 @@ function startWindtLegacyTheme() {
       const finalNote = phraseIndex === phrases.length - 1 && noteIndex === phrase.length - 1;
       pluck(frequency, start, finalNote ? 1.42 : 2.1, finalNote ? 0.25 : (noteIndex % 4 === 0 ? 0.22 : 0.16));
     }));
-    [73.42, 65.41, 58.27, 55, 65.41, 73.42].forEach((frequency, section) => {
-      playWarmSynth(ctx, master, frequency, startedAt + section * 10 + 0.08, 9.72, 0.038);
+    [146.83, 130.81, 116.54, 110, 130.81, 146.83].forEach((frequency, section) => {
+      playWarmSynth(ctx, master, frequency, startedAt + section * 10 + 0.08, 9.72, 0.075);
     });
     windtLegacyThemeTimer = window.setTimeout(() => stopWindtLegacyTheme(), 60200);
   } catch { /* The private note remains readable when a device has sound disabled. */ }
@@ -456,7 +475,7 @@ function playStartupChime() {
     ];
     notes.forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
     [[0.06, 73.42, 3.1], [3.12, 65.41, 3.05], [6.18, 58.27, 3.72]].forEach(([offset, frequency, length]) => {
-      playWarmSynth(ctx, master, frequency, startedAt + offset, length, 0.042);
+      playWarmSynth(ctx, master, frequency * 2, startedAt + offset, length, 0.085);
     });
     startupChimePlayed = true;
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
@@ -1059,7 +1078,7 @@ function startWallpaperTheme() {
       [8.58, 146.83, 1.28, 0.22], [9.28, 220, 0.66, 0.17]
     ].forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
     [[0.06, 73.42, 3.1], [3.12, 65.41, 3.05], [6.18, 58.27, 3.72]].forEach(([offset, frequency, length]) => {
-      playWarmSynth(ctx, master, frequency, startedAt + offset, length, 0.034);
+      playWarmSynth(ctx, master, frequency * 2, startedAt + offset, length, 0.065);
     });
     wallpaperThemeTimer = window.setTimeout(() => {
       wallpaperThemeTimer = null;
