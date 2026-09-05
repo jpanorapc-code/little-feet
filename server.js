@@ -124,6 +124,7 @@ const db = {
   importAudit: [],
   students: [],
   learnerAccessCodes: [],
+  donations: [],
   subscriptionBilling: {
     pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
     payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
@@ -492,6 +493,25 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   };
   billing.orders.unshift(order);
   res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
+});
+
+app.get('/api/donations/payment', (req, res) => {
+  const billing = subscriptionBillingState();
+  res.json({ configured: billingPaymentConfigured(billing.payment), method: billing.payment.method });
+});
+
+app.post('/api/donations/intents', (req, res) => {
+  const amount = billingAmount(req.body?.amount);
+  if (amount === null || amount <= 0) return res.status(400).json({ message: 'Enter a donation amount greater than zero.' });
+  const billing = subscriptionBillingState();
+  if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'Donations are not available until an administrator configures the payment destination.' });
+  const donorName = String(req.body?.donorName || '').trim().slice(0, 120);
+  const donorEmail = String(req.body?.donorEmail || '').trim().slice(0, 160);
+  const reference = `${billing.payment.referencePrefix}-DONATE-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+  const donation = { id: crypto.randomUUID(), reference, amount, donorName, donorEmail, status: 'awaiting payment', createdAt: new Date().toISOString() };
+  if (!Array.isArray(db.donations)) db.donations = [];
+  db.donations.unshift(donation);
+  res.status(201).json({ success: true, donation, payment: paymentInstructions(billing, reference) });
 });
 
 app.get('/api/accounts', (req, res) => {

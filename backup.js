@@ -1045,7 +1045,7 @@ async function loadSchoolProximityMap() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
     const userLocationIcon = L.divIcon({ className: '', html: '<div class="user-location-pin" title="Your current location"></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
     L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`).openPopup();
-    L.circle(userPos, { color: '#f97316', fillColor: '#f97316', fillOpacity: 0.10, radius: 20000 }).addTo(mapInstance);
+    L.circle(userPos, { color: '#2dd4bf', fillColor: '#14b8a6', fillOpacity: 0.14, radius: 20000 }).addTo(mapInstance);
     const latitudeOffset = 20000 / 111320;
     const longitudeOffset = 20000 / (111320 * Math.cos(userLat * Math.PI / 180));
     mapInstance.fitBounds([[userLat - latitudeOffset, userLng - longitudeOffset], [userLat + latitudeOffset, userLng + longitudeOffset]], { padding: [22, 22], maxZoom: 13 });
@@ -2482,8 +2482,30 @@ function openLegalModal(title, text) {
   openModal(title, `<p style="font-size:0.9rem; line-height:1.5; color:var(--text-dark);">${text}</p>`);
 }
 
-function openDonationModal() {
-  openModal('Donate to help Little Feet grow', `<div style="font-size:.9rem;line-height:1.6;"><p>Your contribution can help support accessible tools and continued improvements for early-learning communities.</p><div style="padding:14px;border:1px solid var(--border-color);border-radius:9px;background:var(--input-bg);"><strong>Payflex donation connection</strong><p style="margin:6px 0;color:var(--text-muted);">Donations are not processed until Little Feet has a verified Payflex merchant account, approved payment page, and published donor terms.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('Payflex donations')">Payflex setup required</button></div></div>`);
+async function openDonationModal() {
+  let status;
+  try {
+    const response = await fetch('/api/donations/payment');
+    status = await response.json();
+    if (!response.ok) throw new Error(status.message || 'Unable to open donations.');
+  } catch (error) { return alert(error.message || 'Unable to open donations.'); }
+  if (!status.configured) {
+    return openModal('Donations coming soon', `<p style="font-size:.9rem;line-height:1.6;">Little Feet has not published its secure donation destination yet. Please check back soon.</p>`);
+  }
+  openModal('Donate to Little Feet', `<form onsubmit="createDonationIntent(event)" style="display:grid;gap:12px;font-size:.9rem;"><p style="margin:0;color:var(--text-muted);line-height:1.55;">Your contribution supports accessible tools and continued improvements for early-learning communities.</p><label>Donation amount (R)<input name="amount" type="number" min="1" step="0.01" required placeholder="e.g. 50"></label><label>Your name <span style="color:var(--text-muted);">(optional)</span><input name="donorName" maxlength="120" autocomplete="name"></label><label>Email for acknowledgement <span style="color:var(--text-muted);">(optional)</span><input name="donorEmail" type="email" maxlength="160" autocomplete="email"></label><button class="submit-btn">Continue to donate</button></form>`);
+}
+
+async function createDonationIntent(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/donations/intents', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ amount: form.elements.amount.value, donorName: form.elements.donorName.value, donorEmail: form.elements.donorEmail.value }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to prepare the donation.');
+    const payment = result.payment;
+    const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Continue to secure payment</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    openModal('Donation ready', `<p style="margin:0 0 10px;">Thank you for supporting Little Feet.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Donation: ${formatSubscriptionMoney(result.donation.amount)}</strong><br>Reference: <strong>${escapeWorkspaceText(result.donation.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the contribution can be matched correctly.</p>`);
+  } catch (error) { alert(error.message || 'Unable to prepare the donation.'); }
 }
 
 async function openSubscriptionsModal() {
@@ -3039,7 +3061,7 @@ function openModulesBreakdownModal() {
       <div style="display:grid;gap:10px;">
         <div style="padding:11px;border-left:4px solid #0d9488;background:rgba(13,148,136,.08);border-radius:6px;"><strong>🗺️ Nearby Schools & Campus Discovery</strong><br><span style="color:var(--text-muted);">Uses your optional device location to show mapped education facilities in a 20 km radius. Results are grouped to keep the map readable; select a pin for mapped address and public contact details.</span></div>
         <div style="padding:11px;border-left:4px solid #0284c7;background:rgba(2,132,199,.08);border-radius:6px;"><strong>📚 Learning Records & Portfolio</strong><br><span style="color:var(--text-muted);">Schedules, worksheets, badges, and attendance support day-to-day classroom documentation. Uploaded evidence remains connected to the relevant record.</span></div>
-        <div style="padding:11px;border-left:4px solid #f97316;background:rgba(249,115,22,.08);border-radius:6px;"><strong>🚨 Location-Aware Safety Alerts</strong><br><span style="color:var(--text-muted);">Administrators can create an alert with a location and radius. A user sees it only when their device is within that area and location access is enabled.</span></div>
+        <div style="padding:11px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.08);border-radius:6px;"><strong>🚨 Location-Aware Safety Alerts</strong><br><span style="color:var(--text-muted);">Administrators can create an alert with a location and radius. A user sees it only when their device is within that area and location access is enabled.</span></div>
         <div style="padding:11px;border-left:4px solid #8b5cf6;background:rgba(139,92,246,.08);border-radius:6px;"><strong>💬 Secure Communication Workspaces</strong><br><span style="color:var(--text-muted);">Group and direct chat support staff coordination, while Support Desk provides a separate route for issues requiring tracking and follow-up.</span></div>
         <div style="padding:11px;border-left:4px solid #22c55e;background:rgba(34,197,94,.08);border-radius:6px;"><strong>🟢 Live Service Indicator</strong><br><span style="color:var(--text-muted);">The header light reflects whether the portal is online, busy, or unavailable. A green light means the app can reach the server.</span></div>
       </div>

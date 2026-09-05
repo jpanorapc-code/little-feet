@@ -307,8 +307,8 @@
     .modal-card { background: var(--panel-bg); padding: 24px; border-radius: 8px; max-width: 650px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; border-top: 4px solid var(--primary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
     .modal-card.subscription-modal-card { max-width: 1080px; }
     .modal-close { position: absolute; top: 12px; right: 12px; border: none; background: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted); }
-    .user-location-pin { position: relative; width: 30px; height: 30px; border-radius: 50%; background: #f97316; border: 4px solid #ffffff; box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.35), 0 4px 10px rgba(0, 0, 0, 0.45); }
-    .user-location-pin::after { content: ''; position: absolute; inset: -12px; border: 2px solid #f97316; border-radius: 50%; animation: locationPulse 1.8s ease-out infinite; }
+    .user-location-pin { position: relative; width: 30px; height: 30px; border-radius: 50%; background: #14b8a6; border: 4px solid #ffffff; box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.35), 0 4px 10px rgba(0, 0, 0, 0.45); }
+    .user-location-pin::after { content: ''; position: absolute; inset: -12px; border: 2px solid #2dd4bf; border-radius: 50%; animation: locationPulse 1.8s ease-out infinite; }
     @keyframes locationPulse { 0% { transform: scale(0.35); opacity: 1; } 100% { transform: scale(1.25); opacity: 0; } }
 
     footer { background-color: #07111e; color: var(--text-muted); border-top: 1px solid #1e293b; padding: 20px 15px; font-size: 0.78rem; position: relative; z-index: 2; margin-top: auto; }
@@ -1423,7 +1423,6 @@
       <div id="financeTab" class="tab-content role-admin">
         <div class="card"><div class="card-header-bar"><h2>💳 Finance & Parent Payments</h2><span class="badge-tag urgent">ADMIN</span></div>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Payment Gateway</h3><p>Recurring debit collection, Autopay, and failed-payment tracking require a connected PayFast, SnapScan, Stripe, or bank merchant account.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('Payment gateway')">Connection required</button></div>
             <div class="workspace-card"><h3>Subscription billing</h3><p>Set your monthly plan, learner add-on prices and profit margin, optional late-payment fee, and where approved schools pay.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionBillingAdmin()">Manage subscriptions</button></div>
             <div class="workspace-card"><h3>Sibling & Subsidy Rules</h3><p>Record a discount or subsidy decision below. Payroll and payment provider calculations remain subject to school approval.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Discount / subsidy rule')"><input name="details" placeholder="e.g. 10% sibling discount for Smith family" required><button class="submit-btn">Save rule</button></form></div>
             <div class="workspace-card"><h3>Year-End Tax Statements</h3><p>Create a request record for a parent’s tax invoice pack. The finance team can then verify payment history before issuing it.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Tax statement request')"><input name="details" placeholder="Parent name or account reference" required><button class="submit-btn">Create request</button></form></div>
@@ -1460,7 +1459,6 @@
       <div id="engagementTab" class="tab-content">
         <div class="card"><div class="card-header-bar"><h2>📣 Communication & Engagement</h2><span class="badge-tag info">SCHOOL COMMUNITY</span></div>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Push & SMS Notifications</h3><p>Area alerts are available in this portal. Native mobile push and SMS delivery need an approved messaging provider and consented recipient list.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('SMS and mobile push')">Connection required</button></div>
             <div class="workspace-card"><h3>Read Receipts & Broadcasts</h3><p>Use Alerts for current area-based notifications. The current portal records deliveries locally; external SMS fallback needs provider setup.</p><button type="button" class="action-btn btn-green" onclick="openAlertsTab()">Open alerts</button></div>
             <div class="workspace-card"><h3>Events & Order Requests</h3><p>Record a fundraiser, tuckshop, ticket, or permission-slip request for staff follow-up.</p><form onsubmit="saveWorkspaceRecord(event,'engagement','Event or order request')"><input name="details" placeholder="Event, order, or permission request" required><button class="submit-btn">Save request</button></form></div>
           </div><div id="engagementRecords" class="record-list"></div>
@@ -1505,7 +1503,6 @@
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. English is currently the complete interface; Afrikaans labels will expand as translations are reviewed.</p><select id="languagePreference" onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans (in progress)</option></select></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without reloading the map or interrupting your work.</p><select id="refreshPreference" onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="60000">Every minute</option><option value="120000">Every 2 minutes</option><option value="300000">Every 5 minutes</option></select></div>
-            <div class="workspace-card"><h3>Two-step verification</h3><p>Protect your sign-in with a verification app or email code once a school-owned identity provider is connected.</p><button type="button" class="action-btn btn-blue" onclick="showProviderSetup('two-step verification')">Set up 2FA</button></div>
             <div class="workspace-card" data-roles="parent"><h3>Link a learner with a school code</h3><p>Enter the code from the printed school form. Your request stays pending until an administrator approves the relationship.</p><input id="parentLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><button type="button" class="action-btn btn-green" onclick="redeemLearnerAccessCode()">Request learner link</button></div>
             <div class="workspace-card"><h3>Navigation</h3><p>On desktop, double-click the left sidebar to collapse or expand it. Use the category headings to show or hide each group.</p><button type="button" class="action-btn btn-green" onclick="toggleSidebarCollapse()">Toggle sidebar</button></div>
           </div>
@@ -1556,6 +1553,7 @@
             <a onclick="openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
             <a onclick="openWorkspace('guideTab')">Help &amp; Guide</a>
             <a onclick="openWorkspace('settingsTab')">Settings</a>
+            <a onclick="openDonationModal()">Donate</a>
           </div>
           <p style="margin-top: 6px; font-size: 0.7rem; color: #64748b;">© 2026 Little Feet. All rights reserved.</p>
         </div>
