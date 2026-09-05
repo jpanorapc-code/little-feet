@@ -82,6 +82,39 @@ function showStartupChimePrompt() {
   }, 12000);
 }
 
+// Karplus-Strong picked-string synthesis: a short pick impulse excites a
+// damped string rather than sustaining an electronic oscillator.
+function playGuitarPluck(ctx, output, frequency, start, length = 1.6, volume = 0.2) {
+  const sampleRate = ctx.sampleRate;
+  const sampleCount = Math.max(1, Math.ceil(sampleRate * length));
+  const delaySamples = Math.max(2, Math.round(sampleRate / frequency));
+  const buffer = ctx.createBuffer(1, sampleCount, sampleRate);
+  const samples = buffer.getChannelData(0);
+  for (let index = 0; index < Math.min(delaySamples, sampleCount); index += 1) {
+    const pickPosition = index / delaySamples;
+    samples[index] = (Math.random() * 2 - 1) * (0.82 + Math.sin(Math.PI * pickPosition) * 0.18);
+  }
+  const damping = frequency < 150 ? 0.9972 : 0.9962;
+  for (let index = delaySamples; index < sampleCount; index += 1) {
+    samples[index] = damping * 0.5 * (samples[index - delaySamples] + samples[index - delaySamples + 1]);
+  }
+  const fadeStart = Math.floor(sampleCount * 0.78);
+  for (let index = fadeStart; index < sampleCount; index += 1) samples[index] *= 1 - (index - fadeStart) / Math.max(1, sampleCount - fadeStart);
+
+  const source = ctx.createBufferSource();
+  const body = ctx.createBiquadFilter();
+  const presence = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  body.type = 'lowpass'; body.frequency.setValueAtTime(3600, start); body.Q.setValueAtTime(0.72, start);
+  presence.type = 'peaking'; presence.frequency.setValueAtTime(190, start); presence.Q.setValueAtTime(0.9, start); presence.gain.setValueAtTime(3.2, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+  source.connect(body); body.connect(presence); presence.connect(gain); gain.connect(output);
+  source.start(start); source.stop(start + length + 0.02);
+}
+
 // Audio indicator
 function playDingSound() {
   try {
@@ -302,28 +335,7 @@ function startWindtLegacyTheme() {
     master.connect(warmth); warmth.connect(ctx.destination);
     warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
     warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
-    const pluck = (frequency, start, length = 2.2, volume = 0.18) => {
-      const oscillator = ctx.createOscillator();
-      const string = ctx.createBiquadFilter();
-      const tone = ctx.createGain();
-      const pickBuffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * 0.03)), ctx.sampleRate);
-      const pick = ctx.createBufferSource();
-      const pickFilter = ctx.createBiquadFilter();
-      const pickGain = ctx.createGain();
-      const samples = pickBuffer.getChannelData(0);
-      for (let index = 0; index < samples.length; index += 1) samples[index] = (Math.random() * 2 - 1) * (1 - index / samples.length);
-      oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(frequency, start);
-      string.type = 'lowpass'; string.frequency.setValueAtTime(Math.min(frequency * 7.4, 2750), start); string.Q.setValueAtTime(2.2, start);
-      tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(volume * 1.45, start + 0.014);
-      tone.gain.exponentialRampToValueAtTime(0.028, start + Math.min(0.35, length * 0.18));
-      tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
-      pick.buffer = pickBuffer; pickFilter.type = 'highpass'; pickFilter.frequency.setValueAtTime(620, start);
-      pickGain.gain.setValueAtTime(volume * 0.3, start); pickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.03);
-      oscillator.connect(string); string.connect(tone); tone.connect(master);
-      pick.connect(pickFilter); pickFilter.connect(pickGain); pickGain.connect(master);
-      oscillator.start(start); oscillator.stop(start + length + 0.04); pick.start(start); pick.stop(start + 0.04);
-    };
+    const pluck = (frequency, start, length = 2.2, volume = 0.18) => playGuitarPluck(ctx, master, frequency, start, length, volume);
     const phrases = [
       [146.83, 220, 293.66, 220, 130.81, 196, 261.63, 196],
       [116.54, 174.61, 233.08, 174.61, 130.81, 196, 246.94, 196],
@@ -408,35 +420,7 @@ function playStartupChime() {
     warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
     warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
 
-    const pluck = (frequency, start, length = 1.15, volume = 0.24) => {
-      const oscillator = ctx.createOscillator();
-      const string = ctx.createBiquadFilter();
-      const tone = ctx.createGain();
-      const pickBuffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * 0.026)), ctx.sampleRate);
-      const pick = ctx.createBufferSource();
-      const pickFilter = ctx.createBiquadFilter();
-      const pickGain = ctx.createGain();
-      const pickSamples = pickBuffer.getChannelData(0);
-      for (let index = 0; index < pickSamples.length; index += 1) pickSamples[index] = (Math.random() * 2 - 1) * (1 - index / pickSamples.length);
-      oscillator.type = 'sawtooth';
-      oscillator.frequency.setValueAtTime(frequency, start);
-      string.type = 'lowpass';
-      string.frequency.setValueAtTime(Math.min(frequency * 7.2, 2650), start);
-      string.Q.setValueAtTime(2.1, start);
-      tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(volume * 1.55, start + 0.012);
-      tone.gain.exponentialRampToValueAtTime(0.052, start + Math.min(0.24, length * 0.2));
-      tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
-      pick.buffer = pickBuffer;
-      pickFilter.type = 'highpass';
-      pickFilter.frequency.setValueAtTime(680, start);
-      pickGain.gain.setValueAtTime(volume * 0.35, start);
-      pickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.026);
-      oscillator.connect(string); string.connect(tone); tone.connect(master);
-      pick.connect(pickFilter); pickFilter.connect(pickGain); pickGain.connect(master);
-      oscillator.start(start); oscillator.stop(start + length + 0.03);
-      pick.start(start); pick.stop(start + 0.03);
-    };
+    const pluck = (frequency, start, length = 1.15, volume = 0.24) => playGuitarPluck(ctx, master, frequency, start, length, volume);
 
     // An original, deliberately sparse ten-second fingerpicked phrase.
     const notes = [
@@ -1039,35 +1023,7 @@ function startWallpaperTheme() {
     echoGain.gain.setValueAtTime(0.12, startedAt);
     master.connect(warmth); warmth.connect(ctx.destination);
     warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
-    const pluck = (frequency, start, length, volume) => {
-      const oscillator = ctx.createOscillator();
-      const string = ctx.createBiquadFilter();
-      const tone = ctx.createGain();
-      const pickBuffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * 0.026)), ctx.sampleRate);
-      const pick = ctx.createBufferSource();
-      const pickFilter = ctx.createBiquadFilter();
-      const pickGain = ctx.createGain();
-      const pickSamples = pickBuffer.getChannelData(0);
-      for (let index = 0; index < pickSamples.length; index += 1) pickSamples[index] = (Math.random() * 2 - 1) * (1 - index / pickSamples.length);
-      oscillator.type = 'sawtooth';
-      oscillator.frequency.setValueAtTime(frequency, start);
-      string.type = 'lowpass';
-      string.frequency.setValueAtTime(Math.min(frequency * 7.2, 2650), start);
-      string.Q.setValueAtTime(2.1, start);
-      tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(volume * 1.35, start + 0.012);
-      tone.gain.exponentialRampToValueAtTime(0.04, start + Math.min(0.26, length * 0.22));
-      tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
-      pick.buffer = pickBuffer;
-      pickFilter.type = 'highpass';
-      pickFilter.frequency.setValueAtTime(680, start);
-      pickGain.gain.setValueAtTime(volume * 0.3, start);
-      pickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.026);
-      oscillator.connect(string); string.connect(tone); tone.connect(master);
-      pick.connect(pickFilter); pickFilter.connect(pickGain); pickGain.connect(master);
-      oscillator.start(start); oscillator.stop(start + length + 0.03);
-      pick.start(start); pick.stop(start + 0.03);
-    };
+    const pluck = (frequency, start, length, volume) => playGuitarPluck(ctx, master, frequency, start, length, volume);
     [
       [0.15, 146.83, 1.72, 0.23], [0.96, 220, 1.36, 0.17], [1.90, 293.66, 1.30, 0.15],
       [3.00, 130.81, 1.68, 0.22], [3.82, 196, 1.32, 0.16], [4.78, 261.63, 1.26, 0.14],
