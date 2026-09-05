@@ -26,6 +26,8 @@ let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let wallpaperThemeTimer = null;
 let wallpaperThemeMaster = null;
+let windtLegacyThemeTimer = null;
+let windtLegacyThemeMaster = null;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 let windtLegacyTapCount = 0;
 let windtLegacyTapTimer = null;
@@ -264,6 +266,94 @@ function handleMascotLegacyTap(event) {
 function openWindtLegacy() {
   if (!currentUser) return;
   openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p><details style="border-top:1px solid rgba(45,212,191,.35);padding-top:12px;"><summary style="cursor:pointer;color:#99f6e4;font-weight:800;">’n Brief van Pa</summary><div style="display:grid;gap:12px;margin-top:12px;color:var(--text-dark);"><p style="margin:0;">My seun ek is so trots op jou so ver as wat jy gekom het, as ek nie daar meer is nie ek is jammer jy is die beste ding wat in my lewe gebeur het en ek weet jy gan n success wees in lewe pa glo vas jy sal kan beter doen as wat ek sou kon, asseblief kyk mooi na jou ma as ek nie meer daar is nie.</p><p style="margin:0;">Btw jou middle naam is based op my child hood game hero Marcus Fenix jou ma wou nie hê ek moes jou dit noem nie maar pa het inageval want jy deserve die beste.</p><p style="margin:0;">Die Windt Legacy gan nie oor wat gedoen was nie en aan gaan met dit nie dit gaan oor wat jy voor sit vir jou familie sodat die volgende generation kan streef en nog beter doen as die laaste.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Christiaan Windt in and out, love you my Potato.</p></div></details></article>`);
+  startWindtLegacyTheme();
+}
+
+// An original one-minute acoustic piece for the private Windt Legacy note.
+// It is intentionally not based on a protected song or another artist's melody.
+function startWindtLegacyTheme() {
+  if (windtLegacyThemeTimer || windtLegacyThemeMaster) return;
+  try {
+    const ctx = getPortalAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(startWindtLegacyTheme).catch(showStartupChimePrompt);
+      return;
+    }
+    const startedAt = ctx.currentTime;
+    const master = ctx.createGain();
+    windtLegacyThemeMaster = master;
+    master.gain.setValueAtTime(0.0001, startedAt);
+    master.gain.exponentialRampToValueAtTime(0.34, startedAt + 0.12);
+    master.gain.setValueAtTime(0.34, startedAt + 57.5);
+    master.gain.exponentialRampToValueAtTime(0.0001, startedAt + 60);
+    const warmth = ctx.createBiquadFilter();
+    const echo = ctx.createDelay(0.55);
+    const echoGain = ctx.createGain();
+    const reverb = ctx.createConvolver();
+    const reverbGain = ctx.createGain();
+    warmth.type = 'lowpass'; warmth.frequency.setValueAtTime(2800, startedAt); warmth.Q.setValueAtTime(0.75, startedAt);
+    echo.delayTime.setValueAtTime(0.31, startedAt); echoGain.gain.setValueAtTime(0.18, startedAt);
+    const impulse = ctx.createBuffer(2, Math.ceil(ctx.sampleRate * 3.4), ctx.sampleRate);
+    for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+      const samples = impulse.getChannelData(channel);
+      for (let index = 0; index < samples.length; index += 1) samples[index] = (Math.random() * 2 - 1) * Math.pow(1 - index / samples.length, 2.35);
+    }
+    reverb.buffer = impulse; reverbGain.gain.setValueAtTime(0.14, startedAt);
+    master.connect(warmth); warmth.connect(ctx.destination);
+    warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
+    warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
+    const pluck = (frequency, start, length = 2.2, volume = 0.18) => {
+      const oscillator = ctx.createOscillator();
+      const string = ctx.createBiquadFilter();
+      const tone = ctx.createGain();
+      const pickBuffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * 0.03)), ctx.sampleRate);
+      const pick = ctx.createBufferSource();
+      const pickFilter = ctx.createBiquadFilter();
+      const pickGain = ctx.createGain();
+      const samples = pickBuffer.getChannelData(0);
+      for (let index = 0; index < samples.length; index += 1) samples[index] = (Math.random() * 2 - 1) * (1 - index / samples.length);
+      oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(frequency, start);
+      string.type = 'lowpass'; string.frequency.setValueAtTime(Math.min(frequency * 7.4, 2750), start); string.Q.setValueAtTime(2.2, start);
+      tone.gain.setValueAtTime(0.0001, start);
+      tone.gain.exponentialRampToValueAtTime(volume * 1.45, start + 0.014);
+      tone.gain.exponentialRampToValueAtTime(0.028, start + Math.min(0.35, length * 0.18));
+      tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      pick.buffer = pickBuffer; pickFilter.type = 'highpass'; pickFilter.frequency.setValueAtTime(620, start);
+      pickGain.gain.setValueAtTime(volume * 0.3, start); pickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.03);
+      oscillator.connect(string); string.connect(tone); tone.connect(master);
+      pick.connect(pickFilter); pickFilter.connect(pickGain); pickGain.connect(master);
+      oscillator.start(start); oscillator.stop(start + length + 0.04); pick.start(start); pick.stop(start + 0.04);
+    };
+    const phrases = [
+      [146.83, 220, 293.66, 220, 130.81, 196, 261.63, 196],
+      [116.54, 174.61, 233.08, 174.61, 130.81, 196, 246.94, 196],
+      [146.83, 220, 329.63, 246.94, 130.81, 196, 293.66, 220],
+      [110, 164.81, 220, 164.81, 116.54, 174.61, 233.08, 174.61],
+      [130.81, 196, 261.63, 196, 146.83, 220, 293.66, 220],
+      [116.54, 174.61, 246.94, 196, 146.83, 220, 293.66, 146.83]
+    ];
+    phrases.forEach((phrase, phraseIndex) => phrase.forEach((frequency, noteIndex) => {
+      const start = startedAt + phraseIndex * 10 + 0.2 + noteIndex * 1.18;
+      const finalNote = phraseIndex === phrases.length - 1 && noteIndex === phrase.length - 1;
+      pluck(frequency, start, finalNote ? 1.42 : 2.1, finalNote ? 0.25 : (noteIndex % 4 === 0 ? 0.22 : 0.16));
+    }));
+    windtLegacyThemeTimer = window.setTimeout(() => stopWindtLegacyTheme(), 60200);
+  } catch { /* The private note remains readable when a device has sound disabled. */ }
+}
+
+function stopWindtLegacyTheme() {
+  if (windtLegacyThemeTimer) window.clearTimeout(windtLegacyThemeTimer);
+  windtLegacyThemeTimer = null;
+  const master = windtLegacyThemeMaster;
+  windtLegacyThemeMaster = null;
+  if (!master) return;
+  try {
+    const now = getPortalAudioContext().currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    window.setTimeout(() => master.disconnect(), 420);
+  } catch { try { master.disconnect(); } catch {} }
 }
 
 function showPortalTourSlide(index) {
@@ -601,6 +691,7 @@ function logAppError(code, reason) {
 }
 
 function openModal(title, contentHtml) {
+  stopWindtLegacyTheme();
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = contentHtml;
   document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
@@ -682,6 +773,7 @@ function clearDebugReport() {
 }
 
 function closeModal() {
+  stopWindtLegacyTheme();
   visitorScannerStream?.getTracks().forEach(track => track.stop());
   visitorScannerStream = null;
   document.getElementById('appModal').classList.add('hidden');
@@ -830,6 +922,7 @@ function logout() {
   clearTimeout(wallpaperIdleTimer);
   currentUser = null;
   exitWallpaperMode();
+  stopWindtLegacyTheme();
   startupChimePlayed = false;
   startupChimePending = false;
   startupChimePrompt?.remove();
