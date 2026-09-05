@@ -332,7 +332,7 @@
     .school-popup a { color: var(--primary-hover) !important; font-weight: 700; }
     #schoolPinCard { border:1px solid rgba(45,212,191,.48); border-left:4px solid var(--primary-color); border-radius:10px; background:linear-gradient(135deg,rgba(13,148,136,.16),var(--input-bg)); }
     @media (max-width:767px) {
-      #schoolMapContainer { height:clamp(390px,68vh,520px) !important; }
+      #schoolMapContainer { height:clamp(460px,74vh,620px) !important; }
       #schoolMapContainer .leaflet-control { max-width:calc(100% - 22px); }
       #schoolMapContainer .leaflet-popup-content { max-height:250px; overflow:auto; }
     }
@@ -857,7 +857,7 @@
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
             Click the button to detect your current location. The map will load live education locations within a 20Km radius. Pins are grouped for a clearer map; click a group to zoom in, or click a school pin for its coordinates, address, available contact details, and photo.
           </p>
-          <div id="schoolMapContainer" style="width: 100%; height: clamp(250px, 34vw, 320px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
+          <div id="schoolMapContainer" style="width: 100%; height: clamp(430px, 48vw, 560px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
             📍 Press "Detect My Location" to render interactive map pins.
           </div>
           <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
@@ -1618,7 +1618,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-mobile-map" defer></script>
+  <script src="backup.js?v=20260905-map-size" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
