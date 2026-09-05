@@ -920,6 +920,7 @@ function loadAllData() {
   loadGroupChatMessages();
   loadDirectChatUsers();
   loadStoreItems();
+  loadStoreOrders();
   loadReleaseNotes();
   loadReportReviews();
   loadHouseholdSwitcher();
@@ -2974,15 +2975,77 @@ async function loadStoreItems() {
   const box = document.getElementById('storeItems');
   if (!box || !currentUser) return;
   try {
-    const response = await fetch(`/api/store?username=${encodeURIComponent(currentUser.username)}`);
+    const response = await fetch('/api/store');
     const store = await response.json();
     if (!response.ok) throw new Error(store.message);
-    const safeStoreUrl = typeof store.webStoreUrl === 'string' && /^https:\/\//i.test(store.webStoreUrl) ? store.webStoreUrl : '';
     document.getElementById('storeWelcome').textContent = `${store.schoolName} store`;
-    box.innerHTML = safeStoreUrl
-      ? `<article class="store-item" style="grid-column:1/-1; text-align:center;"><span class="badge-tag info">OFFICIAL SCHOOL WEB STORE</span><h3 style="margin:12px 0 8px;">${store.schoolName}</h3><p style="color:var(--text-muted);margin-bottom:16px;">This is the official online store linked to your school account.</p><a class="submit-btn" style="display:inline-block;text-decoration:none;margin:0;" href="${safeStoreUrl}" target="_blank" rel="noopener noreferrer">Visit school web store</a></article>`
-      : `<article class="store-item" style="grid-column:1/-1; text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🏫</div><h3 style="margin-bottom:8px;">${store.schoolName} has no web store</h3><p style="color:var(--text-muted);max-width:520px;margin:0 auto;">Your school has not linked an official web store to this account. Please contact the school office for uniforms, stationery, activity packs, or payment information.</p></article>`;
+    window.schoolStoreProducts = store.products || [];
+    const productCards = store.products?.length ? store.products.map(product => `<article class="store-item"><span class="badge-tag info">IN STOCK: ${product.stockQuantity}</span><h3 style="margin:10px 0 6px;">${escapeWorkspaceText(product.name)}</h3><strong style="font-size:1.2rem;color:#2dd4bf;">${formatSubscriptionMoney(product.price)}</strong><p style="margin:8px 0 12px;color:var(--text-muted);font-size:.82rem;">Payment reference and confirmed total are shown before you continue to payment.</p>${currentUser.role === 'parent' ? `<button type="button" class="submit-btn" onclick="openStoreCheckout('${product.id}')" ${product.stockQuantity < 1 ? 'disabled' : ''}>${product.stockQuantity < 1 ? 'Out of stock' : 'Buy item'}</button>` : ''}${store.canManage ? `<button type="button" class="action-btn btn-red" style="margin-top:8px;" onclick="removeStoreProduct('${product.id}')">Remove item</button>` : ''}</article>`).join('') : `<article class="store-item" style="grid-column:1/-1;text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🛍️</div><h3 style="margin-bottom:8px;">No store items yet</h3><p style="color:var(--text-muted);margin:0;">An administrator can add uniforms, stationery, activity packs or other school items here.</p></article>`;
+    const safeStoreUrl = typeof store.webStoreUrl === 'string' && /^https:\/\//i.test(store.webStoreUrl) ? store.webStoreUrl : '';
+    const externalStore = safeStoreUrl ? `<article class="store-item" style="grid-column:1/-1;"><span class="badge-tag info">OFFICIAL EXTERNAL SCHOOL STORE</span><h3 style="margin:10px 0 5px;">${escapeWorkspaceText(store.schoolName)} web store</h3><p style="margin:0 0 12px;color:var(--text-muted);">Browse items managed by the school’s linked web-store provider.</p><a class="action-btn btn-blue" style="display:inline-block;text-decoration:none;" href="${safeStoreUrl}" target="_blank" rel="noopener noreferrer">Visit official web store</a></article>` : '';
+    const manager = store.canManage ? `<article class="store-item" style="grid-column:1/-1;"><h3 style="margin-bottom:7px;">Add school-store item</h3><form onsubmit="addStoreProduct(event)" style="display:grid;grid-template-columns:minmax(180px,1fr) 130px 130px auto;gap:8px;align-items:end;"><label>Item name<input name="name" required placeholder="e.g. School jersey"></label><label>Price (R)<input name="price" type="number" min="0.01" step="0.01" required></label><label>Stock quantity<input name="stockQuantity" type="number" min="0" step="1" required></label><button class="submit-btn">Add item</button></form></article>` : '';
+    box.innerHTML = productCards + externalStore + manager;
   } catch { box.textContent = 'Unable to load school store items.'; }
+}
+
+function openStoreCheckout(productId) {
+  const product = (window.schoolStoreProducts || []).find(entry => entry.id === productId);
+  if (!product || currentUser?.role !== 'parent') return alert('This school-store item is no longer available.');
+  window.storeCheckoutProduct = product;
+  openModal('Confirm school-store purchase', `<div style="display:grid;gap:12px;"><p style="margin:0;color:var(--text-muted);">You are about to order <strong>${escapeWorkspaceText(product.name)}</strong>. Check the total before continuing to payment.</p><label>Quantity<input id="storeOrderQuantity" type="number" min="1" max="${product.stockQuantity}" value="1" oninput="updateStoreCheckoutTotal()"></label><div style="padding:12px;border-left:4px solid #2dd4bf;border-radius:0 8px 8px 0;background:rgba(45,212,191,.1);"><span style="color:var(--text-muted);">Item price: ${formatSubscriptionMoney(product.price)}</span><br><strong id="storeCheckoutTotal">Total: ${formatSubscriptionMoney(product.price)}</strong></div><p style="margin:0;font-size:.84rem;color:var(--text-muted);">Are you sure you want to continue? A payment reference will be created and the stock room will be notified to prepare your order.</p><button type="button" class="submit-btn" onclick="confirmStoreCheckout()">Yes, continue to payment</button></div>`);
+}
+
+function updateStoreCheckoutTotal() {
+  const product = window.storeCheckoutProduct;
+  const quantity = Math.max(1, Math.min(Number(document.getElementById('storeOrderQuantity')?.value) || 1, product?.stockQuantity || 1));
+  const field = document.getElementById('storeOrderQuantity');
+  if (field) field.value = quantity;
+  const total = document.getElementById('storeCheckoutTotal');
+  if (total && product) total.textContent = `Total: ${formatSubscriptionMoney(product.price * quantity)}`;
+}
+
+async function confirmStoreCheckout() {
+  const product = window.storeCheckoutProduct;
+  const quantity = Number(document.getElementById('storeOrderQuantity')?.value);
+  if (!product || !quantity) return alert('Choose a valid quantity.');
+  try {
+    const response = await fetch('/api/store/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ productId: product.id, quantity }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to create the order.');
+    const payment = result.payment;
+    const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Continue to secure payment</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    openModal('Order ready for payment', `<p style="margin:0 0 10px;">Your order is in the stock-room queue for preparation.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>${escapeWorkspaceText(result.order.productName)} × ${result.order.quantity}: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the order and payment can be matched.</p>`);
+    loadStoreItems();
+  } catch (error) { alert(error.message || 'Unable to create the order.'); }
+}
+
+async function addStoreProduct(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/store/products', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name: form.elements.name.value, price: form.elements.price.value, stockQuantity: form.elements.stockQuantity.value }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to add the store item.');
+    form.reset(); loadStoreItems();
+  } catch (error) { alert(error.message || 'Unable to add the store item.'); }
+}
+
+async function removeStoreProduct(productId) {
+  if (!confirm('Remove this school-store item?')) return;
+  const response = await fetch(`/api/store/products/${encodeURIComponent(productId)}`, { method:'DELETE' });
+  if (!response.ok) return alert('Unable to remove the store item.');
+  loadStoreItems();
+}
+
+async function loadStoreOrders() {
+  const box = document.getElementById('storeOrderNotifications');
+  if (!box || !['teacher','principal','admin'].includes(currentUser?.role)) return;
+  try {
+    const response = await fetch('/api/store/orders');
+    const orders = await response.json();
+    if (!response.ok) throw new Error(orders.message || 'Unable to load store orders.');
+    box.innerHTML = orders.length ? orders.map(order => `<div class="item-row"><strong>🛍️ ${escapeWorkspaceText(order.productName)} × ${order.quantity}</strong><span class="badge-tag urgent">${escapeWorkspaceText(order.status)}</span><p style="margin:3px 0 0;color:var(--text-muted);">Parent: ${escapeWorkspaceText(order.parentName)} · ${formatSubscriptionMoney(order.amount)} · Ref ${escapeWorkspaceText(order.reference)}</p></div>`).join('') : '<p class="meta">No school-store orders are waiting for preparation.</p>';
+  } catch { box.textContent = 'Unable to load school-store orders.'; }
 }
 
 async function loadReportReviews() {

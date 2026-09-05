@@ -125,6 +125,8 @@ const db = {
   students: [],
   learnerAccessCodes: [],
   donations: [],
+  storeProducts: [],
+  storeOrders: [],
   subscriptionBilling: {
     pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
     payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
@@ -1170,11 +1172,55 @@ app.post('/api/campus-visitors/:id/check-out', (req, res) => {
   res.json({ success: true });
 });
 
-// Store details belong to the school connected to the signed-in account.
+// Store details and purchases are always scoped to the signed-in user's school.
 app.get('/api/store', (req, res) => {
-  const user = db.users.find(entry => entry.username === req.query.username);
-  if (!user) return res.status(404).json({ message: 'School account not found.' });
-  res.json({ schoolName: user.schoolName || 'Your school', webStoreUrl: user.schoolStoreUrl || null });
+  const user = getSessionAccount(req);
+  if (!user) return res.status(401).json({ message: 'Sign in to view the school store.' });
+  const schoolName = user.schoolName || 'Your school';
+  const products = (db.storeProducts || []).filter(product => normalizeComparableText(product.schoolName) === normalizeComparableText(schoolName) && product.active !== false).map(({ schoolName: _schoolName, ...product }) => product);
+  res.json({ schoolName, products, canManage: user.role === 'admin', webStoreUrl: user.schoolStoreUrl || null });
+});
+app.post('/api/store/products', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator can add school store items.' });
+  const name = String(req.body?.name || '').trim().slice(0, 120);
+  const price = billingAmount(req.body?.price);
+  const stockQuantity = Number.parseInt(req.body?.stockQuantity, 10);
+  if (!name || price === null || price <= 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) return res.status(400).json({ message: 'Enter an item name, a price greater than zero, and a valid stock quantity.' });
+  if (!Array.isArray(db.storeProducts)) db.storeProducts = [];
+  const product = { id: crypto.randomUUID(), schoolName: actor.schoolName, name, price, stockQuantity, active: true, createdAt: new Date().toISOString(), createdBy: actor.username };
+  db.storeProducts.unshift(product);
+  res.status(201).json({ success: true, product });
+});
+app.delete('/api/store/products/:id', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator can remove school store items.' });
+  const product = (db.storeProducts || []).find(entry => entry.id === req.params.id && normalizeComparableText(entry.schoolName) === normalizeComparableText(actor.schoolName));
+  if (!product) return res.status(404).json({ message: 'Store item not found.' });
+  product.active = false;
+  res.json({ success: true });
+});
+app.post('/api/store/orders', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'parent') return res.status(403).json({ message: 'Only approved parent accounts can place a school store order.' });
+  const product = (db.storeProducts || []).find(entry => entry.id === req.body?.productId && entry.active !== false && normalizeComparableText(entry.schoolName) === normalizeComparableText(actor.schoolName));
+  const quantity = Number.parseInt(req.body?.quantity, 10);
+  if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) return res.status(400).json({ message: 'Choose an available store item and quantity.' });
+  if (product.stockQuantity < quantity) return res.status(409).json({ message: 'The requested quantity is not currently available.' });
+  const billing = subscriptionBillingState();
+  if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The school payment destination is not configured yet.' });
+  product.stockQuantity -= quantity;
+  const reference = `${billing.payment.referencePrefix}-STORE-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+  const order = { id: crypto.randomUUID(), reference, schoolName: actor.schoolName, productId: product.id, productName: product.name, quantity, amount: Math.round(product.price * quantity * 100) / 100, parentUsername: actor.username, parentName: actor.name || actor.username, status: 'awaiting payment and preparation', createdAt: new Date().toISOString() };
+  if (!Array.isArray(db.storeOrders)) db.storeOrders = [];
+  db.storeOrders.unshift(order);
+  db.moduleRecords.stock.unshift({ id: crypto.randomUUID(), details: `Store order to prepare · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`, schoolName: actor.schoolName, source: 'school-store', status: 'Awaiting payment and preparation', createdAt: new Date().toLocaleString() });
+  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
+});
+app.get('/api/store/orders', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Stock-room access is required.' });
+  res.json((db.storeOrders || []).filter(order => normalizeComparableText(order.schoolName) === normalizeComparableText(actor.schoolName)));
 });
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
