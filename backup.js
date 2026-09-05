@@ -24,6 +24,9 @@ let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
+let windtLegacyTapCount = 0;
+let windtLegacyTapTimer = null;
+let windtLegacyKeyTrail = '';
 const wellbeingTips = [
   'Small routines create a sense of safety. A calm goodbye helps children settle into their day.',
   'Notice effort, not only outcomes. “You kept trying” helps children build confidence.',
@@ -202,10 +205,38 @@ function setupKeyboardShortcuts() {
     const target = event.target;
     if (target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
     const key = event.key.toLowerCase();
+    if (key.length === 1) {
+      windtLegacyKeyTrail = `${windtLegacyKeyTrail}${key}`.slice(-5);
+      if (windtLegacyKeyTrail === 'windt') {
+        windtLegacyKeyTrail = '';
+        openWindtLegacy();
+        return;
+      }
+    }
     const shortcuts = { h: 'homeTab', t: 'ticketsTab', f: 'feedTab', s: 'scheduleTab', g: 'guideTab' };
     if (shortcuts[key]) { event.preventDefault(); openWorkspace(shortcuts[key]); }
     if (key === '/') { event.preventDefault(); openGlobalSearch(); }
   });
+}
+
+function handleMascotLegacyTap(event) {
+  event?.stopPropagation();
+  windtLegacyTapCount += 1;
+  if (windtLegacyTapTimer) clearTimeout(windtLegacyTapTimer);
+  if (windtLegacyTapCount >= 5) {
+    windtLegacyTapCount = 0;
+    openWindtLegacy();
+    return;
+  }
+  windtLegacyTapTimer = setTimeout(() => {
+    windtLegacyTapCount = 0;
+    goToMainMenu();
+  }, 650);
+}
+
+function openWindtLegacy() {
+  if (!currentUser) return;
+  openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p></article>`);
 }
 
 function showPortalTourSlide(index) {

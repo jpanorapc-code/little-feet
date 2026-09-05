@@ -714,7 +714,7 @@
   <div id="dashboardSection" class="hidden">
     <nav>
       <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
-        <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
+        <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
         <div>
           <span>Little Feet</span>
           <span class="org-badge">ECD Portal v2.6</span>
@@ -1618,7 +1618,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-map-card-dismiss" defer></script>
+  <script src="backup.js?v=20260905-windt-legacy" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
