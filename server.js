@@ -50,7 +50,27 @@ const isParentLinkedToLearner = (parent, learner) => {
   return normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName));
 };
 const normaliseAssignedClasses = (value) => [...new Set((Array.isArray(value) ? value : String(value || '').split(',')).map(normalizeComparableText).filter(Boolean))];
-const isSameSchool = (first, second) => normalizeComparableText(first?.schoolName) && normalizeComparableText(first?.schoolName) === normalizeComparableText(second?.schoolName);
+const schoolKey = (value) => normalizeComparableText(value).replace(/\s+/g, ' ');
+const createSchoolId = () => `school_${crypto.randomUUID()}`;
+const ensureSchool = (schoolName) => {
+  const cleanName = String(schoolName || '').trim() || 'Your School';
+  if (!Array.isArray(db.schools)) db.schools = [];
+  let school = db.schools.find(entry => schoolKey(entry.name) === schoolKey(cleanName));
+  if (!school) {
+    school = { id: createSchoolId(), name: cleanName, status: 'active', createdAt: new Date().toISOString() };
+    db.schools.push(school);
+  }
+  return school;
+};
+const accountSchoolId = (account) => {
+  if (!account) return '';
+  if (!account.schoolId) account.schoolId = ensureSchool(account.schoolName).id;
+  return account.schoolId;
+};
+const isSameSchool = (first, second) => Boolean(first && second && accountSchoolId(first) === (second.schoolId || ensureSchool(second.schoolName).id));
+const recordInSchool = (record, actor) => Boolean(record && actor && record.schoolId === accountSchoolId(actor));
+const tagSchoolRecord = (actor, record) => ({ ...record, schoolId: accountSchoolId(actor), schoolName: actor.schoolName });
+const tenantRecords = (records, actor) => (Array.isArray(records) ? records.filter(record => recordInSchool(record, actor)) : []);
 const canUseDirectChat = (first, second) => {
   if (!first || !second || first.username === second.username || !isSameSchool(first, second)) return false;
   const parent = first.role === 'parent' ? first : second.role === 'parent' ? second : null;
@@ -58,7 +78,7 @@ const canUseDirectChat = (first, second) => {
   const staffMember = parent === first ? second : first;
   if (staffMember.role === 'principal') return true;
   if (staffMember.role !== 'teacher') return false;
-  const learnerClasses = new Set(db.students.filter(learner => isParentLinkedToLearner(parent, learner)).map(learner => normalizeComparableText(learner.className)).filter(Boolean));
+  const learnerClasses = new Set(tenantRecords(db.students, parent).filter(learner => isParentLinkedToLearner(parent, learner)).map(learner => normalizeComparableText(learner.className)).filter(Boolean));
   return normaliseAssignedClasses(staffMember.assignedClasses).some(className => learnerClasses.has(className));
 };
 const encryptField = (value) => { const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', fieldKey, iv); const content = Buffer.concat([cipher.update(String(value || ''), 'utf8'), cipher.final()]); return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${content.toString('base64')}`; };
@@ -100,6 +120,7 @@ app.use(express.static(__dirname));
 const db = {
   term: "Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST",
   users: [],
+  schools: [],
   posts: [],
   schedules: [],
   worksheets: [],
@@ -180,7 +201,33 @@ function applySavedState(saved) {
   });
   if (Object.hasOwn(saved, 'moduleRecords')) db.moduleRecords = { ...moduleDefaults, ...(saved.moduleRecords || {}) };
   removeLegacyDemoRecords();
+  migrateSchoolTenancy();
   return true;
+}
+
+function migrateSchoolTenancy() {
+  if (!Array.isArray(db.schools)) db.schools = [];
+  db.users.forEach(account => {
+    const school = ensureSchool(account.schoolName);
+    account.schoolId = account.schoolId || school.id;
+    account.schoolName = school.name;
+  });
+  const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'importAudit', 'chatGroups', 'directMessages'];
+  collections.forEach(collection => {
+    if (!Array.isArray(db[collection])) db[collection] = [];
+    db[collection].forEach(record => {
+      if (!record.schoolId) record.schoolId = record.schoolName ? ensureSchool(record.schoolName).id : defaultSchoolId;
+    });
+  });
+  Object.values(db.moduleRecords || {}).forEach(records => (records || []).forEach(record => {
+    if (!record.schoolId) record.schoolId = record.schoolName ? ensureSchool(record.schoolName).id : defaultSchoolId;
+  }));
+  db.students.forEach(record => { if (!record.schoolId) record.schoolId = defaultSchoolId; });
+  if (!db.schoolTerms || typeof db.schoolTerms !== 'object') db.schoolTerms = {};
+  if (!db.schoolTerms[defaultSchoolId]) db.schoolTerms[defaultSchoolId] = db.term;
+  if (!db.schoolBilling || typeof db.schoolBilling !== 'object') db.schoolBilling = {};
+  if (!db.schoolBilling[defaultSchoolId] && db.subscriptionBilling) db.schoolBilling[defaultSchoolId] = db.subscriptionBilling;
 }
 
 function removeLegacyDemoRecords() {
@@ -303,6 +350,7 @@ async function initialisePersistence() {
   const restoredFromDatabase = await loadDatabaseState();
   if (!restoredFromDatabase) loadReplicaSnapshot();
   ensureBootstrapAdministrator();
+  migrateSchoolTenancy();
   await saveDatabaseState();
   writeReplicaSnapshot();
 }
@@ -364,6 +412,7 @@ app.post('/api/signup', (req, res) => {
     verificationStatus: 'Self-registered — school verification pending',
     termsAcceptedAt: new Date().toISOString(), termsVersion: '2026-08'
   };
+  account.schoolId = ensureSchool(account.schoolName).id;
   db.users.push(account);
   const { pin: _pin, pinHash: _pinHash, ...safeAccount } = account;
   res.status(201).json({ success: true, account: safeAccount });
@@ -385,10 +434,15 @@ const billingDefaults = () => ({
   payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
   orders: []
 });
-const subscriptionBillingState = () => {
+const subscriptionBillingState = (actor = null) => {
   const defaults = billingDefaults();
-  const existing = db.subscriptionBilling || {};
-  db.subscriptionBilling = {
+  const schoolId = actor ? accountSchoolId(actor) : null;
+  if (schoolId) {
+    if (!db.schoolBilling || typeof db.schoolBilling !== 'object') db.schoolBilling = {};
+    if (!db.schoolBilling[schoolId]) db.schoolBilling[schoolId] = db.subscriptionBilling || {};
+  }
+  const existing = schoolId ? db.schoolBilling[schoolId] : (db.subscriptionBilling || {});
+  const state = {
     ...defaults,
     ...existing,
     pricing: {
@@ -399,7 +453,9 @@ const subscriptionBillingState = () => {
     payment: { ...defaults.payment, ...(existing.payment || {}) },
     orders: Array.isArray(existing.orders) ? existing.orders : []
   };
-  return db.subscriptionBilling;
+  if (schoolId) db.schoolBilling[schoolId] = state;
+  else db.subscriptionBilling = state;
+  return state;
 };
 const billingAmount = (value) => {
   const amount = Number(value);
@@ -430,19 +486,20 @@ const paymentInstructions = (billing, reference) => {
 app.get('/api/subscription-billing', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
-  const billing = subscriptionBillingState();
+  const billing = subscriptionBillingState(actor);
   const isAdmin = actor.role === 'admin';
   const { accountNumberEncrypted, ...adminPayment } = billing.payment;
   res.json({
     pricing: publicBillingPricing(billing, isAdmin),
     paymentConfigured: billingPaymentConfigured(billing.payment),
     payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted) } : undefined,
-    orders: (isAdmin ? billing.orders : billing.orders.filter(order => normalizeComparableText(order.schoolName) === normalizeComparableText(actor.schoolName))).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
+    orders: billing.orders.filter(order => !order.schoolId || order.schoolId === accountSchoolId(actor)).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
   });
 });
 
 app.put('/api/subscription-billing', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Only an administrator can change subscription pricing or payment details.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator can change subscription pricing or payment details.' });
   const baseMonthly = billingAmount(req.body?.baseMonthly);
   const lateFee = billingAmount(req.body?.lateFee);
   const bundles = {};
@@ -468,7 +525,7 @@ app.put('/api/subscription-billing', (req, res) => {
   } else if (!accountName || !bankName || !accountNumber) {
     return res.status(400).json({ message: 'Account name, bank name, and account number are required for bank transfers.' });
   }
-  const billing = subscriptionBillingState();
+  const billing = subscriptionBillingState(actor);
   billing.pricing = { baseMonthly, bundles, lateFeeEnabled: Boolean(req.body?.lateFeeEnabled), lateFee };
   billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
   billing.updatedAt = new Date().toISOString();
@@ -480,14 +537,14 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can create a school subscription payment request.' });
   const requestedBundle = Number(req.body?.bundleCapacity || 0);
   if (![0, ...billingBundleSizes].includes(requestedBundle)) return res.status(400).json({ message: 'Choose a valid extra-learner bundle.' });
-  const billing = subscriptionBillingState();
+  const billing = subscriptionBillingState(actor);
   if (billing.pricing.baseMonthly <= 0 || !billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'Subscription pricing and the payment destination must be configured by an administrator first.' });
   const bundle = requestedBundle ? billing.pricing.bundles[requestedBundle] : { costPrice: 0, sellingPrice: 0 };
   if (requestedBundle && bundle.sellingPrice <= 0) return res.status(409).json({ message: 'That learner bundle is not available yet. Ask an administrator to set its selling price.' });
   const reference = `${billing.payment.referencePrefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
   const monthlyTotal = Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
   const order = {
-    id: crypto.randomUUID(), reference, schoolName: actor.schoolName, requestedBy: actor.username,
+    id: crypto.randomUUID(), reference, schoolId: accountSchoolId(actor), schoolName: actor.schoolName, requestedBy: actor.username,
     baseMonthly: billing.pricing.baseMonthly, bundleCapacity: requestedBundle, bundlePrice: bundle.sellingPrice,
     monthlyTotal, lateFeeAccepted: Boolean(req.body?.lateFeeAccepted), lateFee: Boolean(req.body?.lateFeeAccepted) && billing.pricing.lateFeeEnabled ? billing.pricing.lateFee : 0,
     profitMargin: Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
@@ -517,25 +574,29 @@ app.post('/api/donations/intents', (req, res) => {
 });
 
 app.get('/api/accounts', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
-  res.json(db.users.map(safeAccount));
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  res.json(db.users.filter(account => isSameSchool(actor, account)).map(safeAccount));
 });
 app.post('/api/accounts', (req, res) => {
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (!username || !pin || !name || !schoolName || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, role, and school name are required.' });
+  if (!username || !pin || !name || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
+  if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'Administrators can create accounts only for their own school.' });
   if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: String(schoolName).trim(), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
+  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
   db.users.push(account);
   res.status(201).json({ success: true, account: safeAccount(account) });
 });
 app.put('/api/accounts/:username', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const account = db.users.find(entry => entry.username === req.params.username);
-  if (!account) return res.status(404).json({ message: 'Account not found.' });
+  if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (username && username !== account.username && db.users.some(entry => entry.username.toLowerCase() === String(username).toLowerCase())) return res.status(409).json({ message: 'That username is already in use.' });
@@ -543,7 +604,9 @@ app.put('/api/accounts/:username', (req, res) => {
   if (pin) account.pinHash = hashPin(pin);
   if (name) account.name = String(name).trim();
   if (role && allowedRoles.includes(role)) account.role = role;
-  if (schoolName) account.schoolName = String(schoolName).trim();
+  if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
+  account.schoolName = actor.schoolName;
+  account.schoolId = accountSchoolId(actor);
   account.schoolStoreUrl = String(schoolStoreUrl || '').trim();
   const linkValidation = account.role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
@@ -556,18 +619,21 @@ app.put('/api/accounts/:username', (req, res) => {
   res.json({ success: true, account: safeAccount(account) });
 });
 app.delete('/api/accounts/:username', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const target = findAccountByUsername(req.params.username);
-  if (target?.role === 'admin' && db.users.filter(account => account.role === 'admin').length <= 1) return res.status(400).json({ message: 'Create another administrator before removing the final administrator account.' });
+  if (!target || !isSameSchool(actor, target)) return res.status(404).json({ message: 'Account not found.' });
+  if (target.role === 'admin' && db.users.filter(account => account.role === 'admin' && isSameSchool(actor, account)).length <= 1) return res.status(400).json({ message: 'Create another administrator before removing the final administrator account.' });
   const previousLength = db.users.length;
   db.users = db.users.filter(account => account.username !== req.params.username);
   if (db.users.length === previousLength) return res.status(404).json({ message: 'Account not found.' });
   res.json({ success: true });
 });
 app.post('/api/accounts/:username/approve', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const account = findAccountByUsername(req.params.username);
-  if (!account) return res.status(404).json({ message: 'Account not found.' });
+  if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   account.verificationStatus = 'Active';
   if (account.role === 'parent' && !account.linkedLearners?.length) account.parentRelationshipStatus = 'Pending administrator approval';
   account.approvedAt = new Date().toISOString();
@@ -724,105 +790,137 @@ app.post('/api/schools/enrich', async (req, res) => {
 
 // Academic Term
 app.get('/api/term', (req, res) => {
-  res.json({ term: db.term });
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view the academic term.' });
+  res.json({ term: db.schoolTerms?.[accountSchoolId(actor)] || db.term });
 });
 app.post('/api/term', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const { term } = req.body;
-  if (term) db.term = term;
-  res.json({ term: db.term });
+  if (!db.schoolTerms || typeof db.schoolTerms !== 'object') db.schoolTerms = {};
+  if (term) db.schoolTerms[accountSchoolId(actor)] = String(term).slice(0, 200);
+  res.json({ term: db.schoolTerms[accountSchoolId(actor)] || db.term });
 });
 
 // Posts
 app.get('/api/posts', (req, res) => {
-  res.json(db.posts);
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view the school feed.' });
+  res.json(tenantRecords(db.posts, actor));
 });
 app.post('/api/posts', (req, res) => {
-  const post = req.body;
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
+  const post = tagSchoolRecord(actor, req.body || {});
   post.createdAt = post.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   db.posts.unshift(post);
   res.json({ success: true, post });
 });
 app.delete('/api/posts/:id', (req, res) => {
-  db.posts = db.posts.filter(p => p.id !== req.params.id);
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const post = db.posts.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!post) return res.status(404).json({ message: 'School update not found.' });
+  db.posts = db.posts.filter(p => p !== post);
   res.json({ success: true });
 });
 
 // Schedules
 app.get('/api/schedules', (req, res) => {
-  res.json(db.schedules);
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view schedules.' });
+  res.json(tenantRecords(db.schedules, actor));
 });
 app.post('/api/schedules', (req, res) => {
-  const item = { id: Date.now().toString(), ...req.body };
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create schedules.' });
+  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body });
   db.schedules.push(item);
   res.json({ success: true, item });
 });
 app.post('/api/schedules/import', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import schedules.' });
   const { schedules } = req.body;
   if (Array.isArray(schedules)) {
-    db.schedules.push(...schedules);
+    db.schedules.push(...schedules.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
   }
   res.json({ success: true });
 });
 app.delete('/api/schedules/:id', (req, res) => {
-  db.schedules = db.schedules.filter(s => s.id !== req.params.id);
+  const actor = getSessionAccount(req);
+  const item = db.schedules.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Schedule item not found.' });
+  db.schedules = db.schedules.filter(s => s !== item);
   res.json({ success: true });
 });
 
 // Worksheets
 app.get('/api/worksheets', (req, res) => {
-  res.json(db.worksheets);
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view learning files.' });
+  res.json(tenantRecords(db.worksheets, actor));
 });
 app.post('/api/worksheets', (req, res) => {
-  const item = { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() };
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
+  const item = tagSchoolRecord(actor, { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
 });
 app.delete('/api/worksheets/:id', (req, res) => {
-  db.worksheets = db.worksheets.filter(w => w.id !== req.params.id);
+  const actor = getSessionAccount(req);
+  const item = db.worksheets.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Learning file not found.' });
+  db.worksheets = db.worksheets.filter(w => w !== item);
   res.json({ success: true });
 });
 
 // Badges
 app.get('/api/badges', (req, res) => {
-  const requester = findAccountByUsername(req.query.username);
+  const requester = getSessionAccount(req);
   if (!requester) return res.status(401).json({ message: 'Sign in to view badges.' });
-  if (requester.role !== 'parent') return res.json(db.badges);
+  const badges = tenantRecords(db.badges, requester);
+  if (requester.role !== 'parent') return res.json(badges);
 
   const linkedLearners = new Set(
-    db.students
+    tenantRecords(db.students, requester)
       .filter(student => isParentLinkedToLearner(requester, student))
       .map(student => String(student.studentName).toLocaleLowerCase('en-US'))
   );
-  res.json(db.badges.filter(badge => linkedLearners.has(String(badge.studentName || '').toLocaleLowerCase('en-US'))));
+  res.json(badges.filter(badge => linkedLearners.has(String(badge.studentName || '').toLocaleLowerCase('en-US'))));
 });
 app.post('/api/badges', (req, res) => {
-  const actor = findAccountByUsername(req.body.actorUsername);
+  const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) {
     return res.status(403).json({ message: 'Only authorised school staff can award badges.' });
   }
   const { actorUsername: _actorUsername, ...item } = req.body;
   item.awardedBy = actor.username;
-  db.badges.unshift(item);
+  db.badges.unshift(tagSchoolRecord(actor, item));
   res.json({ success: true, item });
 });
 app.delete('/api/badges/:id', (req, res) => {
-  const actor = findAccountByUsername(req.body?.actorUsername);
+  const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) {
     return res.status(403).json({ message: 'Only authorised school staff can remove badges.' });
   }
-  db.badges = db.badges.filter(b => b.id !== req.params.id);
+  const badge = db.badges.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!badge) return res.status(404).json({ message: 'Badge not found.' });
+  db.badges = db.badges.filter(b => b !== badge);
   res.json({ success: true });
 });
 
 // Analytics
 app.get('/api/analytics/:studentName', (req, res) => {
   const name = req.params.studentName;
-  const requester = findAccountByUsername(req.query.username);
+  const requester = getSessionAccount(req);
   if (!requester) return res.status(401).json({ message: 'Sign in to view growth analytics.' });
-  const student = db.students.find(entry => normalizeComparableText(entry.studentName) === normalizeComparableText(name));
+  const student = tenantRecords(db.students, requester).find(entry => normalizeComparableText(entry.studentName) === normalizeComparableText(name));
   if (!student) return res.status(404).json({ message: 'Learner record not found.' });
   if (requester.role === 'parent' && !isParentLinkedToLearner(requester, student)) return res.status(403).json({ message: 'Parents may only view analytics for their linked learner.' });
-  const studentWorksheets = db.worksheets.filter(w => w.studentName.toLowerCase() === name.toLowerCase() && Number.isFinite(Number(w.grade))).reverse();
+  const studentWorksheets = tenantRecords(db.worksheets, requester).filter(w => w.studentName.toLowerCase() === name.toLowerCase() && Number.isFinite(Number(w.grade))).reverse();
   if (!studentWorksheets.length) return res.json({ totalAssessments: 0, subscription: requester.subscription || 'school', studentName: name });
   const scores = studentWorksheets.map(item => Number(item.grade));
   const averageScore = Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 10) / 10;
@@ -838,32 +936,45 @@ app.get('/api/analytics/:studentName', (req, res) => {
 
 // Attendance
 app.get('/api/attendance', (req, res) => {
-  res.json(db.attendance);
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view attendance.' });
+  res.json(tenantRecords(db.attendance, actor));
 });
 app.post('/api/attendance', (req, res) => {
-  const item = { ...req.body, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record attendance.' });
+  const item = tagSchoolRecord(actor, { ...req.body, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
   db.attendance.unshift(item);
   res.json({ success: true, item });
 });
 app.post('/api/attendance/import', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import attendance.' });
   const { attendance } = req.body;
   if (Array.isArray(attendance)) {
-    db.attendance.unshift(...attendance);
+    db.attendance.unshift(...attendance.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
   }
   res.json({ success: true });
 });
 app.post('/api/attendance/toggle', (req, res) => {
+  const actor = getSessionAccount(req);
   const { id, status } = req.body;
-  const item = db.attendance.find(a => a.id === id);
+  const item = db.attendance.find(a => a.id === id && recordInSchool(a, actor));
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Attendance record not found.' });
   if (item) item.status = status;
   res.json({ success: true });
 });
 app.delete('/api/attendance/:id', (req, res) => {
-  db.attendance = db.attendance.filter(a => a.id !== req.params.id);
+  const actor = getSessionAccount(req);
+  const item = db.attendance.find(a => a.id === req.params.id && recordInSchool(a, actor));
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Attendance record not found.' });
+  db.attendance = db.attendance.filter(a => a !== item);
   res.json({ success: true });
 });
 app.post('/api/attendance/clear', (req, res) => {
-  db.attendance = [];
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can clear attendance.' });
+  db.attendance = db.attendance.filter(item => !recordInSchool(item, actor));
   res.json({ success: true });
 });
 
@@ -894,17 +1005,18 @@ app.post('/api/school-applications', (req, res) => {
   const ticket = {
     id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
     message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
-    assignedTo: principal.username, status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt: new Date().toISOString()
+    assignedTo: principal.username, schoolId: accountSchoolId(principal), status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt: new Date().toISOString()
   };
   db.tickets.unshift(ticket);
   res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: principal.name || principal.username, status: ticket.status } });
 });
 
 app.get('/api/tickets', (req, res) => {
-  const viewer = findAccountByUsername(req.query.username);
+  const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'Sign in to view your support tickets.' });
-  if (viewer.role === 'admin') return res.json(db.tickets);
-  const visibleTickets = db.tickets.filter(ticket =>
+  const schoolTickets = tenantRecords(db.tickets, viewer);
+  if (viewer.role === 'admin') return res.json(schoolTickets);
+  const visibleTickets = schoolTickets.filter(ticket =>
     normalizeUsername(ticket.createdBy) === normalizeUsername(viewer.username) ||
     normalizeUsername(ticket.assignedTo) === normalizeUsername(viewer.username)
   );
@@ -912,13 +1024,13 @@ app.get('/api/tickets', (req, res) => {
 });
 app.post('/api/tickets', (req, res) => {
   const { createdBy, assignedTo, ...ticketDetails } = req.body;
-  const creator = findAccountByUsername(createdBy);
+  const creator = getSessionAccount(req);
   if (!creator) return res.status(401).json({ message: 'Sign in to create a support ticket.' });
   const assignedAccount = creator.role === 'admin' ? findAccountByUsername(assignedTo) : null;
   if (assignedTo && (!assignedAccount || !isSameSchool(creator, assignedAccount))) {
     return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
   }
-  const item = {
+  const item = tagSchoolRecord(creator, {
     ...ticketDetails,
     id: String(ticketDetails.id || crypto.randomUUID()),
     createdBy: creator.username,
@@ -927,15 +1039,15 @@ app.post('/api/tickets', (req, res) => {
     status: 'Open',
     monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }),
     createdAt: new Date().toISOString()
-  };
+  });
   db.tickets.unshift(item);
   res.json({ success: true, item });
 });
 app.post('/api/tickets/update', (req, res) => {
   const { id, status, feedback, updatedBy, assignedTo } = req.body;
-  const actor = findAccountByUsername(updatedBy);
+  const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to update a support ticket.' });
-  const ticket = db.tickets.find(t => t.id === id);
+  const ticket = db.tickets.find(t => t.id === id && recordInSchool(t, actor));
   if (!ticket) return res.status(404).json({ message: 'Support ticket not found.' });
   const canManage = actor.role === 'admin' || normalizeUsername(ticket.assignedTo) === normalizeUsername(actor.username);
   if (!canManage) return res.status(403).json({ message: 'Only the assigned account or an administrator can update this ticket.' });
@@ -951,41 +1063,57 @@ app.post('/api/tickets/update', (req, res) => {
   res.json({ success: true, ticket });
 });
 app.delete('/api/tickets/:id', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
-  db.tickets = db.tickets.filter(t => t.id !== req.params.id);
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const ticket = db.tickets.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!ticket) return res.status(404).json({ message: 'Support ticket not found.' });
+  db.tickets = db.tickets.filter(t => t !== ticket);
   res.json({ success: true });
 });
 
 // Chat - Groups
 app.get('/api/chat/groups', (req, res) => {
-  res.json(db.chatGroups);
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view school chat groups.' });
+  res.json(tenantRecords(db.chatGroups, actor));
 });
 app.post('/api/chat/groups', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create groups.' });
   const { groupName } = req.body;
-  const id = Date.now().toString();
-  db.chatGroups.push({ id, groupName });
+  const id = crypto.randomUUID();
+  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName: String(groupName || '').trim().slice(0, 120) }));
   db.groupMessages[id] = [];
   res.json({ success: true, id });
 });
 app.delete('/api/chat/groups/:id', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const id = req.params.id;
-  if (id === 'general') return res.status(400).json({ message: "Cannot delete General group." });
-  db.chatGroups = db.chatGroups.filter(g => g.id !== id);
+  const group = db.chatGroups.find(entry => entry.id === id && recordInSchool(entry, actor));
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
+  db.chatGroups = db.chatGroups.filter(g => g !== group);
   delete db.groupMessages[id];
   res.json({ success: true });
 });
 
 // Chat - Messages
 app.get('/api/chat/messages/:groupId', (req, res) => {
+  const actor = getSessionAccount(req);
+  const group = db.chatGroups.find(entry => entry.id === req.params.groupId && recordInSchool(entry, actor));
+  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
   const msgs = db.groupMessages[req.params.groupId] || [];
   res.json(msgs);
 });
 app.post('/api/chat/messages', (req, res) => {
   const { groupId, sender, message, textColor } = req.body;
+  const actor = getSessionAccount(req);
+  const group = db.chatGroups.find(entry => entry.id === groupId && recordInSchool(entry, actor));
+  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
   if (!db.groupMessages[groupId]) db.groupMessages[groupId] = [];
   const msgObj = {
     id: crypto.randomUUID(),
-    sender,
+    sender: actor.username,
     message,
     textColor: textColor || "#2dd4bf",
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -994,7 +1122,10 @@ app.post('/api/chat/messages', (req, res) => {
   res.json({ success: true, msgObj });
 });
 app.delete('/api/chat/messages/:groupId/:messageId', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const group = db.chatGroups.find(entry => entry.id === req.params.groupId && recordInSchool(entry, actor));
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
   const messages = db.groupMessages[req.params.groupId];
   if (!messages) return res.status(404).json({ message: 'Chat group not found.' });
   const previousLength = messages.length;
@@ -1005,42 +1136,43 @@ app.delete('/api/chat/messages/:groupId/:messageId', (req, res) => {
 
 // Chat - Direct
 app.get('/api/chat/direct/users', (req, res) => {
-  const viewer = findAccountByUsername(req.query.username);
+  const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'A valid signed-in account is required.' });
   res.json(db.users.filter(user => canUseDirectChat(viewer, user)).map(safeAccount));
 });
 app.get('/api/chat/direct/:user1/:user2', (req, res) => {
   const { user1, user2 } = req.params;
-  const viewer = findAccountByUsername(user1);
+  const viewer = getSessionAccount(req);
   const contact = findAccountByUsername(user2);
-  if (!canUseDirectChat(viewer, contact)) return res.status(403).json({ message: 'This private conversation is not available for these accounts.' });
+  if (!viewer || normalizeUsername(user1) !== normalizeUsername(viewer.username) || !canUseDirectChat(viewer, contact)) return res.status(403).json({ message: 'This private conversation is not available for these accounts.' });
   const msgs = db.directMessages.filter(
-    m => (m.sender === user1 && m.recipient === user2) || (m.sender === user2 && m.recipient === user1)
+    m => recordInSchool(m, viewer) && ((m.sender === user1 && m.recipient === user2) || (m.sender === user2 && m.recipient === user1))
   );
   res.json(msgs);
 });
 app.post('/api/chat/direct', (req, res) => {
-  const { sender, recipient, message, textColor } = req.body;
-  const senderAccount = findAccountByUsername(sender);
+  const { recipient, message, textColor } = req.body;
+  const senderAccount = getSessionAccount(req);
   const recipientAccount = findAccountByUsername(recipient);
   if (!canUseDirectChat(senderAccount, recipientAccount)) return res.status(403).json({ message: 'You can only message approved contacts at your school.' });
   if (!String(message || '').trim()) return res.status(400).json({ message: 'A message is required.' });
-  const msgObj = {
+  const msgObj = tagSchoolRecord(senderAccount, {
     id: crypto.randomUUID(),
-    sender,
+    sender: senderAccount.username,
     recipient,
     message,
     textColor: textColor || "#2dd4bf",
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  };
+  });
   db.directMessages.push(msgObj);
   res.json({ success: true, msgObj });
 });
 app.delete('/api/chat/direct/:messageId', (req, res) => {
-  if (!requireAdmin(req)) return res.status(403).json({ message: 'Administrator access is required.' });
-  const previousLength = db.directMessages.length;
-  db.directMessages = db.directMessages.filter(message => message.id !== req.params.messageId);
-  if (db.directMessages.length === previousLength) return res.status(404).json({ message: 'Message not found.' });
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const message = db.directMessages.find(entry => entry.id === req.params.messageId && recordInSchool(entry, actor));
+  if (!message) return res.status(404).json({ message: 'Message not found.' });
+  db.directMessages = db.directMessages.filter(entry => entry !== message);
   res.json({ success: true });
 });
 
@@ -1057,7 +1189,7 @@ app.get('/api/broadcasts', (req, res) => {
   const longitude = Number(req.query.lng);
   const hasLocation = Number.isFinite(latitude) && Number.isFinite(longitude);
   const canSeeAll = ['admin', 'principal'].includes(requester.role);
-  const visible = db.broadcasts.filter(item => {
+  const visible = tenantRecords(db.broadcasts, requester).filter(item => {
     if (canSeeAll || !item.location || !Number(item.radiusKm)) return true;
     if (!hasLocation) return false;
     const latDistance = (latitude - Number(item.location.lat)) * 111.32;
@@ -1074,36 +1206,40 @@ app.post('/api/broadcasts', (req, res) => {
   const actor = requireSafetyStaff(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
   if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
-  const item = {
+  const item = tagSchoolRecord(actor, {
     id: Date.now().toString(),
     ...req.body,
     issuedBy: actor.username,
     issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     readBy: []
-  };
+  });
   db.broadcasts.unshift(item);
   res.json({ success: true, item });
 });
 app.post('/api/broadcasts/:id/read', (req, res) => {
   const requester = getSessionAccount(req);
   if (!requester) return res.status(401).json({ message: 'Sign in to acknowledge an alert.' });
-  const item = db.broadcasts.find(entry => entry.id === req.params.id);
+  const item = db.broadcasts.find(entry => entry.id === req.params.id && recordInSchool(entry, requester));
   if (!item) return res.status(404).json({ message: 'Alert not found.' });
   if (!item.readBy.includes(requester.username)) item.readBy.push(requester.username);
   res.json({ success: true, readCount: item.readBy.length });
 });
 app.delete('/api/broadcasts/:id', (req, res) => {
-  if (!requireSafetyStaff(req)) return res.status(403).json({ message: 'Only authorised safety staff can remove a broadcast.' });
-  db.broadcasts = db.broadcasts.filter(item => item.id !== req.params.id);
+  const actor = requireSafetyStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Only authorised safety staff can remove a broadcast.' });
+  const broadcast = db.broadcasts.find(item => item.id === req.params.id && recordInSchool(item, actor));
+  if (!broadcast) return res.status(404).json({ message: 'Broadcast not found.' });
+  db.broadcasts = db.broadcasts.filter(item => item !== broadcast);
   res.json({ success: true });
 });
 
 app.get('/api/safety-network', (req, res) => {
-  if (!requireSafetyStaff(req)) return res.status(403).json({ message: 'Safety Network is available to authorised school safety staff.' });
-  const presentLearners = db.attendance.filter(entry => /present|checked.?in/i.test(String(entry.status || ''))).length;
-  const visitorsOnCampus = db.campusVisitors.filter(visitor => visitor.status === 'checked-in');
-  const activeBroadcasts = db.broadcasts.filter(broadcast => !broadcast.closedAt);
+  const actor = requireSafetyStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Safety Network is available to authorised school safety staff.' });
+  const presentLearners = tenantRecords(db.attendance, actor).filter(entry => /present|checked.?in/i.test(String(entry.status || ''))).length;
+  const visitorsOnCampus = tenantRecords(db.campusVisitors, actor).filter(visitor => visitor.status === 'checked-in');
+  const activeBroadcasts = tenantRecords(db.broadcasts, actor).filter(broadcast => !broadcast.closedAt);
   res.json({
     presentLearners,
     visitorsOnCampus: visitorsOnCampus.length,
@@ -1114,8 +1250,9 @@ app.get('/api/safety-network', (req, res) => {
 });
 
 app.get('/api/campus-visitors', (req, res) => {
-  if (!requireSafetyStaff(req)) return res.status(403).json({ message: 'Only authorised safety staff can view campus visitors.' });
-  res.json(db.campusVisitors.map(({ passCodeHash, ...visitor }) => visitor));
+  const actor = requireSafetyStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Only authorised safety staff can view campus visitors.' });
+  res.json(tenantRecords(db.campusVisitors, actor).map(({ passCodeHash, ...visitor }) => visitor));
 });
 
 app.get('/api/visitor-meetings/recipients', (req, res) => {
@@ -1128,9 +1265,10 @@ app.get('/api/visitor-meetings', (req, res) => {
   const user = getSessionAccount(req);
   if (!user || !['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'You are not authorised to view meeting requests.' });
   const meetings = db.visitorMeetings.filter(meeting => {
+    if (!recordInSchool(meeting, user)) return false;
     if (user.role === 'parent') return normalizeUsername(meeting.parentUsername) === normalizeUsername(user.username);
     if (user.role === 'teacher') return normalizeUsername(meeting.hostUsername) === normalizeUsername(user.username);
-    return normalizeComparableText(meeting.schoolName) === normalizeComparableText(user.schoolName);
+    return true;
   });
   res.json(meetings);
 });
@@ -1141,14 +1279,14 @@ app.post('/api/visitor-meetings', (req, res) => {
   const proposedAt = String(req.body?.proposedAt || '').trim();
   const purpose = String(req.body?.purpose || '').trim();
   if (!parent || parent.role !== 'parent' || !host || !['teacher', 'principal'].includes(host.role) || !isSameSchool(parent, host) || !proposedAt || !purpose) return res.status(400).json({ message: 'Choose an authorised teacher or principal, a proposed time, and a meeting purpose.' });
-  const meeting = { id: crypto.randomUUID(), schoolName: parent.schoolName, parentUsername: parent.username, parentName: parent.name || parent.username, hostUsername: host.username, hostName: host.name || host.username, proposedAt, agreedAt: null, purpose, status: 'awaiting-teacher-response', requestedAt: new Date().toISOString() };
+  const meeting = tagSchoolRecord(parent, { id: crypto.randomUUID(), parentUsername: parent.username, parentName: parent.name || parent.username, hostUsername: host.username, hostName: host.name || host.username, proposedAt, agreedAt: null, purpose, status: 'awaiting-teacher-response', requestedAt: new Date().toISOString() });
   db.visitorMeetings.unshift(meeting);
   res.status(201).json({ success: true, meeting });
 });
 
 app.post('/api/visitor-meetings/:id/respond', (req, res) => {
   const staff = getSessionAccount(req);
-  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id);
+  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id && recordInSchool(entry, staff));
   const action = String(req.body?.action || '');
   const agreedAt = String(req.body?.agreedAt || '').trim();
   if (!staff || !meeting || !['teacher', 'principal'].includes(staff.role) || normalizeUsername(meeting.hostUsername) !== normalizeUsername(staff.username) || meeting.status !== 'awaiting-teacher-response' || !['accept', 'counter'].includes(action)) return res.status(403).json({ message: 'This meeting cannot be updated by this account.' });
@@ -1161,7 +1299,7 @@ app.post('/api/visitor-meetings/:id/respond', (req, res) => {
 
 app.post('/api/visitor-meetings/:id/confirm', (req, res) => {
   const parent = getSessionAccount(req);
-  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id);
+  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id && recordInSchool(entry, parent));
   if (!parent || !meeting || parent.role !== 'parent' || normalizeUsername(meeting.parentUsername) !== normalizeUsername(parent.username) || meeting.status !== 'awaiting-parent-confirmation') return res.status(403).json({ message: 'This meeting cannot be confirmed by this account.' });
   meeting.status = 'awaiting-principal-approval';
   meeting.parentConfirmedAt = new Date().toISOString();
@@ -1170,10 +1308,10 @@ app.post('/api/visitor-meetings/:id/confirm', (req, res) => {
 
 app.post('/api/visitor-meetings/:id/approve-visitor', (req, res) => {
   const principal = getSessionAccount(req);
-  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id);
+  const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id && recordInSchool(entry, principal));
   if (!principal || !meeting || !['principal', 'admin'].includes(principal.role) || !isSameSchool(principal, meeting) || meeting.status !== 'awaiting-principal-approval') return res.status(403).json({ message: 'Only the principal or administrator can issue visitor authorisation after both parties agree.' });
   const passCode = `LFV-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-  const visitor = { id: crypto.randomUUID(), meetingId: meeting.id, visitorName: meeting.parentName, purpose: meeting.purpose, host: meeting.hostName, expectedDate: meeting.agreedAt, status: 'approved', approvedBy: principal.username, approvedAt: new Date().toISOString(), passCodeHash: hashPin(passCode) };
+  const visitor = tagSchoolRecord(principal, { id: crypto.randomUUID(), meetingId: meeting.id, visitorName: meeting.parentName, purpose: meeting.purpose, host: meeting.hostName, expectedDate: meeting.agreedAt, status: 'approved', approvedBy: principal.username, approvedAt: new Date().toISOString(), passCodeHash: hashPin(passCode) });
   db.campusVisitors.unshift(visitor);
   meeting.status = 'visitor-authorised';
   meeting.visitorId = visitor.id;
@@ -1185,7 +1323,7 @@ app.post('/api/campus-visitors/check-in', (req, res) => {
   const actor = requireSafetyStaff(req);
   const passCode = String(req.body?.passCode || '').trim().toUpperCase();
   if (!actor || !passCode) return res.status(403).json({ message: 'An authorised staff member and visitor pass are required.' });
-  const visitor = db.campusVisitors.find(entry => entry.status === 'approved' && matchesPin(passCode, entry.passCodeHash));
+  const visitor = db.campusVisitors.find(entry => entry.status === 'approved' && recordInSchool(entry, actor) && matchesPin(passCode, entry.passCodeHash));
   if (!visitor) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
   visitor.status = 'checked-in';
   visitor.checkedInAt = new Date().toISOString();
@@ -1196,7 +1334,7 @@ app.post('/api/campus-visitors/check-in', (req, res) => {
 app.post('/api/campus-visitors/:id/check-out', (req, res) => {
   const actor = requireSafetyStaff(req);
   if (!actor) return res.status(403).json({ message: 'Only authorised safety staff can check out a visitor.' });
-  const visitor = db.campusVisitors.find(entry => entry.id === req.params.id && entry.status === 'checked-in');
+  const visitor = db.campusVisitors.find(entry => entry.id === req.params.id && entry.status === 'checked-in' && recordInSchool(entry, actor));
   if (!visitor) return res.status(404).json({ message: 'Checked-in visitor not found.' });
   visitor.status = 'checked-out';
   visitor.checkedOutAt = new Date().toISOString();
@@ -1209,7 +1347,7 @@ app.get('/api/store', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view the school store.' });
   const schoolName = user.schoolName || 'Your school';
-  const products = (db.storeProducts || []).filter(product => normalizeComparableText(product.schoolName) === normalizeComparableText(schoolName) && product.active !== false).map(({ schoolName: _schoolName, ...product }) => product);
+  const products = tenantRecords(db.storeProducts || [], user).filter(product => product.active !== false).map(({ schoolName: _schoolName, schoolId: _schoolId, ...product }) => product);
   res.json({ schoolName, products, canManage: user.role === 'admin', webStoreUrl: user.schoolStoreUrl || null });
 });
 app.post('/api/store/products', (req, res) => {
@@ -1220,14 +1358,14 @@ app.post('/api/store/products', (req, res) => {
   const stockQuantity = Number.parseInt(req.body?.stockQuantity, 10);
   if (!name || price === null || price <= 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) return res.status(400).json({ message: 'Enter an item name, a price greater than zero, and a valid stock quantity.' });
   if (!Array.isArray(db.storeProducts)) db.storeProducts = [];
-  const product = { id: crypto.randomUUID(), schoolName: actor.schoolName, name, price, stockQuantity, active: true, createdAt: new Date().toISOString(), createdBy: actor.username };
+  const product = tagSchoolRecord(actor, { id: crypto.randomUUID(), name, price, stockQuantity, active: true, createdAt: new Date().toISOString(), createdBy: actor.username });
   db.storeProducts.unshift(product);
   res.status(201).json({ success: true, product });
 });
 app.delete('/api/store/products/:id', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator can remove school store items.' });
-  const product = (db.storeProducts || []).find(entry => entry.id === req.params.id && normalizeComparableText(entry.schoolName) === normalizeComparableText(actor.schoolName));
+  const product = (db.storeProducts || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
   if (!product) return res.status(404).json({ message: 'Store item not found.' });
   product.active = false;
   res.json({ success: true });
@@ -1235,108 +1373,133 @@ app.delete('/api/store/products/:id', (req, res) => {
 app.post('/api/store/orders', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || actor.role !== 'parent') return res.status(403).json({ message: 'Only approved parent accounts can place a school store order.' });
-  const product = (db.storeProducts || []).find(entry => entry.id === req.body?.productId && entry.active !== false && normalizeComparableText(entry.schoolName) === normalizeComparableText(actor.schoolName));
+  const product = (db.storeProducts || []).find(entry => entry.id === req.body?.productId && entry.active !== false && recordInSchool(entry, actor));
   const quantity = Number.parseInt(req.body?.quantity, 10);
   if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) return res.status(400).json({ message: 'Choose an available store item and quantity.' });
   if (product.stockQuantity < quantity) return res.status(409).json({ message: 'The requested quantity is not currently available.' });
-  const billing = subscriptionBillingState();
+  const billing = subscriptionBillingState(actor);
   if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The school payment destination is not configured yet.' });
   product.stockQuantity -= quantity;
   const reference = `${billing.payment.referencePrefix}-STORE-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const order = { id: crypto.randomUUID(), reference, schoolName: actor.schoolName, productId: product.id, productName: product.name, quantity, amount: Math.round(product.price * quantity * 100) / 100, parentUsername: actor.username, parentName: actor.name || actor.username, status: 'awaiting payment and preparation', createdAt: new Date().toISOString() };
+  const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, productId: product.id, productName: product.name, quantity, amount: Math.round(product.price * quantity * 100) / 100, parentUsername: actor.username, parentName: actor.name || actor.username, status: 'awaiting payment and preparation', createdAt: new Date().toISOString() });
   if (!Array.isArray(db.storeOrders)) db.storeOrders = [];
   db.storeOrders.unshift(order);
-  db.moduleRecords.stock.unshift({ id: crypto.randomUUID(), details: `Store order to prepare · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`, schoolName: actor.schoolName, source: 'school-store', status: 'Awaiting payment and preparation', createdAt: new Date().toLocaleString() });
+  db.moduleRecords.stock.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), details: `Store order to prepare · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`, source: 'school-store', status: 'Awaiting payment and preparation', createdAt: new Date().toLocaleString() }));
   res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
 });
 app.get('/api/store/orders', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Stock-room access is required.' });
-  res.json((db.storeOrders || []).filter(order => normalizeComparableText(order.schoolName) === normalizeComparableText(actor.schoolName)));
+  res.json(tenantRecords(db.storeOrders || [], actor));
 });
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
 app.get('/api/modules/:module', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view this workspace.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  res.json(records);
+  res.json(tenantRecords(records, actor));
 });
 app.post('/api/modules/:module', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save workspace records.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  const record = { id: Date.now().toString(), ...req.body, createdAt: new Date().toLocaleString() };
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
   records.unshift(record);
   res.json({ success: true, record });
 });
 app.delete('/api/modules/:module/:id', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  db.moduleRecords[req.params.module] = records.filter(record => record.id !== req.params.id);
+  const record = records.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!record) return res.status(404).json({ message: 'Workspace record not found.' });
+  db.moduleRecords[req.params.module] = records.filter(entry => entry !== record);
   res.json({ success: true });
 });
 
-app.get('/api/registry', (req, res) => res.json(db.registry));
+app.get('/api/registry', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view the register.' });
+  res.json(tenantRecords(db.registry, actor));
+});
 app.post('/api/registry', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
   const required = ['learnerName', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
   if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields.' });
-  const record = { id: Date.now().toString(), ...req.body, createdAt: new Date().toLocaleString() };
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
   db.registry.unshift(record);
   res.json({ success: true, record });
 });
 
-app.get('/api/consents', (req, res) => res.json(db.consentRecords));
+app.get('/api/consents', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view consent records.' });
+  res.json(tenantRecords(db.consentRecords, actor));
+});
 app.post('/api/consents', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save consent records.' });
   const { learnerName, guardianName, internalUpdates, marketingPhotos } = req.body;
   if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required.' });
-  const record = { id: Date.now().toString(), learnerName: String(learnerName), guardianName: String(guardianName), internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' };
-  db.consentRecords = db.consentRecords.filter(entry => entry.learnerName.toLowerCase() !== record.learnerName.toLowerCase());
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), guardianName: String(guardianName), internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
+  db.consentRecords = db.consentRecords.filter(entry => !recordInSchool(entry, actor) || entry.learnerName.toLowerCase() !== record.learnerName.toLowerCase());
   db.consentRecords.unshift(record);
   res.status(201).json({ success: true, record });
 });
 
 app.post('/api/pickups/verify', (req, res) => {
-  const { learnerName, pickupAdult, verificationCode, action, recordedBy } = req.body;
+  const actor = getSessionAccount(req);
+  const { learnerName, pickupAdult, verificationCode, action } = req.body;
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record pickups.' });
   if (!learnerName || !pickupAdult || !verificationCode || !action) return res.status(400).json({ message: 'Learner, pickup adult, verification code, and action are required.' });
-  const entry = { id: Date.now().toString(), learnerName: String(learnerName), pickupAdult: String(pickupAdult), verificationCode: hashPin(verificationCode), action: String(action), recordedBy: String(recordedBy || 'Staff'), timestamp: new Date().toISOString() };
+  const entry = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), pickupAdult: String(pickupAdult), verificationCode: hashPin(verificationCode), action: String(action), recordedBy: actor.username, timestamp: new Date().toISOString() });
   db.pickupLogs.unshift(entry);
   res.status(201).json({ success: true, entry: { ...entry, verificationCode: undefined } });
 });
-app.get('/api/pickups', (req, res) => res.json(db.pickupLogs.map(({ verificationCode, ...entry }) => entry)));
+app.get('/api/pickups', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view pickup records.' });
+  res.json(tenantRecords(db.pickupLogs, actor).map(({ verificationCode, ...entry }) => entry));
+});
 
 app.get('/api/release-notes', (req, res) => res.json(db.releaseNotes));
 
 app.post('/api/report-signing-pin', (req, res) => {
-  const { username, pin } = req.body;
-  const user = findAccountByUsername(username);
+  const { pin } = req.body;
+  const user = getSessionAccount(req);
   if (!user || !pin || String(pin).length < 4) return res.status(400).json({ message: 'Choose a signing PIN with at least 4 characters.' });
   user.reportSigningPinHash = hashPin(pin);
   res.json({ success: true });
 });
 
 app.get('/api/report-reviews', (req, res) => {
-  const username = String(req.query.username || '');
-  const user = findAccountByUsername(username);
+  const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view reports.' });
   const reports = user.role === 'parent'
-    ? db.reportReviews.filter(report => normalizeUsername(report.parentUsername) === normalizeUsername(user.username))
-    : db.reportReviews;
+    ? tenantRecords(db.reportReviews, user).filter(report => normalizeUsername(report.parentUsername) === normalizeUsername(user.username))
+    : tenantRecords(db.reportReviews, user);
   res.json(reports);
 });
 app.post('/api/report-reviews', (req, res) => {
   const { studentName, reportTitle, period, teacherUsername, parentUsername, signatureData, signingPin } = req.body;
-  const teacher = findAccountByUsername(teacherUsername);
+  const teacher = getSessionAccount(req);
   const parent = findAccountByUsername(parentUsername);
   if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
-  if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent') return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
+  if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
   if (!studentName || !reportTitle || !period || !parentUsername || !signatureData) return res.status(400).json({ message: 'Complete the report details and teacher signature.' });
-  const report = { id: Date.now().toString(), studentName: String(studentName), reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: signatureData, teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() };
+  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: signatureData, teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
   db.reportReviews.unshift(report);
   res.status(201).json({ success: true, report });
 });
 app.post('/api/report-reviews/:id/sign', (req, res) => {
-  const { username, signatureData, signingPin } = req.body;
-  const report = db.reportReviews.find(entry => entry.id === req.params.id);
-  const user = findAccountByUsername(username);
+  const { signatureData, signingPin } = req.body;
+  const user = getSessionAccount(req);
+  const report = db.reportReviews.find(entry => entry.id === req.params.id && recordInSchool(entry, user));
   if (!report || !user || user.role !== 'parent' || normalizeUsername(report.parentUsername) !== normalizeUsername(user.username)) return res.status(403).json({ message: 'Only the linked parent account can sign this report.' });
   if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
   if (!signatureData) return res.status(400).json({ message: 'Add your signature before confirming.' });
@@ -1353,11 +1516,11 @@ const findLearnerAccessCodeActor = (req) => {
   return actor && ['admin', 'principal'].includes(actor.role) ? actor : null;
 };
 
-const learnerAccessCodeView = (learner, { includeCode = false, includeHistory = false } = {}) => {
+const learnerAccessCodeView = (learner, actor, { includeCode = false, includeHistory = false } = {}) => {
   const key = learnerRecordKey(learner);
-  const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === key && entry.status === 'active');
+  const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === key && entry.status === 'active' && recordInSchool(entry, actor));
   const history = db.learnerAccessCodes
-    .filter(entry => entry.learnerKey === key)
+    .filter(entry => entry.learnerKey === key && recordInSchool(entry, actor))
     .map(entry => ({
       id: entry.id,
       status: entry.status,
@@ -1388,7 +1551,7 @@ app.get('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator may manage codes, and a principal may print them.' });
   const isAdmin = actor.role === 'admin';
-  res.json(db.students.map(learner => learnerAccessCodeView(learner, { includeCode: isAdmin, includeHistory: isAdmin })));
+  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: isAdmin, includeHistory: isAdmin })));
 });
 
 // This is deliberately a separate, credential-free view. It lets an
@@ -1397,13 +1560,13 @@ app.get('/api/learner-access-codes', (req, res) => {
 app.get('/api/learner-access-codes/teacher-preview', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can open the teacher-view preview.' });
-  res.json(db.students.map(learner => {
+  res.json(tenantRecords(db.students, actor).map(learner => {
     const key = learnerRecordKey(learner);
     return {
       learnerName: learner.studentName,
       className: learner.className,
       parentName: learner.parentName || '',
-      codeIssued: db.learnerAccessCodes.some(entry => entry.learnerKey === key && entry.status === 'active')
+      codeIssued: db.learnerAccessCodes.some(entry => entry.learnerKey === key && entry.status === 'active' && recordInSchool(entry, actor))
     };
   }));
 });
@@ -1412,9 +1575,9 @@ app.get('/api/learner-access-codes/:learnerKey/printable', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can print learner code forms.' });
   const learnerKey = String(req.params.learnerKey || '');
-  const learner = db.students.find(entry => learnerRecordKey(entry) === learnerKey);
+  const learner = db.students.find(entry => learnerRecordKey(entry) === learnerKey && recordInSchool(entry, actor));
   if (!learner) return res.status(404).json({ message: 'Learner record not found.' });
-  const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === learnerKey && entry.status === 'active');
+  const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor));
   if (!activeCode) return res.status(404).json({ message: 'There is no active code available to print for this learner.' });
   res.json({
     learnerName: learner.studentName,
@@ -1428,39 +1591,39 @@ app.get('/api/learner-access-codes/:learnerKey/printable', (req, res) => {
 app.post('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can issue learner access codes.' });
-  const learner = db.students.find(entry => learnerRecordKey(entry) === String(req.body?.learnerKey || ''));
+  const learner = db.students.find(entry => learnerRecordKey(entry) === String(req.body?.learnerKey || '') && recordInSchool(entry, actor));
   if (!learner) return res.status(404).json({ message: 'Learner record not found.' });
   const learnerKey = learnerRecordKey(learner);
-  if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active')) return res.status(409).json({ message: 'This learner already has an active code. Replace it instead.' });
+  if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor))) return res.status(409).json({ message: 'This learner already has an active code. Replace it instead.' });
   let accessCode = normaliseAccessCode(req.body?.manualCode);
   if (accessCode && !/^LF-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(accessCode)) return res.status(400).json({ message: 'Use the format LF-AB12-CD34, or leave the field blank to generate a code.' });
-  const codeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === candidate);
+  const codeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && recordInSchool(entry, actor) && decryptField(entry.codeEncrypted) === candidate);
   if (accessCode && codeInUse(accessCode)) return res.status(409).json({ message: 'That access code is already in use. Choose another code or generate one.' });
   while (!accessCode || codeInUse(accessCode)) accessCode = generateLearnerAccessCode();
-  const record = { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username };
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username });
   db.learnerAccessCodes.unshift(record);
-  res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, { includeCode: true, includeHistory: true }) });
+  res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) });
 });
 
 app.post('/api/learner-access-codes/:id/replace', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can replace learner access codes.' });
-  const previous = db.learnerAccessCodes.find(entry => entry.id === req.params.id && entry.status === 'active');
+  const previous = db.learnerAccessCodes.find(entry => entry.id === req.params.id && entry.status === 'active' && recordInSchool(entry, actor));
   if (!previous) return res.status(404).json({ message: 'The active code was not found.' });
   previous.status = 'replaced';
   previous.replacedAt = new Date().toISOString();
   previous.replacedBy = actor.username;
   let accessCode;
-  do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === accessCode));
-  db.learnerAccessCodes.unshift({ id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id });
-  const learner = db.students.find(entry => learnerRecordKey(entry) === previous.learnerKey);
-  res.json({ success: true, learner: learner ? learnerAccessCodeView(learner, { includeCode: true, includeHistory: true }) : null });
+  do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && recordInSchool(entry, actor) && decryptField(entry.codeEncrypted) === accessCode));
+  db.learnerAccessCodes.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id }));
+  const learner = db.students.find(entry => learnerRecordKey(entry) === previous.learnerKey && recordInSchool(entry, actor));
+  res.json({ success: true, learner: learner ? learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) : null });
 });
 
 app.post('/api/learner-access-codes/:id/revoke', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can invalidate learner access codes.' });
-  const record = db.learnerAccessCodes.find(entry => entry.id === req.params.id && entry.status === 'active');
+  const record = db.learnerAccessCodes.find(entry => entry.id === req.params.id && entry.status === 'active' && recordInSchool(entry, actor));
   if (!record) return res.status(404).json({ message: 'The active code was not found.' });
   record.status = 'revoked';
   record.revokedAt = new Date().toISOString();
@@ -1472,9 +1635,9 @@ app.post('/api/learner-access-codes/redeem', (req, res) => {
   const parent = getSessionAccount(req);
   if (!parent || parent.role !== 'parent') return res.status(403).json({ message: 'Only a signed-in parent or guardian can use a learner access code.' });
   const suppliedCode = normaliseAccessCode(req.body?.accessCode);
-  const codeRecord = db.learnerAccessCodes.find(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === suppliedCode);
+  const codeRecord = db.learnerAccessCodes.find(entry => entry.status === 'active' && recordInSchool(entry, parent) && decryptField(entry.codeEncrypted) === suppliedCode);
   if (!codeRecord) return res.status(404).json({ message: 'That learner access code is invalid, has already been used, or has been replaced. Ask the school administrator for a new form.' });
-  const learner = db.students.find(entry => learnerRecordKey(entry) === codeRecord.learnerKey);
+  const learner = db.students.find(entry => learnerRecordKey(entry) === codeRecord.learnerKey && recordInSchool(entry, parent));
   if (!learner) return res.status(404).json({ message: 'The learner record linked to this code is no longer available.' });
   if (normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName))) return res.status(409).json({ message: 'This learner is already linked to your account.' });
   const requested = Array.isArray(parent.requestedLearnerLinks) ? parent.requestedLearnerLinks : [];
@@ -1492,9 +1655,9 @@ app.post('/api/learner-access-codes/redeem', (req, res) => {
 // Student Search
 app.get('/api/students/search', (req, res) => {
   const { className, childName } = req.query;
-  const requester = findAccountByUsername(req.query.username);
+  const requester = getSessionAccount(req);
   if (!requester) return res.status(401).json({ message: 'Sign in to search learner records.' });
-  let results = db.students;
+  let results = tenantRecords(db.students, requester);
   if (requester.role === 'parent') results = results.filter(student => isParentLinkedToLearner(requester, student));
   if (className) {
     results = results.filter(s => s.className.toLowerCase().includes(className.toLowerCase()));
@@ -1506,22 +1669,22 @@ app.get('/api/students/search', (req, res) => {
 });
 
 app.get('/api/household', (req, res) => {
-  const parent = findAccountByUsername(req.query.username);
+  const parent = getSessionAccount(req);
   if (!parent || parent.role !== 'parent') return res.status(403).json({ message: 'Only parent accounts can view linked learner records.' });
-  res.json(db.students.filter(student => isParentLinkedToLearner(parent, student)).map(student => ({ ...student, medicalNotes: decryptField(student.medicalNotes), emergencyContact: decryptField(student.emergencyContact), authorisedPickups: decryptField(student.authorisedPickups) })));
+  res.json(tenantRecords(db.students, parent).filter(student => isParentLinkedToLearner(parent, student)).map(student => ({ ...student, medicalNotes: decryptField(student.medicalNotes), emergencyContact: decryptField(student.emergencyContact), authorisedPickups: decryptField(student.authorisedPickups) })));
 });
 
 // Secure bulk learner import. The browser previews spreadsheet rows first; this
 // endpoint applies the authoritative duplicate check and encrypts sensitive fields.
 app.post('/api/students/import', (req, res) => {
-  const actor = findAccountByUsername(req.body?.actorUsername);
+  const actor = getSessionAccount(req);
   if (!actor || !['admin', 'principal'].includes(actor.role)) return res.status(403).json({ message: 'Only an administrator or principal may import learner records.' });
   const incoming = Array.isArray(req.body?.students) ? req.body.students : [];
   if (!incoming.length) return res.status(400).json({ message: 'No learner records were supplied.' });
   if (incoming.length > 1000) return res.status(400).json({ message: 'Import up to 1,000 learner records at a time.' });
 
   const recordKey = (student) => [student.studentName, student.className, student.contactEmail].map(normalizeComparableText).join('|');
-  const knownRecords = new Set(db.students.map(recordKey));
+  const knownRecords = new Set(tenantRecords(db.students, actor).map(recordKey));
   const seenInFile = new Set();
   const rejected = [];
   let imported = 0;
@@ -1543,7 +1706,7 @@ app.post('/api/students/import', (req, res) => {
     }
     seenInFile.add(key);
     knownRecords.add(key);
-    db.students.push({
+    db.students.push(tagSchoolRecord(actor, {
       studentName,
       className,
       parentName,
@@ -1553,11 +1716,11 @@ app.post('/api/students/import', (req, res) => {
       authorisedPickups: encryptField(String(row?.authorisedPickups || '').trim()),
       importedAt: new Date().toISOString(),
       importedBy: actor.username
-    });
+    }));
     imported += 1;
   });
 
-  db.importAudit.unshift({ id: crypto.randomUUID(), importedAt: new Date().toISOString(), importedBy: actor.username, imported, rejected: rejected.length });
+  db.importAudit.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), importedAt: new Date().toISOString(), importedBy: actor.username, imported, rejected: rejected.length }));
   res.status(201).json({ success: true, imported, rejected, message: `${imported} learner record${imported === 1 ? '' : 's'} imported.` });
 });
 
