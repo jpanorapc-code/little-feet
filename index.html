@@ -330,6 +330,12 @@
     .school-popup strong { color: var(--text-dark) !important; }
     .school-popup .school-muted { color: var(--text-muted) !important; }
     .school-popup a { color: var(--primary-hover) !important; font-weight: 700; }
+    #schoolPinCard { border:1px solid rgba(45,212,191,.48); border-left:4px solid var(--primary-color); border-radius:10px; background:linear-gradient(135deg,rgba(13,148,136,.16),var(--input-bg)); }
+    @media (max-width:767px) {
+      #schoolMapContainer { height:clamp(390px,68vh,520px) !important; }
+      #schoolMapContainer .leaflet-control { max-width:calc(100% - 22px); }
+      #schoolMapContainer .leaflet-popup-content { max-height:250px; overflow:auto; }
+    }
     body.light-mode .workspace-card { background: linear-gradient(145deg, #ffffff, #eef8f7); color: var(--text-dark); }
     body.light-mode .workspace-card h3 { color: #0f766e; }
     body.light-mode #reportsTab .workspace-card [style*="color: #fff"],
@@ -855,6 +861,7 @@
             📍 Press "Detect My Location" to render interactive map pins.
           </div>
           <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
+          <div id="schoolPinCard" class="hidden" aria-live="polite" style="margin-top:12px;padding:13px;"></div>
         </div>
 
       </div>
@@ -1611,7 +1618,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-learner-code-register" defer></script>
+  <script src="backup.js?v=20260905-mobile-map" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

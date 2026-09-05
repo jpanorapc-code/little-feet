@@ -1043,7 +1043,9 @@ async function loadSchoolProximityMap() {
     }
     if (mapInstance) mapInstance.remove();
 
-    mapInstance = L.map('interactiveMap', { closePopupOnClick: false }).setView(userPos, 12);
+    // Disabling Leaflet's mobile tap shim prevents one physical tap being
+    // interpreted as a marker click followed by a map click that closes the card.
+    mapInstance = L.map('interactiveMap', { closePopupOnClick: false, tap: false }).setView(userPos, 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
     const userLocationIcon = L.divIcon({ className: '', html: '<div class="user-location-pin" title="Your current location"></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
     L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`, { autoClose: false, closeOnClick: false, keepInView: true }).openPopup();
@@ -1126,7 +1128,7 @@ async function loadSchoolProximityMap() {
         }
       };
       const markerLayer = typeof L.markerClusterGroup === 'function'
-        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, chunkedLoading: true, chunkInterval: 80, chunkDelay: 15, animate: false, removeOutsideVisibleBounds: true })
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, chunkedLoading: true, chunkInterval: 80, chunkDelay: 15, animate: false, removeOutsideVisibleBounds: true, zoomToBoundsOnClick: true })
         : L.layerGroup();
 
       nearbySchools.forEach((school) => {
@@ -1145,17 +1147,23 @@ async function loadSchoolProximityMap() {
         const contact = `<p style="font-size:0.8rem; margin:7px 0 0;"><strong>Phone:</strong> ${phone ? `<a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : 'Not publicly listed'}<br><strong>Email:</strong> ${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : `Not publicly listed · <a href="${escapeHtml(contactSearchUrl)}" target="_blank" rel="noopener noreferrer">Find official contact</a>`}</p>`;
         school.details = { street, suburb, town, category, phone, email, website, imageUrl };
         const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-green" style="margin:0 0 7px;" onclick="openSchoolDetail(${nearbySchools.indexOf(school)})">View details / apply</button><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeURIComponent(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses verified public details only. No AI-generated school details are saved automatically.</p></div></div>`;
-        const marker = L.marker([school.lat, school.lng]).bindPopup(content, { autoClose: false, closeOnClick: false, keepInView: true });
+        const marker = L.marker([school.lat, school.lng], { riseOnHover: true }).bindPopup(content, { autoClose: false, closeOnClick: false, closeOnEscapeKey: false, keepInView: true, autoPanPadding: [20, 20], maxWidth: 310 });
         marker.on('click', event => {
-          if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
-          marker.openPopup();
+          if (event.originalEvent) L.DomEvent.stop(event.originalEvent);
+          showSchoolPinCard(nearbySchools.indexOf(school));
+          // Open after Leaflet's built-in marker handler has finished so the
+          // popup is not toggled away by the same tap on mobile browsers.
+          window.setTimeout(() => marker.openPopup(), 0);
         });
         markerLayer.addLayer(marker);
       });
       markerLayer.addTo(mapInstance);
       mapInstance.on('popupopen', event => {
         const popupElement = event.popup.getElement();
-        if (popupElement) L.DomEvent.disableClickPropagation(popupElement);
+        if (popupElement) {
+          L.DomEvent.disableClickPropagation(popupElement);
+          L.DomEvent.disableScrollPropagation(popupElement);
+        }
       });
       nearbySchoolRecords = nearbySchools;
       renderNearbySchoolPicker();
@@ -1184,6 +1192,17 @@ function renderNearbySchoolPicker() {
 }
 
 function openSelectedSchoolDetail() { openSchoolDetail(Number(document.getElementById('nearbySchoolPicker')?.value)); }
+function showSchoolPinCard(index) {
+  const school = nearbySchoolRecords[index];
+  const card = document.getElementById('schoolPinCard');
+  const picker = document.getElementById('nearbySchoolPicker');
+  if (!school || !card) return;
+  if (picker) picker.value = String(index);
+  const detail = school.details || {};
+  const address = [detail.street, detail.suburb, detail.town].filter(value => value && value !== 'Not listed in OpenStreetMap').join(', ') || 'Address not publicly listed';
+  card.innerHTML = `<div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;"><div><strong>🏫 ${escapeWorkspaceText(school.name)}</strong><p class="meta" style="margin:5px 0 0;">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(address)}</p><p class="meta" style="margin:4px 0 0;">This selection stays here while you explore the map.</p></div><button type="button" class="action-btn btn-green" onclick="openSchoolDetail(${index})">View details / apply</button></div>`;
+  card.classList.remove('hidden');
+}
 function openSchoolDetail(index) {
   const school = nearbySchoolRecords[index];
   if (!school) return;
