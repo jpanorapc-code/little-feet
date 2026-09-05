@@ -1426,7 +1426,9 @@
             <div class="workspace-card"><h3>Subscription billing</h3><p>Set your monthly plan, learner add-on prices and profit margin, optional late-payment fee, and where approved schools pay.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionBillingAdmin()">Manage subscriptions</button></div>
             <div class="workspace-card"><h3>Sibling & Subsidy Rules</h3><p>Record a discount or subsidy decision below. Payroll and payment provider calculations remain subject to school approval.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Discount / subsidy rule')"><input name="details" placeholder="e.g. 10% sibling discount for Smith family" required><button class="submit-btn">Save rule</button></form></div>
             <div class="workspace-card"><h3>Year-End Tax Statements</h3><p>Create a request record for a parent’s tax invoice pack. The finance team can then verify payment history before issuing it.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Tax statement request')"><input name="details" placeholder="Parent name or account reference" required><button class="submit-btn">Create request</button></form></div>
-          </div><div id="financeRecords" class="record-list"></div>
+          </div>
+          <section id="subscriptionBillingOverview" class="workspace-card" style="margin-top:18px;" aria-live="polite"><p style="margin:0;color:var(--text-muted);">Loading subscription pricing…</p></section>
+          <div id="financeRecords" class="record-list"></div>
         </div>
       </div>
 

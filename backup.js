@@ -654,6 +654,7 @@ function setupSession() {
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
+  loadSubscriptionBillingOverview();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
   if (ticketMonitorId) clearInterval(ticketMonitorId);
@@ -2606,6 +2607,28 @@ function formatSubscriptionMoney(value) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(Number(value || 0));
 }
 
+async function loadSubscriptionBillingOverview() {
+  const container = document.getElementById('subscriptionBillingOverview');
+  if (!container || currentUser?.role !== 'admin') return;
+  try {
+    const response = await fetch('/api/subscription-billing');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load subscription information.');
+    const bundles = data.pricing.bundles || [];
+    const awaiting = (data.orders || []).filter(order => order.status === 'awaiting payment');
+    const requestedMonthly = awaiting.reduce((total, order) => total + Number(order.monthlyTotal || 0), 0);
+    const potentialMargin = awaiting.reduce((total, order) => total + Number(order.profitMargin || 0), 0);
+    const rows = bundles.map(bundle => {
+      const margin = Number(bundle.sellingPrice || 0) - Number(bundle.costPrice || 0);
+      return `<tr><td style="padding:9px 10px;"><strong>+${bundle.capacity} children</strong></td><td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.costPrice)}</td><td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.sellingPrice)}</td><td style="padding:9px 10px;color:#2dd4bf;font-weight:700;">${formatSubscriptionMoney(margin)}</td></tr>`;
+    }).join('');
+    const orders = (data.orders || []).slice(0, 6).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(order.status)}</li>`).join('') || '<li>No payment requests yet.</li>';
+    container.innerHTML = `<div class="card-header-bar"><h3>Subscription pricing &amp; operating overview</h3><span class="badge-tag ${data.paymentConfigured ? 'info' : 'urgent'}">${data.paymentConfigured ? 'PAYMENT READY' : 'SETUP NEEDED'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting monthly revenue</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div></div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:560px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th><th style="padding:9px 10px;">Your cost</th><th style="padding:9px 10px;">School price</th><th style="padding:9px 10px;">Your profit</th></tr></thead><tbody>${rows}</tbody></table></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:14px;"><div><h4 style="margin:0 0 7px;">How it works</h4><ol style="margin:0;padding-left:19px;color:var(--text-muted);font-size:.84rem;line-height:1.6;"><li>Set your cost and selling price for each child bundle.</li><li>Choose a secure payment link or bank-transfer account.</li><li>Principals or admins choose a bundle and create a payment request.</li><li>Little Feet creates a unique reference for payment matching.</li></ol></div><div><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="openSubscriptionBillingAdmin()">Edit prices &amp; payment destination</button>`;
+  } catch (error) {
+    container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load subscription information.')}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
+  }
+}
+
 async function openSubscriptionBillingAdmin() {
   if (currentUser?.role !== 'admin') return alert('Only an administrator can manage subscription pricing and payment details.');
   let data;
@@ -2648,6 +2671,7 @@ async function saveSubscriptionBillingConfig(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to save subscription billing.');
     alert('Subscription pricing and payment details saved.');
+    loadSubscriptionBillingOverview();
     openSubscriptionBillingAdmin();
   } catch (error) { alert(error.message || 'Unable to save subscription billing.'); }
 }
