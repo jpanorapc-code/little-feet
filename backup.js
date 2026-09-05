@@ -1046,6 +1046,10 @@ async function loadSchoolProximityMap() {
     // Disabling Leaflet's mobile tap shim prevents one physical tap being
     // interpreted as a marker click followed by a map click that closes the card.
     mapInstance = L.map('interactiveMap', { closePopupOnClick: false, tap: false }).setView(userPos, 12);
+    mapInstance.on('click', () => {
+      hideSchoolPinCard();
+      mapInstance.closePopup();
+    });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
     const userLocationIcon = L.divIcon({ className: '', html: '<div class="user-location-pin" title="Your current location"></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
     L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`, { autoClose: false, closeOnClick: false, keepInView: true }).openPopup();
@@ -1200,8 +1204,14 @@ function showSchoolPinCard(index) {
   if (picker) picker.value = String(index);
   const detail = school.details || {};
   const address = [detail.street, detail.suburb, detail.town].filter(value => value && value !== 'Not listed in OpenStreetMap').join(', ') || 'Address not publicly listed';
-  card.innerHTML = `<div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;"><div><strong>🏫 ${escapeWorkspaceText(school.name)}</strong><p class="meta" style="margin:5px 0 0;">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(address)}</p><p class="meta" style="margin:4px 0 0;">This selection stays here while you explore the map.</p></div><button type="button" class="action-btn btn-green" onclick="openSchoolDetail(${index})">View details / apply</button></div>`;
+  card.innerHTML = `<div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;"><div><strong>🏫 ${escapeWorkspaceText(school.name)}</strong><p class="meta" style="margin:5px 0 0;">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(address)}</p><p class="meta" style="margin:4px 0 0;">Tap elsewhere on the map to close this selection.</p></div><div style="display:flex;gap:7px;align-items:center;"><button type="button" class="action-btn btn-green" onclick="openSchoolDetail(${index})">View details / apply</button><button type="button" class="action-btn btn-blue" aria-label="Close selected school" onclick="hideSchoolPinCard()">×</button></div></div>`;
   card.classList.remove('hidden');
+}
+function hideSchoolPinCard() {
+  const card = document.getElementById('schoolPinCard');
+  if (!card) return;
+  card.classList.add('hidden');
+  card.innerHTML = '';
 }
 function openSchoolDetail(index) {
   const school = nearbySchoolRecords[index];
