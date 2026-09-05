@@ -1189,15 +1189,26 @@ function openSchoolDetail(index) {
   if (!school) return;
   const detail = school.details || {};
   const coordinates = `${school.lat.toFixed(5)}, ${school.lng.toFixed(5)}`;
-  openModal('School details', `<div style="display:grid;gap:12px;"><div><h3 style="margin:0 0 5px;">${escapeWorkspaceText(school.name)}</h3><p style="margin:0;color:var(--text-muted);">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(detail.street || 'Address not listed')}, ${escapeWorkspaceText(detail.suburb || '')}, ${escapeWorkspaceText(detail.town || '')}</p></div><div><label>Coordinates</label><input id="schoolCoordinates" readonly value="${coordinates}"><button type="button" class="action-btn btn-blue" style="margin-top:8px;" onclick="navigator.clipboard?.writeText(document.getElementById('schoolCoordinates').value); this.textContent='Copied'">Copy coordinates</button></div><form onsubmit="submitSchoolConnectionRequest(event, ${index})"><label>Your reason for contacting or applying to this school</label><textarea name="details" required placeholder="Briefly explain your request. Do not include sensitive child information."></textarea><button class="submit-btn">Send school connection request</button></form></div>`);
+  const verifiedParent = currentUser?.role === 'parent' && !String(currentUser?.verificationStatus || '').toLowerCase().includes('pending');
+  const application = verifiedParent
+    ? `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0 0 12px;color:var(--text-muted);font-size:.84rem;">Your verified Little Feet account is required. The application is sent directly to this school’s principal when its school account is active. Do not include medical or other sensitive details here.</p><form onsubmit="submitSchoolApplication(event, ${index})" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;"><label>Parent / guardian name<input name="guardianName" required value="${escapeWorkspaceText(currentUser.name || '')}"></label><label>Contact email<input name="contactEmail" type="email" required value="${escapeWorkspaceText(currentUser.username || '')}"></label><label>Contact phone<input name="contactPhone" required inputmode="tel"></label><label>Learner name<input name="learnerName" required></label><label>Date of birth<input name="dateOfBirth" type="date" required></label><label>Age group / intended grade<input name="gradeOrAgeGroup" required placeholder="e.g. Grade R / Toddler"></label><label>Intended start date<input name="intendedStart" type="date" required></label><label>Home area / suburb<input name="homeArea" required></label><label style="grid-column:1/-1;">Application note<textarea name="notes" required rows="3" placeholder="Why you are applying, preferred contact time, and any non-sensitive information the school should know."></textarea></label><label style="grid-column:1/-1;display:flex;gap:8px;align-items:flex-start;"><input type="checkbox" required> I confirm these details are accurate and I am authorised to apply for this learner.</label><button class="submit-btn" style="grid-column:1/-1;">Send application to principal</button></form></section>`
+    : `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0;color:var(--text-muted);">Applications require an active, verified parent account. Sign in with your approved Little Feet parent account first.</p></section>`;
+  openModal('School details', `<div style="display:grid;gap:12px;"><div><h3 style="margin:0 0 5px;">${escapeWorkspaceText(school.name)}</h3><p style="margin:0;color:var(--text-muted);">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(detail.street || 'Address not listed')}, ${escapeWorkspaceText(detail.suburb || '')}, ${escapeWorkspaceText(detail.town || '')}</p></div><div><label>Coordinates</label><input id="schoolCoordinates" readonly value="${coordinates}"><button type="button" class="action-btn btn-blue" style="margin-top:8px;" onclick="navigator.clipboard?.writeText(document.getElementById('schoolCoordinates').value); this.textContent='Copied'">Copy coordinates</button></div>${application}</div>`);
 }
-function submitSchoolConnectionRequest(event, index) {
+async function submitSchoolApplication(event, index) {
   event.preventDefault();
   const school = nearbySchoolRecords[index];
   if (!school) return;
-  const details = new FormData(event.target).get('details');
-  saveWorkspaceRecord(null, 'engagement', `School connection request · ${school.name} · ${details}`);
-  closeModal();
+  const form = event.currentTarget;
+  const value = name => String(form.elements[name]?.value || '').trim();
+  try {
+    const response = await fetch('/api/school-applications', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ schoolName: school.name, guardianName: value('guardianName'), contactEmail: value('contactEmail'), contactPhone: value('contactPhone'), learnerName: value('learnerName'), dateOfBirth: value('dateOfBirth'), gradeOrAgeGroup: value('gradeOrAgeGroup'), intendedStart: value('intendedStart'), homeArea: value('homeArea'), notes: value('notes') }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to send the school application.');
+    closeModal();
+    alert(`Application sent to ${result.ticket.assignedTo}. Your application reference is ${result.ticket.id}.`);
+    loadTickets();
+  } catch (error) { alert(error.message || 'Unable to send the school application.'); }
 }
 
 async function enrichSchoolPin(button, schoolName, latitude, longitude) {
@@ -1836,6 +1847,7 @@ async function loadTickets(checkForNew = false) {
               ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${t.message}</p>
+            ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${t.updatedBy}:</strong> ${t.feedback}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
               <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>

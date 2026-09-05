@@ -868,6 +868,38 @@ app.post('/api/attendance/clear', (req, res) => {
 });
 
 // Tickets
+app.post('/api/school-applications', (req, res) => {
+  const applicant = getSessionAccount(req);
+  if (!applicant || String(applicant.verificationStatus || '').toLowerCase().includes('pending')) {
+    return res.status(403).json({ message: 'Use an active, verified Little Feet account before applying to a school.' });
+  }
+  if (applicant.role !== 'parent') return res.status(403).json({ message: 'School applications can only be submitted from a verified parent account.' });
+  const schoolName = String(req.body?.schoolName || '').trim().slice(0, 160);
+  const guardianName = String(req.body?.guardianName || '').trim().slice(0, 120);
+  const contactPhone = String(req.body?.contactPhone || '').trim().slice(0, 50);
+  const contactEmail = String(req.body?.contactEmail || '').trim().slice(0, 160);
+  const learnerName = String(req.body?.learnerName || '').trim().slice(0, 120);
+  const dateOfBirth = String(req.body?.dateOfBirth || '').trim().slice(0, 20);
+  const intendedStart = String(req.body?.intendedStart || '').trim().slice(0, 20);
+  const gradeOrAgeGroup = String(req.body?.gradeOrAgeGroup || '').trim().slice(0, 80);
+  const homeArea = String(req.body?.homeArea || '').trim().slice(0, 160);
+  const notes = String(req.body?.notes || '').trim().slice(0, 1200);
+  if (!schoolName || !guardianName || !contactPhone || !contactEmail || !learnerName || !dateOfBirth || !intendedStart || !gradeOrAgeGroup || !homeArea || !notes) {
+    return res.status(400).json({ message: 'Complete the contact, learner, start-date, age/grade, area and application details.' });
+  }
+  if (!/^\S+@\S+\.\S+$/.test(contactEmail)) return res.status(400).json({ message: 'Enter a valid contact email address.' });
+  const principal = db.users.find(account => account.role === 'principal' && normalizeComparableText(account.schoolName) === normalizeComparableText(schoolName) && !String(account.verificationStatus || '').toLowerCase().includes('pending'));
+  if (!principal) return res.status(409).json({ message: 'This school is not yet available for Little Feet applications. Ask the school to activate its principal account first.' });
+  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, homeArea, notes };
+  const ticket = {
+    id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
+    message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
+    assignedTo: principal.username, status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt: new Date().toISOString()
+  };
+  db.tickets.unshift(ticket);
+  res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: principal.name || principal.username, status: ticket.status } });
+});
+
 app.get('/api/tickets', (req, res) => {
   const viewer = findAccountByUsername(req.query.username);
   if (!viewer) return res.status(401).json({ message: 'Sign in to view your support tickets.' });
