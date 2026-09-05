@@ -1428,6 +1428,24 @@
             <div class="workspace-card"><h3>Year-End Tax Statements</h3><p>Create a request record for a parent’s tax invoice pack. The finance team can then verify payment history before issuing it.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Tax statement request')"><input name="details" placeholder="Parent name or account reference" required><button class="submit-btn">Create request</button></form></div>
           </div>
           <section id="subscriptionBillingOverview" class="workspace-card" style="margin-top:18px;" aria-live="polite"><p style="margin:0;color:var(--text-muted);">Loading subscription pricing…</p></section>
+          <section class="workspace-card" style="margin-top:18px;">
+            <div class="card-header-bar"><h3>Published school subscription guide</h3><span class="badge-tag info">SCHOOL PLANS</span></div>
+            <p style="color:var(--text-muted);margin:0 0 12px;">Use this as the public learner-capacity guide. Your editable cost, selling price, add-on margin and payment settings remain in the section above.</p>
+            <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;">
+              <table style="width:100%;min-width:700px;border-collapse:collapse;text-align:left;">
+                <thead><tr><th style="padding:10px;">Package tier</th><th style="padding:10px;">School size</th><th style="padding:10px;">Monthly price</th><th style="padding:10px;">Extra learner rate</th></tr></thead>
+                <tbody>
+                  <tr><td style="padding:10px;"><strong>Micro / ECD</strong></td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 per learner / month</td></tr>
+                  <tr style="background:rgba(45,212,191,.08);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 per learner / month</td></tr>
+                  <tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:14px;">
+              <div style="padding:14px;border:1px solid rgba(45,212,191,.45);border-radius:10px;background:rgba(13,148,136,.08);"><span class="badge-tag">PARENT SUBSCRIPTION</span><h4 style="margin:8px 0 4px;">LittleSteps Plus</h4><strong style="font-size:1.2rem;color:#2dd4bf;">R29 / month per child</strong><p style="margin:8px 0 0;color:var(--text-muted);font-size:.84rem;line-height:1.5;">Optional family upgrade for full-quality approved media downloads, weekly learning highlights, portfolio access, priority eligible support and approved caregiver access.</p></div>
+              <div style="padding:14px;border:1px solid var(--border-color);border-radius:10px;background:var(--input-bg);"><h4 style="margin:0 0 6px;">How the two parts work together</h4><p style="margin:0;color:var(--text-muted);font-size:.84rem;line-height:1.5;">The school plan covers the institution. Parent Plus is an optional direct family upgrade and does not change the school’s learner-capacity price.</p></div>
+            </div>
+          </section>
           <div id="financeRecords" class="record-list"></div>
         </div>
       </div>

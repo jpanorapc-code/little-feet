@@ -2562,6 +2562,12 @@ async function openSubscriptionsModal() {
         <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">INSTITUTIONAL PRICING & BENEFITS</div>
         <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">School Subscriptions & Operational Advantages</h2>
         <p style="margin:0 0 12px; color:#10b981; font-size:1rem; font-weight:700;">Predictable Pricing Models Designed for Scalability</p>
+        <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; margin-bottom:12px;">
+          <table style="width:100%; min-width:700px; border-collapse:collapse; text-align:left; font-size:.82rem;">
+            <thead><tr style="background:#065f46; color:#fff;"><th style="padding:10px;">Package tier</th><th style="padding:10px;">School learners</th><th style="padding:10px;">Monthly fee</th><th style="padding:10px;">Extra learner fee</th></tr></thead>
+            <tbody><tr><td style="padding:10px;"><strong>Micro / ECD Tier</strong></td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 / learner / month</td></tr><tr style="background:rgba(16,185,129,.10);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 / learner / month</td></tr><tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr></tbody>
+          </table>
+        </div>
         ${subscriptionPricingOverview}
         <div style="margin-top:10px; padding:12px 14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
           <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">Key Institutional Advantages of Subscribing</h3>
