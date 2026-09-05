@@ -248,31 +248,52 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
-// A short original pixel-style welcome motif, played once for each sign-in.
+// An original ten-second pixel-console welcome motif, played once for each sign-in.
+// It uses browser synthesis rather than a copied or licensed startup recording.
 function playStartupChime() {
   if (startupChimePlayed) return;
   try {
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') { startupChimePending = true; return; }
     startupChimePending = false;
+    const startedAt = ctx.currentTime;
+    const duration = 10;
     const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.04);
-    master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 6.9);
+    master.gain.setValueAtTime(0.0001, startedAt);
+    master.gain.exponentialRampToValueAtTime(0.18, startedAt + 0.11);
+    master.gain.setValueAtTime(0.18, startedAt + 8.8);
+    master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
     master.connect(ctx.destination);
-    const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 587.33, 698.46, 880, 1046.5, 880, 783.99, 659.25, 523.25, 587.33, 698.46, 783.99, 880, 1046.5, 1174.66, 1046.5, 880, 783.99, 698.46, 659.25, 587.33, 523.25, 659.25, 783.99, 880, 783.99, 1046.5];
-    notes.forEach((frequency, index) => {
+
+    const playTone = (frequency, start, length, type = 'square', volume = 0.22, detune = 0) => {
       const oscillator = ctx.createOscillator();
       const tone = ctx.createGain();
-      const start = ctx.currentTime + (index * 0.21);
-      oscillator.type = 'square';
+      oscillator.type = type;
       oscillator.frequency.setValueAtTime(frequency, start);
+      oscillator.detune.setValueAtTime(detune, start);
       tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(0.45, start + 0.012);
-      tone.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
+      tone.gain.exponentialRampToValueAtTime(volume, start + 0.018);
+      tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
       oscillator.connect(tone); tone.connect(master);
-      oscillator.start(start); oscillator.stop(start + 0.21);
+      oscillator.start(start); oscillator.stop(start + length + 0.03);
+    };
+
+    // Soft boot glow beneath the pixel notes.
+    [[130.81, 0], [196, 0], [261.63, 0], [329.63, 3.2], [392, 3.2], [523.25, 6.4]].forEach(([frequency, offset], index) => {
+      playTone(frequency, startedAt + offset, index < 3 ? 3.55 : 3.3, 'sine', 0.05, index % 2 ? 5 : -5);
     });
+
+    const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 1046.5, 783.99, 880, 1174.66, 1046.5, 698.46, 783.99, 987.77, 783.99, 659.25, 783.99, 1046.5, 1174.66, 1318.51, 1046.5, 880, 783.99, 698.46, 880, 1046.5, 1318.51, 1567.98, 1318.51, 1046.5, 783.99, 659.25, 783.99, 987.77, 1174.66, 1567.98, 1318.51, 1046.5, 1567.98];
+    melody.forEach((frequency, index) => {
+      const start = startedAt + 0.35 + (index * 0.22);
+      const length = index % 8 === 7 ? 0.37 : 0.18;
+      playTone(frequency, start, length, index % 4 === 0 ? 'triangle' : 'square', index < 28 ? 0.19 : 0.24);
+      if (index % 4 === 0) playTone(frequency / 2, start, Math.min(length + 0.06, 0.32), 'square', 0.055);
+    });
+
+    // The final two notes linger just long enough to complete a true ten-second cue.
+    playTone(1046.5, startedAt + 8.85, 0.92, 'triangle', 0.2);
+    playTone(1567.98, startedAt + 9.18, 0.72, 'sine', 0.12);
     startupChimePlayed = true;
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
