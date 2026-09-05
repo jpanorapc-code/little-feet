@@ -260,10 +260,36 @@ function playStartupChime() {
     const duration = 10;
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.18, startedAt + 0.11);
-    master.gain.setValueAtTime(0.18, startedAt + 8.8);
+    master.gain.exponentialRampToValueAtTime(0.16, startedAt + 0.11);
+    master.gain.setValueAtTime(0.16, startedAt + 8.8);
     master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
-    master.connect(ctx.destination);
+    const warmth = ctx.createBiquadFilter();
+    warmth.type = 'lowpass';
+    warmth.frequency.setValueAtTime(2650, startedAt);
+    warmth.Q.setValueAtTime(0.65, startedAt);
+    const echo = ctx.createDelay(0.35);
+    const echoGain = ctx.createGain();
+    echo.delayTime.setValueAtTime(0.17, startedAt);
+    echoGain.gain.setValueAtTime(0.1, startedAt);
+    master.connect(warmth); warmth.connect(ctx.destination);
+    warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
+
+    // A barely-there textured bed gives the cue a cozy, old-screen warmth.
+    const noiseBuffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate);
+    const noise = noiseBuffer.getChannelData(0);
+    for (let index = 0; index < noise.length; index += 1) noise[index] = (Math.random() * 2 - 1) * 0.2;
+    const noiseSource = ctx.createBufferSource();
+    const noiseFilter = ctx.createBiquadFilter();
+    const noiseGain = ctx.createGain();
+    noiseSource.buffer = noiseBuffer;
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(860, startedAt);
+    noiseFilter.Q.setValueAtTime(0.45, startedAt);
+    noiseGain.gain.setValueAtTime(0.0001, startedAt);
+    noiseGain.gain.exponentialRampToValueAtTime(0.012, startedAt + 0.6);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
+    noiseSource.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(warmth);
+    noiseSource.start(startedAt); noiseSource.stop(startedAt + duration);
 
     const playTone = (frequency, start, length, type = 'square', volume = 0.22, detune = 0) => {
       const oscillator = ctx.createOscillator();
