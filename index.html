@@ -1389,8 +1389,10 @@
 
       <div id="learnerCodesTab" class="tab-content" data-roles="principal,admin">
         <div class="card">
-          <div class="card-header-bar"><h2>🔐 Learner Code Forms</h2><span class="badge-tag info">SCHOOL CONTROLLED</span></div>
-          <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.55;">Each printed handout carries a code tied to one learner. Administrators can issue, replace, or invalidate codes. Principals can print the prepared handout only.</p>
+          <div class="card-header-bar"><h2>🔐 Learner Code Register</h2><span class="badge-tag info">SCHOOL CONTROLLED</span></div>
+          <p style="color:var(--text-muted);margin-bottom:12px;line-height:1.55;">Each printed handout carries a code tied to one learner. Administrators can issue, replace, or scrap an old code and review its status. Principals can print a prepared handout only.</p>
+          <div class="workspace-card" data-roles="admin" style="margin:0 0 14px;padding:12px;"><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;"><div><strong>Teacher-view check</strong><p class="meta" style="margin:4px 0 0;">Teachers see a learner and whether a school code is issued — never the code itself.</p></div><button type="button" class="action-btn btn-blue" onclick="toggleLearnerCodeTeacherPreview()">Preview teacher view</button></div><div id="learnerCodeTeacherPreview" class="record-list hidden" style="margin-top:12px;"></div></div>
+          <label for="learnerCodeSearch" class="sr-only">Find a learner in the code register</label><input id="learnerCodeSearch" type="search" placeholder="Find a learner, class, or parent" oninput="renderLearnerAccessCodes()" style="margin:0 0 14px;">
           <div id="learnerCodeList" class="record-list"><p style="font-size:.84rem;color:var(--text-muted);">Loading learner code forms…</p></div>
         </div>
       </div>
@@ -1609,7 +1611,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260904-live-data" defer></script>
+  <script src="backup.js?v=20260905-learner-code-register" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

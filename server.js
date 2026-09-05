@@ -1353,9 +1353,20 @@ const findLearnerAccessCodeActor = (req) => {
   return actor && ['admin', 'principal'].includes(actor.role) ? actor : null;
 };
 
-const learnerAccessCodeView = (learner) => {
+const learnerAccessCodeView = (learner, { includeCode = false, includeHistory = false } = {}) => {
   const key = learnerRecordKey(learner);
   const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === key && entry.status === 'active');
+  const history = db.learnerAccessCodes
+    .filter(entry => entry.learnerKey === key)
+    .map(entry => ({
+      id: entry.id,
+      status: entry.status,
+      issuedAt: entry.issuedAt || null,
+      issuedBy: entry.issuedBy || null,
+      changedAt: entry.replacedAt || entry.revokedAt || entry.redeemedAt || null,
+      changedBy: entry.replacedBy || entry.revokedBy || entry.redeemedBy || null
+    }))
+    .sort((left, right) => String(right.issuedAt || '').localeCompare(String(left.issuedAt || '')));
   return {
     learnerKey: key,
     learnerName: learner.studentName,
@@ -1363,16 +1374,55 @@ const learnerAccessCodeView = (learner) => {
     parentName: learner.parentName || '',
     contactEmail: learner.contactEmail || '',
     codeRecordId: activeCode?.id || null,
-    accessCode: activeCode ? decryptField(activeCode.codeEncrypted) : null,
+    // A code is only shown in the administrator's register. Principals receive
+    // a print action, not a list of credentials, and teachers never receive one.
+    accessCode: includeCode && activeCode ? decryptField(activeCode.codeEncrypted) : null,
     issuedAt: activeCode?.issuedAt || null,
-    issuedBy: activeCode?.issuedBy || null
+    issuedBy: activeCode?.issuedBy || null,
+    hasPrintableForm: Boolean(activeCode),
+    codeHistory: includeHistory ? history : []
   };
 };
 
 app.get('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator may manage codes, and a principal may print them.' });
-  res.json(db.students.map(learnerAccessCodeView));
+  const isAdmin = actor.role === 'admin';
+  res.json(db.students.map(learner => learnerAccessCodeView(learner, { includeCode: isAdmin, includeHistory: isAdmin })));
+});
+
+// This is deliberately a separate, credential-free view. It lets an
+// administrator verify exactly what teachers can use: learner details and an
+// issued/not-issued indicator, never an access code or its history.
+app.get('/api/learner-access-codes/teacher-preview', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can open the teacher-view preview.' });
+  res.json(db.students.map(learner => {
+    const key = learnerRecordKey(learner);
+    return {
+      learnerName: learner.studentName,
+      className: learner.className,
+      parentName: learner.parentName || '',
+      codeIssued: db.learnerAccessCodes.some(entry => entry.learnerKey === key && entry.status === 'active')
+    };
+  }));
+});
+
+app.get('/api/learner-access-codes/:learnerKey/printable', (req, res) => {
+  const actor = findLearnerAccessCodeActor(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can print learner code forms.' });
+  const learnerKey = String(req.params.learnerKey || '');
+  const learner = db.students.find(entry => learnerRecordKey(entry) === learnerKey);
+  if (!learner) return res.status(404).json({ message: 'Learner record not found.' });
+  const activeCode = db.learnerAccessCodes.find(entry => entry.learnerKey === learnerKey && entry.status === 'active');
+  if (!activeCode) return res.status(404).json({ message: 'There is no active code available to print for this learner.' });
+  res.json({
+    learnerName: learner.studentName,
+    className: learner.className,
+    parentName: learner.parentName || '',
+    accessCode: decryptField(activeCode.codeEncrypted),
+    issuedAt: activeCode.issuedAt || null
+  });
 });
 
 app.post('/api/learner-access-codes', (req, res) => {
@@ -1389,7 +1439,7 @@ app.post('/api/learner-access-codes', (req, res) => {
   while (!accessCode || codeInUse(accessCode)) accessCode = generateLearnerAccessCode();
   const record = { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username };
   db.learnerAccessCodes.unshift(record);
-  res.status(201).json({ success: true, learner: learnerAccessCodeView(learner) });
+  res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, { includeCode: true, includeHistory: true }) });
 });
 
 app.post('/api/learner-access-codes/:id/replace', (req, res) => {
@@ -1404,7 +1454,7 @@ app.post('/api/learner-access-codes/:id/replace', (req, res) => {
   do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === accessCode));
   db.learnerAccessCodes.unshift({ id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id });
   const learner = db.students.find(entry => learnerRecordKey(entry) === previous.learnerKey);
-  res.json({ success: true, learner: learner ? learnerAccessCodeView(learner) : null });
+  res.json({ success: true, learner: learner ? learnerAccessCodeView(learner, { includeCode: true, includeHistory: true }) : null });
 });
 
 app.post('/api/learner-access-codes/:id/revoke', (req, res) => {

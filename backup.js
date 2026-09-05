@@ -2776,15 +2776,51 @@ async function loadLearnerAccessCodes() {
       list.innerHTML = '<p style="font-size:.84rem;color:var(--text-muted);">No learners are available yet. Import or register learners first.</p>';
       return;
     }
-    const canManage = currentUser.role === 'admin';
-    list.innerHTML = records.map(record => {
-      const encodedKey = encodeURIComponent(record.learnerKey);
-      const details = `${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}`;
-      if (!record.accessCode) return `<div class="item-row"><div><strong>${details}</strong><p class="meta" style="margin-top:5px;">No active learner code issued.</p></div>${canManage ? `<button type="button" class="action-btn btn-green" onclick="openLearnerCodeIssue('${encodedKey}')">Generate or enter code</button>` : '<span class="badge-tag info">Awaiting administrator</span>'}</div>`;
-      return `<div class="item-row"><div><strong>${details}</strong><p style="margin-top:5px;">Access code: <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(record.accessCode)}</strong></p><span class="meta">Issued ${new Date(record.issuedAt).toLocaleString()} by ${escapeWorkspaceText(record.issuedBy || 'school administrator')}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="printLearnerCodeForm('${encodedKey}')">🖨️ Print form</button>${canManage ? `<button type="button" class="action-btn btn-green" onclick="replaceLearnerAccessCode('${record.codeRecordId}')">♻️ Replace code</button><button type="button" class="action-btn btn-red" onclick="revokeLearnerAccessCode('${record.codeRecordId}')">Invalidate</button>` : ''}</div></div>`;
-    }).join('');
+    renderLearnerAccessCodes();
   } catch (error) {
     list.textContent = error.message || 'Unable to load learner code forms.';
+  }
+}
+
+function renderLearnerAccessCodes() {
+  const list = document.getElementById('learnerCodeList');
+  if (!list || !['admin', 'principal'].includes(currentUser?.role)) return;
+  const canManage = currentUser.role === 'admin';
+  const query = String(document.getElementById('learnerCodeSearch')?.value || '').trim().toLowerCase();
+  const records = learnerAccessCodeRecords.filter(record => !query || [record.learnerName, record.className, record.parentName, record.accessCode].some(value => String(value || '').toLowerCase().includes(query)));
+  if (!records.length) {
+    list.innerHTML = '<p class="meta">No learners match that search.</p>';
+    return;
+  }
+  list.innerHTML = records.map(record => {
+    const encodedKey = encodeURIComponent(record.learnerKey);
+    const details = `${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}`;
+    const status = record.accessCode ? `<p style="margin-top:5px;">Current code: <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(record.accessCode)}</strong></p>` : record.hasPrintableForm ? '<p class="meta" style="margin-top:5px;">Prepared for printing. The code is not displayed to this role.</p>' : '<p class="meta" style="margin-top:5px;">No active learner code issued.</p>';
+    const history = canManage && record.codeHistory?.length ? `<details style="margin-top:8px;"><summary class="meta">${record.codeHistory.length} code record${record.codeHistory.length === 1 ? '' : 's'} in history</summary><div class="meta" style="margin:7px 0 0;line-height:1.55;">${record.codeHistory.map(entry => `${escapeWorkspaceText(entry.status)} · issued ${entry.issuedAt ? new Date(entry.issuedAt).toLocaleDateString() : 'date unknown'}${entry.changedAt ? ` · updated ${new Date(entry.changedAt).toLocaleDateString()}` : ''}`).join('<br>')}</div></details>` : '';
+    const actions = record.hasPrintableForm ? `<button type="button" class="action-btn btn-blue" onclick="printLearnerCodeForm('${encodedKey}')">🖨️ Print form</button>` : '';
+    const management = canManage ? (record.accessCode ? `<button type="button" class="action-btn btn-green" onclick="replaceLearnerAccessCode('${record.codeRecordId}')">♻️ New random code</button><button type="button" class="action-btn btn-red" onclick="revokeLearnerAccessCode('${record.codeRecordId}')">Scrap code</button>` : `<button type="button" class="action-btn btn-green" onclick="openLearnerCodeIssue('${encodedKey}')">Generate code</button>`) : '';
+    return `<div class="item-row"><div><strong>${details}</strong>${status}<span class="meta">${record.issuedAt ? `Issued ${new Date(record.issuedAt).toLocaleString()} by ${escapeWorkspaceText(record.issuedBy || 'school administrator')}` : 'Awaiting administrator issue'}${record.parentName ? ` · Parent: ${escapeWorkspaceText(record.parentName)}` : ''}</span>${history}</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}${management}</div></div>`;
+  }).join('');
+}
+
+async function toggleLearnerCodeTeacherPreview() {
+  if (currentUser?.role !== 'admin') return;
+  const panel = document.getElementById('learnerCodeTeacherPreview');
+  if (!panel) return;
+  if (!panel.classList.contains('hidden')) {
+    panel.classList.add('hidden');
+    panel.innerHTML = '';
+    return;
+  }
+  panel.innerHTML = '<p class="meta">Loading the teacher-safe view…</p>';
+  panel.classList.remove('hidden');
+  try {
+    const response = await fetch('/api/learner-access-codes/teacher-preview');
+    const records = await response.json();
+    if (!response.ok) throw new Error(records.message || 'Unable to load the teacher view.');
+    panel.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}</strong><p class="meta" style="margin:4px 0 0;">${record.parentName ? `Parent: ${escapeWorkspaceText(record.parentName)} · ` : ''}${record.codeIssued ? 'School code issued' : 'No school code issued'}</p></div><span class="badge-tag info">NO CODE SHOWN</span></div>`).join('') : '<p class="meta">No learner records are available.</p>';
+  } catch (error) {
+    panel.innerHTML = `<p class="meta">${escapeWorkspaceText(error.message || 'Unable to load the teacher view.')}</p>`;
   }
 }
 
@@ -2832,9 +2868,11 @@ async function revokeLearnerAccessCode(id) {
   await loadLearnerAccessCodes();
 }
 
-function printLearnerCodeForm(encodedKey) {
-  const record = learnerCodeRecord(encodedKey);
-  if (!record?.accessCode || !['admin', 'principal'].includes(currentUser?.role)) return alert('An active learner code is required before this form can be printed.');
+async function printLearnerCodeForm(encodedKey) {
+  if (!['admin', 'principal'].includes(currentUser?.role)) return alert('Only an administrator or principal can print this learner form.');
+  const response = await fetch(`/api/learner-access-codes/${encodedKey}/printable`);
+  const record = await response.json();
+  if (!response.ok) return alert(record.message || 'An active learner code is required before this form can be printed.');
   const printWindow = window.open('', '_blank', 'width=820,height=980');
   if (!printWindow) return alert('Allow pop-ups for Little Feet to print this learner form.');
   const safe = escapeWorkspaceText;
