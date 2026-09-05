@@ -248,8 +248,8 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
-// An original ten-second pixel-console welcome motif, played once for each sign-in.
-// It uses browser synthesis rather than a copied or licensed startup recording.
+// An original ten-second, gently fingerpicked welcome motif, played once per sign-in.
+// It is browser synthesis, not a copied or licensed recording.
 function playStartupChime() {
   if (startupChimePlayed) return;
   try {
@@ -265,61 +265,54 @@ function playStartupChime() {
     master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
     const warmth = ctx.createBiquadFilter();
     warmth.type = 'lowpass';
-    warmth.frequency.setValueAtTime(2650, startedAt);
-    warmth.Q.setValueAtTime(0.65, startedAt);
+    warmth.frequency.setValueAtTime(2100, startedAt);
+    warmth.Q.setValueAtTime(0.45, startedAt);
     const echo = ctx.createDelay(0.35);
     const echoGain = ctx.createGain();
-    echo.delayTime.setValueAtTime(0.17, startedAt);
-    echoGain.gain.setValueAtTime(0.1, startedAt);
+    const reverb = ctx.createConvolver();
+    const reverbGain = ctx.createGain();
+    echo.delayTime.setValueAtTime(0.21, startedAt);
+    echoGain.gain.setValueAtTime(0.12, startedAt);
+    const impulse = ctx.createBuffer(2, Math.ceil(ctx.sampleRate * 2.6), ctx.sampleRate);
+    for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+      const samples = impulse.getChannelData(channel);
+      for (let index = 0; index < samples.length; index += 1) {
+        const decay = Math.pow(1 - index / samples.length, 2.6);
+        samples[index] = (Math.random() * 2 - 1) * decay;
+      }
+    }
+    reverb.buffer = impulse;
+    reverbGain.gain.setValueAtTime(0.1, startedAt);
     master.connect(warmth); warmth.connect(ctx.destination);
     warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
+    warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
 
-    // A barely-there textured bed gives the cue a cozy, old-screen warmth.
-    const noiseBuffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate);
-    const noise = noiseBuffer.getChannelData(0);
-    for (let index = 0; index < noise.length; index += 1) noise[index] = (Math.random() * 2 - 1) * 0.2;
-    const noiseSource = ctx.createBufferSource();
-    const noiseFilter = ctx.createBiquadFilter();
-    const noiseGain = ctx.createGain();
-    noiseSource.buffer = noiseBuffer;
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.setValueAtTime(860, startedAt);
-    noiseFilter.Q.setValueAtTime(0.45, startedAt);
-    noiseGain.gain.setValueAtTime(0.0001, startedAt);
-    noiseGain.gain.exponentialRampToValueAtTime(0.012, startedAt + 0.6);
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
-    noiseSource.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(warmth);
-    noiseSource.start(startedAt); noiseSource.stop(startedAt + duration);
-
-    const playTone = (frequency, start, length, type = 'square', volume = 0.22, detune = 0) => {
+    const pluck = (frequency, start, length = 1.15, volume = 0.24) => {
       const oscillator = ctx.createOscillator();
+      const string = ctx.createBiquadFilter();
       const tone = ctx.createGain();
-      oscillator.type = type;
+      oscillator.type = 'triangle';
       oscillator.frequency.setValueAtTime(frequency, start);
-      oscillator.detune.setValueAtTime(detune, start);
+      string.type = 'bandpass';
+      string.frequency.setValueAtTime(Math.min(frequency * 4.2, 2400), start);
+      string.Q.setValueAtTime(3.2, start);
       tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(volume, start + 0.018);
+      tone.gain.exponentialRampToValueAtTime(volume, start + 0.014);
+      tone.gain.exponentialRampToValueAtTime(0.025, start + Math.min(0.28, length * 0.25));
       tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
-      oscillator.connect(tone); tone.connect(master);
+      oscillator.connect(string); string.connect(tone); tone.connect(master);
       oscillator.start(start); oscillator.stop(start + length + 0.03);
     };
 
-    // Soft boot glow beneath the pixel notes.
-    [[130.81, 0], [196, 0], [261.63, 0], [329.63, 3.2], [392, 3.2], [523.25, 6.4]].forEach(([frequency, offset], index) => {
-      playTone(frequency, startedAt + offset, index < 3 ? 3.55 : 3.3, 'sine', 0.05, index % 2 ? 5 : -5);
-    });
-
-    const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 1046.5, 783.99, 880, 1174.66, 1046.5, 698.46, 783.99, 987.77, 783.99, 659.25, 783.99, 1046.5, 1174.66, 1318.51, 1046.5, 880, 783.99, 698.46, 880, 1046.5, 1318.51, 1567.98, 1318.51, 1046.5, 783.99, 659.25, 783.99, 987.77, 1174.66, 1567.98, 1318.51, 1046.5, 1567.98];
-    melody.forEach((frequency, index) => {
-      const start = startedAt + 0.35 + (index * 0.22);
-      const length = index % 8 === 7 ? 0.37 : 0.18;
-      playTone(frequency, start, length, index % 4 === 0 ? 'triangle' : 'square', index < 28 ? 0.19 : 0.24);
-      if (index % 4 === 0) playTone(frequency / 2, start, Math.min(length + 0.06, 0.32), 'square', 0.055);
-    });
-
-    // The final two notes linger just long enough to complete a true ten-second cue.
-    playTone(1046.5, startedAt + 8.85, 0.92, 'triangle', 0.2);
-    playTone(1567.98, startedAt + 9.18, 0.72, 'sine', 0.12);
+    // A simple original fingerpicked progression: soft, melancholy, then warming.
+    const notes = [
+      [0.18, 196, 1.55, 0.22], [0.82, 246.94, 1.2, 0.16], [1.52, 293.66, 1.16, 0.15],
+      [2.22, 174.61, 1.52, 0.2], [2.88, 220, 1.2, 0.16], [3.57, 261.63, 1.16, 0.15],
+      [4.30, 164.81, 1.48, 0.2], [4.95, 207.65, 1.16, 0.16], [5.65, 246.94, 1.16, 0.15],
+      [6.36, 146.83, 1.5, 0.2], [7.03, 196, 1.2, 0.16], [7.72, 246.94, 1.16, 0.15],
+      [8.43, 196, 1.38, 0.24], [9.12, 293.66, 0.78, 0.18]
+    ];
+    notes.forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
     startupChimePlayed = true;
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
