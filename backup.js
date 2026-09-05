@@ -1043,10 +1043,10 @@ async function loadSchoolProximityMap() {
     }
     if (mapInstance) mapInstance.remove();
 
-    mapInstance = L.map('interactiveMap').setView(userPos, 12);
+    mapInstance = L.map('interactiveMap', { closePopupOnClick: false }).setView(userPos, 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
     const userLocationIcon = L.divIcon({ className: '', html: '<div class="user-location-pin" title="Your current location"></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
-    L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`).openPopup();
+    L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`, { autoClose: false, closeOnClick: false, keepInView: true }).openPopup();
     L.circle(userPos, { color: '#2dd4bf', fillColor: '#14b8a6', fillOpacity: 0.14, radius: 20000 }).addTo(mapInstance);
     const latitudeOffset = 20000 / 111320;
     const longitudeOffset = 20000 / (111320 * Math.cos(userLat * Math.PI / 180));
@@ -1145,9 +1145,18 @@ async function loadSchoolProximityMap() {
         const contact = `<p style="font-size:0.8rem; margin:7px 0 0;"><strong>Phone:</strong> ${phone ? `<a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : 'Not publicly listed'}<br><strong>Email:</strong> ${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : `Not publicly listed · <a href="${escapeHtml(contactSearchUrl)}" target="_blank" rel="noopener noreferrer">Find official contact</a>`}</p>`;
         school.details = { street, suburb, town, category, phone, email, website, imageUrl };
         const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-green" style="margin:0 0 7px;" onclick="openSchoolDetail(${nearbySchools.indexOf(school)})">View details / apply</button><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeURIComponent(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses verified public details only. No AI-generated school details are saved automatically.</p></div></div>`;
-        markerLayer.addLayer(L.marker([school.lat, school.lng]).bindPopup(content));
+        const marker = L.marker([school.lat, school.lng]).bindPopup(content, { autoClose: false, closeOnClick: false, keepInView: true });
+        marker.on('click', event => {
+          if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+          marker.openPopup();
+        });
+        markerLayer.addLayer(marker);
       });
       markerLayer.addTo(mapInstance);
+      mapInstance.on('popupopen', event => {
+        const popupElement = event.popup.getElement();
+        if (popupElement) L.DomEvent.disableClickPropagation(popupElement);
+      });
       nearbySchoolRecords = nearbySchools;
       renderNearbySchoolPicker();
       status.getContainer().textContent = usingCachedResults
