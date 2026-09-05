@@ -279,23 +279,23 @@
     .workspace-card p { color:var(--text-muted); font-size:.85rem; line-height:1.5; margin-bottom:12px; }
     .role-home-panel { overflow:hidden; background:linear-gradient(135deg,rgba(13,148,136,.18),rgba(15,43,72,.92)); }
     .role-home-panel .role-home-content { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr); gap:18px; align-items:center; }
-    .role-home-panel h2 { margin:0 0 7px; color:#f8fafc; font-size:clamp(1.2rem,2.4vw,1.7rem); }
-    .role-home-panel p { margin:0; color:#cbd5e1; line-height:1.5; }
+    .role-home-panel h2 { margin:0 0 5px; color:#f8fafc; font-size:clamp(1.1rem,2vw,1.42rem); line-height:1.16; }
+    .role-home-panel p { margin:0; color:#cbd5e1; font-size:.92rem; line-height:1.38; }
     .role-home-panel .role-home-icon { display:grid; place-items:center; min-height:128px; border:1px solid rgba(94,234,212,.2); border-radius:14px; background:radial-gradient(circle at 50% 35%,rgba(45,212,191,.25),rgba(7,17,30,.35)); font-size:3.2rem; }
-    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:0; margin:13px 0 0; padding:13px 0 0; border:0; border-top:1px solid rgba(148,163,184,.22); border-radius:0; background:none; box-shadow:none; }
+    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:0; margin:9px 0 0; padding:9px 0 0; border:0; border-top:1px solid rgba(148,163,184,.22); border-radius:0; background:none; box-shadow:none; }
     .role-home-panel.mascot-role-home::before { display:none; }
     .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:0; max-width:62%; }
     .role-home-panel.mascot-role-home .role-home-icon { display:none; }
     @keyframes adminMascotGlow { from { opacity:.58; transform:scale(.94); } to { opacity:1; transform:scale(1.07); } }
     @media (prefers-reduced-motion:reduce) { .role-home-panel.mascot-role-home::before { animation:none; opacity:.78; } }
-    .portal-welcome-banner { position:relative; isolation:isolate; overflow:hidden; min-height:202px; margin:0 0 18px; padding:21px clamp(20px,4vw,42px); border:1px solid rgba(94,234,212,.38); border-radius:16px; background-image:linear-gradient(90deg,rgba(4,18,34,.98) 0%,rgba(7,29,47,.94) 44%,rgba(5,26,46,.42) 71%,rgba(5,26,46,.18) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover,auto 152%; background-position:center,right 44%; background-repeat:no-repeat; box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08); }
+    .portal-welcome-banner { position:relative; isolation:isolate; overflow:hidden; min-height:164px; margin:0 0 16px; padding:16px clamp(20px,3vw,38px); border:1px solid rgba(94,234,212,.38); border-radius:16px; background-image:linear-gradient(90deg,rgba(4,18,34,.98) 0%,rgba(7,29,47,.94) 44%,rgba(5,26,46,.42) 71%,rgba(5,26,46,.18) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover,auto 142%; background-position:center,right 46%; background-repeat:no-repeat; box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08); }
     .portal-welcome-banner::before { content:""; position:absolute; z-index:0; inset:-32%; pointer-events:none; background:radial-gradient(ellipse at 78% 60%,rgba(255,190,92,.3),rgba(45,212,191,.16) 27%,transparent 62%); filter:blur(12px); animation:adminMascotGlow 5.2s ease-in-out infinite alternate; }
     .portal-welcome-copy { position:relative; z-index:1; max-width:min(760px,62%); }
-    .portal-welcome-kicker { display:inline-flex; align-items:center; gap:7px; margin-bottom:7px; color:#99f6e4; font-size:.72rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
+    .portal-welcome-kicker { display:inline-flex; align-items:center; gap:7px; margin-bottom:4px; color:#99f6e4; font-size:.68rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
     .portal-welcome-kicker::before { content:""; width:8px; height:8px; border-radius:50%; background:#fbbf24; box-shadow:0 0 16px rgba(251,191,36,.8); }
-    .portal-welcome-banner h1 { margin:0 0 5px; color:#fff; font-size:clamp(1.35rem,2.5vw,1.9rem); }
-    .portal-welcome-banner p { margin:0; max-width:580px; color:#dbeafe; line-height:1.5; }
-    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:0; margin-top:12px; padding-top:12px; background:none; } .role-home-panel.mascot-role-home .role-home-content { min-height:0; max-width:100%; } .portal-welcome-banner { min-height:252px; padding-top:20px; padding-bottom:20px; background-size:cover,auto 119%; background-position:center,right 16%; } .portal-welcome-copy { max-width:100%; } }
+    .portal-welcome-banner h1 { margin:0 0 3px; color:#fff; font-size:clamp(1.3rem,2.25vw,1.7rem); line-height:1.14; }
+    .portal-welcome-banner p { margin:0; max-width:580px; color:#dbeafe; font-size:.92rem; line-height:1.38; }
+    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:0; margin-top:8px; padding-top:8px; background:none; } .role-home-panel.mascot-role-home .role-home-content { min-height:0; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:15px; padding-bottom:15px; background-size:cover,auto 108%; background-position:center,right 18%; } .portal-welcome-copy { max-width:100%; } }
     .record-list { margin-top:16px; display:grid; gap:8px; }
     .record-list .item-row { margin:0; }
     .footer-links a { padding:4px 7px; border-radius:5px; }
@@ -1618,7 +1618,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-guitar-login-theme" defer></script>
+  <script src="backup.js?v=20260905-louder-login-theme" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

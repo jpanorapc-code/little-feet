@@ -12,6 +12,7 @@ let ticketsLoaded = false;
 let ticketAssigneeAccounts = [];
 let portalAudioContext = null;
 let startupChimePending = false;
+let startupChimePrompt = null;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
 let portalTourIndex = 0;
@@ -46,11 +47,35 @@ function unlockPortalAudio() {
   try {
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') {
-      ctx.resume().then(() => { if (startupChimePending) playStartupChime(); }).catch(() => {});
+      ctx.resume().then(() => { if (startupChimePending) playStartupChime(); }).catch(showStartupChimePrompt);
     } else if (startupChimePending) {
       playStartupChime();
     }
   } catch { /* Sound remains optional when unavailable on a device. */ }
+}
+
+// Some mobile browsers only permit sound after an explicit second tap.  This
+// small, visible fallback is shown only when the browser blocks the first one.
+function showStartupChimePrompt() {
+  if (startupChimePlayed || startupChimePrompt || !currentUser) return;
+  const prompt = document.createElement('button');
+  prompt.type = 'button';
+  prompt.className = 'action-btn btn-green';
+  prompt.textContent = '🔊 Play welcome theme';
+  prompt.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:10020;box-shadow:0 12px 30px rgba(0,0,0,.35);';
+  prompt.addEventListener('click', () => {
+    const ctx = getPortalAudioContext();
+    ctx.resume().then(() => {
+      prompt.remove();
+      startupChimePrompt = null;
+      playStartupChime();
+    }).catch(() => {});
+  });
+  document.body.append(prompt);
+  startupChimePrompt = prompt;
+  window.setTimeout(() => {
+    if (startupChimePrompt === prompt) { prompt.remove(); startupChimePrompt = null; }
+  }, 12000);
 }
 
 // Audio indicator
@@ -254,25 +279,29 @@ function playStartupChime() {
   if (startupChimePlayed) return;
   try {
     const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') { startupChimePending = true; return; }
+    if (ctx.state === 'suspended') {
+      startupChimePending = true;
+      ctx.resume().then(() => playStartupChime()).catch(showStartupChimePrompt);
+      return;
+    }
     startupChimePending = false;
     const startedAt = ctx.currentTime;
     const duration = 10;
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.16, startedAt + 0.11);
-    master.gain.setValueAtTime(0.16, startedAt + 8.8);
+    master.gain.exponentialRampToValueAtTime(0.56, startedAt + 0.06);
+    master.gain.setValueAtTime(0.56, startedAt + 8.8);
     master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
     const warmth = ctx.createBiquadFilter();
     warmth.type = 'lowpass';
-    warmth.frequency.setValueAtTime(2100, startedAt);
-    warmth.Q.setValueAtTime(0.45, startedAt);
+    warmth.frequency.setValueAtTime(3200, startedAt);
+    warmth.Q.setValueAtTime(0.7, startedAt);
     const echo = ctx.createDelay(0.35);
     const echoGain = ctx.createGain();
     const reverb = ctx.createConvolver();
     const reverbGain = ctx.createGain();
     echo.delayTime.setValueAtTime(0.21, startedAt);
-    echoGain.gain.setValueAtTime(0.12, startedAt);
+    echoGain.gain.setValueAtTime(0.16, startedAt);
     const impulse = ctx.createBuffer(2, Math.ceil(ctx.sampleRate * 2.6), ctx.sampleRate);
     for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
       const samples = impulse.getChannelData(channel);
@@ -282,7 +311,7 @@ function playStartupChime() {
       }
     }
     reverb.buffer = impulse;
-    reverbGain.gain.setValueAtTime(0.1, startedAt);
+    reverbGain.gain.setValueAtTime(0.06, startedAt);
     master.connect(warmth); warmth.connect(ctx.destination);
     warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
     warmth.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(ctx.destination);
@@ -297,8 +326,8 @@ function playStartupChime() {
       string.frequency.setValueAtTime(Math.min(frequency * 4.2, 2400), start);
       string.Q.setValueAtTime(3.2, start);
       tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(volume, start + 0.014);
-      tone.gain.exponentialRampToValueAtTime(0.025, start + Math.min(0.28, length * 0.25));
+      tone.gain.exponentialRampToValueAtTime(volume * 1.9, start + 0.008);
+      tone.gain.exponentialRampToValueAtTime(0.075, start + Math.min(0.2, length * 0.18));
       tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
       oscillator.connect(string); string.connect(tone); tone.connect(master);
       oscillator.start(start); oscillator.stop(start + length + 0.03);
@@ -789,6 +818,8 @@ function logout() {
   exitWallpaperMode();
   startupChimePlayed = false;
   startupChimePending = false;
+  startupChimePrompt?.remove();
+  startupChimePrompt = null;
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
   if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
   knownTicketIds = new Set();
