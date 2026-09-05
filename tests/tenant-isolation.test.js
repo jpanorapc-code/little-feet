@@ -61,6 +61,9 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
 (async () => {
   try {
     await waitForServer();
+    const readiness = await request('/api/ready');
+    assert.equal(readiness.response.status, 503);
+    assert.equal(readiness.data.checks.database, false);
     const alphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     const bravoLogin = await request('/api/login', { method: 'POST', body: { username: 'bravo-admin', pin: 'BravoPass1' } });
     assert.equal(alphaLogin.response.status, 200);

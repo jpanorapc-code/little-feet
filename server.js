@@ -8,14 +8,18 @@ const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isProduction = process.env.NODE_ENV === 'production';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 let activeRequestCount = 0;
 let persistenceReady = Promise.resolve();
+const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
+const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
-if (!process.env.LF_FIELD_ENCRYPTION_KEY) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
+if (!fieldEncryptionConfigured) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
+if (!sessionSecretConfigured) console.warn('Using a development session secret. Set SESSION_SECRET before production.');
 const hashPin = (pin) => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 const matchesPin = (pin, hash) => {
   const expected = Buffer.from(hash || '', 'hex');
@@ -91,6 +95,17 @@ const activeLoginAttempt = (key) => {
 };
 
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), payment=(), usb=()');
+  if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
+    res.setHeader('Cache-Control', 'no-store, private');
+  }
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.set('trust proxy', 1);
@@ -388,6 +403,40 @@ app.post('/api/login', (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: activeRequestCount > 2 ? 'BUSY' : 'OK', instance: replicaMode ? 'STANDBY' : 'PRIMARY', activeRequests: activeRequestCount, timestamp: new Date() });
+});
+
+const runtimeReadiness = () => {
+  const checks = {
+    database: Boolean(process.env.DATABASE_URL),
+    fieldEncryption: fieldEncryptionConfigured,
+    sessionSecret: sessionSecretConfigured,
+    secureCookies: isProduction,
+    bootstrapAccount: db.users.some(account => account.role === 'admin')
+  };
+  return { checks, ready: Object.values(checks).every(Boolean) };
+};
+
+// A separate readiness endpoint lets hosting monitor liveness without treating
+// a missing production secret as a healthy, launch-ready configuration.
+app.get('/api/ready', (req, res) => {
+  const readiness = runtimeReadiness();
+  res.status(readiness.ready ? 200 : 503).json({ ...readiness, environment: isProduction ? 'production' : 'development' });
+});
+
+app.get('/api/production-readiness', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const billing = subscriptionBillingState(actor);
+  const readiness = runtimeReadiness();
+  res.json({
+    ...readiness,
+    paymentDestinationConfigured: billingPaymentConfigured(billing.payment),
+    emailProviderConfigured: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
+    smsProviderConfigured: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
+    monitoringConfigured: Boolean(process.env.LF_MONITORING_DSN),
+    backupStoreConfigured: Boolean(process.env.LF_BACKUP_BUCKET),
+    checkedAt: new Date().toISOString()
+  });
 });
 
 // Public self-registration is intentionally limited to school-facing roles.
