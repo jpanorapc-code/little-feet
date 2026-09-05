@@ -24,6 +24,8 @@ let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
+let wallpaperThemeTimer = null;
+let wallpaperThemeMaster = null;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 let windtLegacyTapCount = 0;
 let windtLegacyTapTimer = null;
@@ -320,26 +322,38 @@ function playStartupChime() {
       const oscillator = ctx.createOscillator();
       const string = ctx.createBiquadFilter();
       const tone = ctx.createGain();
-      oscillator.type = 'triangle';
+      const pickBuffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * 0.026)), ctx.sampleRate);
+      const pick = ctx.createBufferSource();
+      const pickFilter = ctx.createBiquadFilter();
+      const pickGain = ctx.createGain();
+      const pickSamples = pickBuffer.getChannelData(0);
+      for (let index = 0; index < pickSamples.length; index += 1) pickSamples[index] = (Math.random() * 2 - 1) * (1 - index / pickSamples.length);
+      oscillator.type = 'sawtooth';
       oscillator.frequency.setValueAtTime(frequency, start);
-      string.type = 'bandpass';
-      string.frequency.setValueAtTime(Math.min(frequency * 4.2, 2400), start);
-      string.Q.setValueAtTime(3.2, start);
+      string.type = 'lowpass';
+      string.frequency.setValueAtTime(Math.min(frequency * 7.2, 2650), start);
+      string.Q.setValueAtTime(2.1, start);
       tone.gain.setValueAtTime(0.0001, start);
-      tone.gain.exponentialRampToValueAtTime(volume * 1.9, start + 0.008);
-      tone.gain.exponentialRampToValueAtTime(0.075, start + Math.min(0.2, length * 0.18));
+      tone.gain.exponentialRampToValueAtTime(volume * 1.55, start + 0.012);
+      tone.gain.exponentialRampToValueAtTime(0.052, start + Math.min(0.24, length * 0.2));
       tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      pick.buffer = pickBuffer;
+      pickFilter.type = 'highpass';
+      pickFilter.frequency.setValueAtTime(680, start);
+      pickGain.gain.setValueAtTime(volume * 0.35, start);
+      pickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.026);
       oscillator.connect(string); string.connect(tone); tone.connect(master);
+      pick.connect(pickFilter); pickFilter.connect(pickGain); pickGain.connect(master);
       oscillator.start(start); oscillator.stop(start + length + 0.03);
+      pick.start(start); pick.stop(start + 0.03);
     };
 
-    // A simple original fingerpicked progression: soft, melancholy, then warming.
+    // An original, deliberately sparse ten-second fingerpicked phrase.
     const notes = [
-      [0.18, 196, 1.55, 0.22], [0.82, 246.94, 1.2, 0.16], [1.52, 293.66, 1.16, 0.15],
-      [2.22, 174.61, 1.52, 0.2], [2.88, 220, 1.2, 0.16], [3.57, 261.63, 1.16, 0.15],
-      [4.30, 164.81, 1.48, 0.2], [4.95, 207.65, 1.16, 0.16], [5.65, 246.94, 1.16, 0.15],
-      [6.36, 146.83, 1.5, 0.2], [7.03, 196, 1.2, 0.16], [7.72, 246.94, 1.16, 0.15],
-      [8.43, 196, 1.38, 0.24], [9.12, 293.66, 0.78, 0.18]
+      [0.15, 146.83, 1.72, 0.27], [0.96, 220, 1.36, 0.19], [1.90, 293.66, 1.30, 0.17],
+      [3.00, 130.81, 1.68, 0.25], [3.82, 196, 1.32, 0.18], [4.78, 261.63, 1.26, 0.16],
+      [5.92, 116.54, 1.64, 0.24], [6.76, 174.61, 1.30, 0.18], [7.70, 233.08, 1.22, 0.16],
+      [8.58, 146.83, 1.28, 0.25], [9.28, 220, 0.66, 0.20]
     ];
     notes.forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
     startupChimePlayed = true;
@@ -889,6 +903,7 @@ function startWallpaperMode() {
   clearTimeout(wallpaperIdleTimer);
   overlay.classList.add('is-visible');
   overlay.setAttribute('aria-hidden', 'false');
+  startWallpaperTheme();
   overlay.querySelector('.wallpaper-exit')?.focus({ preventScroll: true });
 }
 
@@ -897,7 +912,97 @@ function exitWallpaperMode() {
   if (!overlay) return;
   overlay.classList.remove('is-visible');
   overlay.setAttribute('aria-hidden', 'true');
+  stopWallpaperTheme();
   resetWallpaperTimer();
+}
+
+// Wallpaper mode uses an original, quiet loop of the portal's guitar motif.
+// Keeping it separate from the login cue lets it stop cleanly on exit.
+function startWallpaperTheme() {
+  if (wallpaperThemeTimer || wallpaperThemeMaster) return;
+  const overlay = document.getElementById('wallpaperOverlay');
+  if (!overlay?.classList.contains('is-visible')) return;
+  try {
+    const ctx = getPortalAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(startWallpaperTheme).catch(showStartupChimePrompt);
+      return;
+    }
+    const startedAt = ctx.currentTime;
+    const duration = 10;
+    const master = ctx.createGain();
+    wallpaperThemeMaster = master;
+    master.gain.setValueAtTime(0.0001, startedAt);
+    master.gain.exponentialRampToValueAtTime(0.22, startedAt + 0.1);
+    master.gain.setValueAtTime(0.22, startedAt + 8.8);
+    master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
+    const warmth = ctx.createBiquadFilter();
+    warmth.type = 'lowpass';
+    warmth.frequency.setValueAtTime(2850, startedAt);
+    warmth.Q.setValueAtTime(0.58, startedAt);
+    const echo = ctx.createDelay(0.32);
+    const echoGain = ctx.createGain();
+    echo.delayTime.setValueAtTime(0.23, startedAt);
+    echoGain.gain.setValueAtTime(0.12, startedAt);
+    master.connect(warmth); warmth.connect(ctx.destination);
+    warmth.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
+    const pluck = (frequency, start, length, volume) => {
+      const oscillator = ctx.createOscillator();
+      const string = ctx.createBiquadFilter();
+      const tone = ctx.createGain();
+      const pickBuffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * 0.026)), ctx.sampleRate);
+      const pick = ctx.createBufferSource();
+      const pickFilter = ctx.createBiquadFilter();
+      const pickGain = ctx.createGain();
+      const pickSamples = pickBuffer.getChannelData(0);
+      for (let index = 0; index < pickSamples.length; index += 1) pickSamples[index] = (Math.random() * 2 - 1) * (1 - index / pickSamples.length);
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(frequency, start);
+      string.type = 'lowpass';
+      string.frequency.setValueAtTime(Math.min(frequency * 7.2, 2650), start);
+      string.Q.setValueAtTime(2.1, start);
+      tone.gain.setValueAtTime(0.0001, start);
+      tone.gain.exponentialRampToValueAtTime(volume * 1.35, start + 0.012);
+      tone.gain.exponentialRampToValueAtTime(0.04, start + Math.min(0.26, length * 0.22));
+      tone.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      pick.buffer = pickBuffer;
+      pickFilter.type = 'highpass';
+      pickFilter.frequency.setValueAtTime(680, start);
+      pickGain.gain.setValueAtTime(volume * 0.3, start);
+      pickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.026);
+      oscillator.connect(string); string.connect(tone); tone.connect(master);
+      pick.connect(pickFilter); pickFilter.connect(pickGain); pickGain.connect(master);
+      oscillator.start(start); oscillator.stop(start + length + 0.03);
+      pick.start(start); pick.stop(start + 0.03);
+    };
+    [
+      [0.15, 146.83, 1.72, 0.23], [0.96, 220, 1.36, 0.17], [1.90, 293.66, 1.30, 0.15],
+      [3.00, 130.81, 1.68, 0.22], [3.82, 196, 1.32, 0.16], [4.78, 261.63, 1.26, 0.14],
+      [5.92, 116.54, 1.64, 0.21], [6.76, 174.61, 1.30, 0.16], [7.70, 233.08, 1.22, 0.14],
+      [8.58, 146.83, 1.28, 0.22], [9.28, 220, 0.66, 0.17]
+    ].forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
+    wallpaperThemeTimer = window.setTimeout(() => {
+      wallpaperThemeTimer = null;
+      if (wallpaperThemeMaster === master) wallpaperThemeMaster = null;
+      master.disconnect();
+      startWallpaperTheme();
+    }, 10020);
+  } catch { /* Wallpaper remains available even when a device has sound disabled. */ }
+}
+
+function stopWallpaperTheme() {
+  if (wallpaperThemeTimer) window.clearTimeout(wallpaperThemeTimer);
+  wallpaperThemeTimer = null;
+  const master = wallpaperThemeMaster;
+  wallpaperThemeMaster = null;
+  if (!master) return;
+  try {
+    const now = getPortalAudioContext().currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+    window.setTimeout(() => master.disconnect(), 260);
+  } catch { try { master.disconnect(); } catch {} }
 }
 
 function openWorkspace(tabId) {
