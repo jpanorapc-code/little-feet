@@ -115,6 +115,28 @@ function playGuitarPluck(ctx, output, frequency, start, length = 1.6, volume = 0
   source.start(start); source.stop(start + length + 0.02);
 }
 
+function playWarmSynth(ctx, output, frequency, start, length = 3.2, volume = 0.045) {
+  const fundamental = ctx.createOscillator();
+  const shimmer = ctx.createOscillator();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  fundamental.type = 'sine';
+  shimmer.type = 'triangle';
+  fundamental.frequency.setValueAtTime(frequency, start);
+  shimmer.frequency.setValueAtTime(frequency * 2, start);
+  shimmer.detune.setValueAtTime(5, start);
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(1250, start);
+  filter.Q.setValueAtTime(0.5, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + Math.min(0.75, length * 0.22));
+  gain.gain.setValueAtTime(volume, start + Math.max(0.8, length - 1.1));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+  fundamental.connect(filter); shimmer.connect(filter); filter.connect(gain); gain.connect(output);
+  fundamental.start(start); shimmer.start(start);
+  fundamental.stop(start + length + 0.03); shimmer.stop(start + length + 0.03);
+}
+
 // Audio indicator
 function playDingSound() {
   try {
@@ -349,6 +371,9 @@ function startWindtLegacyTheme() {
       const finalNote = phraseIndex === phrases.length - 1 && noteIndex === phrase.length - 1;
       pluck(frequency, start, finalNote ? 1.42 : 2.1, finalNote ? 0.25 : (noteIndex % 4 === 0 ? 0.22 : 0.16));
     }));
+    [73.42, 65.41, 58.27, 55, 65.41, 73.42].forEach((frequency, section) => {
+      playWarmSynth(ctx, master, frequency, startedAt + section * 10 + 0.08, 9.72, 0.038);
+    });
     windtLegacyThemeTimer = window.setTimeout(() => stopWindtLegacyTheme(), 60200);
   } catch { /* The private note remains readable when a device has sound disabled. */ }
 }
@@ -430,6 +455,9 @@ function playStartupChime() {
       [8.58, 146.83, 1.28, 0.25], [9.28, 220, 0.66, 0.20]
     ];
     notes.forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
+    [[0.06, 73.42, 3.1], [3.12, 65.41, 3.05], [6.18, 58.27, 3.72]].forEach(([offset, frequency, length]) => {
+      playWarmSynth(ctx, master, frequency, startedAt + offset, length, 0.042);
+    });
     startupChimePlayed = true;
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
@@ -1030,6 +1058,9 @@ function startWallpaperTheme() {
       [5.92, 116.54, 1.64, 0.21], [6.76, 174.61, 1.30, 0.16], [7.70, 233.08, 1.22, 0.14],
       [8.58, 146.83, 1.28, 0.22], [9.28, 220, 0.66, 0.17]
     ].forEach(([offset, frequency, length, volume]) => pluck(frequency, startedAt + offset, length, volume));
+    [[0.06, 73.42, 3.1], [3.12, 65.41, 3.05], [6.18, 58.27, 3.72]].forEach(([offset, frequency, length]) => {
+      playWarmSynth(ctx, master, frequency, startedAt + offset, length, 0.034);
+    });
     wallpaperThemeTimer = window.setTimeout(() => {
       wallpaperThemeTimer = null;
       if (wallpaperThemeMaster === master) wallpaperThemeMaster = null;
