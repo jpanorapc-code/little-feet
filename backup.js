@@ -13,6 +13,7 @@ let ticketAssigneeAccounts = [];
 let portalAudioContext = null;
 let startupChimePending = false;
 let startupChimePrompt = null;
+let schoolStatusTimer = null;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
 let portalTourIndex = 0;
@@ -27,6 +28,16 @@ let wallpaperIdleTimer = null;
 let wallpaperThemeTimer = null;
 let wallpaperThemeMaster = null;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
+const SA_PUBLIC_SCHOOL_CALENDAR = {
+  2026: {
+    terms: [['2026-01-14', '2026-03-27'], ['2026-04-08', '2026-06-26'], ['2026-07-21', '2026-09-23'], ['2026-10-06', '2026-12-11']],
+    closed: new Set(['2026-04-27', '2026-05-01', '2026-06-15', '2026-06-16', '2026-08-10', '2026-09-24'])
+  },
+  2027: {
+    terms: [['2027-01-13', '2027-03-19'], ['2027-04-06', '2027-06-25'], ['2027-07-20', '2027-10-01'], ['2027-10-11', '2027-12-10']],
+    closed: new Set(['2027-04-26', '2027-04-27', '2027-06-16', '2027-08-09', '2027-09-24'])
+  }
+};
 let windtLegacyTapCount = 0;
 let windtLegacyTapTimer = null;
 let windtLegacyKeyTrail = '';
@@ -97,6 +108,50 @@ function scheduleLittleFeetJingle(ctx, output, startedAt, volume = 0.16) {
     oscillator.connect(gain); gain.connect(output);
     oscillator.start(start); oscillator.stop(start + length + 0.03);
   });
+}
+
+function southAfricaNow(date = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-ZA', {
+    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  return {
+    year: Number(parts.year), weekday: parts.weekday,
+    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: Number(parts.hour) * 60 + Number(parts.minute)
+  };
+}
+
+function campusHours() {
+  const text = document.getElementById('currentTermText')?.textContent || '';
+  const match = text.match(/Campus Hours:\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/i);
+  if (!match) return { open: 7 * 60, close: 17 * 60 + 30, label: '07:00 - 17:30' };
+  const open = Number(match[1]) * 60 + Number(match[2]);
+  const close = Number(match[3]) * 60 + Number(match[4]);
+  return { open, close, label: `${match[1].padStart(2, '0')}:${match[2]} - ${match[3].padStart(2, '0')}:${match[4]}` };
+}
+
+function updateSchoolDayStatus() {
+  const pill = document.getElementById('navLivePill');
+  if (!pill) return;
+  const now = southAfricaNow();
+  const hours = campusHours();
+  const calendar = SA_PUBLIC_SCHOOL_CALENDAR[now.year];
+  const weekday = !['Sat', 'Sun'].includes(now.weekday);
+  const inTerm = !calendar || calendar.terms.some(([start, end]) => now.dateKey >= start && now.dateKey <= end);
+  const holiday = Boolean(calendar?.closed.has(now.dateKey));
+  const withinHours = now.minutes >= hours.open && now.minutes < hours.close;
+  const open = weekday && inTerm && !holiday && withinHours;
+  pill.textContent = open ? 'School day in progress' : 'School closed';
+  pill.classList.toggle('is-closed', !open);
+  let reason = `Campus hours ${hours.label} SAST`;
+  if (!weekday) reason = 'Closed for the weekend';
+  else if (holiday) reason = 'Closed for a South African public or special school holiday';
+  else if (!inTerm) reason = 'Closed during the official public-school break';
+  else if (now.minutes < hours.open) reason = `Opens at ${hours.label.split(' - ')[0]} SAST`;
+  else if (now.minutes >= hours.close) reason = `Closed at ${hours.label.split(' - ')[1]} SAST`;
+  pill.title = `${reason} · ${now.dateKey}`;
+  pill.setAttribute('aria-label', `${pill.textContent}. ${reason}`);
 }
 
 // Audio indicator
@@ -700,7 +755,9 @@ function setupSession() {
   const navLivePill = document.getElementById('navLivePill');
   if (subscriptionEntry) subscriptionEntry.textContent = isParent ? '💎 Parent Subscription' : '💎 Plans & Benefits';
   if (subscriptionFooter) subscriptionFooter.textContent = isParent ? 'Parent Subscription' : 'School Subscriptions';
-  if (navLivePill) navLivePill.textContent = isParent ? 'Family updates ready' : 'School day in progress';
+  if (navLivePill) updateSchoolDayStatus();
+  if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
+  schoolStatusTimer = window.setInterval(updateSchoolDayStatus, 60 * 1000);
   const footerSchoolName = document.getElementById('footerSchoolName');
   if (footerSchoolName) footerSchoolName.textContent = `${currentUser.schoolName || 'Little Feet'} School Portal`;
   const displayRoleEl = document.getElementById('displayRole');
@@ -786,6 +843,8 @@ function renderRoleHomePanel() {
 
 function logout() {
   clearTimeout(wallpaperIdleTimer);
+  if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
+  schoolStatusTimer = null;
   currentUser = null;
   exitWallpaperMode();
   startupChimePlayed = false;
@@ -1111,6 +1170,7 @@ async function loadAcademicTerm() {
     const data = await res.json();
     if (data.term) {
       document.getElementById('currentTermText').textContent = data.term;
+      updateSchoolDayStatus();
     }
   } catch (err) {
     console.error('Failed to load academic term.');
@@ -1138,6 +1198,7 @@ function editTermModal() {
       body: JSON.stringify({ term: newTerm })
     });
     document.getElementById('currentTermText').textContent = newTerm;
+    updateSchoolDayStatus();
     closeModal();
     playDingSound();
   });

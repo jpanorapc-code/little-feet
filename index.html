@@ -574,6 +574,8 @@
     .nav-welcome span { color:#94a3b8; font-size:.68rem; line-height:1.25; white-space:nowrap; }
     .nav-live-pill { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:6px 10px; border:1px solid rgba(45,212,191,.24); border-radius:999px; background:rgba(13,148,136,.1); color:#99f6e4; font-size:.72rem; font-weight:700; white-space:nowrap; }
     .nav-live-pill::before { content:""; width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 0 4px rgba(52,211,153,.12); }
+    .nav-live-pill.is-closed { border-color:rgba(148,163,184,.3); background:rgba(71,85,105,.18); color:#cbd5e1; }
+    .nav-live-pill.is-closed::before { background:#94a3b8; box-shadow:0 0 0 4px rgba(148,163,184,.12); }
     .nav-term-panel { display:flex; align-items:center; gap:7px; min-width:0; max-width:310px; padding:5px 8px; border:1px solid rgba(45,212,191,.28); border-radius:9px; background:rgba(5,31,49,.72); color:#99f6e4; }
     .nav-term-panel strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.67rem; line-height:1.15; }
     .nav-term-panel .nav-term-edit { min-height:26px; margin:0; padding:4px 7px; border:1px solid rgba(94,234,212,.42); border-radius:6px; background:rgba(13,148,136,.74); color:#fff; font:700 .65rem/1 inherit; cursor:pointer; white-space:nowrap; }
@@ -722,7 +724,7 @@
       </div>
 
       <div class="nav-quickbar" aria-label="Quick access">
-        <span id="navLivePill" class="nav-live-pill">School day in progress</span>
+        <span id="navLivePill" class="nav-live-pill" aria-live="polite">Checking school hours…</span>
         <div class="nav-term-panel" aria-label="Current academic term">
           <strong id="currentTermText">Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
           <button type="button" class="nav-term-edit role-admin hidden" onclick="editTermModal()">✏️ Edit</button>
@@ -1618,7 +1620,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-five-second-jingle" defer></script>
+  <script src="backup.js?v=20260905-live-school-hours" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
