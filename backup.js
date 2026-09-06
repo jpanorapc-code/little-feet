@@ -838,7 +838,7 @@ function renderRoleHomePanel() {
   };
   const experience = experiences[currentUser.role] || experiences.parent;
   panel.classList.add('mascot-role-home');
-  panel.innerHTML = `<div class="role-home-content"><div><span class="portal-tour-kicker">YOUR WORKSPACE</span><h2>${escapeWorkspaceText(experience.title)}</h2><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
+  panel.innerHTML = `<div class="role-home-content"><div><span class="portal-welcome-kicker">YOUR LITTLE FEET WORKSPACE</span><h1>${escapeWorkspaceText(experience.title)}</h1><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
 }
 
 function logout() {

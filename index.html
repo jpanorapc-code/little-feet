@@ -282,7 +282,7 @@
     .role-home-panel h2 { margin:0 0 5px; color:#f8fafc; font-size:clamp(1.1rem,2vw,1.42rem); line-height:1.16; }
     .role-home-panel p { margin:0; color:#cbd5e1; font-size:.92rem; line-height:1.38; }
     .role-home-panel .role-home-icon { display:grid; place-items:center; min-height:128px; border:1px solid rgba(94,234,212,.2); border-radius:14px; background:radial-gradient(circle at 50% 35%,rgba(45,212,191,.25),rgba(7,17,30,.35)); font-size:3.2rem; }
-    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:0; margin:9px 0 0; padding:9px 0 0; border:0; border-top:1px solid rgba(148,163,184,.22); border-radius:0; background:none; box-shadow:none; }
+    .role-home-panel.mascot-role-home { position:relative; isolation:isolate; min-height:0; margin:0; padding:0; border:0; border-radius:0; background:none; box-shadow:none; }
     .role-home-panel.mascot-role-home::before { display:none; }
     .role-home-panel.mascot-role-home .role-home-content { position:relative; z-index:1; grid-template-columns:minmax(0,1fr); min-height:0; max-width:62%; }
     .role-home-panel.mascot-role-home .role-home-icon { display:none; }
@@ -295,7 +295,7 @@
     .portal-welcome-kicker::before { content:""; width:8px; height:8px; border-radius:50%; background:#fbbf24; box-shadow:0 0 16px rgba(251,191,36,.8); }
     .portal-welcome-banner h1 { margin:0 0 3px; color:#fff; font-size:clamp(1.3rem,2.25vw,1.7rem); line-height:1.14; }
     .portal-welcome-banner p { margin:0; max-width:580px; color:#dbeafe; font-size:.92rem; line-height:1.38; }
-    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:0; margin-top:8px; padding-top:8px; background:none; } .role-home-panel.mascot-role-home .role-home-content { min-height:0; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:15px; padding-bottom:15px; background-size:cover,auto 108%; background-position:center,right 18%; } .portal-welcome-copy { max-width:100%; } }
+    @media (max-width:640px) { .role-home-panel .role-home-content { grid-template-columns:1fr; } .role-home-panel .role-home-icon { min-height:88px; font-size:2.5rem; } .role-home-panel.mascot-role-home { min-height:0; margin:0; padding:0; background:none; } .role-home-panel.mascot-role-home .role-home-content { min-height:0; max-width:100%; } .portal-welcome-banner { min-height:214px; padding-top:15px; padding-bottom:15px; background-size:cover,auto 108%; background-position:center,right 18%; } .portal-welcome-copy { max-width:100%; } }
     .record-list { margin-top:16px; display:grid; gap:8px; }
     .record-list .item-row { margin:0; }
     .footer-links a { padding:4px 7px; border-radius:5px; }
@@ -811,9 +811,6 @@
         <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon">🔒</span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
         <section class="portal-welcome-banner" aria-label="Welcome to Little Feet">
           <div class="portal-welcome-copy">
-            <span class="portal-welcome-kicker">Your Little Feet space</span>
-            <h1>Welcome to Little Feet</h1>
-            <p>A secure, friendly home for learning, care, communication, and everyday school life.</p>
             <section id="roleHomePanel" class="role-home-panel" aria-live="polite"></section>
           </div>
         </section>
@@ -1620,7 +1617,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260905-live-school-hours" defer></script>
+  <script src="backup.js?v=20260906-merged-welcome" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
