@@ -410,6 +410,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: activeRequestCount > 2 ? 'BUSY' : 'OK', instance: replicaMode ? 'STANDBY' : 'PRIMARY', activeRequests: activeRequestCount, timestamp: new Date() });
 });
 
+// A lightweight heartbeat used by the repository's free scheduled monitor. It
+// touches the configured datastore so both the web service and a free pilot
+// PostgreSQL project remain active without exposing application records.
+app.get('/api/keepalive', async (_req, res) => {
+  try {
+    if (postgresPool) await postgresPool.query('SELECT 1');
+    else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
+    res.json({ status: 'OK', database: postgresPool ? 'postgresql' : stateDatabase ? 'sqlite' : 'replica', timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Keepalive database probe failed:', error.message);
+    res.status(503).json({ status: 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
+  }
+});
+
 const runtimeReadiness = () => {
   const checks = {
     database: Boolean(process.env.DATABASE_URL),
