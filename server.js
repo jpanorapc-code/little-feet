@@ -185,6 +185,31 @@ let replicaTimer = null;
 let replicaSnapshotTimer = null;
 let stateDatabase = null;
 let postgresPool = null;
+let postgresSaveChain = Promise.resolve();
+let postgresPersistenceSnapshot = new Map();
+
+const persistenceHash = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const persistenceRecordKey = (record, index) => {
+  const candidate = record?.id || record?.username || record?.reference || record?.learnerKey || record?.version;
+  return candidate ? String(candidate) : `legacy-${persistenceHash(record)}-${index}`;
+};
+const flattenPersistentState = () => {
+  const records = new Map();
+  const metadata = new Map();
+  const addRecords = (collection, values) => (Array.isArray(values) ? values : []).forEach((record, index) => {
+    const recordKey = persistenceRecordKey(record, index);
+    records.set(`${collection}\u0000${recordKey}`, { collection, recordKey, schoolId: String(record?.schoolId || ''), payload: record });
+  });
+  Object.entries(db).forEach(([key, value]) => {
+    if (Array.isArray(value)) return addRecords(`array:${key}`, value);
+    if (key === 'moduleRecords') return Object.entries(value || {}).forEach(([moduleName, values]) => addRecords(`module:${moduleName}`, values));
+    if (key === 'groupMessages') return Object.entries(value || {}).forEach(([groupId, values]) => addRecords(`group:${groupId}`, values));
+    if (key === 'schoolBilling') return Object.entries(value || {}).forEach(([schoolId, billing]) => metadata.set(`schoolBilling:${schoolId}`, billing));
+    if (key === 'schoolTerms') return Object.entries(value || {}).forEach(([schoolId, term]) => metadata.set(`schoolTerms:${schoolId}`, term));
+    metadata.set(key, value);
+  });
+  return { records, metadata };
+};
 
 function openStateDatabase() {
   if (replicaMode) return;
@@ -206,6 +231,23 @@ async function openPostgresDatabase() {
   });
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS little_feet_app_state (
+      state_key TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS little_feet_records (
+      collection TEXT NOT NULL,
+      record_key TEXT NOT NULL,
+      school_id TEXT NOT NULL DEFAULT '',
+      payload JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (collection, record_key)
+    );
+    CREATE INDEX IF NOT EXISTS little_feet_records_school_collection_idx
+      ON little_feet_records (school_id, collection);
+    CREATE TABLE IF NOT EXISTS little_feet_metadata (
       state_key TEXT PRIMARY KEY,
       payload JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -267,6 +309,29 @@ function removeLegacyDemoRecords() {
 async function loadDatabaseState() {
   if (postgresPool) {
     try {
+      const normalizedCount = await postgresPool.query('SELECT COUNT(*)::int AS count FROM little_feet_records');
+      const metadataCount = await postgresPool.query('SELECT COUNT(*)::int AS count FROM little_feet_metadata');
+      if (normalizedCount.rows[0].count || metadataCount.rows[0].count) {
+        const [recordResult, metadataResult] = await Promise.all([
+          postgresPool.query('SELECT collection, record_key, school_id, payload FROM little_feet_records ORDER BY collection, record_key'),
+          postgresPool.query('SELECT state_key, payload FROM little_feet_metadata ORDER BY state_key')
+        ]);
+        const saved = {};
+        recordResult.rows.forEach(row => {
+          const [kind, name] = row.collection.split(':', 2);
+          if (kind === 'array') (saved[name] ||= []).push(row.payload);
+          else if (kind === 'module') ((saved.moduleRecords ||= {})[name] ||= []).push(row.payload);
+          else if (kind === 'group') ((saved.groupMessages ||= {})[name] ||= []).push(row.payload);
+          postgresPersistenceSnapshot.set(`record:${row.collection}\u0000${row.record_key}`, persistenceHash(row.payload));
+        });
+        metadataResult.rows.forEach(row => {
+          if (row.state_key.startsWith('schoolBilling:')) (saved.schoolBilling ||= {})[row.state_key.slice(14)] = row.payload;
+          else if (row.state_key.startsWith('schoolTerms:')) (saved.schoolTerms ||= {})[row.state_key.slice(12)] = row.payload;
+          else saved[row.state_key] = row.payload;
+          postgresPersistenceSnapshot.set(`metadata:${row.state_key}`, persistenceHash(row.payload));
+        });
+        return applySavedState(saved);
+      }
       const result = await postgresPool.query('SELECT payload FROM little_feet_app_state WHERE state_key = $1', ['primary']);
       return result.rowCount ? applySavedState(result.rows[0].payload) : false;
     } catch (error) {
@@ -288,18 +353,50 @@ async function loadDatabaseState() {
 async function saveDatabaseState() {
   if (replicaMode) return;
   if (postgresPool) {
-    try {
-      await postgresPool.query(`
-        INSERT INTO little_feet_app_state (state_key, payload, updated_at)
-        VALUES ($1, $2::jsonb, NOW())
-        ON CONFLICT (state_key) DO UPDATE SET
-          payload = EXCLUDED.payload,
-          updated_at = NOW()
-      `, ['primary', JSON.stringify(db)]);
-    } catch (error) {
-      console.error('Unable to save PostgreSQL application state:', error.message);
-    }
-    return;
+    postgresSaveChain = postgresSaveChain.then(async () => {
+      const { records, metadata } = flattenPersistentState();
+      const nextSnapshot = new Map();
+      const client = await postgresPool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const [compositeKey, entry] of records) {
+          const snapshotKey = `record:${compositeKey}`;
+          const hash = persistenceHash(entry.payload);
+          nextSnapshot.set(snapshotKey, hash);
+          if (postgresPersistenceSnapshot.get(snapshotKey) === hash) continue;
+          await client.query(`INSERT INTO little_feet_records (collection, record_key, school_id, payload, updated_at)
+            VALUES ($1, $2, $3, $4::jsonb, NOW()) ON CONFLICT (collection, record_key) DO UPDATE SET
+            school_id = EXCLUDED.school_id, payload = EXCLUDED.payload, updated_at = NOW()`,
+          [entry.collection, entry.recordKey, entry.schoolId, JSON.stringify(entry.payload)]);
+        }
+        for (const [stateKey, payload] of metadata) {
+          const snapshotKey = `metadata:${stateKey}`;
+          const hash = persistenceHash(payload);
+          nextSnapshot.set(snapshotKey, hash);
+          if (postgresPersistenceSnapshot.get(snapshotKey) === hash) continue;
+          await client.query(`INSERT INTO little_feet_metadata (state_key, payload, updated_at)
+            VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (state_key) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+          [stateKey, JSON.stringify(payload)]);
+        }
+        for (const snapshotKey of postgresPersistenceSnapshot.keys()) {
+          if (nextSnapshot.has(snapshotKey)) continue;
+          if (snapshotKey.startsWith('record:')) {
+            const [collection, recordKey] = snapshotKey.slice(7).split('\u0000');
+            await client.query('DELETE FROM little_feet_records WHERE collection = $1 AND record_key = $2', [collection, recordKey]);
+          } else if (snapshotKey.startsWith('metadata:')) {
+            await client.query('DELETE FROM little_feet_metadata WHERE state_key = $1', [snapshotKey.slice(9)]);
+          }
+        }
+        await client.query('COMMIT');
+        postgresPersistenceSnapshot = nextSnapshot;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('Unable to save normalized PostgreSQL state:', error.message);
+      } finally {
+        client.release();
+      }
+    });
+    return postgresSaveChain;
   }
   if (!stateDatabase) return;
   try {
