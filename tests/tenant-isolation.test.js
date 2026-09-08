@@ -27,9 +27,11 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
 
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
-  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test' },
+  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret' },
   stdio: ['ignore', 'pipe', 'pipe']
 });
+let childErrorOutput = '';
+child.stderr.on('data', chunk => { childErrorOutput += chunk.toString(); });
 
 const stopChild = () => new Promise(resolve => {
   if (child.exitCode !== null) return resolve();
@@ -38,14 +40,14 @@ const stopChild = () => new Promise(resolve => {
 });
 
 const waitForServer = async () => {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 150; attempt += 1) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/api/health`);
       if (response.ok) return;
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  throw new Error('Temporary test server did not start.');
+  throw new Error(`Temporary test server did not start.${childErrorOutput ? `\n${childErrorOutput}` : ''}`);
 };
 
 const request = async (route, { method = 'GET', body, cookie } = {}) => {
@@ -90,6 +92,21 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(billing.response.status, 200);
     const alphaBilling = await request('/api/subscription-billing', { cookie: alphaLogin.cookie });
     assert.equal(alphaBilling.data.pricing.baseMonthly, 0);
+
+    const alphaBillingConfigured = await request('/api/subscription-billing', { method: 'PUT', cookie: alphaLogin.cookie, body: { baseMonthly: 500, lateFeeEnabled: false, lateFee: 0, bundles: { 5: { costPrice: 0, sellingPrice: 50 }, 20: { costPrice: 0, sellingPrice: 150 }, 100: { costPrice: 0, sellingPrice: 500 } }, payment: { method: 'bank_transfer', accountName: 'Alpha School', bankName: 'Test Bank', accountNumber: '123456789', branchCode: '000000', referencePrefix: 'ALPHA' } } });
+    assert.equal(alphaBillingConfigured.response.status, 200);
+    const subscriptionOrder = await request('/api/subscription-billing/orders', { method: 'POST', cookie: alphaLogin.cookie, body: { bundleCapacity: 5 } });
+    assert.equal(subscriptionOrder.response.status, 201);
+    assert.equal(subscriptionOrder.data.order.monthlyTotal, 550);
+    const reconciliation = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'bank-statement-line-1', reference: subscriptionOrder.data.order.reference, status: 'paid', amount: 550, bankReference: 'BANK-001' } });
+    assert.equal(reconciliation.response.status, 201);
+    const duplicateReconciliation = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'bank-statement-line-1', reference: subscriptionOrder.data.order.reference, status: 'paid', amount: 550, bankReference: 'BANK-001' } });
+    assert.equal(duplicateReconciliation.response.status, 200);
+    assert.equal(duplicateReconciliation.data.duplicate, true);
+    const alphaLedger = await request('/api/payments/ledger', { cookie: alphaLogin.cookie });
+    const bravoLedger = await request('/api/payments/ledger', { cookie: bravoLogin.cookie });
+    assert.equal(alphaLedger.data.length, 1);
+    assert.equal(bravoLedger.data.length, 0);
 
     console.log('Tenant isolation test passed.');
   } catch (error) {

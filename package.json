@@ -5,6 +5,8 @@
   "main": "server.js",
   "scripts": {
     "test": "node tests/tenant-isolation.test.js",
+    "test:capacity": "node tests/capacity-smoke.test.js",
+    "test:stress": "node tests/capacity-smoke.test.js",
     "start": "node server.js",
     "start:backup": "node backup-server.js"
   },

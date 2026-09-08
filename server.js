@@ -106,7 +106,10 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
+}));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.set('trust proxy', 1);
 app.use(session({
@@ -163,6 +166,8 @@ const db = {
   donations: [],
   storeProducts: [],
   storeOrders: [],
+  paymentEvents: [],
+  paymentLedger: [],
   subscriptionBilling: {
     pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
     payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
@@ -228,7 +233,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'paymentEvents', 'paymentLedger', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -428,13 +433,26 @@ app.get('/api/production-readiness', (req, res) => {
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const billing = subscriptionBillingState(actor);
   const readiness = runtimeReadiness();
+  const integrations = {
+    paymentDestination: billingPaymentConfigured(billing.payment),
+    signedPaymentWebhook: Boolean(process.env.LF_PAYMENT_WEBHOOK_SECRET),
+    emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
+    smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
+    monitoring: Boolean(process.env.LF_MONITORING_DSN),
+    offsiteBackup: Boolean(process.env.LF_BACKUP_BUCKET)
+  };
+  const missingActions = [];
+  if (!readiness.checks.database) missingActions.push('Connect a persistent PostgreSQL DATABASE_URL.');
+  if (!readiness.checks.fieldEncryption) missingActions.push('Set LF_FIELD_ENCRYPTION_KEY.');
+  if (!readiness.checks.sessionSecret) missingActions.push('Set a strong SESSION_SECRET.');
+  if (!integrations.paymentDestination) missingActions.push('Configure a bank-transfer destination or HTTPS payment link.');
+  if (!integrations.monitoring) missingActions.push('Configure error and uptime monitoring.');
+  if (!integrations.offsiteBackup) missingActions.push('Configure an offsite backup target and test a restore.');
   res.json({
     ...readiness,
-    paymentDestinationConfigured: billingPaymentConfigured(billing.payment),
-    emailProviderConfigured: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
-    smsProviderConfigured: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
-    monitoringConfigured: Boolean(process.env.LF_MONITORING_DSN),
-    backupStoreConfigured: Boolean(process.env.LF_BACKUP_BUCKET),
+    integrations,
+    missingActions,
+    launchReady: readiness.ready && integrations.paymentDestination && integrations.monitoring && integrations.offsiteBackup,
     checkedAt: new Date().toISOString()
   });
 });
@@ -531,6 +549,54 @@ const paymentInstructions = (billing, reference) => {
     accountNumber: decryptField(payment.accountNumberEncrypted), branchCode: payment.branchCode, reference
   };
 };
+const paymentStatuses = new Set(['awaiting_payment', 'paid', 'failed', 'refunded']);
+const canonicalPaymentStatus = value => String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+const findPaymentTarget = (reference, actor = null) => {
+  const cleanReference = String(reference || '').trim().toUpperCase();
+  if (!cleanReference) return null;
+  const schoolId = actor ? accountSchoolId(actor) : null;
+  for (const [billingSchoolId, billing] of Object.entries(db.schoolBilling || {})) {
+    if (schoolId && billingSchoolId !== schoolId) continue;
+    const order = (billing.orders || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference);
+    if (order) return { type: 'subscription', record: order, schoolId: billingSchoolId };
+  }
+  const storeOrder = (db.storeOrders || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference && (!schoolId || entry.schoolId === schoolId));
+  if (storeOrder) return { type: 'store', record: storeOrder, schoolId: storeOrder.schoolId };
+  const donation = (db.donations || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference);
+  if (donation && !actor) return { type: 'donation', record: donation, schoolId: donation.schoolId || '' };
+  return null;
+};
+const expectedPaymentAmount = target => Number(target.type === 'subscription' ? target.record.monthlyTotal : target.record.amount);
+const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransactionId, source, receivedAt }, actor = null) => {
+  if (!Array.isArray(db.paymentEvents)) db.paymentEvents = [];
+  if (!Array.isArray(db.paymentLedger)) db.paymentLedger = [];
+  const existing = db.paymentEvents.find(event => event.eventId === eventId);
+  if (existing) return { duplicate: true, event: existing };
+  const target = findPaymentTarget(reference, actor);
+  if (!target) return { error: 'Payment reference was not found.' };
+  const numericAmount = billingAmount(amount);
+  const expectedAmount = expectedPaymentAmount(target);
+  if (numericAmount === null || numericAmount !== expectedAmount) return { error: `Payment amount must match the expected amount of ${expectedAmount.toFixed(2)}.` };
+  const normalStatus = canonicalPaymentStatus(status);
+  if (!paymentStatuses.has(normalStatus)) return { error: 'Payment status is not supported.' };
+  const timestamp = receivedAt || new Date().toISOString();
+  const event = {
+    eventId, reference: target.record.reference, status: normalStatus, amount: numericAmount,
+    providerTransactionId: String(providerTransactionId || '').trim().slice(0, 160), source,
+    schoolId: target.schoolId, targetType: target.type, receivedAt: timestamp
+  };
+  target.record.paymentStatus = normalStatus;
+  target.record.paymentUpdatedAt = timestamp;
+  if (normalStatus === 'paid') target.record.paidAt = timestamp;
+  if (normalStatus === 'refunded') target.record.refundedAt = timestamp;
+  db.paymentEvents.unshift(event);
+  db.paymentLedger.unshift({
+    id: crypto.randomUUID(), eventId, reference: target.record.reference, schoolId: target.schoolId,
+    targetType: target.type, amount: numericAmount, status: normalStatus, source, createdAt: timestamp,
+    recordedBy: actor?.username || 'signed-webhook'
+  });
+  return { duplicate: false, event, target: target.record };
+};
 
 app.get('/api/subscription-billing', (req, res) => {
   const actor = getSessionAccount(req);
@@ -601,6 +667,58 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   };
   billing.orders.unshift(order);
   res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
+});
+
+// Free bank-transfer reconciliation is available to school administrators. The
+// same ledger can accept a gateway later through the signed, provider-neutral
+// webhook without changing the finance screens or historical records.
+app.get('/api/payments/ledger', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  res.json((db.paymentLedger || []).filter(entry => entry.schoolId === accountSchoolId(actor)));
+});
+
+app.post('/api/payments/reconcile', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator can reconcile a bank payment.' });
+  const eventId = String(req.body?.eventId || '').trim().slice(0, 160);
+  if (!eventId) return res.status(400).json({ message: 'A unique reconciliation event ID is required.' });
+  const result = applyPaymentEvent({
+    eventId: `manual:${accountSchoolId(actor)}:${eventId}`,
+    reference: req.body?.reference,
+    status: req.body?.status,
+    amount: req.body?.amount,
+    providerTransactionId: req.body?.bankReference,
+    source: 'manual-bank-reconciliation',
+    receivedAt: new Date().toISOString()
+  }, actor);
+  if (result.error) return res.status(400).json({ message: result.error });
+  res.status(result.duplicate ? 200 : 201).json({ success: true, duplicate: result.duplicate, event: result.event });
+});
+
+app.post('/api/payments/webhook', (req, res) => {
+  const secret = String(process.env.LF_PAYMENT_WEBHOOK_SECRET || '');
+  if (!secret) return res.status(503).json({ message: 'Payment webhook processing is not configured.' });
+  const supplied = String(req.get('x-little-feet-signature') || '').trim().toLowerCase().replace(/^sha256=/, '');
+  const expected = crypto.createHmac('sha256', secret).update(req.rawBody || Buffer.from('')).digest('hex');
+  const suppliedBuffer = Buffer.from(supplied, 'hex');
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  if (suppliedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(suppliedBuffer, expectedBuffer)) {
+    return res.status(401).json({ message: 'Invalid payment webhook signature.' });
+  }
+  const eventId = String(req.body?.eventId || '').trim().slice(0, 160);
+  if (!eventId) return res.status(400).json({ message: 'A provider event ID is required.' });
+  const result = applyPaymentEvent({
+    eventId: `webhook:${eventId}`,
+    reference: req.body?.reference,
+    status: req.body?.status,
+    amount: req.body?.amount,
+    providerTransactionId: req.body?.transactionId,
+    source: String(req.body?.provider || 'payment-webhook').trim().slice(0, 80),
+    receivedAt: String(req.body?.occurredAt || '').trim() || new Date().toISOString()
+  });
+  if (result.error) return res.status(400).json({ message: result.error });
+  res.status(result.duplicate ? 200 : 201).json({ success: true, duplicate: result.duplicate });
 });
 
 app.get('/api/donations/payment', (req, res) => {
