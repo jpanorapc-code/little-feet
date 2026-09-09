@@ -780,6 +780,12 @@ const publicBillingPricing = (billing, includeCosts = false) => ({
 const billingPaymentConfigured = (payment) => payment.method === 'payment_link'
   ? Boolean(payment.paymentLink)
   : Boolean(payment.accountName && payment.bankName && payment.accountNumberEncrypted);
+const donationBillingState = () => {
+  const globalBilling = subscriptionBillingState();
+  if (billingPaymentConfigured(globalBilling.payment)) return globalBilling;
+  const configuredSchoolBilling = Object.values(db.schoolBilling || {}).find(state => billingPaymentConfigured(state?.payment || {}));
+  return configuredSchoolBilling || globalBilling;
+};
 const paymentInstructions = (billing, reference) => {
   const payment = billing.payment;
   if (payment.method === 'payment_link') return { method: 'Online payment', paymentLink: payment.paymentLink, reference };
@@ -961,14 +967,14 @@ app.post('/api/payments/webhook', (req, res) => {
 });
 
 app.get('/api/donations/payment', (req, res) => {
-  const billing = subscriptionBillingState();
+  const billing = donationBillingState();
   res.json({ configured: billingPaymentConfigured(billing.payment), method: billing.payment.method });
 });
 
 app.post('/api/donations/intents', (req, res) => {
   const amount = billingAmount(req.body?.amount);
   if (amount === null || amount <= 0) return res.status(400).json({ message: 'Enter a donation amount greater than zero.' });
-  const billing = subscriptionBillingState();
+  const billing = donationBillingState();
   if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'Donations are not available until an administrator configures the payment destination.' });
   const donorName = String(req.body?.donorName || '').trim().slice(0, 120);
   const donorEmail = String(req.body?.donorEmail || '').trim().slice(0, 160);

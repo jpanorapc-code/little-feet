@@ -415,7 +415,7 @@ function setupFormTemplates() {
     { label: 'Morning learning block', day: 'Monday', time: '08:00 - 08:30', activity: 'Morning circle: welcome, weather, and attendance' },
     { label: 'Literacy activity', day: 'Tuesday', time: '09:00 - 09:45', activity: 'Early literacy: story time, sounds, and name writing' },
     { label: 'Outdoor movement', day: 'Wednesday', time: '10:00 - 10:40', activity: 'Outdoor play: gross-motor movement and cooperative games' }
-  ], template => { document.getElementById('schDay').value = template.day; document.getElementById('schTime').value = template.time; document.getElementById('schActivity').value = template.activity; });
+  ], template => { const [start, end] = template.time.split(' - '); document.getElementById('schDay').value = template.day; document.getElementById('schStartTime').value = start; document.getElementById('schEndTime').value = end; document.getElementById('schActivity').value = template.activity; });
 
   addFormTemplates(document.getElementById('ticketForm'), 'support request', [
     { label: 'Fee or payment question', department: 'Finance', priority: 'Normal', subject: 'Request for account assistance', message: 'Please review the account and advise on the next steps.' },
@@ -1563,9 +1563,11 @@ if (scheduleForm) {
     const body = {
       studentName: document.getElementById('schStudentName').value,
       dayOfWeek: document.getElementById('schDay').value,
-      timeSlot: document.getElementById('schTime').value,
+      timeSlot: `${document.getElementById('schStartTime').value} - ${document.getElementById('schEndTime').value}`,
       activity: document.getElementById('schActivity').value
     };
+    if (!document.getElementById('schStartTime').value || !document.getElementById('schEndTime').value) return alert('Choose both a start and end time.');
+    if (document.getElementById('schEndTime').value <= document.getElementById('schStartTime').value) return alert('The end time must be after the start time.');
     await fetch('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     scheduleForm.reset();
     loadSchedules();
@@ -1759,6 +1761,7 @@ function previewLearnerDatabaseImport() {
   const preview = document.getElementById('schoolDatabasePreview');
   const file = input?.files?.[0];
   if (!file || !preview) return alert('Choose an Excel or CSV school register first.');
+  if (file.size > 50 * 1024 * 1024) return alert('This register is larger than 50 MB. Split it into smaller school-approved files before importing.');
   if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
   const reader = new FileReader();
   reader.onload = (event) => {
@@ -1791,14 +1794,21 @@ function previewLearnerDatabaseImport() {
 async function confirmLearnerDatabaseImport() {
   if (!pendingLearnerImport.length) return alert('Preview a valid school register before importing it.');
   if (!confirm(`Import ${pendingLearnerImport.length} learner record${pendingLearnerImport.length === 1 ? '' : 's'}? Existing matches will not be overwritten.`)) return;
-  const response = await fetch('/api/students/import', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actorUsername: currentUser?.username, students: pendingLearnerImport })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'The learner import could not be completed.');
-  const duplicateSummary = result.rejected?.length ? ` ${result.rejected.length} duplicate or incomplete row${result.rejected.length === 1 ? ' was' : 's were'} skipped.` : '';
-  alert(`${result.message}${duplicateSummary}`);
+  const chunkSize = 250;
+  let imported = 0;
+  const rejected = [];
+  for (let offset = 0; offset < pendingLearnerImport.length; offset += chunkSize) {
+    const response = await fetch('/api/students/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actorUsername: currentUser?.username, students: pendingLearnerImport.slice(offset, offset + chunkSize) })
+    });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'The learner import could not be completed.');
+    imported += Number(result.imported || 0);
+    rejected.push(...(result.rejected || []));
+  }
+  const duplicateSummary = rejected.length ? ` ${rejected.length} duplicate or incomplete row${rejected.length === 1 ? ' was' : 's were'} skipped.` : '';
+  alert(`${imported} learner record${imported === 1 ? '' : 's'} imported in smaller secure batches.${duplicateSummary}`);
   document.getElementById('schoolDatabaseFile').value = '';
   document.getElementById('schoolDatabasePreview').innerHTML = '';
   pendingLearnerImport = [];
@@ -2391,11 +2401,14 @@ async function loadChatGroups() {
     const select = document.getElementById('chatGroupSelect');
     if (!select) return;
 
-    select.innerHTML = groups.map(g => `<option value="${g.id}">${g.groupName}</option>`).join('');
+    select.innerHTML = groups.length
+      ? groups.map(g => `<option value="${g.id}">${g.groupName}</option>`).join('')
+      : '<option value="" selected>No group channels yet</option>';
+    select.disabled = !groups.length;
     
     const delBtn = document.getElementById('btnDeleteGroup');
     if (delBtn && currentUser && currentUser.role === 'admin') {
-      if (select.value === 'general') {
+      if (!select.value || select.value === 'general') {
         delBtn.classList.add('hidden');
       } else {
         delBtn.classList.remove('hidden');
@@ -2410,6 +2423,11 @@ async function loadGroupChatMessages() {
   const select = document.getElementById('chatGroupSelect');
   if (!select) return;
   const groupId = select.value;
+  const chatBox = document.getElementById('chatMessages');
+  if (!groupId) {
+    if (chatBox) chatBox.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">No group channels have been created yet.</p>';
+    return;
+  }
 
   const delBtn = document.getElementById('btnDeleteGroup');
   if (delBtn && currentUser && currentUser.role === 'admin') {
@@ -2423,7 +2441,7 @@ async function loadGroupChatMessages() {
   try {
     const res = await fetch(`/api/chat/messages/${groupId}`);
     const msgs = await res.json();
-    const chatBox = document.getElementById('chatMessages');
+    if (!res.ok || !Array.isArray(msgs)) throw new Error(msgs.message || 'Group channel unavailable.');
 
     chatBox.innerHTML = msgs.length
       ? msgs.map(m => {

@@ -925,8 +925,8 @@
                 </select>
               </div>
               <div style="flex: 1;">
-                <label for="schTime">Time Slot Block <span class="req">*</span></label>
-                <input type="text" id="schTime" placeholder="e.g. 09:00 AM - 10:00 AM" required>
+                <label>Time Slot Block <span class="req">*</span></label>
+                <div style="display:flex;gap:8px;align-items:center;"><input type="time" id="schStartTime" aria-label="Start time" required><span aria-hidden="true">to</span><input type="time" id="schEndTime" aria-label="End time" required></div>
               </div>
             </div>
             <div>
