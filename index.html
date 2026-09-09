@@ -1125,8 +1125,7 @@
               <h2>Team Conversations</h2>
               <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <select id="chatGroupSelect" onchange="loadGroupChatMessages()" style="margin-bottom: 0; padding: 5px; font-size: 0.8rem; width: auto;">
-                  <option value="general">General Staff Lounge</option>
-                  <option value="toddlers">Toddler Educators</option>
+                  <option value="" selected>Loading group channels…</option>
                 </select>
                 <button type="button" onclick="createNewGroupModal()" class="action-btn btn-blue" style="margin:0; padding: 5px 8px;">+ Create group</button>
                 <button type="button" id="btnDeleteGroup" onclick="deleteCurrentGroup()" class="action-btn btn-red role-admin hidden" style="margin:0; padding: 5px 8px;">🗑️ Delete Group</button>
@@ -1615,7 +1614,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260906-merged-welcome" defer></script>
+  <script src="backup.js?v=20260909-chat-donations" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

@@ -1104,7 +1104,7 @@ async function startHealthMonitor() {
   setInterval(checkStatus, 8000);
 }
 
-function loadAllData() {
+async function loadAllData() {
   loadAcademicTerm();
   loadPosts();
   loadSchedules();
@@ -1114,8 +1114,8 @@ function loadAllData() {
   loadTicketAssignees();
   loadAttendance();
   loadBroadcasts();
-  loadChatGroups();
-  loadGroupChatMessages();
+  await loadChatGroups();
+  await loadGroupChatMessages();
   loadDirectChatUsers();
   loadStoreItems();
   loadStoreOrders();
@@ -2441,6 +2441,11 @@ async function loadGroupChatMessages() {
   try {
     const res = await fetch(`/api/chat/messages/${groupId}`);
     const msgs = await res.json();
+    if (res.status === 404) {
+      if (chatBox) chatBox.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">This channel is no longer available. Refreshing the channel list…</p>';
+      await loadChatGroups();
+      return;
+    }
     if (!res.ok || !Array.isArray(msgs)) throw new Error(msgs.message || 'Group channel unavailable.');
 
     chatBox.innerHTML = msgs.length
@@ -2658,6 +2663,7 @@ function setupFormListeners() {
       const message = document.getElementById('chatInput').value;
       const textColor = document.getElementById('chatColorPicker').value;
 
+      if (!groupId) return alert('Create or select a staff group channel first.');
       if (!message.trim() || !currentUser) return;
 
       await fetch('/api/chat/messages', {
@@ -2777,7 +2783,10 @@ async function openDonationModal() {
     if (!response.ok) throw new Error(status.message || 'Unable to open donations.');
   } catch (error) { return alert(error.message || 'Unable to open donations.'); }
   if (!status.configured) {
-    return openModal('Donations coming soon', `<p style="font-size:.9rem;line-height:1.6;">Little Feet has not published its secure donation destination yet. Please check back soon.</p>`);
+    if (currentUser?.role === 'admin') {
+      return openModal('Set up donations', `<p style="font-size:.9rem;line-height:1.6;">No donation payment destination has been saved yet. Add a secure payment link or bank-transfer account once, then the Donate button will accept real donation requests.</p><button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionBillingAdmin();">Add payment destination</button>`);
+    }
+    return openModal('Donations temporarily unavailable', `<p style="font-size:.9rem;line-height:1.6;">Little Feet has not published its secure donation destination yet. Please check back soon.</p>`);
   }
   openModal('Donate to Little Feet', `<form onsubmit="createDonationIntent(event)" style="display:grid;gap:12px;font-size:.9rem;"><p style="margin:0;color:var(--text-muted);line-height:1.55;">Your contribution supports accessible tools and continued improvements for early-learning communities.</p><label>Donation amount (R)<input name="amount" type="number" min="1" step="0.01" required placeholder="e.g. 50"></label><label>Your name <span style="color:var(--text-muted);">(optional)</span><input name="donorName" maxlength="120" autocomplete="name"></label><label>Email for acknowledgement <span style="color:var(--text-muted);">(optional)</span><input name="donorEmail" type="email" maxlength="160" autocomplete="email"></label><button class="submit-btn">Continue to donate</button></form>`);
 }

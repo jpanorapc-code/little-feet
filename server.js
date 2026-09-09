@@ -127,8 +127,14 @@ app.use((req, res, next) => {
     next();
   }).catch(next);
 });
-// Serve static files from current directory
-app.use(express.static(__dirname));
+// Always revalidate application code so a newly deployed fix cannot be hidden by
+// an older browser cache. Versioned media remains cacheable for performance.
+app.use(express.static(__dirname, {
+  setHeaders: (res, filePath) => {
+    if (/\.(?:html|js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+    else res.setHeader('Cache-Control', 'public, max-age=86400');
+  }
+}));
 
 // In-Memory Database Store
 const db = {
