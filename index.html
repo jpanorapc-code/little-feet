@@ -685,6 +685,7 @@
           <label for="rememberLogin" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">Save login details on this device</label>
         </div>
         <button type="submit" class="submit-btn">🔒 Secure Account Login</button>
+        <button type="button" class="action-btn btn-blue" data-portal-audio-mute data-mute-label="Mute theme &amp; login tune" data-unmute-label="Unmute theme &amp; login tune" onclick="togglePortalAudioMute()" style="width:100%;margin-top:9px;">🔊 Mute theme &amp; login tune</button>
         <div class="social-signin" aria-label="Sign in with a connected provider">
           <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')">Continue with Google</button>
           <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
@@ -743,6 +744,7 @@
           <span id="displayRole">Staff Member</span>
         </button>
         <span id="serverStatus" class="server-status" title="Checking server status"><span class="server-dot"></span><span id="serverStatusText">Server offline</span></span>
+        <button type="button" data-portal-audio-mute onclick="togglePortalAudioMute()" class="action-btn btn-blue" style="padding:4px 8px;font-size:.72rem;">🔊 Mute Little Feet</button>
         <button type="button" onclick="toggleDarkMode()" class="action-btn btn-blue" style="padding: 4px 8px; font-size: 0.72rem;">🌙 / ☀️ Theme</button>
       </div>
 
@@ -1544,10 +1546,11 @@
 
       <div id="settingsTab" class="tab-content">
         <div class="card"><div class="card-header-bar"><h2>⚙️ Personal settings</h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
-          <p style="color:var(--text-muted);margin-bottom:16px;">These settings apply only to this device and account session.</p>
+          <p style="color:var(--text-muted);margin-bottom:16px;">These settings are saved on this device for the signed-in account.</p>
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. English is currently the complete interface; Afrikaans labels will expand as translations are reviewed.</p><select id="languagePreference" onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans (in progress)</option></select></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without reloading the map or interrupting your work.</p><select id="refreshPreference" onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="60000">Every minute</option><option value="120000">Every 2 minutes</option><option value="300000">Every 5 minutes</option></select></div>
+            <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute all welcome, login and wallpaper sound. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()">🔊 Mute Little Feet</button></div>
             <div class="workspace-card" data-roles="parent"><h3>Link a learner with a school code</h3><p>Enter the code from the printed school form. Your request stays pending until an administrator approves the relationship.</p><input id="parentLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><button type="button" class="action-btn btn-green" onclick="redeemLearnerAccessCode()">Request learner link</button></div>
             <div class="workspace-card"><h3>Navigation</h3><p>On desktop, double-click the left sidebar to collapse or expand it. Use the category headings to show or hide each group.</p><button type="button" class="action-btn btn-green" onclick="toggleSidebarCollapse()">Toggle sidebar</button></div>
           </div>
@@ -1562,7 +1565,7 @@
             <div class="workspace-card"><h3>Start now</h3><p>Show the active wallpaper with the dedicated looping Little Feet wallpaper song.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
             <div class="workspace-card"><h3>How to return</h3><p>Click anywhere, press any key, touch the screen, or use the visible Exit button.</p><button type="button" class="action-btn btn-blue" onclick="startWallpaperMode()">Preview exit options</button></div>
             <div class="workspace-card"><h3>Automatic start</h3><p>Enabled for this device after <strong>one hour</strong> with no activity.</p><span class="badge-tag">ON</span></div>
-            <div class="workspace-card"><h3>Wallpaper sound</h3><p>Mute or restore the wallpaper music without leaving wallpaper mode.</p><button type="button" class="action-btn btn-blue" data-wallpaper-mute onclick="toggleWallpaperMute()">🔊 Mute wallpaper music</button></div>
+            <div class="workspace-card"><h3>Wallpaper sound</h3><p>Mute or restore all Little Feet sound. Your choice is remembered for this account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()">🔊 Mute Little Feet</button></div>
             <div class="workspace-card" style="grid-column:1/-1;"><h3>Use your own wallpaper</h3><p>Saved only on this device. JPG, PNG, WebP, or GIF; maximum 8 MB and 3840 × 2160. Animated GIFs must be 8 seconds or shorter.</p><input id="customWallpaperFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-green" onclick="importCustomWallpaper()">Use selected wallpaper</button><button type="button" class="action-btn btn-blue" onclick="resetCustomWallpaper()">Restore Little Feet wallpaper</button></div><p id="customWallpaperStatus" class="meta" style="margin-top:9px;">The original Little Feet campfire wallpaper is active.</p></div>
           </div>
         </section>
@@ -1615,11 +1618,11 @@
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
     <img id="wallpaperImage" src="assets/little-feet-original-background.gif" alt="Active Little Feet wallpaper">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
-    <button type="button" class="wallpaper-mute" data-wallpaper-mute onclick="event.stopPropagation(); toggleWallpaperMute()">🔊 Mute wallpaper music</button>
+    <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()">🔊 Mute Little Feet</button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260909-audio-wallpaper" defer></script>
+  <script src="backup.js?v=20260909-audio-preferences" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

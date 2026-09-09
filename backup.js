@@ -28,10 +28,14 @@ let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let welcomeThemeAudio = null;
+let loginChimeAudio = null;
+let loginChimeStopTimer = null;
+let loginChimeFadeTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
 let customWallpaperObjectUrl = '';
-let wallpaperMuted = false;
+let portalAudioMuted = false;
+let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 const DEFAULT_WALLPAPER_URL = 'assets/little-feet-original-background.gif';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
@@ -66,6 +70,7 @@ function getPortalAudioContext() {
 
 function unlockPortalAudio() {
   try {
+    if (portalAudioMuted) return;
     if (startupChimePending) playStartupChime();
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') {
@@ -79,7 +84,7 @@ function unlockPortalAudio() {
 // Some mobile browsers only permit sound after an explicit second tap.  This
 // small, visible fallback is shown only when the browser blocks the first one.
 function showStartupChimePrompt() {
-  if (startupChimePlayed || startupChimePrompt) return;
+  if (portalAudioMuted || startupChimePlayed || startupChimePrompt) return;
   const prompt = document.createElement('button');
   prompt.type = 'button';
   prompt.className = 'action-btn btn-green';
@@ -143,6 +148,7 @@ function updateSchoolDayStatus() {
 
 // Audio indicator
 function playDingSound() {
+  if (portalAudioMuted) return;
   try {
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -162,6 +168,7 @@ function playDingSound() {
 }
 
 function playTicketAlert() {
+  if (portalAudioMuted) return;
   try {
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') return;
@@ -189,8 +196,10 @@ function playTicketAlert() {
 // DOM Initialization
 window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
-  try { wallpaperMuted = localStorage.getItem('lf_wallpaper_muted') === 'true'; } catch {}
-  updateWallpaperMuteControls();
+  try {
+    if (localStorage.getItem('lf_wallpaper_muted') === 'true' && localStorage.getItem('lf_portal_audio_muted_last') === null) localStorage.setItem('lf_portal_audio_muted_last', 'true');
+  } catch {}
+  loadPortalAudioPreference();
   restoreCustomWallpaper().catch(() => {});
   startupChimePending = true;
   playStartupChime();
@@ -349,8 +358,102 @@ function stopWelcomeTheme() {
   welcomeThemeAudio.currentTime = 0;
 }
 
+function portalAudioPreferenceKey() {
+  const username = String(currentUser?.username || '').trim().toLowerCase();
+  return username ? `lf_portal_audio_muted:${username}` : '';
+}
+
+function updatePortalAudioControls() {
+  document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
+    const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
+    const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
+    button.textContent = portalAudioMuted ? `🔇 ${unmuteLabel}` : `🔊 ${muteLabel}`;
+    button.setAttribute('aria-pressed', String(portalAudioMuted));
+    button.title = portalAudioMuted ? 'Turn Little Feet sound back on' : 'Mute all Little Feet sound';
+  });
+}
+
+function stopLoginChime() {
+  if (loginChimeStopTimer) window.clearTimeout(loginChimeStopTimer);
+  if (loginChimeFadeTimer) window.clearInterval(loginChimeFadeTimer);
+  loginChimeStopTimer = null;
+  loginChimeFadeTimer = null;
+  if (!loginChimeAudio) return;
+  loginChimeAudio.pause();
+  loginChimeAudio.currentTime = 0;
+  loginChimeAudio = null;
+}
+
+function stopAllPortalAudio() {
+  stopWelcomeTheme();
+  stopLoginChime();
+  stopWindtLegacyNote();
+  stopWallpaperTheme();
+}
+
+function loadPortalAudioPreference() {
+  try {
+    const accountKey = portalAudioPreferenceKey();
+    const accountValue = accountKey ? localStorage.getItem(accountKey) : null;
+    const savedValue = portalAudioChangedBeforeLogin ? localStorage.getItem('lf_portal_audio_muted_last') : (accountValue === null ? localStorage.getItem('lf_portal_audio_muted_last') : accountValue);
+    portalAudioMuted = savedValue === 'true';
+    if (accountKey && portalAudioChangedBeforeLogin) {
+      localStorage.setItem(accountKey, String(portalAudioMuted));
+      portalAudioChangedBeforeLogin = false;
+    }
+  } catch { portalAudioMuted = false; }
+  if (portalAudioMuted) stopAllPortalAudio();
+  updatePortalAudioControls();
+}
+
+function togglePortalAudioMute() {
+  portalAudioMuted = !portalAudioMuted;
+  if (!currentUser) portalAudioChangedBeforeLogin = true;
+  try {
+    localStorage.setItem('lf_portal_audio_muted_last', String(portalAudioMuted));
+    const accountKey = portalAudioPreferenceKey();
+    if (accountKey) localStorage.setItem(accountKey, String(portalAudioMuted));
+  } catch {}
+  if (portalAudioMuted) {
+    startupChimePending = false;
+    startupChimePrompt?.remove();
+    startupChimePrompt = null;
+    stopAllPortalAudio();
+  } else if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) {
+    startWallpaperTheme();
+  } else if (!currentUser && !startupChimePlayed) {
+    startupChimePending = true;
+    playStartupChime();
+  }
+  updatePortalAudioControls();
+}
+
+// A five-second login cue taken from the supplied main theme keeps the same musical identity.
+function playLoginChime() {
+  stopWelcomeTheme();
+  stopLoginChime();
+  if (portalAudioMuted) return;
+  try {
+    loginChimeAudio = new Audio('assets/audio/little-feet-theme.mp3');
+    loginChimeAudio.preload = 'auto';
+    loginChimeAudio.volume = 0.5;
+    loginChimeAudio.currentTime = 0;
+    loginChimeAudio.play().catch(() => {});
+    loginChimeStopTimer = window.setTimeout(() => {
+      let step = 0;
+      loginChimeFadeTimer = window.setInterval(() => {
+        if (!loginChimeAudio) return stopLoginChime();
+        step += 1;
+        loginChimeAudio.volume = Math.max(0.01, 0.5 * (1 - step / 8));
+        if (step >= 8) stopLoginChime();
+      }, 75);
+    }, 4400);
+  } catch { stopLoginChime(); }
+}
+
 function playWindtLegacyNote() {
   stopWindtLegacyNote();
+  if (portalAudioMuted) return;
   windtLegacyAudio = new Audio('assets/audio/little-feet-note.mp3');
   windtLegacyAudio.loop = true;
   windtLegacyAudio.volume = 0.62;
@@ -367,6 +470,10 @@ function stopWindtLegacyNote() {
 // The supplied Little Feet theme plays once after the first permitted interaction.
 function playStartupChime() {
   if (startupChimePlayed) return;
+  if (portalAudioMuted) {
+    startupChimePending = false;
+    return;
+  }
   try {
     startupChimePending = false;
     if (!welcomeThemeAudio) {
@@ -778,6 +885,7 @@ function openSelectedWorkspace() {
 }
 
 function setupSession() {
+  loadPortalAudioPreference();
   applyRolePermissions(currentUser.role);
   const isParent = currentUser.role === 'parent';
   const subscriptionEntry = document.getElementById('subscriptionEntryButton');
@@ -809,7 +917,7 @@ function setupSession() {
   renderRoleHomePanel();
   configureDebugMode();
   applyUserPreferences();
-  playStartupChime();
+  playLoginChime();
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
@@ -966,24 +1074,14 @@ function exitWallpaperMode() {
   resetWallpaperTimer();
 }
 
-function updateWallpaperMuteControls() {
-  document.querySelectorAll('[data-wallpaper-mute]').forEach(button => {
-    button.textContent = wallpaperMuted ? '🔇 Unmute wallpaper music' : '🔊 Mute wallpaper music';
-    button.setAttribute('aria-pressed', String(wallpaperMuted));
-  });
-}
-
-function toggleWallpaperMute() {
-  wallpaperMuted = !wallpaperMuted;
-  try { localStorage.setItem('lf_wallpaper_muted', String(wallpaperMuted)); } catch {}
-  if (wallpaperThemeAudio) wallpaperThemeAudio.muted = wallpaperMuted;
-  updateWallpaperMuteControls();
-}
-
 // The supplied wallpaper theme loops for as long as wallpaper mode remains open.
 function startWallpaperTheme() {
   const overlay = document.getElementById('wallpaperOverlay');
   if (!overlay?.classList.contains('is-visible')) return;
+  if (portalAudioMuted) {
+    updatePortalAudioControls();
+    return;
+  }
   try {
     if (!wallpaperThemeAudio) {
       wallpaperThemeAudio = new Audio('assets/audio/little-feet-wallpaper.mp3');
@@ -991,10 +1089,9 @@ function startWallpaperTheme() {
       wallpaperThemeAudio.loop = true;
       wallpaperThemeAudio.volume = 0.55;
     }
-    wallpaperThemeAudio.muted = wallpaperMuted;
     wallpaperThemeAudio.currentTime = 0;
     wallpaperThemeAudio.play().catch(() => {});
-    updateWallpaperMuteControls();
+    updatePortalAudioControls();
   } catch { /* Wallpaper remains available even when a device has sound disabled. */ }
 }
 
