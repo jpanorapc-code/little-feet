@@ -811,7 +811,7 @@ function setupSession() {
 function applyRolePermissions(role) {
   document.querySelectorAll('.role-admin, .role-teacher').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('[data-roles]').forEach(el => {
-    const roleAllowed = el.dataset.roles.split(',').includes(role);
+    const roleAllowed = role === 'admin' || el.dataset.roles.split(',').includes(role);
     const subscriptionAllowed = !el.dataset.subscription || role !== 'parent' || currentUser?.subscription === el.dataset.subscription;
     el.classList.toggle('hidden', !roleAllowed || !subscriptionAllowed);
   });
@@ -2848,6 +2848,7 @@ async function openSubscriptionsModal() {
         </div>
       </section>
 
+      ${currentUser?.role === 'admin' ? `<section style="margin-top:20px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);"><div style="display:inline-block;background:#059669;color:#fff;border-radius:999px;padding:3px 11px;font-size:.68rem;font-weight:700;letter-spacing:.08em;">ADMIN VIEW · PARENT PLAN</div><h2 style="margin:8px 0 4px;color:var(--text-dark);font-size:1.25rem;">LittleSteps Plus</h2><strong style="font-size:1.2rem;color:#10b981;">R29 / month per child</strong><p style="margin:8px 0 0;color:var(--text-muted);">Administrators can review both the institutional subscription and the optional parent plan. Other school roles see only institutional pricing.</p></section>` : ''}
       ${['principal', 'admin'].includes(currentUser?.role) ? `<section style="margin-top:24px;padding:16px;border:1px solid #2dd4bf;border-radius:10px;background:rgba(13,148,136,.1);"><h3 style="margin:0 0 6px;color:var(--text-dark);">Ready to subscribe?</h3><p style="margin:0 0 12px;color:var(--text-muted);">Choose your learner capacity, accept the late-payment terms if enabled, and receive a unique payment reference.</p><button type="button" class="submit-btn" onclick="openSubscriptionCheckout()">Choose plan &amp; pay</button></section>` : ''}
     </div>`;
   openModal('School Subscriptions & Advantages', content);
