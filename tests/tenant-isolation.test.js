@@ -73,6 +73,12 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     const bravoLogin = await request('/api/login', { method: 'POST', body: { username: 'bravo-admin', pin: 'BravoPass1' } });
     assert.equal(alphaLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
+    const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
+    assert.equal(diagnostics.response.status, 200);
+    assert.equal(diagnostics.data.persistence, 'read-only-replica');
+    const liveStatus = await request('/api/system-status', { cookie: alphaLogin.cookie });
+    assert.equal(liveStatus.response.status, 200);
+    assert.equal(liveStatus.data.status, 'operational');
 
     const imported = await request('/api/students/import', { method: 'POST', cookie: alphaLogin.cookie, body: { students: [{ studentName: 'Alpha Learner', className: 'A1', parentName: 'Alpha Parent', contactEmail: 'alpha.parent@example.test' }] } });
     assert.equal(imported.response.status, 201);

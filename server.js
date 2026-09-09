@@ -97,6 +97,8 @@ const activeLoginAttempt = (key) => {
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
 app.use((req, res, next) => {
+  req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
+  res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -168,6 +170,7 @@ const db = {
   storeOrders: [],
   paymentEvents: [],
   paymentLedger: [],
+  systemErrors: [],
   subscriptionBilling: {
     pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
     payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
@@ -275,7 +278,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'paymentEvents', 'paymentLedger', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'paymentEvents', 'paymentLedger', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -605,6 +608,67 @@ const requireAdmin = (req) => {
   const account = getSessionAccount(req);
   return account?.role === 'admin' ? account : null;
 };
+const recordSystemError = (error, req = null, extra = {}) => {
+  if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
+  const actor = req ? getSessionAccount(req) : null;
+  const entry = {
+    id: crypto.randomUUID(), requestId: req?.requestId || '', schoolId: actor ? accountSchoolId(actor) : '',
+    method: String(req?.method || extra.method || 'SYSTEM').slice(0, 12),
+    route: String(req?.originalUrl || extra.route || '').split('?')[0].slice(0, 240),
+    name: String(error?.name || 'Error').slice(0, 80), message: String(error?.message || 'Unknown server error').slice(0, 500),
+    severity: extra.severity || 'error', status: 'open', createdAt: new Date().toISOString()
+  };
+  db.systemErrors.unshift(entry);
+  if (db.systemErrors.length > 5000) db.systemErrors.length = 5000;
+  return entry;
+};
+
+app.get('/api/system-status', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view live system status.' });
+  const recentUpdates = (db.releaseNotes || []).slice(0, 5);
+  const openErrors = (db.systemErrors || []).filter(entry => entry.status === 'open' && (!entry.schoolId || entry.schoolId === accountSchoolId(actor))).length;
+  res.json({ status: openErrors ? 'attention' : 'operational', openIssues: openErrors, recentUpdates, checkedAt: new Date().toISOString() });
+});
+
+app.get('/api/system-diagnostics', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const schoolId = accountSchoolId(actor);
+  const schoolCount = records => (records || []).filter(entry => !entry.schoolId || entry.schoolId === schoolId).length;
+  const readiness = runtimeReadiness();
+  res.json({
+    status: readiness.ready ? 'ready' : 'configuration-required', readiness,
+    records: {
+      accounts: db.users.filter(account => accountSchoolId(account) === schoolId).length,
+      learners: schoolCount(db.students), attendance: schoolCount(db.attendance),
+      messages: schoolCount(db.directMessages), payments: schoolCount(db.paymentLedger),
+      openErrors: (db.systemErrors || []).filter(entry => entry.status === 'open' && (!entry.schoolId || entry.schoolId === schoolId)).length
+    },
+    persistence: postgresPool ? 'record-based-postgresql' : replicaMode ? 'read-only-replica' : 'local-sqlite',
+    activeRequests: activeRequestCount, generatedAt: new Date().toISOString()
+  });
+});
+
+app.get('/api/system-errors', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const schoolId = accountSchoolId(actor);
+  res.json((db.systemErrors || []).filter(entry => !entry.schoolId || entry.schoolId === schoolId).slice(0, 250));
+});
+
+app.patch('/api/system-errors/:id', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const entry = (db.systemErrors || []).find(item => item.id === req.params.id && (!item.schoolId || item.schoolId === accountSchoolId(actor)));
+  if (!entry) return res.status(404).json({ message: 'System error report not found.' });
+  const status = String(req.body?.status || 'acknowledged').toLowerCase();
+  if (!['acknowledged', 'resolved'].includes(status)) return res.status(400).json({ message: 'Choose acknowledged or resolved.' });
+  entry.status = status;
+  entry.updatedAt = new Date().toISOString();
+  entry.updatedBy = actor.username;
+  res.json({ success: true, entry });
+});
 
 const billingBundleSizes = [5, 20, 100];
 const billingDefaults = () => ({
@@ -2163,6 +2227,17 @@ app.get('/auth/microsoft/callback', async (req, res) => {
 });
 
 // Wildcard Catch-All (Serves Frontend)
+app.use((error, req, res, _next) => {
+  const report = recordSystemError(error, req);
+  console.error(`[${report.requestId || report.id}] ${report.method} ${report.route}: ${report.message}`);
+  if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
+  scheduleReplicaSnapshot();
+  res.status(Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500).json({
+    message: 'An unexpected server error occurred. The administrator report has been created.',
+    requestId: report.requestId || report.id
+  });
+});
+
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });

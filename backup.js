@@ -20,6 +20,8 @@ let portalTourIndex = 0;
 let portalTourTimer = null;
 let debugModeEnabled = false;
 let debugEvents = [];
+let latestServerDiagnostics = null;
+let latestServerErrors = [];
 let startupChimePlayed = false;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
@@ -671,15 +673,31 @@ function toggleDebugMode() {
   updateDebugModePanel();
 }
 
-function openDebugReport() {
+async function openDebugReport() {
   if (currentUser?.role !== 'admin') return;
+  try {
+    const [diagnosticsResponse, errorsResponse] = await Promise.all([fetch('/api/system-diagnostics'), fetch('/api/system-errors')]);
+    latestServerDiagnostics = diagnosticsResponse.ok ? await diagnosticsResponse.json() : null;
+    latestServerErrors = errorsResponse.ok ? await errorsResponse.json() : [];
+  } catch (error) {
+    captureDebugEvent({ category: 'System doctor', code: 'DIAGNOSTICS_UNAVAILABLE', message: error.message });
+  }
   const report = debugEvents.length ? debugEvents.map(event => `<div class="item-row"><strong>${escapeWorkspaceText(event.code)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(event.message)}</p><span class="meta">${escapeWorkspaceText(event.category)} · ${escapeWorkspaceText(event.source)}${event.line ? ` · Line ${event.line}${event.column ? `, column ${event.column}` : ''}` : ''}<br>${new Date(event.timestamp).toLocaleString()}</span></div>`).join('') : '<p class="meta">No debug events have been captured in this session.</p>';
-  openModal('Administrator debug report', `<p style="margin:0 0 12px;color:var(--text-muted);">This report contains safe technical context only. Do not add learner data or passwords to support requests.</p>${report}`);
+  const serverSummary = latestServerDiagnostics ? `<div class="workspace-card" style="margin-bottom:12px;"><h3>Live system doctor</h3><p><strong>Status:</strong> ${escapeWorkspaceText(latestServerDiagnostics.status)} · <strong>Database:</strong> ${escapeWorkspaceText(latestServerDiagnostics.persistence)} · <strong>Open server errors:</strong> ${Number(latestServerDiagnostics.records?.openErrors || 0)}</p><p class="meta">Learners ${Number(latestServerDiagnostics.records?.learners || 0)} · Accounts ${Number(latestServerDiagnostics.records?.accounts || 0)} · Attendance ${Number(latestServerDiagnostics.records?.attendance || 0)} · Payments ${Number(latestServerDiagnostics.records?.payments || 0)}<br>Generated ${new Date(latestServerDiagnostics.generatedAt).toLocaleString()}</p></div>` : '<p class="meta">Live server diagnostics are temporarily unavailable.</p>';
+  const serverErrors = latestServerErrors.length ? latestServerErrors.slice(0, 25).map(event => `<div class="item-row"><strong>${escapeWorkspaceText(event.name)} · ${escapeWorkspaceText(event.status)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(event.message)}</p><span class="meta">${escapeWorkspaceText(event.method)} ${escapeWorkspaceText(event.route)} · Request ${escapeWorkspaceText(event.requestId || event.id)}<br>${new Date(event.createdAt).toLocaleString()}</span></div>`).join('') : '<p class="meta">No server errors have been recorded.</p>';
+  openModal('Administrator debug report', `<p style="margin:0 0 12px;color:var(--text-muted);">This report contains safe technical context only. Do not add learner data or passwords to support requests.</p>${serverSummary}<h3>Server error history</h3>${serverErrors}<h3 style="margin-top:16px;">This browser session</h3>${report}`);
 }
 
-function downloadDebugReport() {
+async function downloadDebugReport() {
   if (currentUser?.role !== 'admin') return;
-  const content = JSON.stringify({ generatedAt: new Date().toISOString(), events: debugEvents }, null, 2);
+  if (!latestServerDiagnostics) {
+    try {
+      const [diagnosticsResponse, errorsResponse] = await Promise.all([fetch('/api/system-diagnostics'), fetch('/api/system-errors')]);
+      latestServerDiagnostics = diagnosticsResponse.ok ? await diagnosticsResponse.json() : null;
+      latestServerErrors = errorsResponse.ok ? await errorsResponse.json() : [];
+    } catch { /* The downloadable report still includes browser diagnostics. */ }
+  }
+  const content = JSON.stringify({ generatedAt: new Date().toISOString(), server: latestServerDiagnostics, serverErrors: latestServerErrors, browserEvents: debugEvents }, null, 2);
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
   link.download = `LittleFeet_Debug_Report_${new Date().toISOString().slice(0, 10)}.json`;
