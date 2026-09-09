@@ -1175,6 +1175,11 @@ function openAlertsTab() {
 }
 
 const toBase64 = file => new Promise((resolve, reject) => {
+  const maxBytes = 5 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    reject(new Error('This file is larger than 5 MB. Compress it or use a smaller file so the school database remains fast.'));
+    return;
+  }
   const reader = new FileReader();
   reader.readAsDataURL(file);
   reader.onload = () => resolve(reader.result);
@@ -1504,7 +1509,13 @@ if (postForm) {
   postForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const file = document.getElementById('postMedia').files[0];
-    const mediaUrl = file ? await toBase64(file) : null;
+    let mediaUrl = null;
+    try {
+      mediaUrl = file ? await toBase64(file) : null;
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
     const body = {
       id: Date.now().toString(),
       audience: document.getElementById('postAudience').value,
@@ -1687,7 +1698,13 @@ if (worksheetForm) {
     const file = document.getElementById('wsPhoto').files[0];
     if (!file) return alert('Please select a file to attach.');
 
-    const photoUrl = await toBase64(file);
+    let photoUrl;
+    try {
+      photoUrl = await toBase64(file);
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
     const body = {
       id: Date.now().toString(),
       studentName: document.getElementById('wsStudentName').value,
@@ -2831,29 +2848,6 @@ async function openSubscriptionsModal() {
         </div>
       </section>
 
-      <section>
-        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">PREMIUM PARENT UPGRADE</div>
-        <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">LittleSteps Plus & Parent Subscription Advantages</h2>
-        <p style="margin:0 0 12px; color:#10b981; font-size:1rem; font-weight:700;">Unlocking Premium Growth Insights & Keepsake Features</p>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px;">
-          <div style="padding:14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
-            <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">⭐ LittleSteps Plus Add-On Overview</h3>
-            <p style="margin:0 0 10px;">An optional, affordable premium subscription available directly to parents for <strong>R29 / month per child.</strong></p>
-            <div style="padding:9px; border:1px solid #10b981; border-radius:8px; background:var(--panel-bg); text-align:center; margin-bottom:10px;"><strong style="display:block; font-size:1.25rem; color:var(--text-dark);">R29 / month</strong><span style="color:#10b981; font-size:0.75rem; font-weight:700;">Direct Subscription Tier</span></div>
-            <p style="margin:0;">Serves as a high-margin value-add that turns school management software into an engaging, memory-rich parent companion app.</p>
-          </div>
-          <div style="padding:14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
-            <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">💎 Key Advantages for Subscribing Parents</h3>
-            <ul style="margin:0; padding-left:18px; font-size:0.78rem;">
-              <li style="margin-bottom:4px;"><strong>Full High-Definition Media Downloads:</strong> Download unlimited original-resolution photos and videos of daily classroom activities and school events.</li>
-              <li style="margin-bottom:4px;"><strong>AI Growth & Development Insights:</strong> Receive automated weekly summaries highlighting developmental progress, strength areas, and tailored learning tips.</li>
-              <li style="margin-bottom:4px;"><strong>Priority Ticket Queueing:</strong> Escalated response status for administrative, fee, and medical inquiries submitted to the school desk.</li>
-              <li style="margin-bottom:4px;"><strong>Permanent Digital Portfolio:</strong> Lifetime access to archived worksheets, term certificates, and milestone badges across all school years.</li>
-              <li><strong>Multi-Caregiver Family Access:</strong> Grant secondary access accounts for grandparents or guardians to follow the child's progress.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
       ${['principal', 'admin'].includes(currentUser?.role) ? `<section style="margin-top:24px;padding:16px;border:1px solid #2dd4bf;border-radius:10px;background:rgba(13,148,136,.1);"><h3 style="margin:0 0 6px;color:var(--text-dark);">Ready to subscribe?</h3><p style="margin:0 0 12px;color:var(--text-muted);">Choose your learner capacity, accept the late-payment terms if enabled, and receive a unique payment reference.</p><button type="button" class="submit-btn" onclick="openSubscriptionCheckout()">Choose plan &amp; pay</button></section>` : ''}
     </div>`;
   openModal('School Subscriptions & Advantages', content);

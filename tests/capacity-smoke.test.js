@@ -10,9 +10,19 @@ const port = 6000 + Math.floor(Math.random() * 300);
 const sharedPinHash = crypto.scryptSync('CapacityPass1', 'little-feet-pin-salt', 64).toString('hex');
 const schools = Array.from({ length: 1500 }, (_, index) => ({ id: `school-${index + 1}`, name: `Capacity School ${index + 1}`, status: 'active' }));
 const users = schools.map((school, index) => ({ username: `capacity-admin-${index + 1}`, pinHash: sharedPinHash, name: `Capacity Administrator ${index + 1}`, role: 'admin', schoolId: school.id, schoolName: school.name, verificationStatus: 'Active' }));
+const students = Array.from({ length: 2000 }, (_, index) => {
+  const school = schools[index < 1000 ? 0 : 1];
+  return {
+    id: `pilot-learner-${index + 1}`,
+    studentName: `Pilot Learner ${index + 1}`,
+    className: `Class ${Math.floor((index % 1000) / 25) + 1}`,
+    schoolId: school.id,
+    schoolName: school.name
+  };
+});
 
 fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'server.js'));
-fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({ schools, users, students: [], learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {} }));
+fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({ schools, users, students, learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {} }));
 
 const child = spawn(process.execPath, ['server.js'], { cwd: temporaryDirectory, env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test' }, stdio: ['ignore', 'ignore', 'pipe'] });
 let childErrorOutput = '';
@@ -49,7 +59,7 @@ const fetchWithRetry = async (url, options, attempts = 5) => {
       healthResponses.push(...await Promise.all(Array.from({ length: 90 }, () => fetchWithRetry(`http://127.0.0.1:${port}/api/health`))));
     }
     healthResponses.forEach(response => assert.equal(response.status, 200));
-    console.log(`Capacity stress test passed for 1,500 tenant records and 500 sustained requests at up to 90 concurrent connections in ${Date.now() - startedAt} ms.`);
+    console.log(`Capacity stress test passed for 1,500 school tenants, two 1,000-learner pilot schools, and 500 sustained requests at up to 90 concurrent connections in ${Date.now() - startedAt} ms.`);
   } catch (error) {
     console.error(error);
     console.error(`Temporary server exit code: ${child.exitCode === null ? 'still running' : child.exitCode}`);

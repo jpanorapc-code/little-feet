@@ -13,6 +13,7 @@ const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
+const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
 let activeRequestCount = 0;
 let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
@@ -109,17 +110,11 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({
-  limit: '50mb',
+  limit: `${MAX_API_BODY_MB}mb`,
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
 app.set('trust proxy', 1);
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'lax' }
-}));
 app.use((req, res, next) => {
   persistenceReady.then(() => {
     activeRequestCount += 1;
@@ -132,7 +127,6 @@ app.use((req, res, next) => {
     next();
   }).catch(next);
 });
-
 // Serve static files from current directory
 app.use(express.static(__dirname));
 
@@ -191,6 +185,64 @@ let postgresPool = null;
 let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 
+class PostgresSessionStore extends session.Store {
+  constructor() {
+    super();
+    this.cleanupTimer = setInterval(() => {
+      if (postgresPool) postgresPool.query('DELETE FROM little_feet_sessions WHERE expires_at <= NOW()').catch(error => {
+        console.error('Session cleanup failed:', error.message);
+      });
+    }, 15 * 60 * 1000);
+    this.cleanupTimer.unref?.();
+  }
+
+  get(sessionId, callback) {
+    postgresPool.query(
+      'SELECT sess FROM little_feet_sessions WHERE sid = $1 AND expires_at > NOW()',
+      [sessionId]
+    ).then(result => callback(null, result.rows[0]?.sess || null)).catch(callback);
+  }
+
+  set(sessionId, sessionData, callback = () => {}) {
+    const expiresAt = sessionData?.cookie?.expires
+      ? new Date(sessionData.cookie.expires)
+      : new Date(Date.now() + 60 * 60 * 1000);
+    postgresPool.query(`
+      INSERT INTO little_feet_sessions (sid, sess, expires_at)
+      VALUES ($1, $2::jsonb, $3)
+      ON CONFLICT (sid) DO UPDATE SET sess = EXCLUDED.sess, expires_at = EXCLUDED.expires_at
+    `, [sessionId, JSON.stringify(sessionData), expiresAt]).then(() => callback()).catch(callback);
+  }
+
+  destroy(sessionId, callback = () => {}) {
+    postgresPool.query('DELETE FROM little_feet_sessions WHERE sid = $1', [sessionId])
+      .then(() => callback()).catch(callback);
+  }
+
+  touch(sessionId, sessionData, callback = () => {}) {
+    const expiresAt = sessionData?.cookie?.expires
+      ? new Date(sessionData.cookie.expires)
+      : new Date(Date.now() + 60 * 60 * 1000);
+    postgresPool.query('UPDATE little_feet_sessions SET expires_at = $2 WHERE sid = $1', [sessionId, expiresAt])
+      .then(() => callback()).catch(callback);
+  }
+}
+
+app.use(session({
+  store: process.env.DATABASE_URL ? new PostgresSessionStore() : undefined,
+  secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
+  name: 'littlefeet.sid',
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  cookie: {
+    secure: isProduction,
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 1000
+  }
+}));
+
 const persistenceHash = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const persistenceRecordKey = (record, index) => {
   const candidate = record?.id || record?.username || record?.reference || record?.learnerKey || record?.version;
@@ -230,7 +282,11 @@ function openStateDatabase() {
 async function openPostgresDatabase() {
   postgresPool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false }
+    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+    max: Math.max(2, Math.min(12, Number(process.env.PG_POOL_MAX) || 8)),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 15000,
+    allowExitOnIdle: false
   });
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS little_feet_app_state (
@@ -254,7 +310,14 @@ async function openPostgresDatabase() {
       state_key TEXT PRIMARY KEY,
       payload JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
+    );
+    CREATE TABLE IF NOT EXISTS little_feet_sessions (
+      sid TEXT PRIMARY KEY,
+      sess JSONB NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS little_feet_sessions_expiry_idx
+      ON little_feet_sessions (expires_at)
   `);
 }
 
@@ -527,6 +590,7 @@ app.get('/api/keepalive', async (_req, res) => {
 const runtimeReadiness = () => {
   const checks = {
     database: Boolean(process.env.DATABASE_URL),
+    durableSessions: Boolean(process.env.DATABASE_URL),
     fieldEncryption: fieldEncryptionConfigured,
     sessionSecret: sessionSecretConfigured,
     secureCookies: isProduction,
