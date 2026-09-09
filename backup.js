@@ -27,9 +27,15 @@ let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
-let wallpaperThemeTimer = null;
-let wallpaperThemeMaster = null;
+let welcomeThemeAudio = null;
+let windtLegacyAudio = null;
+let wallpaperThemeAudio = null;
+let customWallpaperObjectUrl = '';
+let wallpaperMuted = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
+const DEFAULT_WALLPAPER_URL = 'assets/little-feet-original-background.gif';
+const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
+const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
 const SA_PUBLIC_SCHOOL_CALENDAR = {
   2026: {
     terms: [['2026-01-14', '2026-03-27'], ['2026-04-08', '2026-06-26'], ['2026-07-21', '2026-09-23'], ['2026-10-06', '2026-12-11']],
@@ -60,6 +66,7 @@ function getPortalAudioContext() {
 
 function unlockPortalAudio() {
   try {
+    if (startupChimePending) playStartupChime();
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') {
       ctx.resume().then(() => { if (startupChimePending) playStartupChime(); }).catch(showStartupChimePrompt);
@@ -72,44 +79,22 @@ function unlockPortalAudio() {
 // Some mobile browsers only permit sound after an explicit second tap.  This
 // small, visible fallback is shown only when the browser blocks the first one.
 function showStartupChimePrompt() {
-  if (startupChimePlayed || startupChimePrompt || !currentUser) return;
+  if (startupChimePlayed || startupChimePrompt) return;
   const prompt = document.createElement('button');
   prompt.type = 'button';
   prompt.className = 'action-btn btn-green';
   prompt.textContent = '🔊 Play welcome theme';
   prompt.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:10020;box-shadow:0 12px 30px rgba(0,0,0,.35);';
   prompt.addEventListener('click', () => {
-    const ctx = getPortalAudioContext();
-    ctx.resume().then(() => {
-      prompt.remove();
-      startupChimePrompt = null;
-      playStartupChime();
-    }).catch(() => {});
+    prompt.remove();
+    startupChimePrompt = null;
+    playStartupChime();
   });
   document.body.append(prompt);
   startupChimePrompt = prompt;
   window.setTimeout(() => {
     if (startupChimePrompt === prompt) { prompt.remove(); startupChimePrompt = null; }
   }, 12000);
-}
-
-function scheduleLittleFeetJingle(ctx, output, startedAt, volume = 0.16) {
-  const notes = [
-    [0.08, 523.25, 0.72], [0.64, 659.25, 0.72], [1.2, 783.99, 0.82],
-    [1.96, 659.25, 0.68], [2.58, 880, 0.78], [3.28, 783.99, 0.78], [4.02, 1046.5, 0.9]
-  ];
-  notes.forEach(([offset, frequency, length], index) => {
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const start = startedAt + offset;
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(volume * (index === notes.length - 1 ? 1.12 : 1), start + 0.018);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-    oscillator.connect(gain); gain.connect(output);
-    oscillator.start(start); oscillator.stop(start + length + 0.03);
-  });
 }
 
 function southAfricaNow(date = new Date()) {
@@ -204,6 +189,11 @@ function playTicketAlert() {
 // DOM Initialization
 window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
+  try { wallpaperMuted = localStorage.getItem('lf_wallpaper_muted') === 'true'; } catch {}
+  updateWallpaperMuteControls();
+  restoreCustomWallpaper().catch(() => {});
+  startupChimePending = true;
+  playStartupChime();
   const dateEl = document.getElementById('todayDateStr');
   if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
 
@@ -340,6 +330,8 @@ function handleMascotLegacyTap(event) {
 function openWindtLegacy() {
   if (!currentUser) return;
   openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p><details style="border-top:1px solid rgba(45,212,191,.35);padding-top:12px;"><summary style="cursor:pointer;color:#99f6e4;font-weight:800;">’n Brief van Pa</summary><div style="display:grid;gap:12px;margin-top:12px;color:var(--text-dark);"><p style="margin:0;">My seun ek is so trots op jou so ver as wat jy gekom het, as ek nie daar meer is nie ek is jammer jy is die beste ding wat in my lewe gebeur het en ek weet jy gan n success wees in lewe pa glo vas jy sal kan beter doen as wat ek sou kon, asseblief kyk mooi na jou ma as ek nie meer daar is nie.</p><p style="margin:0;">Btw jou middle naam is based op my child hood game hero Marcus Fenix jou ma wou nie hê ek moes jou dit noem nie maar pa het inageval want jy deserve die beste.</p><p style="margin:0;">Die Windt Legacy gan nie oor wat gedoen was nie en aan gaan met dit nie dit gaan oor wat jy voor sit vir jou familie sodat die volgende generation kan streef en nog beter doen as die laaste.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Christiaan Windt in and out, love you my Potato.</p></div></details></article>`);
+  stopWelcomeTheme();
+  playWindtLegacyNote();
 }
 
 function showPortalTourSlide(index) {
@@ -351,28 +343,47 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
-// A short original five-second welcome jingle, played once per sign-in.
+function stopWelcomeTheme() {
+  if (!welcomeThemeAudio) return;
+  welcomeThemeAudio.pause();
+  welcomeThemeAudio.currentTime = 0;
+}
+
+function playWindtLegacyNote() {
+  stopWindtLegacyNote();
+  windtLegacyAudio = new Audio('assets/audio/little-feet-note.mp3');
+  windtLegacyAudio.loop = true;
+  windtLegacyAudio.volume = 0.62;
+  windtLegacyAudio.play().catch(() => {});
+}
+
+function stopWindtLegacyNote() {
+  if (!windtLegacyAudio) return;
+  windtLegacyAudio.pause();
+  windtLegacyAudio.currentTime = 0;
+  windtLegacyAudio = null;
+}
+
+// The supplied Little Feet theme plays once after the first permitted interaction.
 function playStartupChime() {
   if (startupChimePlayed) return;
   try {
-    const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') {
-      startupChimePending = true;
-      ctx.resume().then(() => playStartupChime()).catch(showStartupChimePrompt);
-      return;
-    }
     startupChimePending = false;
-    const startedAt = ctx.currentTime;
-    const duration = 5;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.48, startedAt + 0.04);
-    master.gain.setValueAtTime(0.48, startedAt + 4.25);
-    master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
-    master.connect(ctx.destination);
-    scheduleLittleFeetJingle(ctx, master, startedAt, 0.18);
-    startupChimePlayed = true;
-  } catch { /* Browser sound is optional and can be disabled by device settings. */ }
+    if (!welcomeThemeAudio) {
+      welcomeThemeAudio = new Audio('assets/audio/little-feet-theme.mp3');
+      welcomeThemeAudio.preload = 'auto';
+      welcomeThemeAudio.volume = 0.58;
+    }
+    welcomeThemeAudio.currentTime = 0;
+    welcomeThemeAudio.play().then(() => {
+      startupChimePlayed = true;
+      startupChimePrompt?.remove();
+      startupChimePrompt = null;
+    }).catch(() => {
+      startupChimePending = true;
+      showStartupChimePrompt();
+    });
+  } catch { startupChimePending = true; showStartupChimePrompt(); }
 }
 
 function movePortalTour(direction) {
@@ -715,6 +726,7 @@ function clearDebugReport() {
 function closeModal() {
   visitorScannerStream?.getTracks().forEach(track => track.stop());
   visitorScannerStream = null;
+  stopWindtLegacyNote();
   document.getElementById('appModal').classList.add('hidden');
 }
 
@@ -865,6 +877,8 @@ function logout() {
   schoolStatusTimer = null;
   currentUser = null;
   exitWallpaperMode();
+  stopWelcomeTheme();
+  stopWindtLegacyNote();
   startupChimePlayed = false;
   startupChimePending = false;
   startupChimePrompt?.remove();
@@ -936,6 +950,7 @@ function startWallpaperMode() {
   const overlay = document.getElementById('wallpaperOverlay');
   if (!currentUser || !overlay) return;
   clearTimeout(wallpaperIdleTimer);
+  stopWelcomeTheme();
   overlay.classList.add('is-visible');
   overlay.setAttribute('aria-hidden', 'false');
   startWallpaperTheme();
@@ -951,49 +966,165 @@ function exitWallpaperMode() {
   resetWallpaperTimer();
 }
 
-// Wallpaper mode quietly repeats the same five-second Little Feet jingle.
+function updateWallpaperMuteControls() {
+  document.querySelectorAll('[data-wallpaper-mute]').forEach(button => {
+    button.textContent = wallpaperMuted ? '🔇 Unmute wallpaper music' : '🔊 Mute wallpaper music';
+    button.setAttribute('aria-pressed', String(wallpaperMuted));
+  });
+}
+
+function toggleWallpaperMute() {
+  wallpaperMuted = !wallpaperMuted;
+  try { localStorage.setItem('lf_wallpaper_muted', String(wallpaperMuted)); } catch {}
+  if (wallpaperThemeAudio) wallpaperThemeAudio.muted = wallpaperMuted;
+  updateWallpaperMuteControls();
+}
+
+// The supplied wallpaper theme loops for as long as wallpaper mode remains open.
 function startWallpaperTheme() {
-  if (wallpaperThemeTimer || wallpaperThemeMaster) return;
   const overlay = document.getElementById('wallpaperOverlay');
   if (!overlay?.classList.contains('is-visible')) return;
   try {
-    const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(startWallpaperTheme).catch(showStartupChimePrompt);
-      return;
+    if (!wallpaperThemeAudio) {
+      wallpaperThemeAudio = new Audio('assets/audio/little-feet-wallpaper.mp3');
+      wallpaperThemeAudio.preload = 'auto';
+      wallpaperThemeAudio.loop = true;
+      wallpaperThemeAudio.volume = 0.55;
     }
-    const startedAt = ctx.currentTime;
-    const duration = 5;
-    const master = ctx.createGain();
-    wallpaperThemeMaster = master;
-    master.gain.setValueAtTime(0.0001, startedAt);
-    master.gain.exponentialRampToValueAtTime(0.16, startedAt + 0.06);
-    master.gain.setValueAtTime(0.16, startedAt + 4.25);
-    master.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
-    master.connect(ctx.destination);
-    scheduleLittleFeetJingle(ctx, master, startedAt, 0.14);
-    wallpaperThemeTimer = window.setTimeout(() => {
-      wallpaperThemeTimer = null;
-      if (wallpaperThemeMaster === master) wallpaperThemeMaster = null;
-      master.disconnect();
-      startWallpaperTheme();
-    }, 5020);
+    wallpaperThemeAudio.muted = wallpaperMuted;
+    wallpaperThemeAudio.currentTime = 0;
+    wallpaperThemeAudio.play().catch(() => {});
+    updateWallpaperMuteControls();
   } catch { /* Wallpaper remains available even when a device has sound disabled. */ }
 }
 
 function stopWallpaperTheme() {
-  if (wallpaperThemeTimer) window.clearTimeout(wallpaperThemeTimer);
-  wallpaperThemeTimer = null;
-  const master = wallpaperThemeMaster;
-  wallpaperThemeMaster = null;
-  if (!master) return;
+  if (!wallpaperThemeAudio) return;
+  wallpaperThemeAudio.pause();
+  wallpaperThemeAudio.currentTime = 0;
+}
+
+function openWallpaperDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject(new Error('This browser cannot store a custom wallpaper.'));
+    const request = indexedDB.open('little-feet-device-assets', 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains('wallpapers')) request.result.createObjectStore('wallpapers');
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Unable to open wallpaper storage.'));
+  });
+}
+
+async function saveCustomWallpaper(blob) {
+  const database = await openWallpaperDatabase();
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction('wallpapers', 'readwrite');
+    transaction.objectStore('wallpapers').put(blob, 'active');
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error || new Error('Unable to save the wallpaper.'));
+  });
+  database.close();
+}
+
+async function storedCustomWallpaper() {
+  const database = await openWallpaperDatabase();
+  const blob = await new Promise((resolve, reject) => {
+    const request = database.transaction('wallpapers', 'readonly').objectStore('wallpapers').get('active');
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error || new Error('Unable to read the wallpaper.'));
+  });
+  database.close();
+  return blob;
+}
+
+function applyCustomWallpaper(blob) {
+  const image = document.getElementById('wallpaperImage');
+  if (!image) return;
+  if (customWallpaperObjectUrl) URL.revokeObjectURL(customWallpaperObjectUrl);
+  customWallpaperObjectUrl = blob ? URL.createObjectURL(blob) : '';
+  image.src = customWallpaperObjectUrl || DEFAULT_WALLPAPER_URL;
+}
+
+async function restoreCustomWallpaper() {
+  const blob = await storedCustomWallpaper();
+  if (blob) {
+    applyCustomWallpaper(blob);
+    const status = document.getElementById('customWallpaperStatus');
+    if (status) status.textContent = `${blob.name || 'Your custom wallpaper'} is saved on this device and active.`;
+  }
+}
+
+function gifDurationMs(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let total = 0;
+  let frames = 0;
+  for (let index = 0; index + 6 < bytes.length; index += 1) {
+    if (bytes[index] !== 0x21 || bytes[index + 1] !== 0xf9 || bytes[index + 2] !== 0x04) continue;
+    const delay = bytes[index + 4] | (bytes[index + 5] << 8);
+    total += Math.max(delay * 10, 20);
+    frames += 1;
+  }
+  return frames > 1 ? total : 0;
+}
+
+function wallpaperDimensions(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('The selected file is not a readable image.'));
+    };
+    image.src = url;
+  });
+}
+
+async function importCustomWallpaper() {
+  const input = document.getElementById('customWallpaperFile');
+  const status = document.getElementById('customWallpaperStatus');
+  const file = input?.files?.[0];
+  if (!file) return alert('Choose a JPG, PNG, WebP, or GIF first.');
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (!['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension) || !file.type.startsWith('image/')) return alert('Use a JPG, PNG, WebP, or GIF wallpaper.');
+  if (file.size > CUSTOM_WALLPAPER_MAX_BYTES) return alert('The wallpaper must be 8 MB or smaller.');
   try {
-    const now = getPortalAudioContext().currentTime;
-    master.gain.cancelScheduledValues(now);
-    master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    window.setTimeout(() => master.disconnect(), 260);
-  } catch { try { master.disconnect(); } catch {} }
+    const dimensions = await wallpaperDimensions(file);
+    if (dimensions.width > 3840 || dimensions.height > 2160 || dimensions.width * dimensions.height > 8294400) throw new Error('Use an image no larger than 3840 × 2160 pixels.');
+    if (extension === 'gif') {
+      const duration = gifDurationMs(await file.arrayBuffer());
+      if (duration > CUSTOM_WALLPAPER_MAX_GIF_MS) throw new Error('Animated GIFs must be 8 seconds or shorter.');
+    }
+    await saveCustomWallpaper(file);
+    applyCustomWallpaper(file);
+    if (status) status.textContent = `${file.name} is saved on this device and ready to preview.`;
+  } catch (error) {
+    alert(error.message || 'Unable to save this wallpaper.');
+  }
+}
+
+async function resetCustomWallpaper() {
+  try {
+    const database = await openWallpaperDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction('wallpapers', 'readwrite');
+      transaction.objectStore('wallpapers').delete('active');
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('Unable to restore the default wallpaper.'));
+    });
+    database.close();
+    applyCustomWallpaper(null);
+    const input = document.getElementById('customWallpaperFile');
+    const status = document.getElementById('customWallpaperStatus');
+    if (input) input.value = '';
+    if (status) status.textContent = 'The original Little Feet campfire wallpaper is active.';
+  } catch (error) {
+    alert(error.message || 'Unable to restore the default wallpaper.');
+  }
 }
 
 function openWorkspace(tabId) {

@@ -244,6 +244,7 @@
     .wallpaper-overlay-copy h2 { margin:0 0 8px; font-size:clamp(1.4rem,3vw,2.45rem); }
     .wallpaper-overlay-copy p { margin:0; color:#d8f5ef; font-size:clamp(.8rem,1.5vw,1rem); }
     .wallpaper-exit { position:absolute; z-index:2; top:18px; right:18px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
+    .wallpaper-mute { position:absolute; z-index:2; top:18px; right:150px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
 
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -478,6 +479,7 @@
       .portal-tour-slide { grid-template-columns:1fr; }
       .portal-tour-image { display:none; }
       .wallpaper-overlay-copy { bottom:32px; }
+      .wallpaper-mute { top:66px; right:18px; }
       nav .nav-links.menu-open { grid-template-columns:1fr; }
       .nav-more-toggle { order:3; width:100%; }
       .nav-user-panel { width:100%; justify-content:space-between; order:2; }
@@ -1555,11 +1557,13 @@
       <div id="wallpaperTab" class="tab-content">
         <section class="card" style="max-width:860px;">
           <div class="card-header-bar"><h2>🖼️ Wallpaper Mode</h2><span class="badge-tag info">SCREEN SAVER</span></div>
-          <p style="color:var(--text-muted);line-height:1.6;max-width:680px;">When the portal has been idle for one hour, it will switch to the Little Feet campfire wallpaper with a short looping jingle. Nothing is signed out or lost, and any normal interaction returns to your work.</p>
+          <p style="color:var(--text-muted);line-height:1.6;max-width:680px;">When the portal has been idle for one hour, it will switch to the Little Feet wallpaper and loop the dedicated wallpaper song. Nothing is signed out or lost, and any normal interaction returns to your work.</p>
           <div class="workspace-grid" style="margin-top:16px;">
-            <div class="workspace-card"><h3>Start now</h3><p>Show the animated campfire wallpaper with its short looping jingle immediately.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
+            <div class="workspace-card"><h3>Start now</h3><p>Show the active wallpaper with the dedicated looping Little Feet wallpaper song.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
             <div class="workspace-card"><h3>How to return</h3><p>Click anywhere, press any key, touch the screen, or use the visible Exit button.</p><button type="button" class="action-btn btn-blue" onclick="startWallpaperMode()">Preview exit options</button></div>
             <div class="workspace-card"><h3>Automatic start</h3><p>Enabled for this device after <strong>one hour</strong> with no activity.</p><span class="badge-tag">ON</span></div>
+            <div class="workspace-card"><h3>Wallpaper sound</h3><p>Mute or restore the wallpaper music without leaving wallpaper mode.</p><button type="button" class="action-btn btn-blue" data-wallpaper-mute onclick="toggleWallpaperMute()">🔊 Mute wallpaper music</button></div>
+            <div class="workspace-card" style="grid-column:1/-1;"><h3>Use your own wallpaper</h3><p>Saved only on this device. JPG, PNG, WebP, or GIF; maximum 8 MB and 3840 × 2160. Animated GIFs must be 8 seconds or shorter.</p><input id="customWallpaperFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-green" onclick="importCustomWallpaper()">Use selected wallpaper</button><button type="button" class="action-btn btn-blue" onclick="resetCustomWallpaper()">Restore Little Feet wallpaper</button></div><p id="customWallpaperStatus" class="meta" style="margin-top:9px;">The original Little Feet campfire wallpaper is active.</p></div>
           </div>
         </section>
       </div>
@@ -1609,12 +1613,13 @@
   </div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
-    <img src="assets/little-feet-original-background.gif" alt="Animated Little Feet penguin resting beside a campfire">
-    <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. The Little Feet theme is playing. Click, touch, or press any key to return.</p></div>
+    <img id="wallpaperImage" src="assets/little-feet-original-background.gif" alt="Active Little Feet wallpaper">
+    <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
+    <button type="button" class="wallpaper-mute" data-wallpaper-mute onclick="event.stopPropagation(); toggleWallpaperMute()">🔊 Mute wallpaper music</button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260909-chat-donations" defer></script>
+  <script src="backup.js?v=20260909-audio-wallpaper" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
