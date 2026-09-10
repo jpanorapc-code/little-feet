@@ -19,9 +19,11 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
   schools,
   users: [
     { username: 'alpha-admin', pinHash: pinHash('AlphaPass1'), name: 'Alpha Administrator', role: 'admin', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
-    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Administrator', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
+    { username: 'alpha-parent', pinHash: pinHash('ParentPass1'), name: 'Alpha Parent', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['alpha learner'], subscription: 'basic' },
+    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Administrator', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
+    { username: 'bravo-parent', pinHash: pinHash('ParentPass1'), name: 'Bravo Parent', role: 'parent', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['bravo learner'], subscription: 'basic' }
   ],
-  students: [], learnerAccessCodes: [], storeProducts: [], storeOrders: [], registry: [], schools,
+  students: [], learnerAccessCodes: [], storeProducts: [], storeOrders: [], parentPayments: [], parentSubscriptions: [], bookRegister: [], registry: [], schools,
   schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}
 }));
 
@@ -70,9 +72,13 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(keepalive.response.status, 200);
     assert.equal(keepalive.data.status, 'OK');
     const alphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
+    const alphaParentLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-parent', pin: 'ParentPass1' } });
     const bravoLogin = await request('/api/login', { method: 'POST', body: { username: 'bravo-admin', pin: 'BravoPass1' } });
+    const bravoParentLogin = await request('/api/login', { method: 'POST', body: { username: 'bravo-parent', pin: 'ParentPass1' } });
     assert.equal(alphaLogin.response.status, 200);
+    assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
+    assert.equal(bravoParentLogin.response.status, 200);
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
@@ -104,6 +110,45 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
 
     const alphaBillingConfigured = await request('/api/subscription-billing', { method: 'PUT', cookie: alphaLogin.cookie, body: { baseMonthly: 500, lateFeeEnabled: false, lateFee: 0, bundles: { 5: { costPrice: 0, sellingPrice: 50 }, 20: { costPrice: 0, sellingPrice: 150 }, 100: { costPrice: 0, sellingPrice: 500 } }, payment: { method: 'bank_transfer', accountName: 'Alpha School', bankName: 'Test Bank', accountNumber: '123456789', branchCode: '000000', referencePrefix: 'ALPHA' } } });
     assert.equal(alphaBillingConfigured.response.status, 200);
+
+    const parentPayment = await request('/api/parent-payments', { method: 'POST', cookie: alphaLogin.cookie, body: { parentUsername: 'alpha-parent', learnerName: 'Alpha Learner', description: 'Term fees', amountDue: 500, dueDate: '2020-01-01', arrangementDueDate: '2021-01-01', arrangementAmount: 400, arrangementNote: 'Approved reduced amount and later date' } });
+    assert.equal(parentPayment.response.status, 201);
+    assert.equal(parentPayment.data.payment.amountDue, 400);
+    assert.equal(parentPayment.data.payment.arrears, 400);
+    const partPayment = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'parent-payment-1', reference: parentPayment.data.payment.reference, status: 'paid', amount: 150, bankReference: 'PARENT-BANK-001' } });
+    assert.equal(partPayment.response.status, 201);
+    const alphaParentPayments = await request('/api/parent-payments', { cookie: alphaParentLogin.cookie });
+    const bravoParentPayments = await request('/api/parent-payments', { cookie: bravoParentLogin.cookie });
+    assert.equal(alphaParentPayments.data.summary.arrears, 250);
+    assert.equal(alphaParentPayments.data.payments[0].paymentHistory.length, 1);
+    assert.equal(bravoParentPayments.data.payments.length, 0);
+
+    const parentSubscription = await request('/api/parent-subscription/orders', { method: 'POST', cookie: alphaParentLogin.cookie, body: {} });
+    assert.equal(parentSubscription.response.status, 201);
+    assert.equal(parentSubscription.data.order.amount, 29);
+    const subscriptionPayment = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'parent-subscription-1', reference: parentSubscription.data.order.reference, status: 'paid', amount: 29, bankReference: 'PLUS-BANK-001' } });
+    assert.equal(subscriptionPayment.response.status, 201);
+    const refreshedParentSession = await request('/api/auth/session', { cookie: alphaParentLogin.cookie });
+    assert.equal(refreshedParentSession.data.user.subscription, 'plus');
+
+    const issuedBook = await request('/api/book-register', { method: 'POST', cookie: alphaLogin.cookie, body: { bookTitle: 'Mathematics Grade 4', bookCode: 'MATH-001', bookPrice: 250, learnerName: 'Alpha Learner', className: 'Grade 4A', parentUsername: 'alpha-parent', issueCondition: 'New, no markings', adminSignature: 'Alpha Administrator' } });
+    assert.equal(issuedBook.response.status, 201);
+    const signedReceipt = await request(`/api/book-register/${issuedBook.data.record.id}/sign`, { method: 'POST', cookie: alphaParentLogin.cookie, body: { action: 'received', signature: 'Alpha Parent' } });
+    assert.equal(signedReceipt.response.status, 200);
+    const returnedBook = await request(`/api/book-register/${issuedBook.data.record.id}/return`, { method: 'PUT', cookie: alphaLogin.cookie, body: { returnStatus: 'damaged', returnCondition: 'Water damaged cover', returnAdminSignature: 'Alpha Administrator' } });
+    assert.equal(returnedBook.response.status, 200);
+    assert.equal(returnedBook.data.record.penaltyAmount, 250);
+    const signedReturn = await request(`/api/book-register/${issuedBook.data.record.id}/sign`, { method: 'POST', cookie: alphaParentLogin.cookie, body: { action: 'returned', signature: 'Alpha Parent' } });
+    assert.equal(signedReturn.response.status, 200);
+    const importedBooks = await request('/api/book-register/import', { method: 'POST', cookie: alphaLogin.cookie, body: { rows: [{ 'Book Title': 'English Grade 4', 'Book Code': 'ENG-001', 'Learner Name': 'Alpha Learner', Class: 'Grade 4A', 'Parent Username': 'alpha-parent', 'Book replacement price': 180, 'Condition at handover': 'Good' }] } });
+    assert.equal(importedBooks.response.status, 201);
+    const alphaBooks = await request('/api/book-register?className=Grade%204A', { cookie: alphaLogin.cookie });
+    const bravoBooks = await request('/api/book-register', { cookie: bravoLogin.cookie });
+    assert.equal(alphaBooks.data.summary.total, 2);
+    assert.equal(alphaBooks.data.summary.returned, 1);
+    assert.equal(alphaBooks.data.summary.penalties, 250);
+    assert.equal(bravoBooks.data.records.length, 0);
+
     const subscriptionOrder = await request('/api/subscription-billing/orders', { method: 'POST', cookie: alphaLogin.cookie, body: { bundleCapacity: 5 } });
     assert.equal(subscriptionOrder.response.status, 201);
     assert.equal(subscriptionOrder.data.order.monthlyTotal, 550);
@@ -114,7 +159,8 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(duplicateReconciliation.data.duplicate, true);
     const alphaLedger = await request('/api/payments/ledger', { cookie: alphaLogin.cookie });
     const bravoLedger = await request('/api/payments/ledger', { cookie: bravoLogin.cookie });
-    assert.equal(alphaLedger.data.length, 1);
+    assert.equal(alphaLedger.data.length, 3);
+    assert.deepEqual(new Set(alphaLedger.data.map(entry => entry.targetType)), new Set(['subscription', 'parent_subscription', 'parent_payment']));
     assert.equal(bravoLedger.data.length, 0);
 
     console.log('Tenant isolation test passed.');

@@ -1,4 +1,6 @@
 let currentUser = null;
+let parentPaymentData = null;
+let bookRegisterData = null;
 const errorLog = [];
 let mapInstance = null;
 let nearbySchoolRecords = [];
@@ -922,6 +924,8 @@ function setupSession() {
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
   loadSubscriptionBillingOverview();
+  loadParentPayments();
+  loadBookRegister();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
   if (ticketMonitorId) clearInterval(ticketMonitorId);
@@ -1358,6 +1362,8 @@ async function loadAllData() {
   loadVisitorMeetings();
   loadConsentRecords();
   loadPickupRecords();
+  loadParentPayments();
+  loadBookRegister();
   ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding', 'absences', 'handovers'].forEach(loadWorkspaceRecords);
 }
 
@@ -3035,10 +3041,13 @@ async function createDonationIntent(event) {
 async function openSubscriptionsModal() {
   const schoolRoles = ['teacher', 'principal', 'district', 'admin'];
   if (currentUser?.role === 'parent') {
+    let parentSubscription = null;
+    try { const response = await fetch('/api/parent-subscription'); if (response.ok) parentSubscription = await response.json(); } catch { /* show the plan even when the payment service is briefly unavailable */ }
+    const activeBadge = parentSubscription?.active ? '<span class="badge-tag info">PAID · SPECIAL ACCESS ACTIVE</span>' : '<span class="badge-tag urgent">NOT PAID · BASIC ACCESS</span>';
     const parentContent = `
       <section style="font-size:0.9rem; line-height:1.55; color:var(--text-dark);">
         <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:4px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">FAMILY PLAN</div>
-        <h2 style="margin:10px 0 4px; color:var(--text-dark); font-size:1.5rem;">LittleSteps Plus</h2>
+        <h2 style="margin:10px 0 4px; color:var(--text-dark); font-size:1.5rem;">LittleSteps Plus ${activeBadge}</h2>
         <p style="margin:0 0 16px; color:#10b981; font-size:1rem; font-weight:700;">More ways to follow and celebrate your child’s learning.</p>
         <div style="padding:16px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:10px; background:rgba(16,185,129,0.08);">
           <strong style="display:block; font-size:1.4rem; color:var(--text-dark);">R29 / month per child</strong>
@@ -3051,7 +3060,8 @@ async function openSubscriptionsModal() {
             <li>Additional family access for approved caregivers.</li>
           </ul>
         </div>
-        <p style="margin:14px 0 0; color:var(--text-muted); font-size:.78rem;">Availability and features are set by your school and your family account permissions.</p>
+        <p style="margin:14px 0 0; color:var(--text-muted); font-size:.78rem;">Only a paid parent subscription unlocks the special features. If payment was made outside the portal, an administrator can grant access manually.</p>
+        ${parentSubscription?.active ? '<p style="margin:10px 0 0;color:#059669;font-weight:700;">Your Plus features are unlocked.</p>' : parentSubscription?.paymentConfigured ? '<button type="button" class="submit-btn" style="margin-top:12px;" onclick="openParentSubscriptionCheckout()">Start paid parent subscription</button>' : '<p class="meta" style="margin-top:10px;">The school has not configured a payment destination yet.</p>'}
       </section>`;
     openModal('Parent Subscription', parentContent);
     document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
@@ -3103,11 +3113,37 @@ async function openSubscriptionsModal() {
         </div>
       </section>
 
-      ${currentUser?.role === 'admin' ? `<section style="margin-top:20px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);"><div style="display:inline-block;background:#059669;color:#fff;border-radius:999px;padding:3px 11px;font-size:.68rem;font-weight:700;letter-spacing:.08em;">ADMIN VIEW · PARENT PLAN</div><h2 style="margin:8px 0 4px;color:var(--text-dark);font-size:1.25rem;">LittleSteps Plus</h2><strong style="font-size:1.2rem;color:#10b981;">R29 / month per child</strong><p style="margin:8px 0 0;color:var(--text-muted);">Administrators can review both the institutional subscription and the optional parent plan. Other school roles see only institutional pricing.</p></section>` : ''}
+      ${currentUser?.role === 'admin' ? `<section style="margin-top:20px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);"><div style="display:inline-block;background:#059669;color:#fff;border-radius:999px;padding:3px 11px;font-size:.68rem;font-weight:700;letter-spacing:.08em;">ADMIN VIEW · PARENT PLAN</div><h2 style="margin:8px 0 4px;color:var(--text-dark);font-size:1.25rem;">LittleSteps Plus</h2><strong style="font-size:1.2rem;color:#10b981;">R29 / month per child</strong><p style="margin:8px 0 0;color:var(--text-muted);">Administrators can review both the institutional subscription and the optional parent plan. Other school roles see only institutional pricing.</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="openParentSubscriptionAccessAdmin()">Grant or remove parent access</button></section>` : ''}
       ${['principal', 'admin'].includes(currentUser?.role) ? `<section style="margin-top:24px;padding:16px;border:1px solid #2dd4bf;border-radius:10px;background:rgba(13,148,136,.1);"><h3 style="margin:0 0 6px;color:var(--text-dark);">Ready to subscribe?</h3><p style="margin:0 0 12px;color:var(--text-muted);">Choose your learner capacity, accept the late-payment terms if enabled, and receive a unique payment reference.</p><button type="button" class="submit-btn" onclick="openSubscriptionCheckout()">Choose plan &amp; pay</button></section>` : ''}
     </div>`;
   openModal('School Subscriptions & Advantages', content);
   document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
+}
+
+async function openParentSubscriptionCheckout() {
+  if (currentUser?.role !== 'parent') return;
+  try {
+    const response = await fetch('/api/parent-subscription/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to start the parent subscription.');
+    const destination = result.payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" target="_blank" rel="noopener" href="${escapeWorkspaceText(result.payment.paymentLink)}">Pay securely now</a>` : `<div class="workspace-card"><strong>${escapeWorkspaceText(result.payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(result.payment.accountName)}<br>Account number: ${escapeWorkspaceText(result.payment.accountNumber)}${result.payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(result.payment.branchCode)}` : ''}</div>`;
+    openModal('Parent subscription payment', `<p style="margin:0 0 10px;">${formatSubscriptionMoney(result.order.amount)} for ${result.order.children} linked child${result.order.children === 1 ? '' : 'ren'}.</p><p class="meta">Use reference <strong>${escapeWorkspaceText(result.order.reference)}</strong>. Special features unlock automatically after the payment is recorded.</p>${destination}`);
+  } catch (error) { alert(error.message || 'Unable to start parent subscription.'); }
+}
+
+async function openParentSubscriptionAccessAdmin() {
+  if (currentUser?.role !== 'admin') return;
+  try {
+    const response = await fetch('/api/parent-subscription'); const data = await response.json(); if (!response.ok) throw new Error(data.message || 'Unable to load parent subscriptions.');
+    const options = (data.parents || []).map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name || parent.username)} · ${escapeWorkspaceText(parent.status || 'basic')}${parent.grantedUntil ? ` · until ${escapeWorkspaceText(parent.grantedUntil)}` : ''}</option>`).join('');
+    if (!options) return alert('No parent accounts are available in this school.');
+    openModal('Manual parent Plus access', `<form onsubmit="saveParentSubscriptionAccess(event)" style="display:grid;gap:12px;"><p class="meta">Use this only when payment was confirmed outside the portal or a school-approved exception was granted. Paid access remains visible in the account audit.</p><label>Parent account<select name="username">${options}</select></label><label>Access status<select name="status"><option value="paid">Paid / special access</option><option value="basic">Basic / remove access</option></select></label><label>Access end date (optional)<input name="grantedUntil" type="date"><span class="meta">Leave blank for ongoing paid access.</span></label><button class="submit-btn">Save access decision</button></form>`);
+  } catch (error) { alert(error.message || 'Unable to load parent subscriptions.'); }
+}
+
+async function saveParentSubscriptionAccess(event) {
+  event.preventDefault(); const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+  try { const response = await fetch(`/api/accounts/${encodeURIComponent(payload.username)}/parent-subscription`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: payload.status, grantedUntil: payload.grantedUntil }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save parent access.'); closeModal(); alert(`${result.account.name || result.account.username} now has ${result.account.subscription === 'plus' ? 'Plus' : 'basic'} access.`); } catch (error) { alert(error.message || 'Unable to save parent access.'); }
 }
 
 function formatSubscriptionMoney(value) {
@@ -3116,21 +3152,22 @@ function formatSubscriptionMoney(value) {
 
 async function loadSubscriptionBillingOverview() {
   const container = document.getElementById('subscriptionBillingOverview');
-  if (!container || currentUser?.role !== 'admin') return;
+  if (!container || !['principal', 'admin'].includes(currentUser?.role)) return;
   try {
     const response = await fetch('/api/subscription-billing');
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription information.');
+    const isAdmin = currentUser.role === 'admin';
     const bundles = data.pricing.bundles || [];
     const awaiting = (data.orders || []).filter(order => order.status === 'awaiting payment');
     const requestedMonthly = awaiting.reduce((total, order) => total + Number(order.monthlyTotal || 0), 0);
     const potentialMargin = awaiting.reduce((total, order) => total + Number(order.profitMargin || 0), 0);
     const rows = bundles.map(bundle => {
       const margin = Number(bundle.sellingPrice || 0) - Number(bundle.costPrice || 0);
-      return `<tr><td style="padding:9px 10px;"><strong>+${bundle.capacity} children</strong></td><td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.costPrice)}</td><td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.sellingPrice)}</td><td style="padding:9px 10px;color:#2dd4bf;font-weight:700;">${formatSubscriptionMoney(margin)}</td></tr>`;
+      return `<tr><td style="padding:9px 10px;"><strong>+${bundle.capacity} children</strong></td>${isAdmin ? `<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.costPrice)}</td>` : ''}<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.sellingPrice)}</td>${isAdmin ? `<td style="padding:9px 10px;color:#2dd4bf;font-weight:700;">${formatSubscriptionMoney(margin)}</td>` : ''}</tr>`;
     }).join('');
     const orders = (data.orders || []).slice(0, 6).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(order.status)}</li>`).join('') || '<li>No payment requests yet.</li>';
-    container.innerHTML = `<div class="card-header-bar"><h3>Subscription pricing &amp; operating overview</h3><span class="badge-tag ${data.paymentConfigured ? 'info' : 'urgent'}">${data.paymentConfigured ? 'PAYMENT READY' : 'SETUP NEEDED'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting monthly revenue</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div></div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:560px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th><th style="padding:9px 10px;">Your cost</th><th style="padding:9px 10px;">School price</th><th style="padding:9px 10px;">Your profit</th></tr></thead><tbody>${rows}</tbody></table></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:14px;"><div><h4 style="margin:0 0 7px;">How it works</h4><ol style="margin:0;padding-left:19px;color:var(--text-muted);font-size:.84rem;line-height:1.6;"><li>Set your cost and selling price for each child bundle.</li><li>Choose a secure payment link or bank-transfer account.</li><li>Principals or admins choose a bundle and create a payment request.</li><li>Little Feet creates a unique reference for payment matching.</li></ol></div><div><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="openSubscriptionBillingAdmin()">Edit prices &amp; payment destination</button>`;
+    container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.paymentConfigured ? 'info' : 'urgent'}">${data.paymentConfigured ? 'PAYMENT READY' : 'SETUP NEEDED'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
   } catch (error) {
     container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load subscription information.')}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
   }
@@ -3207,6 +3244,217 @@ async function createSubscriptionOrder(event) {
     const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Pay securely now</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
     openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
   } catch (error) { alert(error.message || 'Unable to create payment request.'); }
+}
+
+function parentPaymentStatusLabel(payment) {
+  if (payment.status === 'paid') return '<span class="badge-tag info">PAID</span>';
+  if (payment.status === 'in_arrears') return '<span class="badge-tag urgent">IN ARREARS</span>';
+  if (payment.status === 'partially_paid') return '<span class="badge-tag urgent">PARTLY PAID</span>';
+  return '<span class="badge-tag">AWAITING PAYMENT</span>';
+}
+
+async function loadParentPayments() {
+  const summaryBox = document.getElementById('parentPaymentsSummary');
+  const list = document.getElementById('parentPaymentsList');
+  if (!summaryBox || !list || !currentUser || !['parent', 'principal', 'admin'].includes(currentUser.role)) return;
+  try {
+    const response = await fetch('/api/parent-payments');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load parent payments.');
+    parentPaymentData = data;
+    const summary = data.summary || {};
+    summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>`;
+    const admin = ['principal', 'admin'].includes(currentUser.role);
+    list.innerHTML = data.payments?.length ? data.payments.map(payment => {
+      const arrangement = payment.arrangementActive ? `<p style="margin:4px 0;color:#99f6e4;">Approved arrangement: ${formatSubscriptionMoney(payment.arrangementAmount)} due ${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementNote ? ` · ${escapeWorkspaceText(payment.arrangementNote)}` : ''}</p>` : '';
+      const destination = payment.payment?.paymentLink ? `<a class="action-btn btn-green" style="display:inline-block;text-decoration:none;" target="_blank" rel="noopener" href="${escapeWorkspaceText(payment.payment.paymentLink)}">Pay securely</a>` : payment.payment?.accountNumber ? `<span class="meta">Pay by bank transfer to ${escapeWorkspaceText(payment.payment.bankName)} · ${escapeWorkspaceText(payment.payment.accountNumber)} · Ref ${escapeWorkspaceText(payment.reference)}</span>` : '<span class="meta">Payment destination not configured.</span>';
+      const actions = admin && payment.balance > 0 ? `<button type="button" class="action-btn btn-blue" onclick="openParentPaymentReconcile('${encodeURIComponent(payment.id)}')">Record payment</button>` : '';
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? ` · ${escapeWorkspaceText(payment.learnerName)}` : ''}</strong> ${parentPaymentStatusLabel(payment)}<p style="margin:4px 0;">${escapeWorkspaceText(payment.description)} · Due ${escapeWorkspaceText(payment.effectiveDueDate)} · Ref <strong>${escapeWorkspaceText(payment.reference)}</strong></p>${arrangement}<p class="meta">Due ${formatSubscriptionMoney(payment.amountDue)} · Paid ${formatSubscriptionMoney(payment.paidAmount)} · Balance ${formatSubscriptionMoney(payment.balance)}${payment.arrears > 0 ? ` · Arrears ${formatSubscriptionMoney(payment.arrears)}` : ''}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${destination}${actions}${currentUser.role === 'parent' && !payment.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signParentPayment('${encodeURIComponent(payment.id)}')">Confirm account</button>` : ''}</div></div>`;
+    }).join('') : '<p class="meta">No parent payment requests have been created.</p>';
+  } catch (error) {
+    summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load parent payments.')}</p>`;
+    list.innerHTML = '';
+  }
+}
+
+async function openParentPaymentAdmin() {
+  if (!['principal', 'admin'].includes(currentUser?.role)) return alert('Only a principal or administrator can create parent payment requests.');
+  let parents;
+  try {
+    const response = await fetch('/api/parent-payments/parents');
+    parents = await response.json();
+    if (!response.ok) throw new Error(parents.message || 'Unable to load parent accounts.');
+  } catch (error) { return alert(error.message || 'Unable to load parent accounts.'); }
+  if (!parents.length) return alert('Create or approve a parent account first.');
+  const options = parents.map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name)} · ${escapeWorkspaceText(parent.username)}</option>`).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  openModal('Create parent school payment', `<form onsubmit="createParentPayment(event)" style="display:grid;gap:12px;"><p class="meta" style="margin:0;">Record the original amount and due date. If the school approves a later date or a different amount, add it below; arrears will use the approved arrangement automatically.</p><label>Parent account<select name="parentUsername" required>${options}</select></label><div class="workspace-grid"><label>Learner (optional)<input name="learnerName" maxlength="160" placeholder="e.g. Sam Smith"></label><label>Amount due (R)<input name="amountDue" type="number" min="0.01" step="0.01" required></label></div><label>Description<input name="description" maxlength="240" required placeholder="e.g. September school fees"></label><div class="workspace-grid"><label>Original due date<input name="dueDate" type="date" value="${today}" required></label><label>Approved later date (optional)<input name="arrangementDueDate" type="date"></label></div><div class="workspace-grid"><label>Approved arrangement amount (optional)<input name="arrangementAmount" type="number" min="0.01" step="0.01" placeholder="Leave blank to keep original"></label><label>Agreement note (optional)<input name="arrangementNote" maxlength="500" placeholder="e.g. Principal approved payment on 30 Sep"></label></div><button class="submit-btn">Save parent payment</button></form>`);
+}
+
+async function createParentPayment(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const payload = Object.fromEntries(new FormData(form).entries());
+  try {
+    const response = await fetch('/api/parent-payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to create parent payment.');
+    closeModal();
+    await loadParentPayments();
+    alert(`Parent payment created. Reference: ${result.payment.reference}`);
+  } catch (error) { alert(error.message || 'Unable to create parent payment.'); }
+}
+
+function openParentPaymentReconcile(encodedId) {
+  const payment = parentPaymentData?.payments?.find(item => item.id === decodeURIComponent(encodedId));
+  if (!payment) return;
+  openModal('Record parent payment', `<form onsubmit="reconcileParentPayment(event,'${encodeURIComponent(payment.reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">${escapeWorkspaceText(payment.parentName)} · ${escapeWorkspaceText(payment.description)}</p><p class="meta" style="margin:0;">Remaining balance: ${formatSubscriptionMoney(payment.balance)}. Part-payments are accepted and the arrears label will recalculate immediately.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" max="${payment.balance}" step="0.01" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160"></label><button class="submit-btn">Record payment</button></form>`);
+}
+
+async function reconcileParentPayment(event, encodedReference) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/payments/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: `parent-${Date.now()}-${Math.random().toString(16).slice(2)}`, reference: decodeURIComponent(encodedReference), status: 'paid', amount: form.elements.amount.value, bankReference: form.elements.bankReference.value }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to record payment.');
+    closeModal();
+    await loadParentPayments();
+  } catch (error) { alert(error.message || 'Unable to record payment.'); }
+}
+
+function openParentPaymentReport() {
+  if (!parentPaymentData) return loadParentPayments();
+  const summary = parentPaymentData.summary || {};
+  const rows = (parentPaymentData.payments || []).map(payment => `<tr><td style="padding:8px;">${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? `<br><span class="meta">${escapeWorkspaceText(payment.learnerName)}</span>` : ''}</td><td style="padding:8px;">${escapeWorkspaceText(payment.description)}</td><td style="padding:8px;">${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementActive ? `<br><span class="meta">${escapeWorkspaceText(payment.arrangementNote || 'Approved arrangement')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.amountDue)}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.paidAmount)}${payment.paymentHistory?.length ? `<br><span class="meta">${payment.paymentHistory.map(item => `${formatSubscriptionMoney(item.amount)} ${escapeWorkspaceText(item.status)} · ${new Date(item.receivedAt).toLocaleDateString()}`).join('<br>')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.balance)}${payment.arrears ? `<br><span style="color:#fca5a5;">Arrears ${formatSubscriptionMoney(payment.arrears)}</span>` : ''}</td></tr>`).join('');
+  openModal('Full parent payment report', `<p class="meta">Generated ${parentPaymentData.recalculatedAt ? new Date(parentPaymentData.recalculatedAt).toLocaleString() : 'now'}. Paid history and approved arrangements are included in the totals below.</p><div class="workspace-card" style="display:flex;gap:18px;flex-wrap:wrap;"><strong>Due: ${formatSubscriptionMoney(summary.amountDue)}</strong><strong>Paid: ${formatSubscriptionMoney(summary.paidAmount)}</strong><strong>Open: ${formatSubscriptionMoney(summary.balance)}</strong><strong>Arrears: ${formatSubscriptionMoney(summary.arrears)}</strong></div><div style="overflow:auto;margin-top:12px;"><table style="width:100%;min-width:720px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:8px;">Account</th><th style="padding:8px;">Description</th><th style="padding:8px;">Due / arrangement</th><th style="padding:8px;">Due</th><th style="padding:8px;">Paid / history</th><th style="padding:8px;">Balance</th></tr></thead><tbody>${rows || '<tr><td colspan="6" style="padding:12px;">No payment records.</td></tr>'}</tbody></table></div>`);
+}
+
+function exportParentPaymentReport() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
+  const rows = (parentPaymentData?.payments || []).map(payment => ({ Parent: payment.parentName, 'Parent Username': payment.parentUsername, Learner: payment.learnerName, Description: payment.description, 'Original Due Date': payment.dueDate, 'Effective Due Date': payment.effectiveDueDate, 'Approved Arrangement Amount': payment.arrangementAmount || '', 'Approved Arrangement Note': payment.arrangementNote || '', 'Amount Due': payment.amountDue, 'Paid Amount': payment.paidAmount, 'Payment History': (payment.paymentHistory || []).map(item => `${item.amount} ${item.status} ${item.receivedAt}`).join(' | '), Balance: payment.balance, Arrears: payment.arrears, Status: payment.status, Reference: payment.reference }));
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Payment report'); XLSX.writeFile(workbook, `LittleFeet_Parent_Payment_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function signParentPayment(encodedId) {
+  const payment = parentPaymentData?.payments?.find(item => item.id === decodeURIComponent(encodedId));
+  if (!payment) return;
+  openModal('Confirm parent payment account', `<form onsubmit="submitParentPaymentSignature(event,'${encodeURIComponent(payment.id)}')" style="display:grid;gap:12px;"><p class="meta">Type your name to confirm that you have received and reviewed this payment request.</p><label>Your signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm</button></form>`);
+}
+
+async function submitParentPaymentSignature(event, encodedId) {
+  event.preventDefault();
+  const signature = event.currentTarget.elements.signature.value;
+  try { const response = await fetch(`/api/parent-payments/${encodeURIComponent(decodeURIComponent(encodedId))}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save confirmation.'); closeModal(); await loadParentPayments(); } catch (error) { alert(error.message || 'Unable to save confirmation.'); }
+}
+
+function bookStatusLabel(record) {
+  if (record.status === 'returned') return record.returnStatus === 'lost' ? '<span class="badge-tag urgent">LOST</span>' : record.returnStatus === 'damaged' ? '<span class="badge-tag urgent">DAMAGED</span>' : '<span class="badge-tag info">RETURNED</span>';
+  if (!record.parentSignature) return '<span class="badge-tag">AWAITING PARENT SIGNATURE</span>';
+  return '<span class="badge-tag info">ISSUED</span>';
+}
+
+async function loadBookRegister() {
+  const summaryBox = document.getElementById('bookRegisterSummary');
+  const list = document.getElementById('bookRegisterRecords');
+  if (!summaryBox || !list || !currentUser || !['parent', 'teacher', 'principal', 'admin'].includes(currentUser.role)) return;
+  try {
+    const response = await fetch('/api/book-register');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load the book checklist.');
+    bookRegisterData = data;
+    summaryBox.innerHTML = `<div class="card-header-bar"><h3>Current checklist</h3><span class="badge-tag ${data.summary.outstanding ? 'urgent' : 'info'}">${data.summary.outstanding ? `${data.summary.outstanding} OUTSTANDING` : 'ALL RETURNED'}</span></div><div style="display:flex;gap:18px;flex-wrap:wrap;"><span><strong>${data.summary.total}</strong> books</span><span><strong>${data.summary.returned}</strong> returned</span><span><strong>${data.summary.unsignedParents}</strong> parent signatures missing</span><span><strong>${formatSubscriptionMoney(data.summary.penalties)}</strong> damage/loss penalties</span></div>`;
+    list.innerHTML = data.records?.length ? data.records.map(record => {
+      const returnDetails = record.status === 'returned' ? `<p class="meta">Returned ${record.returnedAt ? new Date(record.returnedAt).toLocaleString() : ''} · ${escapeWorkspaceText(record.returnCondition)} · ${escapeWorkspaceText(record.returnStatus)}${record.penaltyAmount ? ` · Penalty ${formatSubscriptionMoney(record.penaltyAmount)}` : ''}</p>` : '';
+      const signatures = `<p class="meta">Admin signed: ${escapeWorkspaceText(record.adminSignature || '—')} ${record.adminSignedAt ? `(${new Date(record.adminSignedAt).toLocaleString()})` : ''} · Parent signed: ${escapeWorkspaceText(record.parentSignature || '—')} ${record.parentSignedAt ? `(${new Date(record.parentSignedAt).toLocaleString()})` : ''}</p>`;
+      const parentActions = currentUser.role === 'parent' ? `${!record.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeURIComponent(record.id)}','received')">Sign received</button>` : ''}${record.status === 'returned' && !record.returnParentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeURIComponent(record.id)}','returned')">Sign returned</button>` : ''}` : '';
+      const staffActions = ['principal', 'admin'].includes(currentUser.role) && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeURIComponent(record.id)}')">Record return</button>` : '';
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(record.bookTitle)}${record.bookCode ? ` · ${escapeWorkspaceText(record.bookCode)}` : ''}</strong> ${bookStatusLabel(record)}<p style="margin:4px 0;">Learner: ${escapeWorkspaceText(record.learnerName)} · Class: ${escapeWorkspaceText(record.className || 'Not recorded')} · Parent: ${escapeWorkspaceText(record.parentName)}</p><p class="meta">Handover condition: ${escapeWorkspaceText(record.issueCondition)} · Replacement price: ${formatSubscriptionMoney(record.bookPrice)}</p>${returnDetails}${signatures}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${parentActions}${staffActions}</div></div>`;
+    }).join('') : '<p class="meta">No books have been added to the school checklist yet.</p>';
+  } catch (error) { summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load book checklist.')}</p>`; list.innerHTML = ''; }
+}
+
+async function openBookIssueModal() {
+  if (!['principal', 'admin'].includes(currentUser?.role)) return alert('Only a principal or administrator can add book checklists.');
+  let parents;
+  try { const response = await fetch('/api/book-register/parents'); parents = await response.json(); if (!response.ok) throw new Error(parents.message || 'Unable to load parents.'); } catch (error) { return alert(error.message || 'Unable to load parents.'); }
+  if (!parents.length) return alert('Create or approve a parent account first.');
+  const options = parents.map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name)} · ${escapeWorkspaceText(parent.username)}</option>`).join('');
+  openModal('Add book to checklist', `<form onsubmit="createBookRecord(event)" style="display:grid;gap:12px;"><p class="meta" style="margin:0;">The admin signature and time are saved automatically. The parent can sign after reviewing the handover.</p><div class="workspace-grid"><label>Book title<input name="bookTitle" required maxlength="200" placeholder="e.g. Grade 4 Mathematics"></label><label>Book code (optional)<input name="bookCode" maxlength="80"></label></div><div class="workspace-grid"><label>Learner name<input name="learnerName" required maxlength="160"></label><label>Class<input name="className" maxlength="120" placeholder="e.g. Grade 4A"></label></div><label>Parent account<select name="parentUsername" required>${options}</select></label><div class="workspace-grid"><label>Replacement price (R)<input name="bookPrice" type="number" min="0" step="0.01" required></label><label>Condition before handover<input name="issueCondition" required maxlength="500" placeholder="e.g. New, no markings"></label></div><label>Notes (optional)<input name="notes" maxlength="500"></label><button class="submit-btn">Save book checklist</button></form>`);
+}
+
+async function createBookRecord(event) {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+  try { const response = await fetch('/api/book-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save book checklist.'); closeModal(); await loadBookRegister(); } catch (error) { alert(error.message || 'Unable to save book checklist.'); }
+}
+
+function openBookReturnModal(encodedId) {
+  const record = bookRegisterData?.records?.find(item => item.id === decodeURIComponent(encodedId));
+  if (!record) return;
+  openModal('Record returned book', `<form onsubmit="recordBookReturn(event,'${encodeURIComponent(record.id)}')" style="display:grid;gap:12px;"><p style="margin:0;"><strong>${escapeWorkspaceText(record.bookTitle)}</strong> · ${escapeWorkspaceText(record.learnerName)} · Replacement price ${formatSubscriptionMoney(record.bookPrice)}</p><label>Return result<select name="returnStatus" required><option value="returned_good">Returned in acceptable condition</option><option value="damaged">Damaged — charge replacement price</option><option value="lost">Lost — charge replacement price</option></select></label><label>Condition at return<textarea name="returnCondition" rows="3" required placeholder="Describe the final condition or loss."></textarea></label><label>Admin signature<input name="returnAdminSignature" value="${escapeWorkspaceText(currentUser.name || '')}" required maxlength="160"></label><button class="submit-btn">Save return</button></form>`);
+}
+
+async function recordBookReturn(event, encodedId) {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/return`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to record return.'); closeModal(); await loadBookRegister(); } catch (error) { alert(error.message || 'Unable to record return.'); }
+}
+
+function signBookRecord(encodedId, action) {
+  const record = bookRegisterData?.records?.find(item => item.id === decodeURIComponent(encodedId));
+  if (!record) return;
+  openModal(action === 'returned' ? 'Confirm returned book' : 'Confirm book received', `<form onsubmit="submitBookSignature(event,'${encodeURIComponent(record.id)}','${action}')" style="display:grid;gap:12px;"><p class="meta">Type your name to save your signature and the current date and time.</p><label>Parent signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm signature</button></form>`);
+}
+
+async function submitBookSignature(event, encodedId, action) {
+  event.preventDefault();
+  const signature = event.currentTarget.elements.signature.value;
+  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save signature.'); closeModal(); await loadBookRegister(); } catch (error) { alert(error.message || 'Unable to save signature.'); }
+}
+
+function downloadBookRegisterTemplate() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
+  const rows = [{ 'Book Title': 'Example Mathematics', 'Book Code': 'BOOK-001', 'Learner Name': 'Example Learner', Class: 'Grade 4A', 'Parent Username': 'parent@example.com', 'Book replacement price': 250, 'Condition at handover': 'New, no markings', Notes: '' }];
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Book register'); XLSX.writeFile(workbook, 'LittleFeet_Book_Register_Template.xlsx');
+}
+
+function importBookRegisterExcel() {
+  const input = document.getElementById('bookRegisterImportFile');
+  if (!input) return;
+  input.value = ''; input.onchange = event => {
+    const file = event.target.files?.[0]; if (!file) return;
+    if (file.size > 8 * 1024 * 1024) return alert('Keep the checklist file under 8 MB.');
+    const reader = new FileReader(); reader.onload = async () => {
+      try { const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }); const response = await fetch('/api/book-register/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to import checklist.'); await loadBookRegister(); alert(`Imported ${result.imported} row(s).${result.rejected?.length ? ` Rejected ${result.rejected.length} row(s).` : ''}`); } catch (error) { alert(error.message || 'Unable to import checklist.'); }
+    }; reader.readAsArrayBuffer(file);
+  }; input.click();
+}
+
+function exportBookRegister() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
+  const rows = (bookRegisterData?.records || []).map(record => ({ 'Book Title': record.bookTitle, 'Book Code': record.bookCode, 'Learner Name': record.learnerName, Class: record.className, 'Parent Name': record.parentName, 'Parent Username': record.parentUsername, 'Replacement Price': record.bookPrice, 'Condition at Handover': record.issueCondition, 'Admin Signed At': record.adminSignedAt, 'Admin Signature': record.adminSignature, 'Parent Signed At': record.parentSignedAt, 'Parent Signature': record.parentSignature, Status: record.status, 'Return Condition': record.returnCondition, 'Return Result': record.returnStatus, 'Returned At': record.returnedAt, Penalty: record.penaltyAmount, 'Return Admin Signature': record.returnAdminSignature, 'Return Parent Signature': record.returnParentSignature }));
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Book register'); XLSX.writeFile(workbook, 'LittleFeet_Book_Register.xlsx');
+}
+
+function openBookClassReport() {
+  const classes = [...new Set((bookRegisterData?.records || []).map(record => record.className).filter(Boolean))].sort();
+  if (!classes.length) return alert('Add books with class names first.');
+  const options = classes.map(className => `<option value="${escapeWorkspaceText(className)}">${escapeWorkspaceText(className)}</option>`).join('');
+  openModal('Class book return report', `<label>Class<select id="bookReportClass" onchange="renderBookClassReport()">${options}</select></label><div id="bookClassReport" style="margin-top:14px;"></div><button type="button" class="action-btn btn-blue" style="margin-top:12px;" onclick="exportBookClassReport()">Export this class</button>`);
+  renderBookClassReport();
+}
+
+function renderBookClassReport() {
+  const className = document.getElementById('bookReportClass')?.value; const box = document.getElementById('bookClassReport'); if (!box) return;
+  const records = (bookRegisterData?.records || []).filter(record => record.className === className); const returned = records.filter(record => record.status === 'returned').length; const penalties = records.reduce((sum, record) => sum + Number(record.penaltyAmount || 0), 0);
+  box.innerHTML = `<div class="workspace-card"><strong>${escapeWorkspaceText(className)}</strong><p class="meta">${returned}/${records.length} books returned · ${formatSubscriptionMoney(penalties)} in damage/loss penalties</p>${records.map(record => `<div style="padding:8px 0;border-top:1px solid var(--border-color);"><strong>${escapeWorkspaceText(record.learnerName)}</strong> · ${escapeWorkspaceText(record.bookTitle)} · ${bookStatusLabel(record)}<br><span class="meta">Handover: ${escapeWorkspaceText(record.issueCondition)} · Return: ${escapeWorkspaceText(record.returnCondition || 'Not returned')}</span></div>`).join('')}</div>`;
+}
+
+function exportBookClassReport() {
+  const className = document.getElementById('bookReportClass')?.value; if (!className || typeof XLSX === 'undefined') return;
+  const rows = (bookRegisterData?.records || []).filter(record => record.className === className).map(record => ({ Learner: record.learnerName, Book: record.bookTitle, Status: record.status, 'Handover condition': record.issueCondition, 'Return condition': record.returnCondition || 'Not returned', Penalty: record.penaltyAmount || 0, 'Parent signature': record.parentSignature || 'Missing' }));
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Class report'); XLSX.writeFile(workbook, `LittleFeet_${className.replace(/[^a-z0-9]+/gi, '_')}_Book_Returns.xlsx`);
 }
 
 function downloadAttendanceTemplate() {

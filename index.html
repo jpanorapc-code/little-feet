@@ -772,8 +772,10 @@
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)">💳 Finance</button>
         <ul class="sidebar-links">
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('financeTab', this)">Billing &amp; Finance</button></li>
+        <li data-roles="parent,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('parentPaymentsTab', this)">Parent Payments</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('storeTab', this)">School Store</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('inventoryTab', this)">Supplies</button></li>
+        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('bookRegisterTab', this)">Books &amp; Returns</button></li>
         </ul>
       </section>
       <section data-nav-group>
@@ -1431,10 +1433,12 @@
         </div>
       </div>
 
-      <div id="financeTab" class="tab-content role-admin">
-        <div class="card"><div class="card-header-bar"><h2>💳 Finance & Parent Payments</h2><span class="badge-tag urgent">ADMIN</span></div>
+      <div id="financeTab" class="tab-content" data-roles="principal,admin">
+        <div class="card"><div class="card-header-bar"><h2>💳 Finance & Parent Payments</h2><span class="badge-tag urgent">SCHOOL FINANCE</span></div>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Subscription billing</h3><p>Set your monthly plan, learner add-on prices and profit margin, optional late-payment fee, and where approved schools pay.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionBillingAdmin()">Manage subscriptions</button></div>
+            <div class="workspace-card" data-roles="admin"><h3>Subscription billing</h3><p>Set your monthly plan, learner add-on prices and profit margin, optional late-payment fee, and where approved schools pay.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionBillingAdmin()">Manage subscriptions</button></div>
+            <div class="workspace-card" data-roles="principal"><h3>School subscription payment</h3><p>Review the school-only price and create a payment request with the correct reference.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionCheckout()">Choose school plan</button></div>
+            <div class="workspace-card"><h3>Parent school payments</h3><p>Create a parent invoice, record an approved later date or negotiated amount, and let the portal recalculate the live arrears balance after each payment.</p><button type="button" class="action-btn btn-green" onclick="openParentPaymentAdmin()">Manage parent payments</button></div>
             <div class="workspace-card"><h3>Sibling & Subsidy Rules</h3><p>Record a discount or subsidy decision below. Payroll and payment provider calculations remain subject to school approval.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Discount / subsidy rule')"><input name="details" placeholder="e.g. 10% sibling discount for Smith family" required><button class="submit-btn">Save rule</button></form></div>
             <div class="workspace-card"><h3>Year-End Tax Statements</h3><p>Create a request record for a parent’s tax invoice pack. The finance team can then verify payment history before issuing it.</p><form onsubmit="saveWorkspaceRecord(event,'finance','Tax statement request')"><input name="details" placeholder="Parent name or account reference" required><button class="submit-btn">Create request</button></form></div>
           </div>
@@ -1474,6 +1478,25 @@
             <div style="margin-top:14px;padding:14px;border-left:4px solid #2dd4bf;border-radius:0 8px 8px 0;background:rgba(45,212,191,.08);color:var(--text-muted);font-size:.84rem;line-height:1.55;"><strong style="color:var(--text-dark);">Full commercial terms:</strong> a 30-day money-back guarantee and 36-month agreement apply where included in the signed school quotation. Cancellation and post-contract customisation fees are fixed in that quotation before a school agrees. Viewing plans or creating a payment request does not itself create an agreement.</div>
           </section>
           <div id="financeRecords" class="record-list"></div>
+        </div>
+      </div>
+
+      <div id="parentPaymentsTab" class="tab-content" data-roles="parent,principal,admin">
+        <div class="card"><div class="card-header-bar"><h2>💰 Parent School Payments</h2><span class="badge-tag info">LIVE BALANCES</span></div>
+          <p style="color:var(--text-muted);margin:0 0 14px;">Every balance is recalculated from the payment history. An approved later date or agreed amount is shown clearly and changes when a payment is recorded.</p>
+          <div id="parentPaymentsSummary" class="workspace-card" aria-live="polite"><p class="meta">Loading parent payments…</p></div>
+          <div id="parentPaymentsActions" data-roles="principal,admin" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button type="button" class="action-btn btn-green" onclick="openParentPaymentAdmin()">Create parent payment</button><button type="button" class="action-btn btn-blue" onclick="loadParentPayments()">Recalculate now</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="action-btn btn-blue" onclick="openParentPaymentReport()">View full account report</button><button type="button" class="action-btn btn-blue" onclick="exportParentPaymentReport()">Export payment report</button></div>
+          <div id="parentPaymentsList" class="record-list" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <div id="bookRegisterTab" class="tab-content" data-roles="parent,teacher,principal,admin">
+        <div class="card"><div class="card-header-bar"><h2>📚 Book Issue &amp; Return Checklist</h2><span class="badge-tag info">SCHOOL STOCK</span></div>
+          <p style="color:var(--text-muted);margin:0 0 14px;">Record the condition and replacement price before handover, capture the administrator and parent signatures, and finish the year with a class return report.</p>
+          <div id="bookRegisterStaffControls" data-roles="principal,admin" class="workspace-card" style="display:grid;gap:10px;"><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-green" onclick="openBookIssueModal()">Add book checklist</button><button type="button" class="action-btn btn-blue" onclick="downloadBookRegisterTemplate()">Download template</button><button type="button" class="action-btn btn-blue" onclick="importBookRegisterExcel()">Import Excel / CSV</button><button type="button" class="action-btn btn-blue" onclick="exportBookRegister()">Export checklist</button><button type="button" class="action-btn btn-blue" onclick="openBookClassReport()">Class return report</button></div><input id="bookRegisterImportFile" type="file" accept=".xlsx,.xls,.csv" class="hidden"></div>
+          <div id="bookRegisterSummary" class="workspace-card" aria-live="polite" style="margin-top:12px;"><p class="meta">Loading book checklist…</p></div>
+          <div id="bookRegisterRecords" class="record-list" style="margin-top:14px;"></div>
         </div>
       </div>
 

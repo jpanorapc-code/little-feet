@@ -168,6 +168,9 @@ const db = {
   donations: [],
   storeProducts: [],
   storeOrders: [],
+  parentPayments: [],
+  parentSubscriptions: [],
+  bookRegister: [],
   paymentEvents: [],
   paymentLedger: [],
   systemErrors: [],
@@ -347,7 +350,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'paymentEvents', 'paymentLedger', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -562,7 +565,7 @@ app.post('/api/login', (req, res) => {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
-    const { pin: _pin, pinHash: _pinHash, ...safeUser } = user;
+    const safeUser = safeAccount(user);
     req.session.littleFeetUser = safeUser;
     req.session.save(error => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
@@ -669,7 +672,10 @@ app.post('/api/signup', (req, res) => {
   res.status(201).json({ success: true, account: safeAccount });
 });
 
-const safeAccount = ({ pin, pinHash, ...account }) => account;
+const safeAccount = ({ pin, pinHash, ...account }) => ({
+  ...account,
+  ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {})
+});
 const getSessionAccount = (req) => {
   const username = req.session?.littleFeetUser?.username;
   return username ? findAccountByUsername(username) : null;
@@ -800,6 +806,61 @@ const paymentInstructions = (billing, reference) => {
     accountNumber: decryptField(payment.accountNumberEncrypted), branchCode: payment.branchCode, reference
   };
 };
+const dateKeyInSouthAfrica = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date());
+const parentSubscriptionActive = account => {
+  if (!account || account.role !== 'parent') return true;
+  const grantedUntil = validDateKey(account.parentSubscriptionGrantedUntil);
+  if (String(account.parentSubscriptionStatus || '').toLowerCase() === 'paid') return !grantedUntil || grantedUntil >= dateKeyInSouthAfrica();
+  return Boolean(grantedUntil && grantedUntil >= dateKeyInSouthAfrica());
+};
+const validDateKey = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value).trim() : '';
+const cents = value => Math.round(Number(value || 0) * 100) / 100;
+const parentPaymentAmount = record => billingAmount(record.arrangementAmount) > 0 ? billingAmount(record.arrangementAmount) : (billingAmount(record.amountDue) || 0);
+const parentPaymentDueDate = record => {
+  const original = validDateKey(record.dueDate) || dateKeyInSouthAfrica();
+  const arrangement = validDateKey(record.arrangementDueDate);
+  return arrangement && arrangement > original ? arrangement : original;
+};
+const parentPaymentFinancials = (record, asOf = dateKeyInSouthAfrica()) => {
+  const amountDue = parentPaymentAmount(record);
+  const events = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase());
+  const paid = cents(events.filter(event => event.status === 'paid').reduce((sum, event) => sum + Number(event.amount || 0), 0));
+  const refunded = cents(events.filter(event => event.status === 'refunded').reduce((sum, event) => sum + Number(event.amount || 0), 0));
+  const paidAmount = Math.max(0, cents(paid - refunded));
+  const balance = Math.max(0, cents(amountDue - paidAmount));
+  const effectiveDueDate = parentPaymentDueDate(record);
+  const overdue = balance > 0 && effectiveDueDate < asOf;
+  return {
+    amountDue, originalAmount: billingAmount(record.amountDue) || amountDue,
+    arrangementAmount: billingAmount(record.arrangementAmount) || null,
+    paidAmount, balance, arrears: overdue ? balance : 0, dueDate: validDateKey(record.dueDate),
+    effectiveDueDate, status: balance <= 0 ? 'paid' : overdue ? 'in_arrears' : paidAmount > 0 ? 'partially_paid' : 'awaiting_payment',
+    arrangementActive: Boolean(validDateKey(record.arrangementDueDate) && effectiveDueDate === record.arrangementDueDate && effectiveDueDate >= asOf),
+    arrangementNote: String(record.arrangementNote || '').trim()
+  };
+};
+const parentPaymentSummary = records => (records || []).reduce((summary, record) => {
+  const financials = parentPaymentFinancials(record);
+  summary.count += 1;
+  summary.amountDue = cents(summary.amountDue + financials.amountDue);
+  summary.paidAmount = cents(summary.paidAmount + financials.paidAmount);
+  summary.balance = cents(summary.balance + financials.balance);
+  summary.arrears = cents(summary.arrears + financials.arrears);
+  if (financials.status === 'paid') summary.paid += 1;
+  else if (financials.status === 'in_arrears') summary.inArrears += 1;
+  return summary;
+}, { count: 0, paid: 0, inArrears: 0, amountDue: 0, paidAmount: 0, balance: 0, arrears: 0 });
+const parentPaymentView = (record, actor) => {
+  const financials = parentPaymentFinancials(record);
+  const paymentHistory = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase()).map(event => ({ amount: billingAmount(event.amount) || 0, status: event.status, receivedAt: event.receivedAt, providerTransactionId: event.providerTransactionId || '' }));
+  return {
+    id: record.id, reference: record.reference, parentUsername: record.parentUsername, parentName: record.parentName,
+    learnerName: record.learnerName, description: record.description, createdAt: record.createdAt, createdBy: record.createdBy, parentSignature: record.parentSignature || '', parentSignedAt: record.parentSignedAt || '',
+    ...financials, paymentHistory, payment: paymentInstructions(subscriptionBillingState(actor), record.reference)
+  };
+};
 const paymentStatuses = new Set(['awaiting_payment', 'paid', 'failed', 'refunded']);
 const canonicalPaymentStatus = value => String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
 const findPaymentTarget = (reference, actor = null) => {
@@ -811,13 +872,17 @@ const findPaymentTarget = (reference, actor = null) => {
     const order = (billing.orders || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference);
     if (order) return { type: 'subscription', record: order, schoolId: billingSchoolId };
   }
+  const parentSubscription = (db.parentSubscriptions || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference && (!schoolId || entry.schoolId === schoolId));
+  if (parentSubscription) return { type: 'parent_subscription', record: parentSubscription, schoolId: parentSubscription.schoolId };
+  const parentPayment = (db.parentPayments || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference && (!schoolId || entry.schoolId === schoolId));
+  if (parentPayment) return { type: 'parent_payment', record: parentPayment, schoolId: parentPayment.schoolId };
   const storeOrder = (db.storeOrders || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference && (!schoolId || entry.schoolId === schoolId));
   if (storeOrder) return { type: 'store', record: storeOrder, schoolId: storeOrder.schoolId };
   const donation = (db.donations || []).find(entry => String(entry.reference || '').toUpperCase() === cleanReference);
   if (donation && !actor) return { type: 'donation', record: donation, schoolId: donation.schoolId || '' };
   return null;
 };
-const expectedPaymentAmount = target => Number(target.type === 'subscription' ? target.record.monthlyTotal : target.record.amount);
+const expectedPaymentAmount = target => Number(target.type === 'subscription' ? target.record.monthlyTotal : target.type === 'parent_payment' ? parentPaymentAmount(target.record) : target.record.amount);
 const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransactionId, source, receivedAt }, actor = null) => {
   if (!Array.isArray(db.paymentEvents)) db.paymentEvents = [];
   if (!Array.isArray(db.paymentLedger)) db.paymentLedger = [];
@@ -827,9 +892,16 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
   if (!target) return { error: 'Payment reference was not found.' };
   const numericAmount = billingAmount(amount);
   const expectedAmount = expectedPaymentAmount(target);
-  if (numericAmount === null || numericAmount !== expectedAmount) return { error: `Payment amount must match the expected amount of ${expectedAmount.toFixed(2)}.` };
   const normalStatus = canonicalPaymentStatus(status);
   if (!paymentStatuses.has(normalStatus)) return { error: 'Payment status is not supported.' };
+  if (numericAmount === null || numericAmount <= 0) return { error: 'Payment amount must be greater than zero.' };
+  if (target.type === 'parent_payment') {
+    const current = parentPaymentFinancials(target.record);
+    const remaining = normalStatus === 'refunded' ? current.paidAmount : Math.max(0, cents(expectedAmount - current.paidAmount));
+    if (numericAmount > remaining || (normalStatus !== 'failed' && remaining <= 0)) return { error: `Payment amount cannot exceed the remaining balance of ${remaining.toFixed(2)}.` };
+  } else if (numericAmount !== expectedAmount) {
+    return { error: `Payment amount must match the expected amount of ${expectedAmount.toFixed(2)}.` };
+  }
   const timestamp = receivedAt || new Date().toISOString();
   const event = {
     eventId, reference: target.record.reference, status: normalStatus, amount: numericAmount,
@@ -840,6 +912,15 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
   target.record.paymentUpdatedAt = timestamp;
   if (normalStatus === 'paid') target.record.paidAt = timestamp;
   if (normalStatus === 'refunded') target.record.refundedAt = timestamp;
+  if (target.type === 'parent_subscription') {
+    const parent = findAccountByUsername(target.record.parentUsername);
+    if (parent && normalStatus === 'paid') {
+      parent.parentSubscriptionStatus = 'paid'; parent.subscription = 'plus'; parent.parentSubscriptionPaidAt = timestamp;
+      parent.parentSubscriptionGrantedUntil = target.record.grantedUntil || '';
+    } else if (parent && normalStatus === 'refunded') {
+      parent.parentSubscriptionStatus = 'basic'; parent.subscription = 'basic'; parent.parentSubscriptionGrantedUntil = '';
+    }
+  }
   db.paymentEvents.unshift(event);
   db.paymentLedger.unshift({
     id: crypto.randomUUID(), eventId, reference: target.record.reference, schoolId: target.schoolId,
@@ -920,6 +1001,224 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
 });
 
+const allowedParentPaymentRoles = new Set(['parent', 'principal', 'admin']);
+const parentPaymentParentForSchool = (username, actor) => {
+  const parent = findAccountByUsername(username);
+  return parent && parent.role === 'parent' && isSameSchool(actor, parent) ? parent : null;
+};
+const createParentPaymentRecord = (body, actor) => {
+  const parent = parentPaymentParentForSchool(body?.parentUsername, actor);
+  if (!parent) return { error: 'Choose a parent account from this school.' };
+  const amountDue = billingAmount(body?.amountDue);
+  const dueDate = validDateKey(body?.dueDate);
+  const arrangementDueDate = validDateKey(body?.arrangementDueDate);
+  const hasArrangementAmount = body?.arrangementAmount !== '' && body?.arrangementAmount != null;
+  const arrangementAmount = hasArrangementAmount ? billingAmount(body.arrangementAmount) : null;
+  if (amountDue === null || amountDue <= 0 || !dueDate) return { error: 'Enter a positive amount and a valid due date.' };
+  if (body?.arrangementDueDate && !arrangementDueDate) return { error: 'Enter a valid approved later date.' };
+  if (arrangementDueDate && arrangementDueDate <= dueDate) return { error: 'The approved later date must be after the original due date.' };
+  if (hasArrangementAmount && (arrangementAmount === null || arrangementAmount <= 0 || arrangementAmount > amountDue)) return { error: 'The approved arrangement amount must be positive and no more than the original amount.' };
+  const description = String(body?.description || '').trim().slice(0, 240);
+  if (!description) return { error: 'Add a short description for this parent payment.' };
+  const billing = subscriptionBillingState(actor);
+  if (!billingPaymentConfigured(billing.payment)) return { error: 'Configure the school payment destination before creating a parent payment.' };
+  const reference = `${billing.payment.referencePrefix}-PARENT-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+  const record = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), reference, parentUsername: parent.username, parentName: parent.name || parent.username,
+    learnerName: String(body?.learnerName || '').trim().slice(0, 160), description, amountDue, dueDate,
+    arrangementDueDate: arrangementDueDate || '', arrangementAmount, arrangementNote: String(body?.arrangementNote || '').trim().slice(0, 500), parentSignature: '', parentSignedAt: '',
+    paymentStatus: 'awaiting_payment', createdAt: new Date().toISOString(), createdBy: actor.username
+  });
+  return { record };
+};
+
+app.get('/api/parent-payments/parents', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'School finance access is required.' });
+  res.json(db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name || account.username, linkedLearners: account.linkedLearners || [] })));
+});
+
+app.get('/api/parent-payments', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !allowedParentPaymentRoles.has(actor.role)) return res.status(403).json({ message: 'Parent payment access is required.' });
+  let records = (db.parentPayments || []).filter(record => recordInSchool(record, actor));
+  if (actor.role === 'parent') records = records.filter(record => normalizeUsername(record.parentUsername) === normalizeUsername(actor.username));
+  const payments = records.map(record => parentPaymentView(record, actor));
+  res.json({ payments, summary: parentPaymentSummary(records), recalculatedAt: new Date().toISOString() });
+});
+
+app.post('/api/parent-payments', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can create parent payment requests.' });
+  const result = createParentPaymentRecord(req.body, actor);
+  if (result.error) return res.status(400).json({ message: result.error });
+  if (!Array.isArray(db.parentPayments)) db.parentPayments = [];
+  db.parentPayments.unshift(result.record);
+  res.status(201).json({ success: true, payment: parentPaymentView(result.record, actor), summary: parentPaymentSummary(db.parentPayments.filter(record => recordInSchool(record, actor))) });
+});
+
+app.post('/api/parent-payments/:id/acknowledge', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'parent') return res.status(403).json({ message: 'Only the parent account can confirm this payment request.' });
+  const record = (db.parentPayments || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor) && normalizeUsername(entry.parentUsername) === normalizeUsername(actor.username));
+  const signature = String(req.body?.signature || '').trim().slice(0, 160);
+  if (!record || !signature) return res.status(400).json({ message: 'A parent signature is required.' });
+  record.parentSignature = signature; record.parentSignedAt = new Date().toISOString();
+  res.json({ success: true, payment: parentPaymentView(record, actor) });
+});
+
+app.get('/api/parent-subscription', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['parent', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Parent subscription access is required.' });
+  const records = (db.parentSubscriptions || []).filter(record => recordInSchool(record, actor) && (actor.role === 'admin' || normalizeUsername(record.parentUsername) === normalizeUsername(actor.username)));
+  res.json({ active: actor.role === 'admin' ? undefined : parentSubscriptionActive(actor), pricePerChild: 29, latest: records[0] ? { reference: records[0].reference, status: records[0].paymentStatus, amount: records[0].amount, createdAt: records[0].createdAt } : null, parents: actor.role === 'admin' ? db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name, active: parentSubscriptionActive(account), status: account.parentSubscriptionStatus || 'basic', grantedUntil: account.parentSubscriptionGrantedUntil || '' })) : undefined, paymentConfigured: billingPaymentConfigured(subscriptionBillingState(actor).payment) });
+});
+
+app.post('/api/parent-subscription/orders', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'parent') return res.status(403).json({ message: 'Only a parent can start a parent subscription.' });
+  const billing = subscriptionBillingState(actor);
+  if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The school payment destination is not configured yet.' });
+  const children = Math.max(1, Math.min(4, (actor.linkedLearners || []).length));
+  const amount = children * 29;
+  const reference = `${billing.payment.referencePrefix}-PLUS-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+  const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, parentUsername: actor.username, parentName: actor.name || actor.username, children, amount, paymentStatus: 'awaiting_payment', grantedUntil: String(req.body?.grantedUntil || '').trim(), createdAt: new Date().toISOString() });
+  if (!Array.isArray(db.parentSubscriptions)) db.parentSubscriptions = [];
+  db.parentSubscriptions.unshift(order);
+  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
+});
+
+app.patch('/api/accounts/:username/parent-subscription', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Only an administrator can grant parent subscription access.' });
+  const parent = findAccountByUsername(req.params.username);
+  if (!parent || parent.role !== 'parent' || !isSameSchool(actor, parent)) return res.status(404).json({ message: 'Parent account not found.' });
+  const status = String(req.body?.status || '').toLowerCase() === 'paid' ? 'paid' : 'basic';
+  const grantedUntil = validDateKey(req.body?.grantedUntil);
+  if (req.body?.grantedUntil && !grantedUntil) return res.status(400).json({ message: 'Enter a valid access end date.' });
+  parent.parentSubscriptionStatus = status;
+  parent.parentSubscriptionGrantedUntil = status === 'paid' ? grantedUntil : '';
+  parent.parentSubscriptionUpdatedAt = new Date().toISOString();
+  parent.parentSubscriptionUpdatedBy = actor.username;
+  parent.subscription = parentSubscriptionActive(parent) ? 'plus' : 'basic';
+  res.json({ success: true, account: safeAccount(parent) });
+});
+
+const bookRecordVisibleTo = (record, actor) => {
+  if (!recordInSchool(record, actor)) return false;
+  if (actor.role !== 'parent') return true;
+  return normalizeUsername(record.parentUsername) === normalizeUsername(actor.username);
+};
+const bookRecordView = record => ({
+  id: record.id, bookTitle: record.bookTitle, bookCode: record.bookCode, bookPrice: billingAmount(record.bookPrice) || 0, learnerName: record.learnerName,
+  className: record.className, parentUsername: record.parentUsername, parentName: record.parentName, issueCondition: record.issueCondition,
+  issuedAt: record.issuedAt, adminSignature: record.adminSignature, adminSignedAt: record.adminSignedAt,
+  parentSignature: record.parentSignature, parentSignedAt: record.parentSignedAt, returnCondition: record.returnCondition,
+  returnedAt: record.returnedAt, returnAdminSignature: record.returnAdminSignature, returnAdminSignedAt: record.returnAdminSignedAt,
+  returnParentSignature: record.returnParentSignature, returnParentSignedAt: record.returnParentSignedAt, returnStatus: record.returnStatus || '', penaltyAmount: billingAmount(record.penaltyAmount) || 0, status: record.status,
+  notes: record.notes, createdAt: record.createdAt
+});
+const bookRecordsForSchool = actor => (db.bookRegister || []).filter(record => bookRecordVisibleTo(record, actor));
+
+app.get('/api/book-register', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['parent', 'teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Book register access is required.' });
+  const className = normalizeComparableText(req.query.className);
+  let records = bookRecordsForSchool(actor);
+  if (className) records = records.filter(record => normalizeComparableText(record.className) === className);
+  res.json({ records: records.map(bookRecordView), summary: { total: records.length, returned: records.filter(record => record.status === 'returned').length, outstanding: records.filter(record => record.status !== 'returned').length, unsignedParents: records.filter(record => !record.parentSignature).length, penalties: cents(records.reduce((sum, record) => sum + (billingAmount(record.penaltyAmount) || 0), 0)) }, generatedAt: new Date().toISOString() });
+});
+
+app.get('/api/book-register/parents', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'School book-register management is required.' });
+  res.json(db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name || account.username, linkedLearners: account.linkedLearners || [] })));
+});
+
+app.post('/api/book-register', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can issue books.' });
+  const parent = parentPaymentParentForSchool(req.body?.parentUsername, actor);
+  const bookTitle = String(req.body?.bookTitle || '').trim().slice(0, 200);
+  const learnerName = String(req.body?.learnerName || '').trim().slice(0, 160);
+  const issueCondition = String(req.body?.issueCondition || '').trim().slice(0, 500);
+  if (!parent || !bookTitle || !learnerName || !issueCondition) return res.status(400).json({ message: 'Choose a parent and enter the book, learner, and condition before handover.' });
+  const bookPrice = billingAmount(req.body?.bookPrice);
+  if (bookPrice === null || bookPrice < 0) return res.status(400).json({ message: 'Enter a valid replacement price for the book.' });
+  const record = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), bookTitle, bookCode: String(req.body?.bookCode || '').trim().slice(0, 80), bookPrice, learnerName,
+    className: String(req.body?.className || '').trim().slice(0, 120), parentUsername: parent.username, parentName: parent.name || parent.username,
+    issueCondition, issuedAt: String(req.body?.issuedAt || '').trim() || new Date().toISOString(), adminSignature: String(req.body?.adminSignature || actor.name || actor.username).trim().slice(0, 160),
+    adminSignedAt: new Date().toISOString(), parentSignature: '', parentSignedAt: '', returnCondition: '', returnedAt: '',
+    returnAdminSignature: '', returnAdminSignedAt: '', returnParentSignature: '', returnParentSignedAt: '', returnStatus: '', penaltyAmount: 0, status: 'awaiting_parent_signature',
+    notes: String(req.body?.notes || '').trim().slice(0, 500), createdAt: new Date().toISOString()
+  });
+  if (!Array.isArray(db.bookRegister)) db.bookRegister = [];
+  db.bookRegister.unshift(record);
+  res.status(201).json({ success: true, record: bookRecordView(record) });
+});
+
+app.post('/api/book-register/import', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can import the book register.' });
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows.slice(0, 2000) : [];
+  if (!rows.length) return res.status(400).json({ message: 'Add at least one checklist row to import.' });
+  const imported = [], rejected = [];
+  rows.forEach((row, index) => {
+    const result = createBookRecordFromImport(row, actor);
+    if (result.error) rejected.push({ row: index + 2, error: result.error });
+    else { db.bookRegister.unshift(result.record); imported.push(bookRecordView(result.record)); }
+  });
+  res.status(imported.length ? 201 : 400).json({ success: Boolean(imported.length), imported: imported.length, rejected, records: imported });
+});
+
+function createBookRecordFromImport(row, actor) {
+  const body = {
+    bookTitle: row.bookTitle ?? row['Book Title'], bookCode: row.bookCode ?? row['Book Code'], learnerName: row.learnerName ?? row['Learner Name'],
+    className: row.className ?? row.Class ?? row['Class Name'], parentUsername: row.parentUsername ?? row['Parent Username'],
+    issueCondition: row.issueCondition ?? row['Condition at handover'] ?? row['Condition at Handover'], bookPrice: row.bookPrice ?? row['Book replacement price'] ?? row['Replacement Price'], notes: row.notes ?? row.Notes,
+    adminSignature: row.adminSignature ?? row['Admin signature']
+  };
+  const parent = parentPaymentParentForSchool(body.parentUsername, actor);
+  const bookPrice = billingAmount(body.bookPrice);
+  const bookTitle = String(body.bookTitle || '').trim().slice(0, 200), learnerName = String(body.learnerName || '').trim().slice(0, 160), issueCondition = String(body.issueCondition || '').trim().slice(0, 500);
+  if (!parent || !bookTitle || !learnerName || !issueCondition || bookPrice === null || bookPrice < 0) return { error: 'Parent username, book title, learner name, handover condition, and a valid replacement price are required.' };
+  return { record: tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), bookTitle, bookCode: String(body.bookCode || '').trim().slice(0, 80), bookPrice, learnerName, className: String(body.className || '').trim().slice(0, 120),
+    parentUsername: parent.username, parentName: parent.name || parent.username, issueCondition, issuedAt: new Date().toISOString(),
+    adminSignature: String(body.adminSignature || actor.name || actor.username).trim().slice(0, 160), adminSignedAt: new Date().toISOString(),
+    parentSignature: '', parentSignedAt: '', returnCondition: '', returnedAt: '', returnAdminSignature: '', returnAdminSignedAt: '', returnParentSignature: '', returnParentSignedAt: '', returnStatus: '', penaltyAmount: 0, status: 'awaiting_parent_signature', notes: String(body.notes || '').trim().slice(0, 500), createdAt: new Date().toISOString()
+  }) };
+}
+
+app.post('/api/book-register/:id/sign', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'parent') return res.status(403).json({ message: 'Only the linked parent can sign this handover or return.' });
+  const record = (db.bookRegister || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor) && normalizeUsername(entry.parentUsername) === normalizeUsername(actor.username));
+  const signature = String(req.body?.signature || '').trim().slice(0, 160);
+  const action = String(req.body?.action || 'received').trim().toLowerCase();
+  if (!record || !signature) return res.status(400).json({ message: 'A parent signature is required.' });
+  if (action === 'returned') {
+    if (record.status !== 'returned') return res.status(409).json({ message: 'The school must record the returned book condition before the parent can sign the return.' });
+    record.returnParentSignature = signature; record.returnParentSignedAt = new Date().toISOString();
+  } else {
+    record.parentSignature = signature; record.parentSignedAt = new Date().toISOString(); record.status = 'issued';
+  }
+  res.json({ success: true, record: bookRecordView(record) });
+});
+
+app.put('/api/book-register/:id/return', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record returned books.' });
+  const record = (db.bookRegister || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  const returnCondition = String(req.body?.returnCondition || '').trim().slice(0, 500);
+  const returnStatus = ['returned_good', 'damaged', 'lost'].includes(String(req.body?.returnStatus || '')) ? String(req.body.returnStatus) : '';
+  const signature = String(req.body?.returnAdminSignature || actor.name || actor.username).trim().slice(0, 160);
+  if (!record || !returnCondition || !returnStatus) return res.status(400).json({ message: 'Record the condition and choose returned, damaged, or lost.' });
+  record.returnCondition = returnCondition; record.returnStatus = returnStatus; record.penaltyAmount = ['damaged', 'lost'].includes(returnStatus) ? (billingAmount(record.bookPrice) || 0) : 0; record.returnedAt = new Date().toISOString(); record.returnAdminSignature = signature; record.returnAdminSignedAt = new Date().toISOString(); record.status = 'returned';
+  res.json({ success: true, record: bookRecordView(record) });
+});
+
 // Free bank-transfer reconciliation is available to school administrators. The
 // same ledger can accept a gateway later through the signed, provider-neutral
 // webhook without changing the finance screens or historical records.
@@ -930,8 +1229,8 @@ app.get('/api/payments/ledger', (req, res) => {
 });
 
 app.post('/api/payments/reconcile', (req, res) => {
-  const actor = requireAdmin(req);
-  if (!actor) return res.status(403).json({ message: 'Only an administrator can reconcile a bank payment.' });
+  const actor = getSessionAccount(req);
+  if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can reconcile a school payment.' });
   const eventId = String(req.body?.eventId || '').trim().slice(0, 160);
   if (!eventId) return res.status(400).json({ message: 'A unique reconciliation event ID is required.' });
   const result = applyPaymentEvent({
@@ -1348,8 +1647,8 @@ app.get('/api/analytics/:studentName', (req, res) => {
   const percentageChange = Number(first.grade) ? Math.round((pointChange / Number(first.grade)) * 1000) / 10 : null;
   const best = studentWorksheets.reduce((bestItem, item) => Number(item.grade) > Number(bestItem.grade) ? item : bestItem);
   const worst = studentWorksheets.reduce((worstItem, item) => Number(item.grade) < Number(worstItem.grade) ? item : worstItem);
-  const hasPremiumDetail = requester.role !== 'parent' || requester.subscription === 'plus';
-  res.json({ totalAssessments: scores.length, averageScore, latestScore: Number(latest.grade), baselineScore: Number(first.grade), pointChange, percentageChange, trend: pointChange > 0 ? 'Improved' : pointChange < 0 ? 'Declined' : 'Maintained', best: hasPremiumDetail ? { title: best.title || 'Assessment', score: Number(best.grade) } : null, worst: hasPremiumDetail ? { title: worst.title || 'Assessment', score: Number(worst.grade) } : null, subscription: requester.subscription || 'school', detailedInsights: hasPremiumDetail });
+  const hasPremiumDetail = requester.role !== 'parent' || parentSubscriptionActive(requester);
+  res.json({ totalAssessments: scores.length, averageScore, latestScore: Number(latest.grade), baselineScore: Number(first.grade), pointChange, percentageChange, trend: pointChange > 0 ? 'Improved' : pointChange < 0 ? 'Declined' : 'Maintained', best: hasPremiumDetail ? { title: best.title || 'Assessment', score: Number(best.grade) } : null, worst: hasPremiumDetail ? { title: worst.title || 'Assessment', score: Number(worst.grade) } : null, subscription: requester.role === 'parent' ? (hasPremiumDetail ? 'plus' : 'basic') : (requester.subscription || 'school'), detailedInsights: hasPremiumDetail });
 });
 
 // Attendance
