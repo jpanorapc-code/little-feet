@@ -19,6 +19,33 @@ let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
 const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
+const CURRENT_RELEASE_NOTES = Object.freeze([
+  Object.freeze({
+    id: '2026-09-10-payments-books', version: '3.1', title: 'Payments, arrears and book returns',
+    summary: 'Added Capitec bank-transfer instructions for donations and subscriptions, parent arrears and arrangements, paid Plus access, finance exports, and signed book issue and return reports.',
+    publishedAt: '2026-09-10T05:30:00.000+02:00'
+  }),
+  Object.freeze({
+    id: '2026-09-10-media-imports', version: '3.0', title: 'Audio, timetable and data-import improvements',
+    summary: 'Added remembered sound controls, login and wallpaper music, the secret Easter-egg loop, custom wallpaper uploads, proper time pickers, large spreadsheet imports, and cleaner chat diagnostics.',
+    publishedAt: '2026-09-10T04:30:00.000+02:00'
+  }),
+  Object.freeze({
+    id: '2026-09-09-production-ready', version: '2.9', title: 'Secure production foundation',
+    summary: 'Added PostgreSQL persistence, durable sessions, encrypted sensitive fields, administrator super-view, live diagnostics, tenant isolation, and capacity testing for large schools.',
+    publishedAt: '2026-09-09T18:00:00.000+02:00'
+  }),
+  Object.freeze({
+    id: '2026-08-safeguarding', version: '2.8', title: 'Safeguarding and family records',
+    summary: 'Added consent, pickup audit, staff verification, parent report review, and digital signing controls.',
+    publishedAt: '2026-08-28T08:00:00.000Z'
+  }),
+  Object.freeze({
+    id: '2026-08-workflows', version: '2.7', title: 'Daily classroom workflows',
+    summary: 'Added care logging, progress records, stock intake, and spreadsheet templates.',
+    publishedAt: '2026-08-27T08:00:00.000Z'
+  })
+]);
 if (!fieldEncryptionConfigured) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
 if (!sessionSecretConfigured) console.warn('Using a development session secret. Set SESSION_SECRET before production.');
 const hashPin = (pin) => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
@@ -155,10 +182,7 @@ const db = {
   consentRecords: [],
   pickupLogs: [],
   reportReviews: [],
-  releaseNotes: [
-    { id: '2026-08-safeguarding', version: '2.8', title: 'Safeguarding and family records', summary: 'Added consent, pickup audit, staff verification, parent report review, and digital signing controls.', publishedAt: '2026-08-28T08:00:00.000Z' },
-    { id: '2026-08-workflows', version: '2.7', title: 'Daily classroom workflows', summary: 'Added care logging, progress records, stock intake, and spreadsheet templates.', publishedAt: '2026-08-27T08:00:00.000Z' }
-  ],
+  releaseNotes: CURRENT_RELEASE_NOTES.map(note => ({ ...note })),
   chatGroups: [],
   groupMessages: {},
   directMessages: [],
@@ -337,9 +361,23 @@ function applySavedState(saved) {
     if (key !== 'moduleRecords' && Object.hasOwn(saved, key)) db[key] = saved[key];
   });
   if (Object.hasOwn(saved, 'moduleRecords')) db.moduleRecords = { ...moduleDefaults, ...(saved.moduleRecords || {}) };
+  syncCurrentReleaseNotes();
   removeLegacyDemoRecords();
   migrateSchoolTenancy();
   return true;
+}
+
+function syncCurrentReleaseNotes() {
+  const notesById = new Map((Array.isArray(db.releaseNotes) ? db.releaseNotes : [])
+    .filter(note => note && note.id)
+    .map(note => [String(note.id), note]));
+  CURRENT_RELEASE_NOTES.forEach(note => notesById.set(note.id, { ...note }));
+  db.releaseNotes = [...notesById.values()].sort((first, second) => {
+    const dateDifference = Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || '');
+    return Number.isFinite(dateDifference) && dateDifference !== 0
+      ? dateDifference
+      : String(second.version || '').localeCompare(String(first.version || ''), undefined, { numeric: true });
+  });
 }
 
 function migrateSchoolTenancy() {
@@ -543,6 +581,7 @@ async function initialisePersistence() {
   if (!restoredFromDatabase) loadReplicaSnapshot();
   ensureBootstrapAdministrator();
   migrateSchoolTenancy();
+  syncCurrentReleaseNotes();
   await saveDatabaseState();
   writeReplicaSnapshot();
 }
@@ -2184,7 +2223,7 @@ app.get('/api/pickups', (req, res) => {
   res.json(tenantRecords(db.pickupLogs, actor).map(({ verificationCode, ...entry }) => entry));
 });
 
-app.get('/api/release-notes', (req, res) => res.json(db.releaseNotes));
+app.get('/api/release-notes', (req, res) => res.json((db.releaseNotes || []).slice().sort((first, second) => Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || ''))));
 
 app.post('/api/report-signing-pin', (req, res) => {
   const { pin } = req.body;

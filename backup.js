@@ -20,6 +20,7 @@ let reportSignaturePads = {};
 let pendingLearnerImport = [];
 let portalTourIndex = 0;
 let portalTourTimer = null;
+let releaseNotesRefreshTimer = null;
 let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
@@ -610,14 +611,27 @@ async function loadReleaseNotes() {
   const board = document.getElementById('updatesBoard');
   if (!board) return;
   try {
-    const response = await fetch('/api/release-notes');
-    const notes = await response.json();
+    const response = await fetch('/api/release-notes', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Unable to load release notes.');
+    const payload = await response.json();
+    const notes = (Array.isArray(payload) ? payload : []).slice().sort((first, second) => Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || ''));
     const latest = notes[0];
     const seen = localStorage.getItem('lf_latest_release_seen');
-    if (!latest || seen === latest.id) return;
-    board.innerHTML = `<div class="card-header-bar"><h2>✨ What’s new</h2><button type="button" class="action-btn btn-blue" onclick="dismissReleaseNotes('${latest.id}')">Mark as read</button></div>${notes.slice(0, 3).map(note => `<div class="item-row"><div><strong>Version ${escapeWorkspaceText(note.version)} · ${escapeWorkspaceText(note.title)}</strong><p style="margin-top:4px;color:var(--text-muted);">${escapeWorkspaceText(note.summary)}</p><span class="meta">${new Date(note.publishedAt).toLocaleDateString()}</span></div></div>`).join('')}`;
+    if (!latest || seen === latest.id) {
+      board.innerHTML = '';
+      board.classList.add('hidden');
+      return;
+    }
+    board.innerHTML = `<div class="card-header-bar"><div><h2>✨ What’s new</h2><span class="meta">Updates automatically while you are signed in</span></div><button type="button" class="action-btn btn-blue" onclick="dismissReleaseNotes('${latest.id}')">Mark as read</button></div>${notes.slice(0, 3).map(note => `<div class="item-row"><div><strong>Version ${escapeWorkspaceText(note.version)} · ${escapeWorkspaceText(note.title)}</strong><p style="margin-top:4px;color:var(--text-muted);">${escapeWorkspaceText(note.summary)}</p><span class="meta">${new Date(note.publishedAt).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' })}</span></div></div>`).join('')}`;
     board.classList.remove('hidden');
   } catch { board.classList.add('hidden'); }
+}
+
+function startReleaseNotesMonitor() {
+  if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
+  releaseNotesRefreshTimer = window.setInterval(() => {
+    if (currentUser && !document.hidden) loadReleaseNotes();
+  }, 60 * 1000);
 }
 
 function dismissReleaseNotes(id) {
@@ -926,6 +940,7 @@ function setupSession() {
   loadSubscriptionBillingOverview();
   loadParentPayments();
   loadBookRegister();
+  startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
   if (ticketMonitorId) clearInterval(ticketMonitorId);
@@ -987,6 +1002,8 @@ function logout() {
   clearTimeout(wallpaperIdleTimer);
   if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
   schoolStatusTimer = null;
+  if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
+  releaseNotesRefreshTimer = null;
   currentUser = null;
   exitWallpaperMode();
   stopWelcomeTheme();

@@ -24,7 +24,8 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
     { username: 'bravo-parent', pinHash: pinHash('ParentPass1'), name: 'Bravo Parent', role: 'parent', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['bravo learner'], subscription: 'basic' }
   ],
   students: [], learnerAccessCodes: [], storeProducts: [], storeOrders: [], parentPayments: [], parentSubscriptions: [], bookRegister: [], registry: [], schools,
-  schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}
+  schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {},
+  releaseNotes: [{ id: '2026-08-safeguarding', version: '2.8', title: 'Old saved release', summary: 'This stale database value must be replaced by the deployed release catalogue.', publishedAt: '2026-08-28T08:00:00.000Z' }]
 }));
 
 const child = spawn(process.execPath, ['server.js'], {
@@ -85,6 +86,11 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     const liveStatus = await request('/api/system-status', { cookie: alphaLogin.cookie });
     assert.equal(liveStatus.response.status, 200);
     assert.equal(liveStatus.data.status, 'operational');
+    assert.equal(liveStatus.data.recentUpdates[0].version, '3.1');
+    const releaseNotes = await request('/api/release-notes');
+    assert.equal(releaseNotes.response.status, 200);
+    assert.deepEqual(releaseNotes.data.slice(0, 3).map(note => note.version), ['3.1', '3.0', '2.9']);
+    assert.equal(releaseNotes.data.find(note => note.id === '2026-08-safeguarding').title, 'Safeguarding and family records');
 
     const imported = await request('/api/students/import', { method: 'POST', cookie: alphaLogin.cookie, body: { students: [{ studentName: 'Alpha Learner', className: 'A1', parentName: 'Alpha Parent', contactEmail: 'alpha.parent@example.test' }] } });
     assert.equal(imported.response.status, 201);
