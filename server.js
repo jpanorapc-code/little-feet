@@ -147,7 +147,7 @@ app.use((req, res, next) => {
     activeRequestCount += 1;
     res.on('finish', () => {
       activeRequestCount = Math.max(0, activeRequestCount - 1);
-      if (!req.method || req.method === 'GET' || replicaMode) return;
+      if (!req.method || req.method === 'GET' || replicaMode || req.persistenceCommitted) return;
       void saveDatabaseState();
       scheduleReplicaSnapshot();
     });
@@ -983,7 +983,7 @@ app.get('/api/subscription-billing', (req, res) => {
   });
 });
 
-app.put('/api/subscription-billing', (req, res) => {
+app.put('/api/subscription-billing', async (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator can change subscription pricing or payment details.' });
   const baseMonthly = billingAmount(req.body?.baseMonthly);
@@ -1015,6 +1015,12 @@ app.put('/api/subscription-billing', (req, res) => {
   billing.pricing = { baseMonthly, bundles, lateFeeEnabled: Boolean(req.body?.lateFeeEnabled), lateFee };
   billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
   billing.updatedAt = new Date().toISOString();
+  // Payment destinations must survive a restart. Commit this high-value setting
+  // before acknowledging the request instead of relying only on the normal
+  // post-response persistence queue.
+  await saveDatabaseState();
+  writeReplicaSnapshot();
+  req.persistenceCommitted = true;
   res.json({ success: true, pricing: publicBillingPricing(billing, true), paymentConfigured: true });
 });
 
