@@ -796,6 +796,9 @@ const billingDefaults = () => ({
   payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
   orders: []
 });
+const billingPaymentConfigured = (payment) => payment?.method === 'payment_link'
+  ? Boolean(payment.paymentLink)
+  : Boolean(payment?.accountName && payment?.bankName && payment?.accountNumberEncrypted);
 const subscriptionBillingState = (actor = null) => {
   const defaults = billingDefaults();
   const schoolId = actor ? accountSchoolId(actor) : null;
@@ -815,6 +818,12 @@ const subscriptionBillingState = (actor = null) => {
     payment: { ...defaults.payment, ...(existing.payment || {}) },
     orders: Array.isArray(existing.orders) ? existing.orders : []
   };
+  // The platform owner receives subscription and donation payments. A saved
+  // global destination is therefore the safe fallback for a school record that
+  // predates payment setup or was created by an older release.
+  if (schoolId && !billingPaymentConfigured(state.payment) && billingPaymentConfigured(db.subscriptionBilling?.payment)) {
+    state.payment = { ...defaults.payment, ...db.subscriptionBilling.payment };
+  }
   if (schoolId) db.schoolBilling[schoolId] = state;
   else db.subscriptionBilling = state;
   return state;
@@ -833,9 +842,6 @@ const publicBillingPricing = (billing, includeCosts = false) => ({
     ...(includeCosts ? { costPrice: billing.pricing.bundles[capacity]?.costPrice || 0 } : {})
   }))
 });
-const billingPaymentConfigured = (payment) => payment.method === 'payment_link'
-  ? Boolean(payment.paymentLink)
-  : Boolean(payment.accountName && payment.bankName && payment.accountNumberEncrypted);
 const donationBillingState = () => {
   const globalBilling = subscriptionBillingState();
   if (billingPaymentConfigured(globalBilling.payment)) return globalBilling;
@@ -1021,10 +1027,25 @@ app.put('/api/subscription-billing', async (req, res) => {
   billing.pricing = { baseMonthly, bundles, lateFeeEnabled: Boolean(req.body?.lateFeeEnabled), lateFee };
   billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
   billing.updatedAt = new Date().toISOString();
+  db.subscriptionBilling = {
+    ...billing,
+    pricing: { ...billing.pricing, bundles: { ...billing.pricing.bundles } },
+    payment: { ...billing.payment },
+    orders: Array.isArray(db.subscriptionBilling?.orders) ? db.subscriptionBilling.orders : []
+  };
   // Payment destinations must survive a restart. Commit this high-value setting
   // before acknowledging the request instead of relying only on the normal
   // post-response persistence queue.
   await saveDatabaseState();
+  if (postgresPool) {
+    const schoolBillingKey = `schoolBilling:${accountSchoolId(actor)}`;
+    const persisted = await postgresPool.query(
+      'SELECT state_key, payload FROM little_feet_metadata WHERE state_key = ANY($1::text[])',
+      [[schoolBillingKey, 'subscriptionBilling']]
+    );
+    const destinationStored = persisted.rows.some(row => billingPaymentConfigured(row.payload?.payment || {}));
+    if (!destinationStored) throw new Error('The payment destination could not be confirmed in persistent storage.');
+  }
   writeReplicaSnapshot();
   req.persistenceCommitted = true;
   res.json({ success: true, pricing: publicBillingPricing(billing, true), paymentConfigured: true });
