@@ -3026,6 +3026,22 @@ function openLegalModal(title, text) {
   openModal(title, `<p style="font-size:0.9rem; line-height:1.5; color:var(--text-dark);">${text}</p>`);
 }
 
+function paymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
+  const primary = payment.paymentLink
+    ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">${escapeWorkspaceText(linkLabel)}</a>`
+    : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+  const capitec = payment.capitecPayMePayload
+    ? `<div style="margin-top:12px;padding:12px;border:1px solid #2dd4bf;border-radius:8px;text-align:center;background:rgba(45,212,191,.08);"><strong>Pay with the Capitec app</strong><div id="capitecPayMeQr" style="width:190px;min-height:190px;margin:10px auto;background:#fff;padding:5px;"></div><span class="meta">Capitec customers can scan this Pay Me code. Other banks can use the EFT details above.</span></div>`
+    : '';
+  return `${primary}${capitec}`;
+}
+
+function renderCapitecPayMeQr(payment) {
+  const holder = document.getElementById('capitecPayMeQr');
+  if (!holder || !payment?.capitecPayMePayload || !window.QRCode) return;
+  new window.QRCode(holder, { text: payment.capitecPayMePayload, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M });
+}
+
 async function openDonationModal() {
   let status;
   try {
@@ -3050,8 +3066,9 @@ async function createDonationIntent(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to prepare the donation.');
     const payment = result.payment;
-    const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Continue to secure payment</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
     openModal('Donation ready', `<p style="margin:0 0 10px;">Thank you for supporting Little Feet.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Donation: ${formatSubscriptionMoney(result.donation.amount)}</strong><br>Reference: <strong>${escapeWorkspaceText(result.donation.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the contribution can be matched correctly.</p>`);
+    renderCapitecPayMeQr(payment);
   } catch (error) { alert(error.message || 'Unable to prepare the donation.'); }
 }
 
@@ -3143,8 +3160,9 @@ async function openParentSubscriptionCheckout() {
     const response = await fetch('/api/parent-subscription/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to start the parent subscription.');
-    const destination = result.payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" target="_blank" rel="noopener" href="${escapeWorkspaceText(result.payment.paymentLink)}">Pay securely now</a>` : `<div class="workspace-card"><strong>${escapeWorkspaceText(result.payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(result.payment.accountName)}<br>Account number: ${escapeWorkspaceText(result.payment.accountNumber)}${result.payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(result.payment.branchCode)}` : ''}</div>`;
+    const destination = paymentDestinationMarkup(result.payment);
     openModal('Parent subscription payment', `<p style="margin:0 0 10px;">${formatSubscriptionMoney(result.order.amount)} for ${result.order.children} linked child${result.order.children === 1 ? '' : 'ren'}.</p><p class="meta">Use reference <strong>${escapeWorkspaceText(result.order.reference)}</strong>. Special features unlock automatically after the payment is recorded.</p>${destination}`);
+    renderCapitecPayMeQr(result.payment);
   } catch (error) { alert(error.message || 'Unable to start parent subscription.'); }
 }
 
@@ -3207,7 +3225,7 @@ async function openSubscriptionBillingAdmin() {
       <div class="workspace-grid"><label>Base monthly school price<input name="baseMonthly" type="number" min="0" step="0.01" value="${data.pricing.baseMonthly}"></label><label>Late-payment fee<input name="lateFee" type="number" min="0" step="0.01" value="${data.pricing.lateFee}"></label></div>
       <label style="display:flex;align-items:center;gap:8px;"><input name="lateFeeEnabled" type="checkbox" ${data.pricing.lateFeeEnabled ? 'checked' : ''}> Apply the late-payment fee only when the school accepts this term.</label>
       <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:540px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px;">Extra learners</th><th style="padding:9px;">Your cost</th><th style="padding:9px;">School price</th><th style="padding:9px;">Your margin</th></tr></thead><tbody>${[5,20,100].map(capacity => `<tr><td style="padding:9px;"><strong>+${capacity} children</strong></td><td style="padding:9px;"><input name="cost${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'costPrice')}"></td><td style="padding:9px;"><input name="price${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'sellingPrice')}"></td><td style="padding:9px;color:#2dd4bf;">Calculated after saving</td></tr>`).join('')}</tbody></table></div>
-      <fieldset style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><legend style="padding:0 5px;font-weight:700;">Where schools pay</legend><label>Payment method<select name="paymentMethod" onchange="toggleSubscriptionPaymentFields(this.value)"><option value="payment_link" ${payment.method === 'payment_link' ? 'selected' : ''}>Secure payment link</option><option value="bank_transfer" ${payment.method === 'bank_transfer' ? 'selected' : ''}>Bank transfer</option></select></label><div id="subscriptionPaymentLinkFields" style="margin-top:10px;"><label>HTTPS payment link<input name="paymentLink" type="url" placeholder="https://..." value="${escapeWorkspaceText(payment.paymentLink || '')}"></label></div><div id="subscriptionBankFields" style="display:none;margin-top:10px;" class="workspace-grid"><label>Account name<input name="accountName" value="${escapeWorkspaceText(payment.accountName || '')}"></label><label>Bank name<input name="bankName" value="${escapeWorkspaceText(payment.bankName || '')}"></label><label>Account number<input name="accountNumber" inputmode="numeric" value="${escapeWorkspaceText(payment.accountNumber || '')}"></label><label>Branch code<input name="branchCode" inputmode="numeric" value="${escapeWorkspaceText(payment.branchCode || '')}"></label></div><label style="margin-top:10px;display:block;">Payment reference prefix<input name="referencePrefix" maxlength="16" value="${escapeWorkspaceText(payment.referencePrefix || 'LF')}"></label></fieldset>
+      <fieldset style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><legend style="padding:0 5px;font-weight:700;">Where schools pay</legend><label>Payment method<select name="paymentMethod" onchange="toggleSubscriptionPaymentFields(this.value)"><option value="payment_link" ${payment.method === 'payment_link' ? 'selected' : ''}>Secure payment link</option><option value="bank_transfer" ${payment.method === 'bank_transfer' ? 'selected' : ''}>Bank transfer</option></select></label><div id="subscriptionPaymentLinkFields" style="margin-top:10px;"><label>HTTPS payment link<input name="paymentLink" type="url" placeholder="https://..." value="${escapeWorkspaceText(payment.paymentLink || '')}"></label></div><div id="subscriptionBankFields" style="display:none;margin-top:10px;" class="workspace-grid"><label>Account name<input name="accountName" value="${escapeWorkspaceText(payment.accountName || '')}"></label><label>Bank name<input name="bankName" value="${escapeWorkspaceText(payment.bankName || '')}"></label><label>Account number<input name="accountNumber" inputmode="numeric" value="${escapeWorkspaceText(payment.accountNumber || '')}"></label><label>Branch code<input name="branchCode" inputmode="numeric" value="${escapeWorkspaceText(payment.branchCode || '')}"></label></div><label style="margin-top:10px;display:block;">Capitec Pay Me QR text <span class="meta">(optional)</span><input name="capitecPayMePayload" maxlength="512" placeholder="${payment.capitecPayMeConfigured ? 'Pay Me code is saved — leave blank to keep it' : 'Paste the decoded Capitec Pay Me QR text'}"></label><label style="margin-top:10px;display:block;">Payment reference prefix<input name="referencePrefix" maxlength="16" value="${escapeWorkspaceText(payment.referencePrefix || 'LF')}"></label></fieldset>
       <button class="submit-btn">Save subscription billing</button>
     </form>
     <section style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:12px;"><h3 style="margin:0 0 8px;">Recent payment requests</h3><ul style="margin:0;padding-left:20px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></section>`);
@@ -3226,6 +3244,7 @@ async function saveSubscriptionBillingConfig(event) {
   const form = event.currentTarget;
   const value = name => form.elements[name]?.value || '';
   const payload = { baseMonthly: value('baseMonthly'), lateFee: value('lateFee'), lateFeeEnabled: form.elements.lateFeeEnabled.checked, bundles: {}, payment: { method: value('paymentMethod'), paymentLink: value('paymentLink'), accountName: value('accountName'), bankName: value('bankName'), accountNumber: value('accountNumber'), branchCode: value('branchCode'), referencePrefix: value('referencePrefix') } };
+  if (value('capitecPayMePayload').trim()) payload.payment.capitecPayMePayload = value('capitecPayMePayload').trim();
   [5,20,100].forEach(capacity => { payload.bundles[capacity] = { costPrice: value(`cost${capacity}`), sellingPrice: value(`price${capacity}`) }; });
   try {
     const response = await fetch('/api/subscription-billing', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
@@ -3260,8 +3279,9 @@ async function createSubscriptionOrder(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to create payment request.');
     const payment = result.payment;
-    const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Pay securely now</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    const destination = paymentDestinationMarkup(payment);
     openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
+    renderCapitecPayMeQr(payment);
   } catch (error) { alert(error.message || 'Unable to create payment request.'); }
 }
 
@@ -3818,8 +3838,9 @@ async function confirmStoreCheckout() {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to create the order.');
     const payment = result.payment;
-    const destination = payment.paymentLink ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">Continue to secure payment</a>` : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
     openModal('Order ready for payment', `<p style="margin:0 0 10px;">Your order is in the stock-room queue for preparation.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>${escapeWorkspaceText(result.order.productName)} × ${result.order.quantity}: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the order and payment can be matched.</p>`);
+    renderCapitecPayMeQr(payment);
     loadStoreItems();
   } catch (error) { alert(error.message || 'Unable to create the order.'); }
 }

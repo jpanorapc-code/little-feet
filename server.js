@@ -21,6 +21,11 @@ const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
 const CURRENT_RELEASE_NOTES = Object.freeze([
   Object.freeze({
+    id: '2026-09-10-capitec-payme', version: '3.2', title: 'Free Capitec Pay Me option',
+    summary: 'Added an encrypted Capitec Pay Me QR option alongside bank transfer for donations, parent subscriptions, school plans, and school-store payments.',
+    publishedAt: '2026-09-10T15:15:00.000+02:00'
+  }),
+  Object.freeze({
     id: '2026-09-10-payments-books', version: '3.1', title: 'Payments, arrears and book returns',
     summary: 'Added Capitec bank-transfer instructions and fixed-price school plan payments, parent arrears and arrangements, paid Plus access, finance exports, and signed book issue and return reports.',
     publishedAt: '2026-09-10T05:30:00.000+02:00'
@@ -793,7 +798,7 @@ const schoolSubscriptionPlans = Object.freeze([
 ]);
 const billingDefaults = () => ({
   pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
-  payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
+  payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', payMePayloadEncrypted: '', branchCode: '', referencePrefix: 'LF' },
   orders: []
 });
 const billingPaymentConfigured = (payment) => payment?.method === 'payment_link'
@@ -853,7 +858,8 @@ const paymentInstructions = (billing, reference) => {
   if (payment.method === 'payment_link') return { method: 'Online payment', paymentLink: payment.paymentLink, reference };
   return {
     method: 'Bank transfer', accountName: payment.accountName, bankName: payment.bankName,
-    accountNumber: decryptField(payment.accountNumberEncrypted), branchCode: payment.branchCode, reference
+    accountNumber: decryptField(payment.accountNumberEncrypted), branchCode: payment.branchCode, reference,
+    capitecPayMePayload: decryptField(payment.payMePayloadEncrypted)
   };
 };
 const dateKeyInSouthAfrica = () => new Intl.DateTimeFormat('en-CA', {
@@ -985,12 +991,12 @@ app.get('/api/subscription-billing', (req, res) => {
   if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
   const billing = subscriptionBillingState(actor);
   const isAdmin = actor.role === 'admin';
-  const { accountNumberEncrypted, ...adminPayment } = billing.payment;
+  const { accountNumberEncrypted, payMePayloadEncrypted, ...adminPayment } = billing.payment;
   res.json({
     pricing: publicBillingPricing(billing, isAdmin),
     plans: schoolSubscriptionPlans.map(plan => ({ ...plan })),
     paymentConfigured: billingPaymentConfigured(billing.payment),
-    payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted) } : undefined,
+    payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted), capitecPayMeConfigured: Boolean(decryptField(payMePayloadEncrypted)) } : undefined,
     orders: billing.orders.filter(order => !order.schoolId || order.schoolId === accountSchoolId(actor)).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
   });
 });
@@ -1024,8 +1030,17 @@ app.put('/api/subscription-billing', async (req, res) => {
     return res.status(400).json({ message: 'Account name, bank name, and account number are required for bank transfers.' });
   }
   const billing = subscriptionBillingState(actor);
+  const paymentInput = req.body?.payment || {};
+  const hasPayMePayload = Object.prototype.hasOwnProperty.call(paymentInput, 'capitecPayMePayload');
+  const capitecPayMePayload = String(paymentInput.capitecPayMePayload || '').trim();
+  if (capitecPayMePayload && (!capitecPayMePayload.startsWith('000201') || !capitecPayMePayload.includes('za.co.capitec.electrum.payme') || capitecPayMePayload.length > 512)) {
+    return res.status(400).json({ message: 'Enter a valid Capitec Pay Me QR payload.' });
+  }
+  const payMePayloadEncrypted = hasPayMePayload
+    ? (capitecPayMePayload ? encryptField(capitecPayMePayload) : '')
+    : String(billing.payment.payMePayloadEncrypted || '');
   billing.pricing = { baseMonthly, bundles, lateFeeEnabled: Boolean(req.body?.lateFeeEnabled), lateFee };
-  billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
+  billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', payMePayloadEncrypted, branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
   billing.updatedAt = new Date().toISOString();
   db.subscriptionBilling = {
     ...billing,
