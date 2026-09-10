@@ -22,7 +22,7 @@ const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPT
 const CURRENT_RELEASE_NOTES = Object.freeze([
   Object.freeze({
     id: '2026-09-10-payments-books', version: '3.1', title: 'Payments, arrears and book returns',
-    summary: 'Added Capitec bank-transfer instructions for donations and subscriptions, parent arrears and arrangements, paid Plus access, finance exports, and signed book issue and return reports.',
+    summary: 'Added Capitec bank-transfer instructions and fixed-price school plan payments, parent arrears and arrangements, paid Plus access, finance exports, and signed book issue and return reports.',
     publishedAt: '2026-09-10T05:30:00.000+02:00'
   }),
   Object.freeze({
@@ -786,6 +786,11 @@ app.patch('/api/system-errors/:id', (req, res) => {
 });
 
 const billingBundleSizes = [5, 20, 100];
+const schoolSubscriptionPlans = Object.freeze([
+  Object.freeze({ code: 'micro', name: 'Micro / ECD', maxLearners: 30, monthlyPrice: 350 }),
+  Object.freeze({ code: 'standard', name: 'Standard Primary', maxLearners: 250, monthlyPrice: 1500 }),
+  Object.freeze({ code: 'enterprise', name: 'Enterprise Campus', maxLearners: 1000, monthlyPrice: 7500 })
+]);
 const billingDefaults = () => ({
   pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
   payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
@@ -977,6 +982,7 @@ app.get('/api/subscription-billing', (req, res) => {
   const { accountNumberEncrypted, ...adminPayment } = billing.payment;
   res.json({
     pricing: publicBillingPricing(billing, isAdmin),
+    plans: schoolSubscriptionPlans.map(plan => ({ ...plan })),
     paymentConfigured: billingPaymentConfigured(billing.payment),
     payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted) } : undefined,
     orders: billing.orders.filter(order => !order.schoolId || order.schoolId === accountSchoolId(actor)).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
@@ -1027,19 +1033,24 @@ app.put('/api/subscription-billing', async (req, res) => {
 app.post('/api/subscription-billing/orders', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can create a school subscription payment request.' });
+  const requestedPlanCode = String(req.body?.planCode || '').trim().toLowerCase();
+  const requestedPlan = schoolSubscriptionPlans.find(plan => plan.code === requestedPlanCode);
+  if (requestedPlanCode && !requestedPlan) return res.status(400).json({ message: 'Choose a valid school subscription plan.' });
   const requestedBundle = Number(req.body?.bundleCapacity || 0);
-  if (![0, ...billingBundleSizes].includes(requestedBundle)) return res.status(400).json({ message: 'Choose a valid extra-learner bundle.' });
+  if (!requestedPlan && ![0, ...billingBundleSizes].includes(requestedBundle)) return res.status(400).json({ message: 'Choose a valid extra-learner bundle.' });
   const billing = subscriptionBillingState(actor);
-  if (billing.pricing.baseMonthly <= 0 || !billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'Subscription pricing and the payment destination must be configured by an administrator first.' });
+  if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The payment destination must be configured by an administrator first.' });
   const bundle = requestedBundle ? billing.pricing.bundles[requestedBundle] : { costPrice: 0, sellingPrice: 0 };
-  if (requestedBundle && bundle.sellingPrice <= 0) return res.status(409).json({ message: 'That learner bundle is not available yet. Ask an administrator to set its selling price.' });
+  if (!requestedPlan && billing.pricing.baseMonthly <= 0) return res.status(409).json({ message: 'Choose one of the published school plans.' });
+  if (!requestedPlan && requestedBundle && bundle.sellingPrice <= 0) return res.status(409).json({ message: 'That learner bundle is not available yet. Ask an administrator to set its selling price.' });
   const reference = `${billing.payment.referencePrefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const monthlyTotal = Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
+  const monthlyTotal = requestedPlan ? requestedPlan.monthlyPrice : Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
   const order = {
     id: crypto.randomUUID(), reference, schoolId: accountSchoolId(actor), schoolName: actor.schoolName, requestedBy: actor.username,
-    baseMonthly: billing.pricing.baseMonthly, bundleCapacity: requestedBundle, bundlePrice: bundle.sellingPrice,
+    planCode: requestedPlan?.code || '', planName: requestedPlan?.name || '', learnerCapacity: requestedPlan?.maxLearners || 0,
+    baseMonthly: requestedPlan ? requestedPlan.monthlyPrice : billing.pricing.baseMonthly, bundleCapacity: requestedPlan ? 0 : requestedBundle, bundlePrice: requestedPlan ? 0 : bundle.sellingPrice,
     monthlyTotal, lateFeeAccepted: Boolean(req.body?.lateFeeAccepted), lateFee: Boolean(req.body?.lateFeeAccepted) && billing.pricing.lateFeeEnabled ? billing.pricing.lateFee : 0,
-    profitMargin: Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
+    profitMargin: requestedPlan ? 0 : Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
     status: 'awaiting payment', createdAt: new Date().toISOString()
   };
   billing.orders.unshift(order);

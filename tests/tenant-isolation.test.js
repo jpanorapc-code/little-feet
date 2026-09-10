@@ -116,6 +116,13 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
 
     const alphaBillingConfigured = await request('/api/subscription-billing', { method: 'PUT', cookie: alphaLogin.cookie, body: { baseMonthly: 500, lateFeeEnabled: false, lateFee: 0, bundles: { 5: { costPrice: 0, sellingPrice: 50 }, 20: { costPrice: 0, sellingPrice: 150 }, 100: { costPrice: 0, sellingPrice: 500 } }, payment: { method: 'bank_transfer', accountName: 'Alpha School', bankName: 'Test Bank', accountNumber: '123456789', branchCode: '000000', referencePrefix: 'ALPHA' } } });
     assert.equal(alphaBillingConfigured.response.status, 200);
+    const publishedPlans = await request('/api/subscription-billing', { cookie: alphaLogin.cookie });
+    assert.deepEqual(publishedPlans.data.plans.map(plan => [plan.code, plan.monthlyPrice]), [['micro', 350], ['standard', 1500], ['enterprise', 7500]]);
+    const enterpriseOrder = await request('/api/subscription-billing/orders', { method: 'POST', cookie: alphaLogin.cookie, body: { planCode: 'enterprise' } });
+    assert.equal(enterpriseOrder.response.status, 201);
+    assert.equal(enterpriseOrder.data.order.monthlyTotal, 7500);
+    assert.equal(enterpriseOrder.data.order.learnerCapacity, 1000);
+    assert.equal(enterpriseOrder.data.payment.bankName, 'Test Bank');
 
     const parentPayment = await request('/api/parent-payments', { method: 'POST', cookie: alphaLogin.cookie, body: { parentUsername: 'alpha-parent', learnerName: 'Alpha Learner', description: 'Term fees', amountDue: 500, dueDate: '2020-01-01', arrangementDueDate: '2021-01-01', arrangementAmount: 400, arrangementNote: 'Approved reduced amount and later date' } });
     assert.equal(parentPayment.response.status, 201);

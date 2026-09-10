@@ -3245,16 +3245,18 @@ async function openSubscriptionCheckout() {
     data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription pricing.');
   } catch (error) { return alert(error.message || 'Unable to load subscription pricing.'); }
-  if (!data.paymentConfigured || Number(data.pricing.baseMonthly) <= 0) return alert('An administrator still needs to configure the subscription price and payment destination.');
-  const options = [{ capacity:0, sellingPrice:0 }, ...data.pricing.bundles].map(bundle => `<option value="${bundle.capacity}">${bundle.capacity ? `+${bundle.capacity} children — ${formatSubscriptionMoney(bundle.sellingPrice)}/month` : 'No extra learner bundle'}</option>`).join('');
-  openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Base school subscription: <strong>${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong>. Select extra learner capacity if needed.</p><label>Extra learner bundle<select name="bundleCapacity">${options}</select></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
+  if (!data.paymentConfigured) return alert('An administrator still needs to configure the payment destination.');
+  const plans = Array.isArray(data.plans) ? data.plans : [];
+  if (!plans.length) return alert('The published school plans are temporarily unavailable.');
+  const options = plans.map(plan => `<option value="${escapeWorkspaceText(plan.code)}">${escapeWorkspaceText(plan.name)} — up to ${Number(plan.maxLearners).toLocaleString('en-ZA')} learners — ${formatSubscriptionMoney(plan.monthlyPrice)}/month</option>`).join('');
+  openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Choose the published plan that matches your school size. Little Feet will create a unique Capitec payment reference.</p><label>School plan<select name="planCode">${options}</select></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
 }
 
 async function createSubscriptionOrder(event) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
-    const response = await fetch('/api/subscription-billing/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ bundleCapacity: form.elements.bundleCapacity.value, lateFeeAccepted: Boolean(form.elements.lateFeeAccepted?.checked) }) });
+    const response = await fetch('/api/subscription-billing/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ planCode: form.elements.planCode?.value || '', bundleCapacity: form.elements.bundleCapacity?.value || 0, lateFeeAccepted: Boolean(form.elements.lateFeeAccepted?.checked) }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to create payment request.');
     const payment = result.payment;
