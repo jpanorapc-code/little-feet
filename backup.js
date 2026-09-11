@@ -919,7 +919,7 @@ function setupSession() {
 
   const userAvatarEl = document.getElementById('userAvatar');
   if (userAvatarEl) {
-    userAvatarEl.textContent = '👤';
+    userAvatarEl.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-user"></use></svg>';
     userAvatarEl.title = currentUser.name || currentUser.username;
   }
 
@@ -2093,6 +2093,20 @@ async function loadBadges() {
 }
 
 const badgeForm = document.getElementById('badgeForm');
+const badgeCategory = document.getElementById('badgeCategory');
+const milestoneChoices = [...document.querySelectorAll('.milestone-choice')];
+function syncMilestoneChoice(value = badgeCategory?.value) {
+  milestoneChoices.forEach(choice => {
+    const selected = choice.dataset.value === value;
+    choice.classList.toggle('is-selected', selected);
+    choice.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  });
+}
+milestoneChoices.forEach(choice => choice.addEventListener('click', () => {
+  if (badgeCategory) badgeCategory.value = choice.dataset.value;
+  syncMilestoneChoice(choice.dataset.value);
+}));
+syncMilestoneChoice();
 if (badgeForm) {
   badgeForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2109,6 +2123,7 @@ if (badgeForm) {
     const result = await response.json();
     if (!response.ok) return alert(result.message || 'Unable to award this badge.');
     badgeForm.reset();
+    syncMilestoneChoice();
     loadBadges();
     playDingSound();
   });
@@ -3963,7 +3978,10 @@ async function loadWorkspaceRecords(module) {
   try {
     const response = await fetch(`/api/modules/${module}`);
     const records = await response.json();
-    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${currentUser?.role === 'admin' ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : '<p style="font-size:.84rem;color:var(--text-muted);">No records saved in this workspace yet.</p>';
+    const emptyIcon = escapeWorkspaceText(list.dataset.emptyIcon || '🗂️');
+    const emptyTitle = escapeWorkspaceText(list.dataset.emptyTitle || 'No records yet');
+    const emptyText = escapeWorkspaceText(list.dataset.emptyText || 'New records will appear here after they are saved.');
+    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${currentUser?.role === 'admin' ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : `<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">${emptyIcon}</span><span><strong>${emptyTitle}</strong><span>${emptyText}</span></span></div>`;
   } catch { list.textContent = 'Unable to load workspace records.'; }
 }
 
