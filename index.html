@@ -64,7 +64,7 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      background-image: linear-gradient(rgba(5, 16, 27, 0.42), rgba(5, 16, 27, 0.62)), url('assets/little-feet-original-background.gif');
+      background-image: linear-gradient(rgba(5, 16, 27, 0.42), rgba(5, 16, 27, 0.62)), url('assets/4k/little-feet-wallpaper-4k.jpg');
       background-repeat: no-repeat;
       background-position: center;
       /* Fill the viewport without leaving unused dark margins around the animation. */
@@ -206,7 +206,7 @@
     .btn-blue:hover { background-color: var(--primary-hover); }
 
     #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; isolation:isolate; }
-    #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background-image:linear-gradient(rgba(5,16,27,.42),rgba(5,16,27,.64)),url('assets/little-feet-original-background.gif'); background-position:center; background-size:100% 100%; background-repeat:no-repeat; opacity:.48; pointer-events:none; z-index:-1; }
+    #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background-image:linear-gradient(rgba(5,16,27,.42),rgba(5,16,27,.64)),url('assets/4k/little-feet-wallpaper-4k.jpg'); background-position:center; background-size:cover; background-repeat:no-repeat; opacity:.48; pointer-events:none; z-index:-1; }
     #authSection > .auth-card { position:relative; z-index:1; width:min(100%,450px) !important; max-width:450px !important; margin:0; padding:18px; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
     .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:24px; padding-top:10px; overflow:hidden; }
     .mascot-stage { position:relative; display:grid; place-items:center; min-height:180px; margin-bottom:4px; }
@@ -314,7 +314,7 @@
     .role-home-panel.mascot-role-home .role-home-icon { display:none; }
     @keyframes adminMascotGlow { from { opacity:.58; transform:scale(.94); } to { opacity:1; transform:scale(1.07); } }
     @media (prefers-reduced-motion:reduce) { .role-home-panel.mascot-role-home::before { animation:none; opacity:.78; } }
-    .portal-welcome-banner { position:relative; isolation:isolate; overflow:hidden; min-height:164px; margin:0 0 16px; padding:16px clamp(20px,3vw,38px); border:1px solid rgba(94,234,212,.38); border-radius:16px; background-image:linear-gradient(90deg,rgba(4,18,34,.98) 0%,rgba(7,29,47,.94) 44%,rgba(5,26,46,.42) 71%,rgba(5,26,46,.18) 100%),url('assets/admin-mascot-dashboard.png'); background-size:cover,auto 142%; background-position:center,right 46%; background-repeat:no-repeat; box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08); }
+    .portal-welcome-banner { position:relative; isolation:isolate; overflow:hidden; min-height:164px; margin:0 0 16px; padding:16px clamp(20px,3vw,38px); border:1px solid rgba(94,234,212,.38); border-radius:16px; background-image:linear-gradient(90deg,rgba(4,18,34,.98) 0%,rgba(7,29,47,.94) 44%,rgba(5,26,46,.42) 71%,rgba(5,26,46,.18) 100%),url('assets/4k/admin-mascot-dashboard-4k.jpg'); background-size:cover,auto 142%; background-position:center,right 46%; background-repeat:no-repeat; box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08); }
     .portal-welcome-banner::before { content:""; position:absolute; z-index:0; inset:-32%; pointer-events:none; background:radial-gradient(ellipse at 78% 60%,rgba(255,190,92,.3),rgba(45,212,191,.16) 27%,transparent 62%); filter:blur(12px); animation:adminMascotGlow 5.2s ease-in-out infinite alternate; }
     .portal-welcome-copy { position:relative; z-index:1; max-width:min(760px,62%); }
     .portal-welcome-kicker { display:inline-flex; align-items:center; gap:7px; margin-bottom:4px; color:#99f6e4; font-size:.68rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
@@ -403,7 +403,7 @@
     .login-account-help { margin:10px 0 0; color:var(--text-muted); font-size:.74rem; line-height:1.4; text-align:center; }
     .wellbeing-banner { position:relative; isolation:isolate; overflow:hidden; display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.2),rgba(15,43,72,.66)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
     .wellbeing-banner > * { position:relative; z-index:1; }
-    .wellbeing-banner::after { content:""; position:absolute; z-index:0; inset:0 0 0 auto; width:190px; pointer-events:none; opacity:.26; background:linear-gradient(90deg,transparent,rgba(7,17,30,.15)),url('assets/welcome-footsteps-banner.png') center/cover; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,.92) 44%); }
+    .wellbeing-banner::after { content:""; position:absolute; z-index:0; inset:0 0 0 auto; width:190px; pointer-events:none; opacity:.26; background:linear-gradient(90deg,transparent,rgba(7,17,30,.15)),url('assets/4k/welcome-footsteps-banner-4k.jpg') center/cover; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,.92) 44%); }
     .wellbeing-banner .tip-icon { font-size:1.5rem; } .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
     .wellbeing-banner button { background:transparent; color:var(--text-muted); border:0; font-size:1.15rem; cursor:pointer; padding:3px 6px; }
     .portal-tour { position:relative; min-height:350px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
@@ -550,11 +550,11 @@
       box-shadow:6px 0 20px rgba(0,0,0,.16);
     }
     .app-sidebar > * { position:relative; z-index:1; }
-    .app-sidebar::before { content:""; position:absolute; z-index:0; left:0; right:0; bottom:16px; height:300px; pointer-events:none; opacity:.34; background:linear-gradient(180deg,#07111e 0%,rgba(7,17,30,.18) 32%,#07111e 100%),url('assets/sidebar-penguin.png') center bottom/220px auto no-repeat; }
+    .app-sidebar::before { content:""; position:absolute; z-index:0; left:0; right:0; bottom:16px; height:300px; pointer-events:none; opacity:.34; background:linear-gradient(180deg,#07111e 0%,rgba(7,17,30,.18) 32%,#07111e 100%),url('assets/4k/sidebar-penguin-hq.png') center bottom/220px auto no-repeat; }
     .sidebar-heading { color:#94a3b8; font-size:.68rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; margin:18px 10px 7px; }
     .sidebar-heading:first-child { margin-top:4px; }
     .app-sidebar [data-nav-group] { position:relative; isolation:isolate; overflow:hidden; margin-top:14px; padding:9px 7px 7px; border:1px solid rgba(148,163,184,.13); border-radius:10px; background:rgba(15,43,72,.88); }
-    .app-sidebar [data-nav-group]::before { content:""; position:absolute; z-index:0; right:-10px; bottom:-10px; width:94px; height:94px; background:url('assets/sidebar-penguin.png') center bottom/contain no-repeat; opacity:.15; filter:saturate(.9) contrast(1.04); pointer-events:none; }
+    .app-sidebar [data-nav-group]::before { content:""; position:absolute; z-index:0; right:-10px; bottom:-10px; width:94px; height:94px; background:url('assets/4k/sidebar-penguin-hq.png') center bottom/contain no-repeat; opacity:.15; filter:saturate(.9) contrast(1.04); pointer-events:none; }
     .app-sidebar [data-nav-group] > * { position:relative; z-index:1; }
     .app-sidebar [data-nav-group] .sidebar-heading { margin:0 4px 7px; color:#5eead4; }
     .sidebar-group-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0; padding:7px 8px; border:0; border-radius:7px; background:transparent; color:#5eead4; font:800 .72rem/1.1 inherit; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; text-align:left; }
@@ -722,7 +722,7 @@
 
   <div id="portalLoader" role="status" aria-live="polite" aria-label="Little Feet is loading">
     <div class="walking-loader">
-      <div class="walking-loader-mark" aria-hidden="true"><img src="little-feet-mascot.jfif" alt=""><span>👣</span><span>👣</span></div>
+      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/little-feet-mascot-hq.png" alt=""><span>👣</span><span>👣</span></div>
       <p>Little Feet is getting ready</p>
     </div>
   </div>
@@ -741,7 +741,7 @@
     <div class="card auth-card">
       <div class="brand-header">
         <div class="mascot-stage">
-          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="goToMainMenu()" title="Click to go to Main Menu" onerror="this.style.display='none'">
+          <img src="assets/4k/little-feet-mascot-hq.png" alt="Little Feet mascot logo" onclick="goToMainMenu()" title="Click to go to Main Menu" onerror="this.style.display='none'">
         </div>
         <h2 onclick="goToMainMenu()" title="Click to go to Main Menu">Little Feet</h2>
         <p class="slogan">Every Little Step Matters</p>
@@ -794,7 +794,7 @@
   <div id="dashboardSection" class="hidden">
     <nav>
       <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
-        <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
+        <img src="assets/4k/little-feet-mascot-hq.png" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
         <div>
           <span>Little Feet</span>
           <span class="org-badge">ECD Portal v3.2</span>
@@ -910,19 +910,19 @@
 
         <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
           <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
-            <img class="portal-tour-image" loading="lazy" src="assets/tour-connected-learning.png" alt="Little Feet mascot guiding connected school life">
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-connected-learning-4k.jpg" alt="Little Feet mascot guiding connected school life">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected learning</span><h2>One home for everyday school life.</h2><p>Bring schedules, learning evidence, parent updates, attendance, and daily care into role-specific workspaces.</p><div class="portal-tour-fact"><strong>Did you know?</strong> Each role sees only the tools needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 2 of 4">
-            <img class="portal-tour-image" loading="lazy" src="assets/tour-school-admin.png" alt="Little Feet mascot reviewing secure learner records">
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-school-admin-4k.jpg" alt="Little Feet mascot reviewing secure learner records">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Smarter school admin</span><h2>Import the register, then review it once.</h2><p>Principals and administrators can preview a school spreadsheet before importing learner records, instead of retyping a whole register.</p><div class="portal-tour-fact"><strong>Built in:</strong> Duplicate learner records are skipped, while medical, emergency, and pickup fields are encrypted when saved.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('dataImportTab')">Open Data Import</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 3 of 4">
-            <img class="portal-tour-image" loading="lazy" src="assets/tour-family-partnership.png" alt="Little Feet penguin mascots sharing family learning updates">
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-family-partnership-4k.jpg" alt="Little Feet penguin mascots sharing family learning updates">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Family partnership</span><h2>Turn updates into meaningful conversations.</h2><p>Parents can see the learning records, reports, badges, and notices made available to their family account.</p><div class="portal-tour-fact"><strong>Helpful reminder:</strong> Parent report review records can capture teacher and parent acknowledgements before a report is marked complete.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('reportsTab')">View reports</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 4 of 4">
-            <img class="portal-tour-image" loading="lazy" src="assets/tour-safety-first.png" alt="Little Feet mascot supporting calm care and safeguarding">
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-safety-first-4k.jpg" alt="Little Feet mascot supporting calm care and safeguarding">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Safety first</span><h2>Keep the right information close at hand.</h2><p>Care, safeguarding, pickup, and area-alert tools are grouped so staff can act calmly when time matters.</p><div class="portal-tour-fact"><strong>Privacy by design:</strong> Location is used only for relevant area alerts, and is not shown to other users.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('careTab')">Open Care &amp; Safety</button></div></div>
           </article>
           <div class="tour-controls"><button type="button" onclick="movePortalTour(-1)" aria-label="Previous slide">‹</button><div class="tour-dots" role="tablist" aria-label="Portal tour slides"><button type="button" class="is-active" onclick="showPortalTourSlide(0)" aria-label="Show slide 1"></button><button type="button" onclick="showPortalTourSlide(1)" aria-label="Show slide 2"></button><button type="button" onclick="showPortalTourSlide(2)" aria-label="Show slide 3"></button><button type="button" onclick="showPortalTourSlide(3)" aria-label="Show slide 4"></button></div><button type="button" onclick="movePortalTour(1)" aria-label="Next slide">›</button></div>
@@ -1742,13 +1742,13 @@
   </div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
-    <img id="wallpaperImage" src="assets/little-feet-original-background.gif" alt="Active Little Feet wallpaper">
+    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-4k.jpg" alt="Active Little Feet wallpaper">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260910-vector-icon-system" defer></script>
+  <script src="backup.js?v=20260911-4k-artwork" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
