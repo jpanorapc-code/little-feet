@@ -766,7 +766,7 @@
       <form id="loginForm">
         <div>
           <label for="loginUsername">Staff ID or Parent Email <span class="req">*</span></label>
-          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" required>
+          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" autocomplete="username" required>
         </div>
         <div>
           <label for="loginPin">Security PIN / Password <span class="req">*</span></label>
@@ -1772,7 +1772,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260912-profile-controls" defer></script>
+  <script src="backup.js?v=20260912-login-controls" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

@@ -46,6 +46,7 @@ const WELCOME_THEME_MAX_MS = 8000;
 const DEFAULT_WALLPAPER_URL = 'assets/4k/little-feet-wallpaper-4k.jpg';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
+const SAVED_LOGIN_USERNAME_KEY = 'lf_saved_login_username';
 const SA_PUBLIC_SCHOOL_CALENDAR = {
   2026: {
     terms: [['2026-01-14', '2026-03-27'], ['2026-04-08', '2026-06-26'], ['2026-07-21', '2026-09-23'], ['2026-10-06', '2026-12-11']],
@@ -206,6 +207,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('lf_wallpaper_muted') === 'true' && localStorage.getItem('lf_portal_audio_muted_last') === null) localStorage.setItem('lf_portal_audio_muted_last', 'true');
   } catch {}
   loadPortalAudioPreference();
+  restoreRememberedLogin();
+  document.getElementById('rememberLogin')?.addEventListener('change', event => {
+    if (!event.target.checked) clearRememberedLogin();
+  });
   restoreCustomWallpaper().catch(() => {});
   startupChimePending = true;
   playStartupChime();
@@ -691,6 +696,33 @@ function toggleLoginPinVisibility() {
   input.focus({ preventScroll: true });
 }
 
+function clearRememberedLogin() {
+  try { localStorage.removeItem(SAVED_LOGIN_USERNAME_KEY); } catch {}
+}
+
+function restoreRememberedLogin() {
+  try {
+    const username = localStorage.getItem(SAVED_LOGIN_USERNAME_KEY) || '';
+    if (!username) return;
+    const usernameInput = document.getElementById('loginUsername');
+    const rememberInput = document.getElementById('rememberLogin');
+    if (usernameInput && !usernameInput.value) usernameInput.value = username;
+    if (rememberInput) rememberInput.checked = true;
+  } catch {}
+}
+
+async function saveRememberedLogin(username, pin) {
+  try { localStorage.setItem(SAVED_LOGIN_USERNAME_KEY, username); } catch {}
+  if (!window.PasswordCredential || !navigator.credentials?.store) return;
+  try {
+    await navigator.credentials.store(new PasswordCredential({
+      id: username,
+      name: currentUser?.name || username,
+      password: pin
+    }));
+  } catch { /* The browser may choose its own password-save prompt instead. */ }
+}
+
 function showSignupForm() {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('signupForm').classList.remove('hidden');
@@ -710,6 +742,8 @@ if (loginForm) {
     unlockPortalAudio();
     const username = document.getElementById('loginUsername').value;
     const pin = document.getElementById('loginPin').value;
+    const rememberLogin = document.getElementById('rememberLogin')?.checked === true;
+    if (!rememberLogin) clearRememberedLogin();
 
     try {
       const res = await fetch('/api/login', {
@@ -720,6 +754,7 @@ if (loginForm) {
       const data = await res.json();
       if (res.ok) {
         currentUser = data.user;
+        if (rememberLogin) await saveRememberedLogin(username, pin);
         setupSession();
       } else {
         alert(data.message || 'Login failed.');
