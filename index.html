@@ -806,6 +806,123 @@
       .mascot-stage::before { width: 150px; height:150px; }
       .brand-header img { width:134px; height:134px; }
     }
+
+    /* Conversation and signing workspaces: familiar, calm, high-contrast surfaces. */
+    .chat-shell { max-width: 1080px; padding: 0; overflow: hidden; }
+    .chat-toolbar {
+      gap: 9px;
+      padding: 14px 16px;
+      background: linear-gradient(120deg, rgba(7, 39, 58, .92), rgba(13, 91, 94, .60));
+      border-bottom-color: rgba(94,234,212,.20);
+    }
+    .chat-toolbar .action-btn {
+      min-height: 38px;
+      margin: 0;
+      border: 1px solid rgba(148,163,184,.24);
+      background: rgba(6, 29, 48, .60);
+      color: #dffbf5;
+      box-shadow: none;
+    }
+    .chat-toolbar .action-btn.btn-blue { background: rgba(13, 148, 136, .92); border-color: rgba(94,234,212,.55); color: #fff; }
+    .chat-panel { padding: 18px; }
+    .chat-box.modern-chat {
+      min-height: 380px;
+      height: min(52vh, 500px);
+      padding: 16px;
+      border: 1px solid rgba(94,234,212,.18);
+      border-radius: 16px;
+      background-color: rgba(5, 28, 45, .72);
+      background-image: radial-gradient(rgba(94,234,212,.055) 1px, transparent 1px), linear-gradient(180deg, rgba(11,50,68,.82), rgba(6,31,49,.78));
+      background-size: 18px 18px, auto;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .chat-compose { gap: 9px; margin-top: 12px; }
+    .chat-compose textarea { min-height: 82px; margin:0; border-radius: 15px; padding: 13px 15px; background: rgba(6, 29, 48, .76); }
+    .chat-compose .submit-btn { min-height: 48px; border-radius: 14px; box-shadow: 0 10px 20px rgba(13,148,136,.18); }
+    .signature-pad {
+      min-height: 156px;
+      border: 1px solid rgba(94,234,212,.62);
+      border-radius: 16px;
+      background-color: rgba(237, 251, 255, .96);
+      background-image: linear-gradient(rgba(13,148,136,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(13,148,136,.07) 1px, transparent 1px);
+      background-size: 18px 18px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 10px 22px rgba(2,8,23,.14);
+    }
+    .profile-icon-picker { grid-template-columns:repeat(5,minmax(48px,1fr)); gap:10px; }
+    .profile-icon-choice {
+      min-height:54px;
+      border-radius:14px;
+      border-color:rgba(94,234,212,.24);
+      background:linear-gradient(145deg, rgba(7,39,58,.78), rgba(13,70,82,.55));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+      transition:transform .16s ease,border-color .16s ease,background .16s ease;
+    }
+    .profile-icon-choice:hover, .profile-icon-choice:focus-visible { transform:translateY(-2px); border-color:#5eead4; background:linear-gradient(145deg, rgba(13,148,136,.36), rgba(6,54,70,.82)); }
+    .profile-icon-choice.is-selected { border-color:#5eead4; background:linear-gradient(145deg, rgba(13,148,136,.66), rgba(15,118,110,.72)); box-shadow:0 0 0 3px rgba(45,212,191,.15); }
+    body.light-mode .chat-toolbar { background:linear-gradient(120deg, rgba(198,236,247,.96), rgba(167,223,224,.82)); }
+    body.light-mode .chat-toolbar .action-btn:not(.btn-blue) { background:rgba(240,251,255,.84); color:#164e63; }
+    body.light-mode .chat-box.modern-chat { background-color:rgba(232,247,253,.86); background-image:radial-gradient(rgba(14,116,144,.08) 1px, transparent 1px), linear-gradient(180deg, rgba(238,251,255,.92), rgba(207,235,245,.82)); }
+    body.light-mode .chat-compose textarea { background:rgba(248,254,255,.94); }
+    body.light-mode .profile-icon-choice { background:linear-gradient(145deg, rgba(245,253,255,.96), rgba(210,239,247,.86)); }
+    @media (max-width:640px) {
+      .chat-toolbar { padding:12px; }
+      .chat-toolbar .action-btn { flex:1 1 100%; justify-content:center; }
+      .chat-panel { padding:13px; }
+      .chat-box.modern-chat { min-height:300px; height:48vh; }
+      .profile-icon-picker { grid-template-columns:repeat(5,minmax(42px,1fr)); gap:8px; }
+      .profile-icon-choice { min-height:48px; font-size:1.18rem; }
+    }
+
+    /* The login identity lives above the glass card, like a moon in the night scene. */
+    #authSection { padding-top: 230px; padding-bottom: 44px; }
+    #authSection > .auth-card {
+      overflow: visible;
+      margin-top: 0;
+      padding-top: 20px;
+      background: linear-gradient(155deg, rgba(13, 43, 69, .58), rgba(8, 28, 48, .46)) !important;
+      box-shadow: 0 28px 72px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.10);
+    }
+    .brand-header {
+      position:absolute;
+      z-index:4;
+      top:-204px;
+      left:50%;
+      width:250px;
+      margin:0;
+      padding:0;
+      overflow:visible;
+      transform:translateX(-50%);
+    }
+    .mascot-stage { min-height:158px; margin:0 0 8px; }
+    .mascot-stage::before {
+      width:194px;
+      height:194px;
+      border-radius:50%;
+      border:1px solid rgba(186,230,253,.48);
+      background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.58), rgba(191,219,254,.24) 38%, rgba(45,212,191,.10) 62%, transparent 72%);
+      box-shadow:0 0 0 12px rgba(148,163,184,.035), 0 18px 34px rgba(2,8,23,.24), inset 14px -14px 24px rgba(2,8,23,.12);
+    }
+    .brand-header img {
+      width:148px;
+      height:148px;
+      padding:3px;
+      border:1px solid rgba(255,255,255,.72);
+      border-radius:50%;
+      background:rgba(245,253,255,.96);
+      box-shadow:0 9px 22px rgba(2,8,23,.28), inset 0 0 0 4px rgba(94,234,212,.10);
+      object-fit:cover;
+    }
+    .brand-header h2 { margin-top:3px; font-size:2.15rem; }
+    .brand-header p.slogan { background:rgba(7,28,47,.52); }
+    body.light-mode #authSection > .auth-card { background:linear-gradient(155deg, rgba(222,244,253,.72), rgba(190,225,241,.58)) !important; }
+    @media (max-width:640px) {
+      #authSection { padding-top:205px; padding-bottom:26px; }
+      .brand-header { top:-184px; width:230px; }
+      .mascot-stage { min-height:142px; }
+      .mascot-stage::before { width:168px; height:168px; }
+      .brand-header img { width:132px; height:132px; }
+      .brand-header h2 { font-size:1.92rem; }
+    }
   </style>
 </head>
 <body>
