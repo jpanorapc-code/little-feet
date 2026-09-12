@@ -4064,7 +4064,8 @@ async function loadWorkspaceRecords(module) {
   try {
     const response = await fetch(`/api/modules/${module}`);
     const records = await response.json();
-    const emptyIcon = escapeWorkspaceText(list.dataset.emptyIcon || '🗂️');
+    const emptyIconName = { edit: 'icon-edit', document: 'icon-document', handover: 'icon-handover' }[list.dataset.emptyIcon] || 'icon-document';
+    const emptyIcon = `<svg class="ui-icon" aria-hidden="true"><use href="#${emptyIconName}"></use></svg>`;
     const emptyTitle = escapeWorkspaceText(list.dataset.emptyTitle || 'No records yet');
     const emptyText = escapeWorkspaceText(list.dataset.emptyText || 'New records will appear here after they are saved.');
     list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${currentUser?.role === 'admin' ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : `<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">${emptyIcon}</span><span><strong>${emptyTitle}</strong><span>${emptyText}</span></span></div>`;

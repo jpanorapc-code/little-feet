@@ -334,12 +334,15 @@
     .workspace-results-panel.is-reports::before { background:rgba(96,165,250,.1); }
     .workspace-results-heading { position:relative; display:flex; align-items:center; gap:11px; margin-bottom:12px; }
     .workspace-results-icon { flex:0 0 38px; width:38px; height:38px; display:grid; place-items:center; border:1px solid rgba(94,234,212,.25); border-radius:11px; background:rgba(13,148,136,.13); font-size:1.1rem; }
+    .workspace-results-icon .ui-icon { width:1.2rem; height:1.2rem; color:#5eead4; }
     .is-reports .workspace-results-icon { border-color:rgba(96,165,250,.28); background:rgba(37,99,235,.13); }
+    .is-reports .workspace-results-icon .ui-icon { color:#93c5fd; }
     .workspace-results-heading h3 { margin:0; color:#f8fafc; font-size:.98rem; line-height:1.2; }
     .workspace-results-heading p { margin:3px 0 0; color:var(--text-muted); font-size:.75rem; line-height:1.35; }
     .workspace-results-panel .record-list { position:relative; margin:0; }
     .record-empty-state { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:11px; min-height:76px; padding:13px; border:1px dashed rgba(148,163,184,.25); border-radius:11px; background:rgba(2,8,23,.2); }
     .record-empty-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:rgba(148,163,184,.09); filter:grayscale(.15); }
+    .record-empty-icon .ui-icon { width:1.05rem; height:1.05rem; color:#94a3b8; }
     .record-empty-state strong { display:block; margin-bottom:3px; color:#e2e8f0; font-size:.82rem; }
     .record-empty-state span:last-child { display:block; color:var(--text-muted); font-size:.75rem; line-height:1.4; }
     body.light-mode .workspace-results-panel { background:linear-gradient(145deg,#fff,#eef8f7); border-color:#cbd5e1; }
@@ -734,6 +737,11 @@
       <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 4h4l1 3H9l1-3ZM7 7l.7 13h8.6L17 7M10 10v7M14 10v7"/></symbol>
       <symbol id="icon-alert" viewBox="0 0 24 24"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5M12 17h.01"/></symbol>
       <symbol id="icon-edit" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.8 6.7 3.5 3.5M4 20.8l3.5-3.5"/></symbol>
+      <symbol id="icon-growth" viewBox="0 0 24 24"><path d="M12 21v-9M12 15c-4.7 0-7.5-2.8-7.5-7.5 4.7 0 7.5 2.8 7.5 7.5ZM12 12c0-4.7 2.8-7.5 7.5-7.5 0 4.7-2.8 7.5-7.5 7.5Z"/></symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/><path d="m4 7 6-4 6 6 5-5"/></symbol>
+      <symbol id="icon-document" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5M9 12h6M9 16h6"/></symbol>
+      <symbol id="icon-handover" viewBox="0 0 24 24"><path d="M3 8.5h5l2 2h4l2-2h5M5 12v6h14v-6"/><path d="m9 15 3 3 3-3"/></symbol>
+      <symbol id="icon-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/></symbol>
     </defs>
   </svg>
 
@@ -1222,15 +1230,15 @@
 
       <div id="schoolDayTab" class="tab-content role-teacher role-admin">
         <div class="card">
-          <div class="card-header-bar"><div><h2>🌤️ School Day Hub</h2><p style="margin:4px 0 0;color:var(--text-muted);font-size:.85rem;">Keep the day organised from the first classroom check to the final handover.</p></div><span class="badge-tag info">STAFF</span></div>
+          <div class="card-header-bar"><div><h2 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sun"></use></svg><span>School Day Hub</span></h2><p style="margin:4px 0 0;color:var(--text-muted);font-size:.85rem;">Keep the day organised from the first classroom check to the final handover.</p></div><span class="badge-tag info">STAFF</span></div>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>📝 Learner absence note</h3><p>Record a parent-reported absence for the teaching team to follow up.</p><form onsubmit="saveWorkspaceRecord(event,'absences','Learner absence note')"><input name="details" placeholder="Learner · date · reason / expected return" required><button class="submit-btn">Record absence</button></form></div>
-            <div class="workspace-card"><h3>🤝 Classroom handover</h3><p>Leave a concise handover for the next educator or closing team.</p><form onsubmit="saveWorkspaceRecord(event,'handovers','Classroom handover')"><textarea name="details" rows="3" placeholder="Class · key events · follow-up needed" required></textarea><button class="submit-btn">Save handover</button></form></div>
-            <div class="workspace-card"><h3>✅ Opening checklist</h3><p>Before children arrive: check the register, allergies, room safety, supplies, and the day’s timetable.</p><button type="button" class="action-btn btn-blue" onclick="openWorkspace('attendanceTab')">Open attendance</button></div>
-            <div class="workspace-card"><h3><svg class="ui-icon" aria-hidden="true"><use href="#icon-safety"></use></svg> Closing checklist</h3><p>Before leaving: complete handovers, check pick-up records, record incidents, and secure learning spaces.</p><button type="button" class="action-btn btn-green" onclick="openWorkspace('safeguardingTab')">Open safeguarding</button></div>
+            <div class="workspace-card"><h3 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Learner absence note</span></h3><p>Record a parent-reported absence for the teaching team to follow up.</p><form onsubmit="saveWorkspaceRecord(event,'absences','Learner absence note')"><input name="details" placeholder="Learner · date · reason / expected return" required><button class="submit-btn">Record absence</button></form></div>
+            <div class="workspace-card"><h3 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-handover"></use></svg><span>Classroom handover</span></h3><p>Leave a concise handover for the next educator or closing team.</p><form onsubmit="saveWorkspaceRecord(event,'handovers','Classroom handover')"><textarea name="details" rows="3" placeholder="Class · key events · follow-up needed" required></textarea><button class="submit-btn">Save handover</button></form></div>
+            <div class="workspace-card"><h3 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-check-circle"></use></svg><span>Opening checklist</span></h3><p>Before children arrive: check the register, allergies, room safety, supplies, and the day’s timetable.</p><button type="button" class="action-btn btn-blue" onclick="openWorkspace('attendanceTab')">Open attendance</button></div>
+            <div class="workspace-card"><h3 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-safety"></use></svg><span>Closing checklist</span></h3><p>Before leaving: complete handovers, check pick-up records, record incidents, and secure learning spaces.</p><button type="button" class="action-btn btn-green" onclick="openWorkspace('safeguardingTab')">Open safeguarding</button></div>
           </div>
-          <h3 class="workspace-heading">Today’s absence notes</h3><div id="absencesRecords" class="record-list"></div>
-          <h3 class="workspace-heading">Classroom handovers</h3><div id="handoversRecords" class="record-list"></div>
+          <h3 class="workspace-heading">Today’s absence notes</h3><div id="absencesRecords" class="record-list" data-empty-icon="edit"></div>
+          <h3 class="workspace-heading">Classroom handovers</h3><div id="handoversRecords" class="record-list" data-empty-icon="handover"></div>
         </div>
       </div>
 
@@ -1662,7 +1670,7 @@
       </div>
 
       <div id="progressTab" class="tab-content role-teacher role-admin">
-        <div class="card"><div class="card-header-bar"><h2>🌱 Development, Portfolio & Reports</h2><span class="badge-tag info">LEARNING RECORDS</span></div>
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-growth"></use></svg><span>Development, Portfolio &amp; Reports</span></h2><span class="badge-tag info">LEARNING RECORDS</span></div>
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Milestone observation</h3><p>Record a dated observation against motor, speech, social, or another framework area.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Milestone observation')"><input name="details" placeholder="Learner · framework area · observation" required><button class="submit-btn">Save observation</button></form></div>
             <div class="workspace-card"><h3>Portfolio evidence</h3><p>Use Worksheets for photo evidence, then add the developmental context here for the learner portfolio.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Portfolio tag')"><input name="details" placeholder="Learner · evidence title · development tag" required><button class="submit-btn">Tag portfolio</button></form></div>
@@ -1670,12 +1678,12 @@
           </div>
           <div class="workspace-results-grid">
             <section class="workspace-results-panel" aria-labelledby="portfolioResultsTitle">
-              <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true">🌱</span><div><h3 id="portfolioResultsTitle">Portfolio observations</h3><p>Milestones and evidence saved for learner portfolios.</p></div></div>
-              <div id="portfolioRecords" class="record-list" aria-live="polite" data-empty-icon="📝" data-empty-title="No observations yet" data-empty-text="Save a milestone or portfolio tag above to start the learner timeline."></div>
+              <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-growth"></use></svg></span><div><h3 id="portfolioResultsTitle">Portfolio observations</h3><p>Milestones and evidence saved for learner portfolios.</p></div></div>
+              <div id="portfolioRecords" class="record-list" aria-live="polite" data-empty-icon="edit" data-empty-title="No observations yet" data-empty-text="Save a milestone or portfolio tag above to start the learner timeline."></div>
             </section>
             <section class="workspace-results-panel is-reports" aria-labelledby="reportResultsTitle">
-              <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true">📊</span><div><h3 id="reportResultsTitle">Report requests</h3><p>Progress reports waiting to be prepared or reviewed.</p></div></div>
-              <div id="reportsRecords" class="record-list" aria-live="polite" data-empty-icon="📄" data-empty-title="No report requests yet" data-empty-text="Create a term progress report above when an educator summary is ready."></div>
+              <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-chart"></use></svg></span><div><h3 id="reportResultsTitle">Report requests</h3><p>Progress reports waiting to be prepared or reviewed.</p></div></div>
+              <div id="reportsRecords" class="record-list" aria-live="polite" data-empty-icon="document" data-empty-title="No report requests yet" data-empty-text="Create a term progress report above when an educator summary is ready."></div>
             </section>
           </div>
         </div>
