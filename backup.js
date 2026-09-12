@@ -31,6 +31,8 @@ let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let welcomeThemeAudio = null;
+let welcomeThemeStopTimer = null;
+let startupChimeStarting = false;
 let loginChimeAudio = null;
 let loginChimeStopTimer = null;
 let loginChimeFadeTimer = null;
@@ -40,6 +42,7 @@ let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
+const WELCOME_THEME_MAX_MS = 8000;
 const DEFAULT_WALLPAPER_URL = 'assets/4k/little-feet-wallpaper-4k.jpg';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
@@ -356,9 +359,13 @@ function showPortalTourSlide(index) {
 }
 
 function stopWelcomeTheme() {
+  if (welcomeThemeStopTimer) window.clearTimeout(welcomeThemeStopTimer);
+  welcomeThemeStopTimer = null;
+  startupChimeStarting = false;
   if (!welcomeThemeAudio) return;
   welcomeThemeAudio.pause();
   welcomeThemeAudio.currentTime = 0;
+  welcomeThemeAudio = null;
 }
 
 function portalAudioPreferenceKey() {
@@ -472,7 +479,7 @@ function stopWindtLegacyNote() {
 
 // The supplied Little Feet theme plays once after the first permitted interaction.
 function playStartupChime() {
-  if (startupChimePlayed) return;
+  if (startupChimePlayed || startupChimeStarting) return;
   if (portalAudioMuted) {
     startupChimePending = false;
     return;
@@ -484,16 +491,25 @@ function playStartupChime() {
       welcomeThemeAudio.preload = 'auto';
       welcomeThemeAudio.volume = 0.58;
     }
+    welcomeThemeAudio.loop = false;
     welcomeThemeAudio.currentTime = 0;
+    startupChimeStarting = true;
     welcomeThemeAudio.play().then(() => {
+      startupChimeStarting = false;
       startupChimePlayed = true;
       startupChimePrompt?.remove();
       startupChimePrompt = null;
+      welcomeThemeStopTimer = window.setTimeout(stopWelcomeTheme, WELCOME_THEME_MAX_MS);
     }).catch(() => {
+      startupChimeStarting = false;
       startupChimePending = true;
       showStartupChimePrompt();
     });
-  } catch { startupChimePending = true; showStartupChimePrompt(); }
+  } catch {
+    startupChimeStarting = false;
+    startupChimePending = true;
+    showStartupChimePrompt();
+  }
 }
 
 function movePortalTour(direction) {
@@ -660,6 +676,19 @@ function clearSignature(id) { reportSignaturePads[id]?.clear(); }
 function quickFill(user, pin) {
   document.getElementById('loginUsername').value = user;
   document.getElementById('loginPin').value = pin;
+}
+
+function toggleLoginPinVisibility() {
+  const input = document.getElementById('loginPin');
+  const button = document.getElementById('loginPinToggle');
+  if (!input || !button) return;
+  const shouldShow = input.type === 'password';
+  input.type = shouldShow ? 'text' : 'password';
+  const label = shouldShow ? 'Hide password' : 'Show password';
+  button.setAttribute('aria-pressed', String(shouldShow));
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  input.focus({ preventScroll: true });
 }
 
 function showSignupForm() {
@@ -858,6 +887,33 @@ function toggleDarkMode() {
 }
 
 let dashboardRefreshTimer = null;
+const profileIcons = ['👤', '🧑‍🏫', '👨‍👩‍👧', '🏫', '🌟', '🌱', '🐾', '📚', '🎨', '🏆'];
+
+function getProfileIconStorageKey() {
+  const account = currentUser?.username || 'guest';
+  return `lf_profile_icon_${encodeURIComponent(account)}`;
+}
+
+function applyProfileIcon(icon = localStorage.getItem(getProfileIconStorageKey()) || profileIcons[0]) {
+  const selectedIcon = profileIcons.includes(icon) ? icon : profileIcons[0];
+  const avatar = document.getElementById('userAvatar');
+  if (avatar) {
+    avatar.textContent = selectedIcon;
+    avatar.title = currentUser?.name || currentUser?.username || 'Profile';
+  }
+  document.querySelectorAll('.profile-icon-choice').forEach(button => {
+    const selected = button.dataset.profileIcon === selectedIcon;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function selectProfileIcon(icon) {
+  if (!profileIcons.includes(icon)) return;
+  localStorage.setItem(getProfileIconStorageKey(), icon);
+  applyProfileIcon(icon);
+}
+
 function applyUserPreferences() {
   const preferences = JSON.parse(localStorage.getItem('lf_user_preferences') || '{}');
   const language = document.getElementById('languagePreference');
@@ -869,6 +925,7 @@ function applyUserPreferences() {
   document.getElementById('dashboardSection')?.classList.toggle('sidebar-collapsed', sidebarCollapsed);
   document.getElementById('mainNavigation')?.classList.toggle('is-collapsed', sidebarCollapsed);
   restoreSidebarGroups();
+  applyProfileIcon();
   if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
   const interval = Number(preferences.refresh || 0);
   if (interval > 0) dashboardRefreshTimer = setInterval(() => { if (currentUser && !document.hidden) loadAllData(); }, interval);
@@ -916,12 +973,6 @@ function setupSession() {
   if (footerSchoolName) footerSchoolName.textContent = `${currentUser.schoolName || 'Little Feet'} School Portal`;
   const displayRoleEl = document.getElementById('displayRole');
   if (displayRoleEl) displayRoleEl.textContent = `${currentUser.name || currentUser.username} · ${currentUser.role.toUpperCase()}`;
-
-  const userAvatarEl = document.getElementById('userAvatar');
-  if (userAvatarEl) {
-    userAvatarEl.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-user"></use></svg>';
-    userAvatarEl.title = currentUser.name || currentUser.username;
-  }
 
   if (document.getElementById('postAuthorTag')) {
     document.getElementById('postAuthorTag').textContent = `${currentUser.role.toUpperCase()} - ${currentUser.username}`;

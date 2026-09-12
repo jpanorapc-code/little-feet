@@ -395,6 +395,18 @@
     #loginForm { display:flex; flex-direction:column; align-items:center; }
     #loginForm > div:not(.social-signin) { align-self:stretch; }
     #loginForm > .submit-btn { width:min(100%, 360px); align-self:center; margin-top:2px; }
+    .password-field { position:relative; }
+    .password-field input { padding-right:52px; }
+    .password-toggle { position:absolute; top:50%; right:5px; width:42px; height:42px; margin:0; padding:0; transform:translateY(-50%); display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:8px; background:transparent; color:var(--text-muted); cursor:pointer; }
+    .password-toggle:hover, .password-toggle:focus-visible { color:var(--primary-color); background:rgba(13,148,136,.12); outline:2px solid rgba(45,212,191,.55); outline-offset:-2px; }
+    .password-toggle .ui-icon { width:1.2rem; height:1.2rem; }
+    .password-toggle .icon-eye-off { display:none; }
+    .password-toggle[aria-pressed="true"] .icon-eye { display:none; }
+    .password-toggle[aria-pressed="true"] .icon-eye-off { display:block; }
+    .profile-icon-picker { display:grid; grid-template-columns:repeat(5,minmax(44px,1fr)); gap:9px; margin-top:12px; }
+    .profile-icon-choice { min-height:48px; margin:0; padding:7px; border:1px solid var(--border-color); border-radius:10px; background:var(--input-bg); color:var(--text-dark); font-size:1.35rem; line-height:1; cursor:pointer; }
+    .profile-icon-choice:hover, .profile-icon-choice:focus-visible { border-color:var(--primary-color); background:rgba(13,148,136,.12); outline:none; }
+    .profile-icon-choice.is-selected { border-color:#2dd4bf; background:rgba(13,148,136,.24); box-shadow:0 0 0 2px rgba(45,212,191,.2); }
     .social-signin { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:9px; width:min(100%, 360px); margin:12px auto 0; }
     .social-signin button { min-height:44px; border:1px solid var(--border-color); border-radius:8px; padding:9px 10px; color:var(--text-dark); background:var(--input-bg); font-size:.78rem; font-weight:700; line-height:1.2; cursor:pointer; }
     .social-signin button:hover, .social-signin button:focus-visible { border-color:var(--primary-color); background:rgba(13,148,136,.12); outline:none; }
@@ -716,6 +728,8 @@
       <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21V5.5Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M8 7h7M8 10h5"/></symbol>
       <symbol id="icon-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="m8.7 13.2-1.2 7 4.5-2.3 4.5 2.3-1.2-7M10 9l1.3 1.3L14 7.7"/></symbol>
       <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
+      <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+      <symbol id="icon-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.2A10.8 10.8 0 0 1 12 6c6 0 9.5 6 9.5 6a15.6 15.6 0 0 1-2.5 3.2M6.1 6.1C3.8 7.7 2.5 12 2.5 12s3.5 6 9.5 6c1 0 2-.2 2.8-.5M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
       <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M5 14v5h14v-5"/></symbol>
       <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 4h4l1 3H9l1-3ZM7 7l.7 13h8.6L17 7M10 10v7M14 10v7"/></symbol>
       <symbol id="icon-alert" viewBox="0 0 24 24"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5M12 17h.01"/></symbol>
@@ -756,7 +770,13 @@
         </div>
         <div>
           <label for="loginPin">Security PIN / Password <span class="req">*</span></label>
-          <input type="password" id="loginPin" placeholder="••••••••" required>
+          <div class="password-field">
+            <input type="password" id="loginPin" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="password-toggle" id="loginPinToggle" aria-label="Show password" aria-controls="loginPin" aria-pressed="false" title="Show password" onclick="toggleLoginPinVisibility()">
+              <svg class="ui-icon icon-eye" aria-hidden="true"><use href="#icon-eye"></use></svg>
+              <svg class="ui-icon icon-eye-off" aria-hidden="true"><use href="#icon-eye-off"></use></svg>
+            </button>
+          </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
           <input type="checkbox" id="rememberLogin" style="width: auto; margin-bottom: 0;">
@@ -1677,6 +1697,7 @@
         <div class="card"><div class="card-header-bar"><h2>⚙️ Personal settings</h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
           <p style="color:var(--text-muted);margin-bottom:16px;">These settings are saved on this device for the signed-in account.</p>
           <div class="workspace-grid">
+            <div class="workspace-card"><h3>Profile icon</h3><p>Choose the icon shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="👤" aria-label="Person" title="Person" onclick="selectProfileIcon(this.dataset.profileIcon)">👤</button><button type="button" class="profile-icon-choice" data-profile-icon="🧑‍🏫" aria-label="Educator" title="Educator" onclick="selectProfileIcon(this.dataset.profileIcon)">🧑‍🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="👨‍👩‍👧" aria-label="Family" title="Family" onclick="selectProfileIcon(this.dataset.profileIcon)">👨‍👩‍👧</button><button type="button" class="profile-icon-choice" data-profile-icon="🏫" aria-label="School" title="School" onclick="selectProfileIcon(this.dataset.profileIcon)">🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="🌟" aria-label="Star" title="Star" onclick="selectProfileIcon(this.dataset.profileIcon)">🌟</button><button type="button" class="profile-icon-choice" data-profile-icon="🌱" aria-label="Seedling" title="Seedling" onclick="selectProfileIcon(this.dataset.profileIcon)">🌱</button><button type="button" class="profile-icon-choice" data-profile-icon="🐾" aria-label="Little feet" title="Little feet" onclick="selectProfileIcon(this.dataset.profileIcon)">🐾</button><button type="button" class="profile-icon-choice" data-profile-icon="📚" aria-label="Books" title="Books" onclick="selectProfileIcon(this.dataset.profileIcon)">📚</button><button type="button" class="profile-icon-choice" data-profile-icon="🎨" aria-label="Creative arts" title="Creative arts" onclick="selectProfileIcon(this.dataset.profileIcon)">🎨</button><button type="button" class="profile-icon-choice" data-profile-icon="🏆" aria-label="Achievement" title="Achievement" onclick="selectProfileIcon(this.dataset.profileIcon)">🏆</button></div></div>
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. English is currently the complete interface; Afrikaans labels will expand as translations are reviewed.</p><select id="languagePreference" onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans (in progress)</option></select></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without reloading the map or interrupting your work.</p><select id="refreshPreference" onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="60000">Every minute</option><option value="120000">Every 2 minutes</option><option value="300000">Every 5 minutes</option></select></div>
             <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute all welcome, login and wallpaper sound. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
@@ -1751,7 +1772,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260911-4k-artwork" defer></script>
+  <script src="backup.js?v=20260912-profile-controls" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
