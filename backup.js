@@ -202,6 +202,7 @@ function playTicketAlert() {
 
 // DOM Initialization
 window.addEventListener('DOMContentLoaded', () => {
+  upgradeLegacyIcons();
   document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
   try {
     if (localStorage.getItem('lf_wallpaper_muted') === 'true' && localStorage.getItem('lf_portal_audio_muted_last') === null) localStorage.setItem('lf_portal_audio_muted_last', 'true');
@@ -246,6 +247,24 @@ window.addEventListener('DOMContentLoaded', () => {
   setupKeyboardShortcuts();
   setupWallpaperMode();
 });
+
+function upgradeLegacyIcons() {
+  const iconFor = (value = '') => {
+    const first = Array.from(String(value).trim())[0];
+    return ({ '📣':'alert', '📢':'alert', '🚨':'alert', '💳':'finance', '💰':'finance', '🛍':'finance', '🛡':'safety', '🤝':'handover', '📦':'operations', '⚙':'operations', '🖼':'image', '📅':'document', '📁':'book', '📚':'book', '📊':'chart', '💬':'help', '🧷':'heart-star', '🌱':'growth', '🏆':'award', '🎨':'palette', '🏫':'home', '👤':'user', '🧑':'user', '👨':'user', '🐾':'heart-star', '🌟':'award' })[first] || 'heart-star';
+  };
+  const svg = name => `<span class="professional-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-${name}"></use></svg></span>`;
+  document.querySelectorAll('.card-header-bar h2:not(.icon-label), .guide-link-card h3:not(.icon-label)').forEach(heading => {
+    const text = heading.textContent.trim();
+    if (!/^[\p{Extended_Pictographic}]/u.test(text)) return;
+    heading.classList.add('icon-label');
+    heading.innerHTML = `${svg(iconFor(text))}<span>${text.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '')}</span>`;
+  });
+  document.querySelectorAll('.profile-icon-choice').forEach(button => {
+    const value = button.dataset.profileIcon || button.textContent.trim();
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${iconFor(value)}"></use></svg>`;
+  });
+}
 
 async function completeProviderLogin() {
   try {
