@@ -15,6 +15,7 @@ const loginAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
+const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 let activeRequestCount = 0;
 let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
@@ -628,7 +629,15 @@ app.post('/api/login', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: activeRequestCount > 2 ? 'BUSY' : 'OK', instance: replicaMode ? 'STANDBY' : 'PRIMARY', activeRequests: activeRequestCount, timestamp: new Date() });
+  // Do not count the health probe itself, and do not report normal concurrent
+  // dashboard startup requests as server overload.
+  const reportedActiveRequests = Math.max(0, activeRequestCount - 1);
+  res.json({
+    status: reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK',
+    instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    activeRequests: reportedActiveRequests,
+    timestamp: new Date()
+  });
 });
 
 // A lightweight heartbeat used by the repository's free scheduled monitor. It

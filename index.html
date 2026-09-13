@@ -64,7 +64,7 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      background-image: linear-gradient(rgba(5, 16, 27, 0.42), rgba(5, 16, 27, 0.62)), url('assets/4k/little-feet-wallpaper-4k.jpg');
+      background-image: linear-gradient(rgba(5, 16, 27, 0.42), rgba(5, 16, 27, 0.62)), url('assets/4k/little-feet-wallpaper-no-moon-4k.jpg');
       background-repeat: no-repeat;
       background-position: center;
       /* Fill the viewport without leaving unused dark margins around the animation. */
@@ -206,7 +206,7 @@
     .btn-blue:hover { background-color: var(--primary-hover); }
 
     #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; isolation:isolate; }
-    #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background-image:linear-gradient(rgba(5,16,27,.42),rgba(5,16,27,.64)),url('assets/4k/little-feet-wallpaper-4k.jpg'); background-position:center; background-size:cover; background-repeat:no-repeat; opacity:.48; pointer-events:none; z-index:-1; }
+    #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background-image:linear-gradient(rgba(5,16,27,.42),rgba(5,16,27,.64)),url('assets/4k/little-feet-wallpaper-no-moon-4k.jpg'); background-position:center; background-size:cover; background-repeat:no-repeat; opacity:.48; pointer-events:none; z-index:-1; }
     #authSection > .auth-card { position:relative; z-index:1; width:min(100%,450px) !important; max-width:450px !important; margin:0; padding:18px; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
     .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:24px; padding-top:10px; overflow:hidden; }
     .mascot-stage { position:relative; display:grid; place-items:center; min-height:180px; margin-bottom:4px; }
@@ -2324,7 +2324,7 @@
   </div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
-    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-4k.jpg" alt="Active Little Feet wallpaper">
+    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-no-moon-4k.jpg" alt="Active Little Feet wallpaper">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
