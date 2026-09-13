@@ -889,7 +889,7 @@
       left:50%;
       width:250px;
       margin:0;
-      /* Keep the name with the form while the emblem sits in the wallpaper moon. */
+      /* Keep the emblem and name on one centred vertical brand axis. */
       padding-top:158px;
       overflow:visible;
       transform:translateX(-50%);
@@ -897,7 +897,7 @@
     .mascot-stage {
       position:absolute;
       z-index:6;
-      left:calc(50% + 190px);
+      left:50%;
       top:-67px;
       display:grid;
       place-items:center;
@@ -931,7 +931,7 @@
     @media (max-width:640px) {
       #authSection { padding-top:205px; padding-bottom:26px; }
       .brand-header { top:-184px; width:230px; padding-top:142px; }
-      .mascot-stage { left:calc(50% + 92px); top:-52px; min-height:168px; width:168px; }
+      .mascot-stage { left:50%; top:-52px; min-height:168px; width:168px; }
       .mascot-stage::before { width:168px; height:168px; }
       .brand-header img { width:132px; height:132px; }
       .brand-header h2 { font-size:1.92rem; }
@@ -1118,6 +1118,116 @@
       #authSection::before { background-size:auto 100%; }
       .portal-tour { min-height:280px; }
       .portal-tour-image { min-height:280px; }
+    }
+
+    /* Mobile action layout: keep controls ordered without turning every button
+       (including compact header controls) into an oversized full-width block. */
+    @media (max-width: 640px) {
+      .container { width:100%; padding:14px 12px; }
+      .card, .workspace-card, .store-item { width:100%; }
+
+      .action-btn,
+      button.submit-btn { min-height:44px; margin:0; padding:10px 12px; }
+      .action-btn { width:auto; }
+
+      .nav-user-panel .action-btn,
+      .nav-term-edit,
+      .nav-shortcut,
+      .nav-more-toggle,
+      .modal-close,
+      .password-toggle,
+      .wellbeing-banner button,
+      .tour-controls button,
+      .tour-dots button,
+      .profile-icon-choice { width:auto; }
+
+      .nav-user-panel .action-btn {
+        min-width:38px;
+        min-height:38px;
+        padding:7px !important;
+        justify-content:center;
+      }
+      .nav-user-panel .action-btn > span { display:none; }
+      .nav-user-panel .action-btn .ui-icon { width:18px; height:18px; }
+      .nav-user-panel #displayRole { max-width:72px; }
+
+      .nav-quickbar {
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:7px;
+      }
+      .nav-term-panel { grid-column:1 / -1; min-height:40px; }
+      .nav-quickbar .nav-shortcut {
+        width:100%;
+        min-width:0;
+        min-height:42px;
+        padding:8px 6px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:5px;
+      }
+      .nav-more-toggle { width:100%; min-height:44px; }
+
+      .card-header-bar,
+      .item-row { align-items:stretch; }
+      .card-header-bar > .action-btn,
+      .card-header-bar > button,
+      .item-row > .action-btn,
+      .item-row > button { width:100%; justify-content:center; }
+
+      .card-header-bar > div[style*="display:flex"],
+      .item-row > div[style*="display:flex"],
+      #parentPaymentsActions,
+      .chat-toolbar,
+      .portal-tour-actions {
+        display:grid !important;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        width:100%;
+        gap:8px !important;
+        align-items:stretch !important;
+      }
+      .card-header-bar > div[style*="display:flex"] > button,
+      .item-row > div[style*="display:flex"] > button,
+      #parentPaymentsActions > button,
+      .chat-toolbar > button,
+      .portal-tour-actions > button {
+        width:100%;
+        min-width:0;
+        margin:0;
+        justify-content:center;
+      }
+
+      .form-template-bar {
+        display:grid;
+        grid-template-columns:minmax(0,1fr);
+        align-items:stretch;
+      }
+      .form-template-bar select,
+      .form-template-bar .action-btn,
+      .chat-compose .action-btn,
+      .chat-compose .submit-btn,
+      #authSection .action-btn,
+      #authSection .submit-btn,
+      form > .submit-btn { width:100%; justify-content:center; }
+
+      .workspace-grid,
+      .workspace-results-grid,
+      .store-grid,
+      form[style*="grid-template-columns"] {
+        grid-template-columns:minmax(0,1fr) !important;
+      }
+      table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    }
+
+    @media (max-width: 420px) {
+      .card-header-bar > div[style*="display:flex"],
+      .item-row > div[style*="display:flex"],
+      #parentPaymentsActions,
+      .chat-toolbar,
+      .portal-tour-actions { grid-template-columns:minmax(0,1fr); }
+      .nav-brand > div > span:first-child { font-size:.92rem; }
+      .nav-user-panel #displayRole { display:none; }
     }
   </style>
 </head>
