@@ -1060,6 +1060,8 @@
     .profile-icon-choice { display:grid; place-items:center; color:#99f6e4; }
     .profile-icon-choice .ui-icon { width:20px; height:20px; }
     .profile-icon-choice.is-selected .ui-icon { filter:drop-shadow(0 0 7px rgba(94,234,212,.58)); }
+    .profile-icon-picker { grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; width:100%; }
+    .profile-icon-choice { min-width:0; width:100%; }
 
     /* Performance pass: preserve the look without repainting the whole wallpaper. */
     .card,
