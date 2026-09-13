@@ -889,18 +889,31 @@
       left:50%;
       width:250px;
       margin:0;
-      padding:0;
+      /* Keep the name with the form while the emblem sits in the wallpaper moon. */
+      padding-top:158px;
       overflow:visible;
       transform:translateX(-50%);
     }
-    .mascot-stage { min-height:158px; margin:0 0 8px; }
+    .mascot-stage {
+      position:fixed;
+      z-index:6;
+      left:64vw;
+      top:37px;
+      display:grid;
+      place-items:center;
+      min-height:194px;
+      width:194px;
+      margin:0;
+      transform:translateX(-50%);
+      pointer-events:none;
+    }
     .mascot-stage::before {
       width:194px;
       height:194px;
       border-radius:50%;
       border:1px solid rgba(186,230,253,.48);
       background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.58), rgba(191,219,254,.24) 38%, rgba(45,212,191,.10) 62%, transparent 72%);
-      box-shadow:0 0 0 12px rgba(148,163,184,.035), 0 18px 34px rgba(2,8,23,.24), inset 14px -14px 24px rgba(2,8,23,.12);
+      box-shadow:0 0 0 12px rgba(148,163,184,.05), 0 0 24px rgba(186,230,253,.24), 0 0 46px rgba(45,212,191,.16), 0 18px 34px rgba(2,8,23,.24), inset 14px -14px 24px rgba(2,8,23,.12);
     }
     .brand-header img {
       width:148px;
@@ -917,8 +930,8 @@
     body.light-mode #authSection > .auth-card { background:linear-gradient(155deg, rgba(222,244,253,.72), rgba(190,225,241,.58)) !important; }
     @media (max-width:640px) {
       #authSection { padding-top:205px; padding-bottom:26px; }
-      .brand-header { top:-184px; width:230px; }
-      .mascot-stage { min-height:142px; }
+      .brand-header { top:-184px; width:230px; padding-top:142px; }
+      .mascot-stage { left:62vw; top:25px; min-height:168px; width:168px; }
       .mascot-stage::before { width:168px; height:168px; }
       .brand-header img { width:132px; height:132px; }
       .brand-header h2 { font-size:1.92rem; }
