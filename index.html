@@ -216,15 +216,12 @@
     .nav-brand img { background: #ffffff !important; }
     @keyframes logoPulse { from { filter: brightness(1.18) contrast(1.05) drop-shadow(0 0 5px rgba(45,212,191,.55)); } to { filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 18px rgba(45,212,191,1)); } }
     .brand-header h2 { position:relative; z-index:3; margin-top:2px; margin-bottom:4px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2.25rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
-    /* The mascot artwork already includes the Little Feet wordmark; keep one visible brand name. */
-    .brand-header h2 { display:none; }
     .brand-header p.slogan { position:relative; z-index:3; display:inline-block; margin:0; padding:5px 11px; border:1px solid rgba(45,212,191,.38); border-radius:999px; background:rgba(13,148,136,.11); color:#99f6e4; font-size:.69rem; font-style:normal; font-weight:800; letter-spacing:1.45px; text-transform:uppercase; animation:sloganLift 3s ease-in-out infinite; }
     @keyframes titleShimmer { to { background-position:220% center; } }
     @keyframes sloganLift { 50% { transform:translateY(-2px); box-shadow:0 7px 18px rgba(13,148,136,.28); } }
 
     nav { background-color: #07111e; border-bottom: 3px solid var(--primary-color); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; position: relative; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
     .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #ffffff; font-size: 1.15rem; cursor: pointer; user-select: none; }
-    .nav-brand .brand-name { display:none; }
     .nav-brand img { height: 42px; width: 42px; background: #ffffff; padding: 2px; border:1px solid rgba(45,212,191,.72); border-radius:7px; filter: drop-shadow(0 0 5px rgba(45,212,191,.55)); object-fit: contain; }
     .ui-icon { width:1.22em; height:1.22em; flex:0 0 auto; display:inline-block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.22em; }
     .ui-icon--fill { fill:currentColor; stroke:none; }
@@ -1254,7 +1251,7 @@
       <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
         <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
         <div>
-          <span class="brand-name" aria-hidden="true">Little Feet</span>
+          <span>Little Feet</span>
           <span class="org-badge">ECD Portal v3.2</span>
         </div>
       </div>
