@@ -895,10 +895,10 @@
       transform:translateX(-50%);
     }
     .mascot-stage {
-      position:fixed;
+      position:absolute;
       z-index:6;
-      left:64vw;
-      top:37px;
+      left:calc(50% + 190px);
+      top:-67px;
       display:grid;
       place-items:center;
       min-height:194px;
@@ -931,7 +931,7 @@
     @media (max-width:640px) {
       #authSection { padding-top:205px; padding-bottom:26px; }
       .brand-header { top:-184px; width:230px; padding-top:142px; }
-      .mascot-stage { left:62vw; top:25px; min-height:168px; width:168px; }
+      .mascot-stage { left:calc(50% + 92px); top:-52px; min-height:168px; width:168px; }
       .mascot-stage::before { width:168px; height:168px; }
       .brand-header img { width:132px; height:132px; }
       .brand-header h2 { font-size:1.92rem; }
