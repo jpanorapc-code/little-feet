@@ -16,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^13.0.3",
+    "compression": "^1.8.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-session": "^1.19.0",

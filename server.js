@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -129,6 +130,7 @@ const activeLoginAttempt = (key) => {
 
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
+app.use(compression({ threshold: 1024 }));
 app.use((req, res, next) => {
   req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
   res.setHeader('X-Request-Id', req.requestId);

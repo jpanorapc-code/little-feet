@@ -1040,6 +1040,57 @@
       #parentPaymentsSummary { grid-template-columns:1fr 1fr; padding:14px; }
       #guideTab .guide-link-card { min-height:0; }
     }
+
+    /* One icon language across the portal: compact, calm, and readable. */
+    .professional-icon {
+      display:inline-grid;
+      place-items:center;
+      width:28px;
+      height:28px;
+      flex:0 0 28px;
+      border:1px solid rgba(94,234,212,.22);
+      border-radius:9px;
+      background:rgba(45,212,191,.10);
+      color:#99f6e4;
+    }
+    .professional-icon .ui-icon { width:16px; height:16px; }
+    .card-header-bar h2.icon-label { gap:9px; }
+    #guideTab .guide-link-card h3.icon-label { align-items:flex-start; gap:9px; }
+    #guideTab .guide-link-card h3.icon-label .professional-icon { margin-top:-2px; }
+    .profile-icon-choice { display:grid; place-items:center; color:#99f6e4; }
+    .profile-icon-choice .ui-icon { width:20px; height:20px; }
+    .profile-icon-choice.is-selected .ui-icon { filter:drop-shadow(0 0 7px rgba(94,234,212,.58)); }
+
+    /* Performance pass: preserve the look without repainting the whole wallpaper. */
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .guide-link-card,
+    .chat-shell,
+    .modal-overlay {
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
+    }
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .guide-link-card { animation:none; }
+    .tab-content.active { animation:fadeIn .16s ease-out both; }
+    .portal-welcome-banner::before,
+    .portal-tour-image,
+    .card-header-bar h2::before,
+    .badge-tag,
+    .user-avatar { animation:none; }
+    .portal-welcome-banner::before { filter:none; opacity:.72; }
+    .workspace-card:hover,
+    .store-item:hover,
+    .guide-link-card:hover { transform:none; }
+    .tab-content:not(.active) { content-visibility:auto; contain-intrinsic-size:900px; }
+    @media (max-width: 900px) {
+      #authSection::before { background-size:auto 100%; }
+      .portal-tour { min-height:280px; }
+      .portal-tour-image { min-height:280px; }
+    }
   </style>
 </head>
 <body>
@@ -1893,7 +1944,7 @@
       </div>
 
       <div id="financeTab" class="tab-content" data-roles="principal,admin">
-        <div class="card"><div class="card-header-bar"><h2>💳 Finance & Parent Payments</h2><span class="badge-tag urgent">SCHOOL FINANCE</span></div>
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-finance"></use></svg></span><span>Finance &amp; Parent Payments</span></h2><span class="badge-tag urgent">SCHOOL FINANCE</span></div>
           <div class="workspace-grid">
             <div class="workspace-card" data-roles="admin"><h3>Subscription billing</h3><p>Set your monthly plan, learner add-on prices and profit margin, optional late-payment fee, and where approved schools pay.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionBillingAdmin()">Manage subscriptions</button></div>
             <div class="workspace-card" data-roles="principal"><h3>School subscription payment</h3><p>Review the school-only price and create a payment request with the correct reference.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionCheckout()">Choose school plan</button></div>
@@ -1941,7 +1992,7 @@
       </div>
 
       <div id="parentPaymentsTab" class="tab-content" data-roles="parent,principal,admin">
-        <div class="card"><div class="card-header-bar"><h2>💰 Parent School Payments</h2><span class="badge-tag info">LIVE BALANCES</span></div>
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-finance"></use></svg></span><span>Parent School Payments</span></h2><span class="badge-tag info">LIVE BALANCES</span></div>
           <p style="color:var(--text-muted);margin:0 0 14px;">Every balance is recalculated from the payment history. An approved later date or agreed amount is shown clearly and changes when a payment is recorded.</p>
           <div id="parentPaymentsSummary" class="workspace-card" aria-live="polite"><p class="meta">Loading parent payments…</p></div>
           <div id="parentPaymentsActions" data-roles="principal,admin" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button type="button" class="action-btn btn-green" onclick="openParentPaymentAdmin()">Create parent payment</button><button type="button" class="action-btn btn-blue" onclick="loadParentPayments()">Recalculate now</button></div>
@@ -1986,7 +2037,7 @@
 
       <!-- Engagement -->
       <div id="engagementTab" class="tab-content">
-        <div class="card"><div class="card-header-bar"><h2>📣 Communication & Engagement</h2><span class="badge-tag info">SCHOOL COMMUNITY</span></div>
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><span>Communication &amp; Engagement</span></h2><span class="badge-tag info">SCHOOL COMMUNITY</span></div>
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Read Receipts & Broadcasts</h3><p>Use Alerts for current area-based notifications. The current portal records deliveries locally; external SMS fallback needs provider setup.</p><button type="button" class="action-btn btn-green" onclick="openAlertsTab()">Open alerts</button></div>
             <div class="workspace-card"><h3>Events & Order Requests</h3><p>Record a fundraiser, tuckshop, ticket, or permission-slip request for staff follow-up.</p><form onsubmit="saveWorkspaceRecord(event,'engagement','Event or order request')"><input name="details" placeholder="Event, order, or permission request" required><button class="submit-btn">Save request</button></form></div>
@@ -2025,7 +2076,7 @@
       </div>
 
       <div id="safeguardingTab" class="tab-content role-teacher role-admin">
-        <div class="card"><div class="card-header-bar"><h2>🛡️ Safeguarding & Privacy Controls</h2><span class="badge-tag urgent">RESTRICTED</span></div>
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-safety"></use></svg></span><span>Safeguarding &amp; Privacy Controls</span></h2><span class="badge-tag urgent">RESTRICTED</span></div>
           <p style="color:var(--text-muted);margin-bottom:14px;">Use only for authorised school duties. Confirm school policy, parental authority, and the applicable POPIA/Children’s Act process before recording sensitive information.</p>
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Parental media consent</h3><p>Record separate choices for private class updates and optional marketing photography. No consent means no photo processing for that purpose.</p><form id="consentForm"><input id="consentLearner" placeholder="Learner name" required><input id="consentGuardian" placeholder="Parent / guardian name" required><label><input id="consentInternal" type="checkbox"> Allow authenticated internal class updates</label><label><input id="consentMarketing" type="checkbox"> Allow external marketing photos</label><button class="submit-btn">Save consent decision</button></form></div>
@@ -2037,7 +2088,7 @@
       </div>
 
       <div id="settingsTab" class="tab-content">
-        <div class="card"><div class="card-header-bar"><h2>⚙️ Personal settings</h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-operations"></use></svg></span><span>Personal settings</span></h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
           <p style="color:var(--text-muted);margin-bottom:16px;">These settings are saved on this device for the signed-in account.</p>
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Profile icon</h3><p>Choose the icon shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="👤" aria-label="Person" title="Person" onclick="selectProfileIcon(this.dataset.profileIcon)">👤</button><button type="button" class="profile-icon-choice" data-profile-icon="🧑‍🏫" aria-label="Educator" title="Educator" onclick="selectProfileIcon(this.dataset.profileIcon)">🧑‍🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="👨‍👩‍👧" aria-label="Family" title="Family" onclick="selectProfileIcon(this.dataset.profileIcon)">👨‍👩‍👧</button><button type="button" class="profile-icon-choice" data-profile-icon="🏫" aria-label="School" title="School" onclick="selectProfileIcon(this.dataset.profileIcon)">🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="🌟" aria-label="Star" title="Star" onclick="selectProfileIcon(this.dataset.profileIcon)">🌟</button><button type="button" class="profile-icon-choice" data-profile-icon="🌱" aria-label="Seedling" title="Seedling" onclick="selectProfileIcon(this.dataset.profileIcon)">🌱</button><button type="button" class="profile-icon-choice" data-profile-icon="🐾" aria-label="Little feet" title="Little feet" onclick="selectProfileIcon(this.dataset.profileIcon)">🐾</button><button type="button" class="profile-icon-choice" data-profile-icon="📚" aria-label="Books" title="Books" onclick="selectProfileIcon(this.dataset.profileIcon)">📚</button><button type="button" class="profile-icon-choice" data-profile-icon="🎨" aria-label="Creative arts" title="Creative arts" onclick="selectProfileIcon(this.dataset.profileIcon)">🎨</button><button type="button" class="profile-icon-choice" data-profile-icon="🏆" aria-label="Achievement" title="Achievement" onclick="selectProfileIcon(this.dataset.profileIcon)">🏆</button></div></div>
