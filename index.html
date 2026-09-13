@@ -911,9 +911,21 @@
       width:194px;
       height:194px;
       border-radius:50%;
-      border:1px solid rgba(186,230,253,.48);
-      background:radial-gradient(circle at 34% 28%, #5d7485 0%, #29475d 46%, #102d43 72%, #071c30 100%);
-      box-shadow:0 0 0 9px rgba(186,230,253,.08), 0 0 14px rgba(240,249,255,.48), 0 0 34px rgba(125,211,252,.36), 0 0 72px rgba(45,212,191,.26), 0 18px 34px rgba(2,8,23,.34), inset 14px -14px 24px rgba(2,8,23,.22);
+      border:1px solid rgba(248,250,252,.82);
+      background:
+        radial-gradient(circle at 13% 36%, rgba(71,85,105,.46) 0 5px, rgba(226,232,240,.18) 6px, transparent 10px),
+        radial-gradient(circle at 83% 25%, rgba(71,85,105,.40) 0 4px, rgba(241,245,249,.20) 5px, transparent 9px),
+        radial-gradient(circle at 86% 67%, rgba(71,85,105,.38) 0 6px, rgba(226,232,240,.16) 7px, transparent 12px),
+        radial-gradient(circle at 25% 84%, rgba(71,85,105,.34) 0 5px, rgba(248,250,252,.15) 6px, transparent 10px),
+        radial-gradient(circle at 34% 27%, #f8fafc 0%, #dbe4ed 35%, #aab8c5 67%, #667789 100%);
+      box-shadow:
+        0 0 0 7px rgba(226,232,240,.10),
+        0 0 18px rgba(248,250,252,.72),
+        0 0 42px rgba(186,230,253,.50),
+        0 0 82px rgba(125,211,252,.28),
+        0 18px 34px rgba(2,8,23,.32),
+        inset -18px -13px 24px rgba(30,41,59,.34),
+        inset 10px 8px 18px rgba(255,255,255,.36);
     }
     .brand-header img {
       width:148px;
@@ -1228,6 +1240,35 @@
       .portal-tour-actions { grid-template-columns:minmax(0,1fr); }
       .nav-brand > div > span:first-child { font-size:.92rem; }
       .nav-user-panel #displayRole { display:none; }
+    }
+
+    /* Keep the complete login identity visible above the card on phones. */
+    @media (max-width: 640px) {
+      #authSection {
+        align-items:flex-start;
+        padding-top:280px;
+        padding-bottom:28px;
+      }
+      .brand-header {
+        top:-260px;
+        width:min(270px, calc(100vw - 40px));
+        padding-top:174px;
+      }
+      .mascot-stage { top:0; }
+      .brand-header h2 {
+        margin:4px 0 6px;
+        font-size:clamp(1.72rem, 8.7vw, 1.95rem);
+        line-height:1.08;
+        white-space:nowrap;
+      }
+      .brand-header p.slogan {
+        max-width:100%;
+        padding:5px 10px;
+        font-size:clamp(.56rem, 2.65vw, .65rem);
+        letter-spacing:clamp(.7px, .35vw, 1.25px);
+        line-height:1.2;
+        white-space:nowrap;
+      }
     }
   </style>
 </head>
