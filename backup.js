@@ -4092,9 +4092,9 @@ async function saveWorkspaceRecord(event, module, defaultDetails) {
 async function saveStickyNote(event) {
   event.preventDefault();
   const form = event.target;
-  const title = form.elements.title.value.trim();
-  const details = form.elements.details.value.trim();
-  const colour = form.elements.colour.value;
+  const title = form.querySelector('[name="noteTitle"]')?.value.trim() || '';
+  const details = form.querySelector('[name="details"]')?.value.trim() || '';
+  const colour = form.querySelector('[name="colour"]')?.value || 'yellow';
   if (!title || !details) return;
   const response = await fetch('/api/modules/stickyNotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: title, details, colour, recordedBy: currentUser?.name || currentUser?.username || 'User' }) });
   if (!response.ok) return alert('Unable to save this sticky note.');
