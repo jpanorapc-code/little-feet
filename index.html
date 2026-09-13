@@ -912,8 +912,8 @@
       height:194px;
       border-radius:50%;
       border:1px solid rgba(186,230,253,.48);
-      background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.58), rgba(191,219,254,.24) 38%, rgba(45,212,191,.10) 62%, transparent 72%);
-      box-shadow:0 0 0 12px rgba(148,163,184,.05), 0 0 24px rgba(186,230,253,.24), 0 0 46px rgba(45,212,191,.16), 0 18px 34px rgba(2,8,23,.24), inset 14px -14px 24px rgba(2,8,23,.12);
+      background:radial-gradient(circle at 34% 28%, #5d7485 0%, #29475d 46%, #102d43 72%, #071c30 100%);
+      box-shadow:0 0 0 9px rgba(186,230,253,.08), 0 0 14px rgba(240,249,255,.48), 0 0 34px rgba(125,211,252,.36), 0 0 72px rgba(45,212,191,.26), 0 18px 34px rgba(2,8,23,.34), inset 14px -14px 24px rgba(2,8,23,.22);
     }
     .brand-header img {
       width:148px;
@@ -935,6 +935,110 @@
       .mascot-stage::before { width:168px; height:168px; }
       .brand-header img { width:132px; height:132px; }
       .brand-header h2 { font-size:1.92rem; }
+    }
+
+    /* Remaining workspace polish: calm hierarchy, compact controls, and clear high-stakes actions. */
+    .tab-content > .card > .card-header-bar {
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(125,211,252,.18);
+    }
+    .tab-content > .card > .workspace-grid {
+      gap: 14px;
+    }
+    .workspace-card h3.icon-label .ui-icon,
+    .card-header-bar h2.icon-label .ui-icon {
+      width: 1.35em;
+      height: 1.35em;
+      padding: 7px;
+      border: 1px solid rgba(94,234,212,.28);
+      border-radius: 10px;
+      background: rgba(45,212,191,.10);
+      color: #99f6e4;
+    }
+    #schoolDayTab .workspace-card,
+    #progressTab .workspace-card,
+    #safeguardingTab .workspace-card,
+    #financeTab .workspace-card {
+      position: relative;
+      overflow: hidden;
+    }
+    #schoolDayTab .workspace-card::after,
+    #progressTab .workspace-card::after,
+    #safeguardingTab .workspace-card::after,
+    #financeTab .workspace-card::after {
+      content:"";
+      position:absolute;
+      inset:auto -32px -54px auto;
+      width:124px;
+      height:124px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(45,212,191,.12), transparent 68%);
+      pointer-events:none;
+    }
+    #broadcastsTab .card:first-child {
+      border-top-color:#ef4444 !important;
+      background:linear-gradient(145deg,rgba(66,16,27,.68),rgba(19,39,62,.78)) !important;
+      box-shadow:0 20px 44px rgba(69,10,10,.18), inset 0 1px rgba(255,255,255,.07);
+    }
+    #broadcastsTab .card:first-child h2 {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      letter-spacing:.01em;
+    }
+    #broadcastsTab .card:first-child h2::before {
+      content:"!";
+      display:grid;
+      place-items:center;
+      width:25px;
+      height:25px;
+      border-radius:50%;
+      background:rgba(239,68,68,.16);
+      border:1px solid rgba(252,165,165,.48);
+      color:#fecaca;
+      font-size:.9rem;
+      font-weight:900;
+    }
+    #broadcastForm { display:grid; gap:13px; }
+    #broadcastForm > div { padding:0; }
+    #broadcastForm textarea { min-height:108px; resize:vertical; }
+    #broadcastForm > div[style*="grid-template-columns"] {
+      padding:12px;
+      border:1px solid rgba(125,211,252,.14);
+      border-radius:13px;
+      background:rgba(2,15,29,.18);
+    }
+    #broadcastForm .submit-btn {
+      min-height:48px;
+      border-radius:12px;
+      box-shadow:0 12px 25px rgba(220,38,38,.24);
+    }
+    #broadcastsTab .card + .card { margin-top:22px; }
+    #parentPaymentsSummary {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+      gap:12px;
+      padding:18px;
+      border-left:4px solid #2dd4bf;
+      background:linear-gradient(120deg,rgba(13,148,136,.15),rgba(15,43,72,.58)) !important;
+    }
+    #parentPaymentsActions + div .action-btn,
+    #parentPaymentsActions .action-btn { min-height:42px; border-radius:11px; }
+    #ticketsTab .card,
+    #parentPaymentsTab .card { box-shadow:0 18px 42px rgba(2,8,23,.16), inset 0 1px rgba(255,255,255,.06); }
+    .guide-link-card h3::first-letter { color:#5eead4; }
+    #guideTab .guide-link-card {
+      min-height:176px;
+      border-color:rgba(125,211,252,.18);
+      background:linear-gradient(150deg,rgba(13,43,69,.62),rgba(16,73,97,.24));
+    }
+    #guideTab .guide-link-card:hover { box-shadow:0 16px 30px rgba(2,8,23,.23), inset 0 1px rgba(255,255,255,.08); }
+    @media (max-width:640px) {
+      #broadcastForm > div[style*="grid-template-columns"] { grid-template-columns:1fr !important; }
+      #broadcastsTab .card:first-child { padding:16px; }
+      #parentPaymentsSummary { grid-template-columns:1fr 1fr; padding:14px; }
+      #guideTab .guide-link-card { min-height:0; }
     }
   </style>
 </head>
