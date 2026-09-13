@@ -1063,6 +1063,32 @@
     .profile-icon-picker { grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; width:100%; }
     .profile-icon-choice { min-width:0; width:100%; }
 
+    /* Final shared workspace pass. */
+    .action-btn.icon-label,
+    .submit-btn.icon-label { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+    .action-btn .professional-icon,
+    .submit-btn .professional-icon { width:21px; height:21px; flex-basis:21px; border:0; border-radius:6px; background:rgba(255,255,255,.14); color:currentColor; }
+    .action-btn .professional-icon .ui-icon,
+    .submit-btn .professional-icon .ui-icon { width:13px; height:13px; }
+    .record-list:empty::before { content:"Nothing to show yet."; display:block; padding:16px; border:1px dashed rgba(125,211,252,.22); border-radius:12px; color:var(--text-muted); }
+    .modal-card { border:1px solid rgba(125,211,252,.28); background:linear-gradient(145deg,rgba(12,38,62,.98),rgba(7,25,43,.98)); }
+    body.light-mode .modal-card { background:linear-gradient(145deg,#f6fcff,#dff2fa); }
+    body.light-mode .professional-icon { border-color:rgba(13,148,136,.22); background:rgba(13,148,136,.10); color:#0f766e; }
+    @media (max-width:900px) {
+      .workspace-grid, .workspace-results-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); }
+      .card-header-bar { gap:10px; align-items:flex-start; }
+      .card-header-bar h2 { font-size:clamp(1rem,3.8vw,1.25rem); }
+      .modal-card { width:min(94vw,680px); max-height:88vh; overflow:auto; }
+    }
+    @media (max-width:480px) {
+      .card { padding:14px; }
+      .card-header-bar { flex-wrap:wrap; }
+      .badge-tag { font-size:.62rem; }
+      .workspace-card { padding:14px; }
+      .action-btn, button.submit-btn { width:100%; }
+      .profile-icon-picker { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    }
+
     /* Performance pass: preserve the look without repainting the whole wallpaper. */
     .card,
     .workspace-card,

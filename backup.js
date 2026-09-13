@@ -254,7 +254,7 @@ function upgradeLegacyIcons() {
     return ({ '📣':'alert', '📢':'alert', '🚨':'alert', '💳':'finance', '💰':'finance', '🛍':'finance', '🛡':'safety', '🤝':'handover', '📦':'operations', '⚙':'operations', '🖼':'image', '📅':'document', '📁':'book', '📚':'book', '📊':'chart', '💬':'help', '🧷':'heart-star', '🌱':'growth', '🏆':'award', '🎨':'palette', '🏫':'home', '👤':'user', '🧑':'user', '👨':'user', '🐾':'heart-star', '🌟':'award' })[first] || 'heart-star';
   };
   const svg = name => `<span class="professional-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-${name}"></use></svg></span>`;
-  document.querySelectorAll('.card-header-bar h2:not(.icon-label), .guide-link-card h3:not(.icon-label)').forEach(heading => {
+  document.querySelectorAll('.card-header-bar h2:not(.icon-label), .guide-link-card h3:not(.icon-label), .workspace-card h3:not(.icon-label), .action-btn:not(.icon-label), .submit-btn:not(.icon-label)').forEach(heading => {
     const text = heading.textContent.trim();
     if (!/^[\p{Extended_Pictographic}]/u.test(text)) return;
     heading.classList.add('icon-label');
