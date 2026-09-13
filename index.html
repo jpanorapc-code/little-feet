@@ -874,7 +874,7 @@
     }
 
     /* The login identity lives above the glass card, like a moon in the night scene. */
-    #authSection { padding-top: 230px; padding-bottom: 44px; }
+    #authSection { padding-top: 255px; padding-bottom: 44px; }
     #authSection > .auth-card {
       overflow: visible;
       margin-top: 0;
@@ -885,12 +885,12 @@
     .brand-header {
       position:absolute;
       z-index:4;
-      top:-259px;
+      top:-279px;
       left:50%;
       width:280px;
       margin:0;
       /* Keep the emblem and name on one centred vertical brand axis. */
-      padding-top:158px;
+      padding-top:184px;
       overflow:visible;
       transform:translateX(-50%);
     }
@@ -940,6 +940,24 @@
     .brand-header h2 { margin:3px 0 7px; font-size:2.15rem; text-align:center; }
     .brand-header p.slogan { background:rgba(7,28,47,.52); text-align:center; }
     body.light-mode #authSection > .auth-card { background:linear-gradient(155deg, rgba(222,244,253,.72), rgba(190,225,241,.58)) !important; }
+    .sticky-note-form { display:grid; grid-template-columns:minmax(180px,.75fr) minmax(240px,1.6fr) minmax(130px,.5fr) auto; gap:12px; align-items:end; margin-bottom:18px; padding:14px; border:1px solid rgba(45,212,191,.25); border-radius:14px; background:linear-gradient(125deg, rgba(14,116,144,.10), rgba(13,148,136,.08)); }
+    .sticky-note-form label { display:grid; gap:6px; color:var(--text-dark); font-size:.8rem; font-weight:700; }
+    .sticky-note-form textarea { resize:vertical; min-height:84px; }
+    .sticky-note-form .submit-btn { min-height:44px; white-space:nowrap; }
+    .sticky-notes-board { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; align-items:start; }
+    .sticky-note { position:relative; min-height:180px; padding:18px 16px 15px; border:1px solid rgba(250,204,21,.38); border-radius:4px 13px 8px 13px; color:#1f2937; box-shadow:0 12px 22px rgba(2,8,23,.20); transform:rotate(-.6deg); overflow:hidden; }
+    .sticky-note::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(0deg, transparent 0 26px, rgba(15,23,42,.07) 27px 28px); pointer-events:none; }
+    .sticky-note:nth-child(even) { transform:rotate(.7deg); }
+    .sticky-note strong, .sticky-note p, .sticky-note span { position:relative; z-index:1; display:block; }
+    .sticky-note strong { padding-right:22px; font-size:1rem; line-height:1.25; }
+    .sticky-note p { margin:12px 0 18px; white-space:pre-wrap; line-height:1.5; font-size:.88rem; }
+    .sticky-note span { margin-top:auto; color:rgba(15,23,42,.72); font-size:.72rem; }
+    .sticky-note-delete { position:absolute; z-index:2; top:8px; right:9px; width:25px; height:25px; border:0; border-radius:50%; background:rgba(15,23,42,.12); color:#334155; cursor:pointer; font-size:1.15rem; line-height:1; }
+    .sticky-note-delete:hover { background:rgba(185,28,28,.18); color:#991b1b; }
+    .sticky-note--yellow { background:#fef3a8; }
+    .sticky-note--teal { background:#b8f3e5; border-color:rgba(13,148,136,.42); }
+    .sticky-note--blue { background:#cceeff; border-color:rgba(2,132,199,.40); }
+    .sticky-note--rose { background:#ffd6df; border-color:rgba(225,29,72,.34); }
     @media (max-width:640px) {
       #authSection { padding-top:205px; padding-bottom:26px; }
       .brand-header { top:-184px; width:230px; padding-top:142px; }
@@ -947,6 +965,8 @@
       .mascot-stage::before { width:160px; height:160px; }
       .brand-header img { width:146px; height:146px; }
       .brand-header h2 { font-size:1.92rem; }
+      .sticky-note-form { grid-template-columns:1fr; }
+      .sticky-note-form .submit-btn { width:100%; }
     }
 
     /* Remaining workspace polish: calm hierarchy, compact controls, and clear high-stakes actions. */
@@ -1464,6 +1484,7 @@
         <ul class="sidebar-links">
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('attendanceTab', this)">Daily Attendance</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('schoolDayTab', this)">School Day Hub</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('notesTab', this)">Sticky Notes</button></li>
         <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Messages</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
@@ -2216,6 +2237,19 @@
       </div>
 
       <!-- Operations -->
+      <div id="notesTab" class="tab-content role-teacher role-admin">
+        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Staff Sticky Notes</span></h2><span class="badge-tag info">STAFF ONLY</span></div>
+          <p style="color:var(--text-muted);margin:0 0 14px;">Keep quick internal reminders, handovers and follow-ups in one place. Do not include medical, safeguarding or other sensitive learner information here.</p>
+          <form class="sticky-note-form" onsubmit="saveStickyNote(event)">
+            <label>Note title<input name="title" maxlength="90" required placeholder="e.g. Call parent after 15:00"></label>
+            <label>Reminder<textarea name="details" rows="4" maxlength="600" required placeholder="Add the task, owner or follow-up detail"></textarea></label>
+            <label>Colour<select name="colour"><option value="yellow">Sunshine</option><option value="teal">Teal</option><option value="blue">Blue</option><option value="rose">Rose</option></select></label>
+            <button class="submit-btn">Add sticky note</button>
+          </form>
+          <div id="stickyNotesRecords" class="sticky-notes-board" data-empty-title="No sticky notes yet" data-empty-text="Add a staff reminder to begin."></div>
+        </div>
+      </div>
+
       <div id="operationsTab" class="tab-content role-teacher role-admin">
         <div class="card"><div class="card-header-bar"><h2>🧑‍🏫 Staff & Classroom Operations</h2><span class="badge-tag info">LIVE WORKSPACE</span></div>
           <div class="workspace-grid">

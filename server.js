@@ -189,7 +189,7 @@ const db = {
   campusVisitors: [],
   visitorMeetings: [],
   registry: [],
-  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [] },
+  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [], stickyNotes: [] },
   consentRecords: [],
   pickupLogs: [],
   reportReviews: [],

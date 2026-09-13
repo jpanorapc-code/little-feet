@@ -1185,6 +1185,7 @@ function loadWorkspaceOnDemand(tabId) {
     bookRegisterTab: [loadBookRegister], safetyNetworkTab: [loadSafetyNetwork],
     visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
+    notesTab: [loadStickyNotes],
     progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords)]
   };
   (loaders[tabId] || []).forEach(load => Promise.resolve().then(load).catch(() => {}));
@@ -4086,6 +4087,31 @@ async function saveWorkspaceRecord(event, module, defaultDetails) {
   if (event) event.target.reset();
   await loadWorkspaceRecords(module);
   playDingSound();
+}
+
+async function saveStickyNote(event) {
+  event.preventDefault();
+  const form = event.target;
+  const title = form.elements.title.value.trim();
+  const details = form.elements.details.value.trim();
+  const colour = form.elements.colour.value;
+  if (!title || !details) return;
+  const response = await fetch('/api/modules/stickyNotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: title, details, colour, recordedBy: currentUser?.name || currentUser?.username || 'User' }) });
+  if (!response.ok) return alert('Unable to save this sticky note.');
+  form.reset();
+  await loadStickyNotes();
+  playDingSound();
+}
+
+async function loadStickyNotes() {
+  const board = document.getElementById('stickyNotesRecords');
+  if (!board) return;
+  try {
+    const response = await fetch('/api/modules/stickyNotes');
+    const records = await response.json();
+    if (!response.ok) throw new Error('Unable to load notes');
+    board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${['yellow','teal','blue','rose'].includes(record.colour) ? record.colour : 'yellow'}"><button type="button" class="sticky-note-delete" title="Delete note" aria-label="Delete ${escapeWorkspaceText(record.type)}" onclick="deleteWorkspaceRecord('stickyNotes','${record.id}')">×</button><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
+  } catch { board.textContent = 'Unable to load sticky notes.'; }
 }
 
 async function loadWorkspaceRecords(module) {
