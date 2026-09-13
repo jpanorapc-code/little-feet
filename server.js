@@ -159,11 +159,14 @@ app.use((req, res, next) => {
     next();
   }).catch(next);
 });
-// Always revalidate application code so a newly deployed fix cannot be hidden by
-// an older browser cache. Versioned media remains cacheable for performance.
+// The entry page always revalidates after a deploy. Static media and the
+// versioned client bundle can be reused aggressively, keeping repeat visits
+// fast even on slower school connections.
 app.use(express.static(__dirname, {
   setHeaders: (res, filePath) => {
-    if (/\.(?:html|js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+    if (/\.html$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+    else if (/\.(?:js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+    else if (/\.(?:png|jpe?g|webp|gif|svg|ico|mp3|wav|woff2?)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     else res.setHeader('Cache-Control', 'public, max-age=86400');
   }
 }));

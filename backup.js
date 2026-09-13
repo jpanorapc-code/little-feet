@@ -1023,9 +1023,6 @@ function setupSession() {
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
-  loadSubscriptionBillingOverview();
-  loadParentPayments();
-  loadBookRegister();
   startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
@@ -1138,6 +1135,23 @@ function switchTab(tabId, btn) {
   }
   if (btn) btn.classList.add('active');
   closeNavigation();
+  loadWorkspaceOnDemand(tabId);
+}
+
+function loadWorkspaceOnDemand(tabId) {
+  if (!currentUser) return;
+  const loaders = {
+    scheduleTab: [loadSchedules], worksheetsTab: [loadWorksheets], badgesTab: [loadBadges],
+    attendanceTab: [loadAttendance], ticketsTab: [loadTickets, loadTicketAssignees],
+    broadcastsTab: [loadBroadcasts], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
+    registryTab: [loadRegistry, loadAccounts, loadLearnerAccessCodes],
+    financeTab: [loadSubscriptionBillingOverview], parentPaymentsTab: [loadParentPayments],
+    bookRegisterTab: [loadBookRegister], safetyNetworkTab: [loadSafetyNetwork],
+    visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
+    safeguardingTab: [loadConsentRecords, loadPickupRecords],
+    progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords)]
+  };
+  (loaders[tabId] || []).forEach(load => Promise.resolve().then(load).catch(() => {}));
 }
 
 function setupWallpaperMode() {
@@ -1436,38 +1450,18 @@ async function startHealthMonitor() {
   };
 
   checkStatus();
-  setInterval(checkStatus, 8000);
+  setInterval(checkStatus, 30000);
 }
 
 async function loadAllData() {
+  // Prioritise what is visible at sign-in. The rest loads when its workspace
+  // opens, avoiding a burst of 30+ requests on every login.
   loadAcademicTerm();
   loadPosts();
-  loadSchedules();
-  loadWorksheets();
-  loadBadges();
   loadTickets();
-  loadTicketAssignees();
-  loadAttendance();
   loadBroadcasts();
-  await loadChatGroups();
-  await loadGroupChatMessages();
-  loadDirectChatUsers();
-  loadStoreItems();
-  loadStoreOrders();
   loadReleaseNotes();
-  loadReportReviews();
   loadHouseholdSwitcher();
-  loadRegistry();
-  loadAccounts();
-  loadLearnerAccessCodes();
-  loadSafetyNetwork();
-  loadVisitorMeetingRecipients();
-  loadVisitorMeetings();
-  loadConsentRecords();
-  loadPickupRecords();
-  loadParentPayments();
-  loadBookRegister();
-  ['finance', 'operations', 'care', 'engagement', 'dailyCare', 'portfolio', 'supplies', 'stock', 'reports', 'safeguarding', 'absences', 'handovers'].forEach(loadWorkspaceRecords);
 }
 
 async function loadHouseholdSwitcher() {
