@@ -426,6 +426,9 @@
     .wellbeing-banner .tip-icon .ui-icon { width:17px; height:17px; vertical-align:0; }
     .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
     .wellbeing-banner button { background:transparent; color:var(--text-muted); border:0; font-size:1.15rem; cursor:pointer; padding:3px 6px; }
+    .runtime-error-banner { border-left-color:#fb7185; background:linear-gradient(90deg,rgba(190,24,93,.22),rgba(15,43,72,.72)); }
+    .runtime-error-banner .tip-icon { color:#fecdd3; border-color:rgba(251,113,133,.36); background:rgba(190,24,93,.18); }
+    .runtime-error-banner .action-btn { flex:0 0 auto; margin:0; min-height:38px; white-space:nowrap; }
     .portal-tour { position:relative; min-height:350px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
     .portal-tour-slide { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.82fr); opacity:0; pointer-events:none; transform:scale(1.015); transition:opacity .55s ease, transform .55s ease; }
     .portal-tour-slide.is-active { opacity:1; pointer-events:auto; transform:scale(1); }
@@ -1537,6 +1540,7 @@
       <div id="homeTab" class="tab-content active">
         <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-heart-star"></use></svg></span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
         <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg></span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
+        <aside id="runtimeErrorBanner" class="wellbeing-banner runtime-error-banner hidden" aria-live="assertive"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><p><strong>We detected a technical issue.</strong> Your Support Desk ticket is prepared; add any useful notes before you send it.</p><button type="button" class="action-btn btn-red" onclick="openRuntimeErrorSupport()">Open Support Desk</button><button type="button" onclick="dismissRuntimeErrorBanner()" aria-label="Dismiss technical issue notice" title="Dismiss">×</button></aside>
         <section class="portal-welcome-banner" aria-label="Welcome to Little Feet">
           <div class="portal-welcome-copy">
             <section id="roleHomePanel" class="role-home-panel" aria-live="polite"></section>
@@ -2425,7 +2429,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-responsive-audit" defer></script>
+  <script src="backup.js?v=20260914-support-banner" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

@@ -631,15 +631,32 @@ function routeErrorToHelpdesk(error) {
   console.error(details);
   if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
   sessionStorage.setItem(`lf_error_${details}`, '1');
-  const ticketBody = { id: `err-${Date.now()}`, department: 'Technical Support', priority: 'High', subject: `Automatic error report: ${error.code}`, message: details, createdBy: currentUser?.username };
-  fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ticketBody) }).catch(() => {});
+  sessionStorage.setItem('lf_pending_support_error', JSON.stringify({ code: error.code, details }));
+  document.getElementById('runtimeErrorBanner')?.classList.remove('hidden');
+}
+
+function dismissRuntimeErrorBanner() {
+  document.getElementById('runtimeErrorBanner')?.classList.add('hidden');
+}
+
+function openRuntimeErrorSupport() {
+  const pending = JSON.parse(sessionStorage.getItem('lf_pending_support_error') || 'null');
+  if (!pending) return dismissRuntimeErrorBanner();
   const supportButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes("ticketsTab"));
   switchTab('ticketsTab', supportButton);
+  const department = document.getElementById('ticketDept');
+  const priority = document.getElementById('ticketPriority');
   const subject = document.getElementById('ticketSubject');
   const message = document.getElementById('ticketMessage');
-  if (subject) subject.value = `Automatic error report: ${error.code}`;
-  if (message) message.value = details;
-  alert('A technical issue was detected. You have been taken to Support Desk with the error details.');
+  if (department) department.value = 'Technical Support';
+  if (priority) priority.value = 'High';
+  if (subject) subject.value = `Technical issue: ${pending.code}`;
+  if (message) {
+    message.value = `${pending.details}\n\nAdditional notes (optional): `;
+    message.focus();
+    message.setSelectionRange(message.value.length, message.value.length);
+  }
+  dismissRuntimeErrorBanner();
 }
 
 function showWellbeingBanner() {
