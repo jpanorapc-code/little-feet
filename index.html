@@ -106,7 +106,7 @@
     .walking-loader p { margin:0; font-size:.82rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
     @keyframes loaderWalk { from { transform:translateX(-7px) translateY(2px) rotate(-4deg); } to { transform:translateX(7px) translateY(-2px) rotate(4deg); } }
     @keyframes footstep { 0%,100% { opacity:.25; transform:translateY(5px) scale(.82); } 50% { opacity:1; transform:translateY(-2px) scale(1); } }
-    @media (prefers-reduced-motion: reduce) { .walking-loader-mark img, .walking-loader-mark span, body.portal-active::after { animation:none; } }
+    @media (prefers-reduced-motion: reduce) { .walking-loader-mark img, .walking-loader-mark .loader-step, body.portal-active::after { animation:none; } }
     
     .container { padding: 15px; max-width: 1150px; margin: 0 auto; width: 100%; flex: 1; position: relative; z-index: 1; }
     
@@ -983,12 +983,6 @@
     .floating-sticky-note span { color:rgba(15,23,42,.70); font-size:.7rem; }
     @media (max-width:640px) { .floating-sticky-note { width:min(222px, calc(100vw - 24px)); min-height:154px; } }
     @media (max-width:640px) {
-      #authSection { padding-top:205px; padding-bottom:26px; }
-      .brand-header { top:-184px; width:230px; padding-top:142px; }
-      .mascot-stage { left:50%; top:-52px; min-height:168px; width:168px; }
-      .mascot-stage::before { width:160px; height:160px; }
-      .brand-header img { width:146px; height:146px; }
-      .brand-header h2 { font-size:1.92rem; }
       .sticky-note-form { grid-template-columns:1fr; }
       .sticky-note-form .submit-btn { width:100%; }
     }
@@ -2431,7 +2425,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-professional-icons" defer></script>
+  <script src="backup.js?v=20260914-responsive-audit" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
