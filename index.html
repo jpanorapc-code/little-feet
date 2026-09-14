@@ -945,7 +945,7 @@
     .sticky-note-form textarea { resize:vertical; min-height:84px; }
     .sticky-note-form .submit-btn { min-height:44px; white-space:nowrap; }
     .sticky-notes-board { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; align-items:start; }
-    .sticky-note { position:relative; min-height:180px; padding:18px 16px 15px; border:1px solid rgba(250,204,21,.38); border-radius:4px 13px 8px 13px; color:#1f2937; box-shadow:0 12px 22px rgba(2,8,23,.20); transform:rotate(-.6deg); overflow:hidden; }
+    .sticky-note { position:relative; min-height:180px; padding:18px 16px 15px; border:1px solid rgba(250,204,21,.38); border-radius:4px 13px 8px 13px; color:#1f2937; box-shadow:0 12px 22px rgba(2,8,23,.20); transform:rotate(-.6deg); overflow:hidden; cursor:zoom-in; }
     .sticky-note::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(0deg, transparent 0 26px, rgba(15,23,42,.07) 27px 28px); pointer-events:none; }
     .sticky-note::after { content:""; position:absolute; z-index:0; right:10px; bottom:9px; width:58px; height:58px; background:url('little-feet-mascot.jfif') center/contain no-repeat; opacity:.18; pointer-events:none; }
     .sticky-note:nth-child(even) { transform:rotate(.7deg); }
@@ -2429,7 +2429,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-closable-sticky-notes" defer></script>
+  <script src="backup.js?v=20260914-openable-sticky-notes" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
