@@ -4120,7 +4120,7 @@ async function loadStickyNotes() {
     const response = await fetch('/api/modules/stickyNotes');
     const records = await response.json();
     if (!response.ok) throw new Error('Unable to load notes');
-    if (board) board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${stickyNoteColour(record)}" title="Double-click to open this floating note" ondblclick="openStickyNote('${record.id}')"><button type="button" class="sticky-note-delete" title="Close note (keeps it saved)" aria-label="Close ${escapeWorkspaceText(record.type)}" onclick="event.stopPropagation();closeStickyNote('${record.id}')" ondblclick="event.stopPropagation()">×</button><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
+    if (board) board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${stickyNoteColour(record)}" title="Double-click to open this floating note" ondblclick="openStickyNote('${record.id}')"><button type="button" class="sticky-note-delete" title="Delete permanently" aria-label="Delete ${escapeWorkspaceText(record.type)} permanently" onclick="event.stopPropagation();deleteStickyNote('${record.id}')" ondblclick="event.stopPropagation()">×</button><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
     renderFloatingStickyNotes(records);
   } catch { if (board) board.textContent = 'Unable to load sticky notes.'; }
 }
@@ -4140,6 +4140,20 @@ function stickyNoteClosedKey(id) {
 function closeStickyNote(id) {
   localStorage.setItem(stickyNoteClosedKey(id), 'true');
   loadStickyNotes();
+}
+
+async function deleteStickyNote(id) {
+  if (!confirm('Permanently delete this sticky note? This cannot be undone.')) return;
+  try {
+    const response = await fetch(`/api/modules/stickyNotes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || 'Unable to delete this sticky note.');
+    }
+    localStorage.removeItem(stickyNoteClosedKey(id));
+    localStorage.removeItem(stickyNotePositionKey(id));
+    await loadStickyNotes();
+  } catch (error) { alert(error.message || 'Unable to delete this sticky note.'); }
 }
 
 async function openStickyNote(id) {
