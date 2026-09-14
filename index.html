@@ -947,10 +947,11 @@
     .sticky-notes-board { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; align-items:start; }
     .sticky-note { position:relative; min-height:180px; padding:18px 16px 15px; border:1px solid rgba(250,204,21,.38); border-radius:4px 13px 8px 13px; color:#1f2937; box-shadow:0 12px 22px rgba(2,8,23,.20); transform:rotate(-.6deg); overflow:hidden; }
     .sticky-note::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(0deg, transparent 0 26px, rgba(15,23,42,.07) 27px 28px); pointer-events:none; }
+    .sticky-note::after { content:""; position:absolute; z-index:0; right:10px; bottom:9px; width:58px; height:58px; background:url('little-feet-mascot.jfif') center/contain no-repeat; opacity:.18; pointer-events:none; }
     .sticky-note:nth-child(even) { transform:rotate(.7deg); }
     .sticky-note strong, .sticky-note p, .sticky-note span { position:relative; z-index:1; display:block; }
     .sticky-note strong { padding-right:22px; font-size:1rem; line-height:1.25; }
-    .sticky-note p { margin:12px 0 18px; white-space:pre-wrap; line-height:1.5; font-size:.88rem; }
+    .sticky-note p { min-height:62px; margin:12px 0 18px; padding-right:54px; white-space:pre-wrap; line-height:1.5; font-size:.88rem; }
     .sticky-note span { margin-top:auto; color:rgba(15,23,42,.72); font-size:.72rem; }
     .sticky-note-delete { position:absolute; z-index:2; top:8px; right:9px; width:25px; height:25px; border:0; border-radius:50%; background:rgba(15,23,42,.12); color:#334155; cursor:pointer; font-size:1.15rem; line-height:1; }
     .sticky-note-delete:hover { background:rgba(185,28,28,.18); color:#991b1b; }
@@ -962,6 +963,7 @@
     #stickyNotesOverlay.hidden { display:none; }
     .floating-sticky-note { position:fixed; width:min(244px, calc(100vw - 28px)); min-height:178px; padding:0 15px 14px; border:1px solid rgba(250,204,21,.44); border-radius:4px 13px 8px 13px; color:#1f2937; box-shadow:0 16px 34px rgba(2,8,23,.34); overflow:hidden; pointer-events:auto; touch-action:none; }
     .floating-sticky-note::before { content:""; position:absolute; inset:36px 0 0; background:repeating-linear-gradient(0deg, transparent 0 26px, rgba(15,23,42,.075) 27px 28px); pointer-events:none; }
+    .floating-sticky-note::after { content:""; position:absolute; z-index:0; right:10px; bottom:9px; width:62px; height:62px; background:url('little-feet-mascot.jfif') center/contain no-repeat; opacity:.20; pointer-events:none; }
     .floating-sticky-note.is-dragging { cursor:grabbing; box-shadow:0 22px 42px rgba(2,8,23,.46); }
     .floating-sticky-note--yellow { background:#fef3a8; }
     .floating-sticky-note--teal { background:#b8f3e5; border-color:rgba(13,148,136,.45); }
@@ -973,7 +975,7 @@
     .floating-sticky-note-delete:hover { background:rgba(185,28,28,.18); color:#991b1b; }
     .floating-sticky-note strong, .floating-sticky-note p, .floating-sticky-note span { position:relative; z-index:1; display:block; }
     .floating-sticky-note strong { padding-right:4px; line-height:1.25; font-size:1rem; }
-    .floating-sticky-note p { margin:10px 0 18px; white-space:pre-wrap; line-height:1.5; font-size:.87rem; }
+    .floating-sticky-note p { min-height:62px; margin:10px 0 18px; padding-right:58px; white-space:pre-wrap; line-height:1.5; font-size:.87rem; }
     .floating-sticky-note span { color:rgba(15,23,42,.70); font-size:.7rem; }
     @media (max-width:640px) { .floating-sticky-note { width:min(222px, calc(100vw - 24px)); min-height:154px; } }
     @media (max-width:640px) {
