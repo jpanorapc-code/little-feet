@@ -92,6 +92,16 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.deepEqual(releaseNotes.data.slice(0, 3).map(note => note.version), ['3.2', '3.1', '3.0']);
     assert.equal(releaseNotes.data.find(note => note.id === '2026-08-safeguarding').title, 'Safeguarding and family records');
 
+    const stickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaLogin.cookie, body: { type: 'Call family', details: 'Confirm the pickup time after 15:00.', colour: 'teal', recordedBy: 'Alpha Administrator' } });
+    assert.equal(stickyNote.response.status, 200);
+    const alphaStickyNotes = await request('/api/modules/stickyNotes', { cookie: alphaLogin.cookie });
+    const bravoStickyNotes = await request('/api/modules/stickyNotes', { cookie: bravoLogin.cookie });
+    const parentStickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaParentLogin.cookie, body: { type: 'Unauthorised', details: 'This must not be saved.' } });
+    assert.equal(alphaStickyNotes.data.length, 1);
+    assert.equal(alphaStickyNotes.data[0].type, 'Call family');
+    assert.equal(bravoStickyNotes.data.length, 0);
+    assert.equal(parentStickyNote.response.status, 403);
+
     const imported = await request('/api/students/import', { method: 'POST', cookie: alphaLogin.cookie, body: { students: [{ studentName: 'Alpha Learner', className: 'A1', parentName: 'Alpha Parent', contactEmail: 'alpha.parent@example.test' }] } });
     assert.equal(imported.response.status, 201);
     const alphaCodes = await request('/api/learner-access-codes', { cookie: alphaLogin.cookie });
