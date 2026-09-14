@@ -101,6 +101,10 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(alphaStickyNotes.data[0].type, 'Call family');
     assert.equal(bravoStickyNotes.data.length, 0);
     assert.equal(parentStickyNote.response.status, 403);
+    const blockedStickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaLogin.cookie, body: { type: 'Follow-up', details: 'This contains f.u.c.k wording and must not be saved.' } });
+    assert.equal(blockedStickyNote.response.status, 422);
+    const moderatedStickyNotes = await request('/api/modules/stickyNotes', { cookie: alphaLogin.cookie });
+    assert.equal(moderatedStickyNotes.data.length, 1);
 
     const imported = await request('/api/students/import', { method: 'POST', cookie: alphaLogin.cookie, body: { students: [{ studentName: 'Alpha Learner', className: 'A1', parentName: 'Alpha Parent', contactEmail: 'alpha.parent@example.test' }] } });
     assert.equal(imported.response.status, 201);

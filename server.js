@@ -16,6 +16,9 @@ const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
+const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
+const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
+  .split(',').map(term => term.trim().toLocaleLowerCase('en-US')).filter(Boolean));
 let activeRequestCount = 0;
 let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
@@ -73,6 +76,22 @@ const findAccountByUsername = (username) => db.users.find(account => accountMatc
 const normalizeComparableText = (value) => String(value || '').trim().toLocaleLowerCase('en-US');
 const learnerRecordKey = (learner) => [learner?.studentName, learner?.className, learner?.contactEmail].map(normalizeComparableText).join('|');
 const normaliseAccessCode = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+const normaliseModerationText = (value) => String(value || '')
+  .toLocaleLowerCase('en-US')
+  .replace(/[@4]/g, 'a').replace(/[3]/g, 'e').replace(/[1!]/g, 'i')
+  .replace(/[0]/g, 'o').replace(/[$5]/g, 's').replace(/[7]/g, 't');
+const containsBlockedLanguage = (value) => {
+  const normalised = normaliseModerationText(value);
+  const compact = normalised.replace(/[^a-z]+/g, '');
+  return blockedTerms.some(term => new RegExp(`(^|[^a-z])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z])`, 'i').test(normalised)
+    || (term.length >= 4 && compact.includes(term)));
+};
+const requestContainsBlockedLanguage = (value) => {
+  if (typeof value === 'string') return containsBlockedLanguage(value);
+  if (Array.isArray(value)) return value.some(requestContainsBlockedLanguage);
+  if (!value || typeof value !== 'object') return false;
+  return Object.values(value).some(requestContainsBlockedLanguage);
+};
 const generateLearnerAccessCode = () => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const segment = () => Array.from(crypto.randomBytes(4), byte => alphabet[byte % alphabet.length]).join('');
@@ -149,6 +168,10 @@ app.use(express.json({
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
+app.use('/api', (req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method) || !requestContainsBlockedLanguage(req.body)) return next();
+  return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
+});
 app.set('trust proxy', 1);
 app.use((req, res, next) => {
   persistenceReady.then(() => {
