@@ -1139,6 +1139,8 @@ function logout() {
   document.getElementById('dashboardSection').classList.add('hidden');
   document.getElementById('authSection').classList.remove('hidden');
   document.body.classList.remove('portal-active');
+  document.getElementById('stickyNotesOverlay')?.replaceChildren();
+  document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
 }
 
 function switchUser() {
@@ -1499,6 +1501,7 @@ async function loadAllData() {
   loadBroadcasts();
   loadReleaseNotes();
   loadHouseholdSwitcher();
+  loadStickyNotes();
 }
 
 async function loadHouseholdSwitcher() {
@@ -4105,13 +4108,87 @@ async function saveStickyNote(event) {
 
 async function loadStickyNotes() {
   const board = document.getElementById('stickyNotesRecords');
-  if (!board) return;
+  const canUseStickyNotes = ['teacher', 'principal', 'admin'].includes(currentUser?.role);
+  if (!canUseStickyNotes) {
+    document.getElementById('stickyNotesOverlay')?.replaceChildren();
+    document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
+    return;
+  }
   try {
     const response = await fetch('/api/modules/stickyNotes');
     const records = await response.json();
     if (!response.ok) throw new Error('Unable to load notes');
-    board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${['yellow','teal','blue','rose'].includes(record.colour) ? record.colour : 'yellow'}"><button type="button" class="sticky-note-delete" title="Delete note" aria-label="Delete ${escapeWorkspaceText(record.type)}" onclick="deleteWorkspaceRecord('stickyNotes','${record.id}')">×</button><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
-  } catch { board.textContent = 'Unable to load sticky notes.'; }
+    if (board) board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${stickyNoteColour(record)}">${currentUser?.role === 'admin' ? `<button type="button" class="sticky-note-delete" title="Delete note" aria-label="Delete ${escapeWorkspaceText(record.type)}" onclick="deleteWorkspaceRecord('stickyNotes','${record.id}')">×</button>` : ''}<strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
+    renderFloatingStickyNotes(records);
+  } catch { if (board) board.textContent = 'Unable to load sticky notes.'; }
+}
+
+function stickyNoteColour(record) {
+  return ['yellow', 'teal', 'blue', 'rose'].includes(record?.colour) ? record.colour : 'yellow';
+}
+
+function stickyNotePositionKey(id) {
+  return `lf_sticky_note_position_${currentUser?.username || 'user'}_${id}`;
+}
+
+function readStickyNotePosition(id, index) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(stickyNotePositionKey(id)) || 'null');
+    if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) return saved;
+  } catch {}
+  return { left: Math.min(window.innerWidth - 260, 24 + (index % 4) * 34), top: Math.min(window.innerHeight - 210, 112 + (index % 5) * 38) };
+}
+
+function clampStickyNotePosition(note, left, top) {
+  const width = note.offsetWidth || 244;
+  const height = note.offsetHeight || 178;
+  return { left: Math.round(Math.max(10, Math.min(left, window.innerWidth - width - 10))), top: Math.round(Math.max(76, Math.min(top, window.innerHeight - height - 10))) };
+}
+
+function renderFloatingStickyNotes(records) {
+  const overlay = document.getElementById('stickyNotesOverlay');
+  if (!overlay) return;
+  overlay.replaceChildren();
+  overlay.classList.toggle('hidden', !records.length);
+  records.forEach((record, index) => {
+    const note = document.createElement('article');
+    note.className = `floating-sticky-note floating-sticky-note--${stickyNoteColour(record)}`;
+    note.dataset.noteId = record.id;
+    note.innerHTML = `<div class="floating-sticky-note-handle" aria-label="Drag ${escapeWorkspaceText(record.type || 'sticky note')}" title="Drag to move"><span>Drag note</span>${currentUser?.role === 'admin' ? `<button type="button" class="floating-sticky-note-delete" aria-label="Delete ${escapeWorkspaceText(record.type || 'sticky note')}" title="Delete note">×</button>` : ''}</div><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span>`;
+    overlay.append(note);
+    const saved = readStickyNotePosition(record.id, index);
+    const position = clampStickyNotePosition(note, saved.left, saved.top);
+    note.style.left = `${position.left}px`;
+    note.style.top = `${position.top}px`;
+    note.querySelector('.floating-sticky-note-handle')?.addEventListener('pointerdown', event => startStickyNoteDrag(event, note));
+    note.querySelector('.floating-sticky-note-delete')?.addEventListener('pointerdown', event => event.stopPropagation());
+    note.querySelector('.floating-sticky-note-delete')?.addEventListener('click', async event => { event.stopPropagation(); await deleteWorkspaceRecord('stickyNotes', record.id); });
+  });
+}
+
+function startStickyNoteDrag(event, note) {
+  if (event.button !== undefined && event.button !== 0) return;
+  if (event.target.closest('button')) return;
+  event.preventDefault();
+  const start = { x: event.clientX, y: event.clientY, left: parseFloat(note.style.left) || 10, top: parseFloat(note.style.top) || 76 };
+  note.classList.add('is-dragging');
+  note.setPointerCapture?.(event.pointerId);
+  const move = moveEvent => {
+    const next = clampStickyNotePosition(note, start.left + moveEvent.clientX - start.x, start.top + moveEvent.clientY - start.y);
+    note.style.left = `${next.left}px`;
+    note.style.top = `${next.top}px`;
+  };
+  const finish = finishEvent => {
+    note.classList.remove('is-dragging');
+    note.releasePointerCapture?.(finishEvent.pointerId);
+    localStorage.setItem(stickyNotePositionKey(note.dataset.noteId), JSON.stringify({ left: parseFloat(note.style.left), top: parseFloat(note.style.top) }));
+    note.removeEventListener('pointermove', move);
+    note.removeEventListener('pointerup', finish);
+    note.removeEventListener('pointercancel', finish);
+  };
+  note.addEventListener('pointermove', move);
+  note.addEventListener('pointerup', finish);
+  note.addEventListener('pointercancel', finish);
 }
 
 async function loadWorkspaceRecords(module) {
