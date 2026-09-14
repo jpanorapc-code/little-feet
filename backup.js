@@ -418,7 +418,7 @@ function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
     const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
     const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
-    button.textContent = portalAudioMuted ? `🔇 ${unmuteLabel}` : `🔊 ${muteLabel}`;
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
     button.setAttribute('aria-pressed', String(portalAudioMuted));
     button.title = portalAudioMuted ? 'Turn Little Feet sound back on' : 'Mute all Little Feet sound';
   });
@@ -959,6 +959,15 @@ function toggleDarkMode() {
 
 let dashboardRefreshTimer = null;
 const profileIcons = ['👤', '🧑‍🏫', '👨‍👩‍👧', '🏫', '🌟', '🌱', '🐾', '📚', '🎨', '🏆'];
+const profileIconNames = {
+  '👤': 'user', '🧑‍🏫': 'academics', '👨‍👩‍👧': 'users', '🏫': 'home', '🌟': 'award',
+  '🌱': 'growth', '🐾': 'heart-star', '📚': 'book', '🎨': 'palette', '🏆': 'medal'
+};
+
+function profileIconMarkup(icon) {
+  const iconName = profileIconNames[icon] || 'user';
+  return `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${iconName}"></use></svg>`;
+}
 
 function getProfileIconStorageKey() {
   const account = currentUser?.username || 'guest';
@@ -969,7 +978,7 @@ function applyProfileIcon(icon = localStorage.getItem(getProfileIconStorageKey()
   const selectedIcon = profileIcons.includes(icon) ? icon : profileIcons[0];
   const avatar = document.getElementById('userAvatar');
   if (avatar) {
-    avatar.textContent = selectedIcon;
+    avatar.innerHTML = profileIconMarkup(selectedIcon);
     avatar.title = currentUser?.name || currentUser?.username || 'Profile';
   }
   document.querySelectorAll('.profile-icon-choice').forEach(button => {

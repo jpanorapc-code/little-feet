@@ -100,9 +100,9 @@
     .walking-loader { display:flex; flex-direction:column; align-items:center; gap:12px; color:#e6fffb; text-align:center; }
     .walking-loader-mark { position:relative; width:124px; height:92px; }
     .walking-loader-mark img { position:absolute; left:38px; top:0; width:58px; height:58px; object-fit:contain; filter:drop-shadow(0 8px 10px rgba(0,0,0,.34)); animation:loaderWalk .72s ease-in-out infinite alternate; }
-    .walking-loader-mark span { position:absolute; bottom:0; color:#5eead4; font-size:1.7rem; filter:drop-shadow(0 0 9px rgba(45,212,191,.55)); }
-    .walking-loader-mark span:first-of-type { left:10px; animation:footstep .72s ease-in-out infinite; }
-    .walking-loader-mark span:last-of-type { right:10px; animation:footstep .72s ease-in-out .36s infinite; }
+    .walking-loader-mark .loader-step { position:absolute; bottom:0; color:#5eead4; width:25px; height:25px; filter:drop-shadow(0 0 9px rgba(45,212,191,.55)); }
+    .walking-loader-mark .loader-step:first-of-type { left:10px; animation:footstep .72s ease-in-out infinite; }
+    .walking-loader-mark .loader-step:last-of-type { right:10px; animation:footstep .72s ease-in-out .36s infinite; }
     .walking-loader p { margin:0; font-size:.82rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
     @keyframes loaderWalk { from { transform:translateX(-7px) translateY(2px) rotate(-4deg); } to { transform:translateX(7px) translateY(-2px) rotate(4deg); } }
     @keyframes footstep { 0%,100% { opacity:.25; transform:translateY(5px) scale(.82); } 50% { opacity:1; transform:translateY(-2px) scale(1); } }
@@ -422,7 +422,9 @@
     .wellbeing-banner { position:relative; isolation:isolate; overflow:hidden; display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:18px; border:1px solid rgba(45,212,191,.45); border-left:5px solid var(--primary-color); border-radius:10px; background:linear-gradient(90deg,rgba(13,148,136,.2),rgba(15,43,72,.66)); box-shadow:0 8px 20px rgba(0,0,0,.12); }
     .wellbeing-banner > * { position:relative; z-index:1; }
     .wellbeing-banner::after { content:""; position:absolute; z-index:0; inset:0 0 0 auto; width:190px; pointer-events:none; opacity:.26; background:linear-gradient(90deg,transparent,rgba(7,17,30,.15)),url('assets/4k/welcome-footsteps-banner-4k.jpg') center/cover; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,.92) 44%); }
-    .wellbeing-banner .tip-icon { font-size:1.5rem; } .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
+    .wellbeing-banner .tip-icon { display:inline-grid; place-items:center; width:30px; height:30px; flex:0 0 30px; color:#5eead4; border:1px solid rgba(94,234,212,.28); border-radius:9px; background:rgba(45,212,191,.1); }
+    .wellbeing-banner .tip-icon .ui-icon { width:17px; height:17px; vertical-align:0; }
+    .wellbeing-banner p { margin:0; color:var(--text-dark); font-size:.88rem; line-height:1.4; flex:1; }
     .wellbeing-banner button { background:transparent; color:var(--text-muted); border:0; font-size:1.15rem; cursor:pointer; padding:3px 6px; }
     .portal-tour { position:relative; min-height:350px; margin-bottom:22px; overflow:hidden; border:1px solid var(--border-color); border-radius:16px; background:#07111e; box-shadow:0 14px 28px rgba(2,8,23,.28); }
     .portal-tour-slide { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.82fr); opacity:0; pointer-events:none; transform:scale(1.015); transition:opacity .55s ease, transform .55s ease; }
@@ -1364,7 +1366,7 @@
 
   <div id="portalLoader" role="status" aria-live="polite" aria-label="Little Feet is loading">
     <div class="walking-loader">
-      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/little-feet-mascot-hq.png" alt=""><span>👣</span><span>👣</span></div>
+      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/little-feet-mascot-hq.png" alt=""><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg></div>
       <p>Little Feet is getting ready</p>
     </div>
   </div>
@@ -1378,7 +1380,7 @@
     </div>
   </div>
   <aside id="stickyNotesOverlay" class="hidden" aria-label="Floating staff sticky notes"></aside>
-  <button id="stickyNotesLauncher" class="hidden" type="button" onclick="restoreStickyNotes()" aria-label="Reopen closed sticky notes">🗒 Notes</button>
+  <button id="stickyNotesLauncher" class="hidden" type="button" onclick="restoreStickyNotes()" aria-label="Reopen closed sticky notes"><svg class="ui-icon" aria-hidden="true"><use href="#icon-document"></use></svg><span>Notes</span></button>
 
   <!-- Auth Screen -->
   <div id="authSection">
@@ -1539,8 +1541,8 @@
       
       <!-- 0. Home Page Tab Content -->
       <div id="homeTab" class="tab-content active">
-        <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon">🌼</span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
-        <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon">🔒</span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
+        <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-heart-star"></use></svg></span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
+        <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg></span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
         <section class="portal-welcome-banner" aria-label="Welcome to Little Feet">
           <div class="portal-welcome-copy">
             <section id="roleHomePanel" class="role-home-panel" aria-live="polite"></section>
@@ -2366,7 +2368,7 @@
 
       <div id="wallpaperTab" class="tab-content">
         <section class="card" style="max-width:860px;">
-          <div class="card-header-bar"><h2>🖼️ Wallpaper Mode</h2><span class="badge-tag info">SCREEN SAVER</span></div>
+          <div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg></span><span>Wallpaper Mode</span></h2><span class="badge-tag info">SCREEN SAVER</span></div>
           <p style="color:var(--text-muted);line-height:1.6;max-width:680px;">When the portal has been idle for one hour, it will switch to the Little Feet wallpaper and loop the dedicated wallpaper song. Nothing is signed out or lost, and any normal interaction returns to your work.</p>
           <div class="workspace-grid" style="margin-top:16px;">
             <div class="workspace-card"><h3>Start now</h3><p>Show the active wallpaper with the dedicated looping Little Feet wallpaper song.</p><button type="button" class="submit-btn" onclick="startWallpaperMode()">Open Wallpaper Mode</button></div>
@@ -2429,7 +2431,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-note-tab-delete" defer></script>
+  <script src="backup.js?v=20260914-professional-icons" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
