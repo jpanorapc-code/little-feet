@@ -1141,6 +1141,7 @@ function logout() {
   document.body.classList.remove('portal-active');
   document.getElementById('stickyNotesOverlay')?.replaceChildren();
   document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
+  document.getElementById('stickyNotesLauncher')?.classList.add('hidden');
 }
 
 function switchUser() {
@@ -4112,13 +4113,14 @@ async function loadStickyNotes() {
   if (!canUseStickyNotes) {
     document.getElementById('stickyNotesOverlay')?.replaceChildren();
     document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
+    document.getElementById('stickyNotesLauncher')?.classList.add('hidden');
     return;
   }
   try {
     const response = await fetch('/api/modules/stickyNotes');
     const records = await response.json();
     if (!response.ok) throw new Error('Unable to load notes');
-    if (board) board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${stickyNoteColour(record)}">${currentUser?.role === 'admin' ? `<button type="button" class="sticky-note-delete" title="Delete note" aria-label="Delete ${escapeWorkspaceText(record.type)}" onclick="deleteWorkspaceRecord('stickyNotes','${record.id}')">×</button>` : ''}<strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
+    if (board) board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${stickyNoteColour(record)}"><button type="button" class="sticky-note-delete" title="Close note (keeps it saved)" aria-label="Close ${escapeWorkspaceText(record.type)}" onclick="closeStickyNote('${record.id}')">×</button><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
     renderFloatingStickyNotes(records);
   } catch { if (board) board.textContent = 'Unable to load sticky notes.'; }
 }
@@ -4129,6 +4131,20 @@ function stickyNoteColour(record) {
 
 function stickyNotePositionKey(id) {
   return `lf_sticky_note_position_${currentUser?.username || 'user'}_${id}`;
+}
+
+function stickyNoteClosedKey(id) {
+  return `lf_sticky_note_closed_${currentUser?.username || 'user'}_${id}`;
+}
+
+function closeStickyNote(id) {
+  localStorage.setItem(stickyNoteClosedKey(id), 'true');
+  loadStickyNotes();
+}
+
+function restoreStickyNotes() {
+  document.querySelectorAll('#stickyNotesOverlay [data-note-id]').forEach(note => localStorage.removeItem(stickyNoteClosedKey(note.dataset.noteId)));
+  fetch('/api/modules/stickyNotes').then(response => response.json()).then(records => (Array.isArray(records) ? records : []).forEach(record => localStorage.removeItem(stickyNoteClosedKey(record.id)))).finally(() => loadStickyNotes());
 }
 
 function readStickyNotePosition(id, index) {
@@ -4147,14 +4163,17 @@ function clampStickyNotePosition(note, left, top) {
 
 function renderFloatingStickyNotes(records) {
   const overlay = document.getElementById('stickyNotesOverlay');
+  const launcher = document.getElementById('stickyNotesLauncher');
   if (!overlay) return;
+  if (launcher) launcher.classList.toggle('hidden', !records.length);
   overlay.replaceChildren();
-  overlay.classList.toggle('hidden', !records.length);
-  records.forEach((record, index) => {
+  const visibleRecords = records.filter(record => localStorage.getItem(stickyNoteClosedKey(record.id)) !== 'true');
+  overlay.classList.toggle('hidden', !visibleRecords.length);
+  visibleRecords.forEach((record, index) => {
     const note = document.createElement('article');
     note.className = `floating-sticky-note floating-sticky-note--${stickyNoteColour(record)}`;
     note.dataset.noteId = record.id;
-    note.innerHTML = `<div class="floating-sticky-note-handle" aria-label="Drag ${escapeWorkspaceText(record.type || 'sticky note')}" title="Drag to move"><span>Drag note</span>${currentUser?.role === 'admin' ? `<button type="button" class="floating-sticky-note-delete" aria-label="Delete ${escapeWorkspaceText(record.type || 'sticky note')}" title="Delete note">×</button>` : ''}</div><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span>`;
+    note.innerHTML = `<div class="floating-sticky-note-handle" aria-label="Drag ${escapeWorkspaceText(record.type || 'sticky note')}" title="Drag to move"><span>Drag note</span><button type="button" class="floating-sticky-note-delete" aria-label="Close ${escapeWorkspaceText(record.type || 'sticky note')}" title="Close note (keeps it saved)">×</button></div><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span>`;
     overlay.append(note);
     const saved = readStickyNotePosition(record.id, index);
     const position = clampStickyNotePosition(note, saved.left, saved.top);
@@ -4162,7 +4181,7 @@ function renderFloatingStickyNotes(records) {
     note.style.top = `${position.top}px`;
     note.querySelector('.floating-sticky-note-handle')?.addEventListener('pointerdown', event => startStickyNoteDrag(event, note));
     note.querySelector('.floating-sticky-note-delete')?.addEventListener('pointerdown', event => event.stopPropagation());
-    note.querySelector('.floating-sticky-note-delete')?.addEventListener('click', async event => { event.stopPropagation(); await deleteWorkspaceRecord('stickyNotes', record.id); });
+    note.querySelector('.floating-sticky-note-delete')?.addEventListener('click', event => { event.stopPropagation(); closeStickyNote(record.id); });
   });
 }
 

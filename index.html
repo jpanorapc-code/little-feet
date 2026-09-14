@@ -961,6 +961,8 @@
     .sticky-note--rose { background:#ffd6df; border-color:rgba(225,29,72,.34); }
     #stickyNotesOverlay { position:fixed; inset:0; z-index:80; pointer-events:none; }
     #stickyNotesOverlay.hidden { display:none; }
+    #stickyNotesLauncher { position:fixed; z-index:81; right:20px; bottom:20px; display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid rgba(94,234,212,.72); border-radius:999px; background:#0f766e; color:#fff; box-shadow:0 10px 24px rgba(2,8,23,.34); cursor:pointer; font-weight:800; }
+    #stickyNotesLauncher.hidden { display:none; }
     .floating-sticky-note { position:fixed; width:min(244px, calc(100vw - 28px)); min-height:178px; padding:0 15px 14px; border:1px solid rgba(250,204,21,.44); border-radius:4px 13px 8px 13px; color:#1f2937; box-shadow:0 16px 34px rgba(2,8,23,.34); overflow:hidden; pointer-events:auto; touch-action:none; }
     .floating-sticky-note::before { content:""; position:absolute; inset:36px 0 0; background:repeating-linear-gradient(0deg, transparent 0 26px, rgba(15,23,42,.075) 27px 28px); pointer-events:none; }
     .floating-sticky-note::after { content:""; position:absolute; z-index:0; right:10px; bottom:9px; width:62px; height:62px; background:url('little-feet-mascot.jfif') center/contain no-repeat; opacity:.20; pointer-events:none; }
@@ -1376,6 +1378,7 @@
     </div>
   </div>
   <aside id="stickyNotesOverlay" class="hidden" aria-label="Floating staff sticky notes"></aside>
+  <button id="stickyNotesLauncher" class="hidden" type="button" onclick="restoreStickyNotes()" aria-label="Reopen closed sticky notes">🗒 Notes</button>
 
   <!-- Auth Screen -->
   <div id="authSection">
@@ -2426,7 +2429,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-floating-sticky-notes" defer></script>
+  <script src="backup.js?v=20260914-closable-sticky-notes" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
