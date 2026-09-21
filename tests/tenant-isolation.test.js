@@ -115,6 +115,40 @@ const rawRequest = async (route) => {
     alphaLogin.cookie = migratedAlphaLogin.cookie;
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
+    const schoolApplication = await request('/api/school-applications', { method: 'POST', cookie: alphaParentLogin.cookie, body: {
+      schoolName: 'Alpha School',
+      guardianName: 'Alpha Parent',
+      contactEmail: 'alpha.parent@example.test',
+      contactPhone: '0123456789',
+      learnerName: 'Prospective Alpha Learner',
+      dateOfBirth: '2022-04-03',
+      gradeOrAgeGroup: 'Toddler',
+      intendedStart: '2027-01-15',
+      homeArea: 'Pretoria',
+      notes: 'Needs a morning placement.'
+    } });
+    assert.equal(schoolApplication.response.status, 201);
+    const admissionsTickets = await request('/api/tickets', { cookie: alphaLogin.cookie });
+    const admissionsTicket = admissionsTickets.data.find(ticket => ticket.id === schoolApplication.data.ticket.id);
+    assert.ok(admissionsTicket);
+    assert.equal(admissionsTicket.subject, 'School application');
+    assert.equal(admissionsTicket.application.learnerName, 'Prospective Alpha Learner');
+    assert.equal(admissionsTicket.application.contactPhone, '0123456789');
+
+    assert.equal((await request('/api/broadcasts', { method: 'POST', cookie: alphaLogin.cookie, body: { bcPriority: 'Campus Notice', bcMessage: 'Invalid radius', radiusKm: 500, location: { lat: -25.7479, lng: 28.2293 } } })).response.status, 400);
+    assert.equal((await request('/api/broadcasts', { method: 'POST', cookie: alphaLogin.cookie, body: { bcPriority: 'Invalid Priority', bcMessage: 'Invalid priority', radiusKm: 5, location: { lat: -25.7479, lng: 28.2293 } } })).response.status, 400);
+    assert.equal((await request('/api/broadcasts', { method: 'POST', cookie: alphaLogin.cookie, body: { bcPriority: 'Campus Notice', bcMessage: 'Invalid coordinates', radiusKm: 5, location: { lat: -125, lng: 280 } } })).response.status, 400);
+    const validBroadcast = await request('/api/broadcasts', { method: 'POST', cookie: alphaLogin.cookie, body: { bcPriority: 'Campus Notice', bcMessage: '<img src=x onerror=alert(1)> Safety notice', radiusKm: 5, location: { lat: -25.7479, lng: 28.2293 } } });
+    assert.equal(validBroadcast.response.status, 200);
+    assert.equal(validBroadcast.data.item.radiusKm, 5);
+    assert.deepEqual(validBroadcast.data.item.location, { lat: -25.7479, lng: 28.2293 });
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const wrongPass = await request('/api/campus-visitors/check-in', { method: 'POST', cookie: alphaLogin.cookie, body: { passCode: 'LFV-NOT-A-REAL-PASS' } });
+      assert.equal(wrongPass.response.status, 404);
+    }
+    const throttledVisitorPass = await request('/api/campus-visitors/check-in', { method: 'POST', cookie: alphaLogin.cookie, body: { passCode: 'LFV-NOT-A-REAL-PASS' } });
+    assert.equal(throttledVisitorPass.response.status, 429);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
     const liveStatus = await request('/api/system-status', { cookie: alphaLogin.cookie });
     assert.equal(liveStatus.response.status, 200);
