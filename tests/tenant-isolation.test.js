@@ -35,7 +35,7 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
 
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
-  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret' },
+  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 let childErrorOutput = '';
@@ -122,6 +122,9 @@ const rawRequest = async (route) => {
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
+    const productionReadiness = await request('/api/production-readiness', { cookie: alphaLogin.cookie });
+    assert.equal(productionReadiness.response.status, 200);
+    assert.equal(productionReadiness.data.integrations.offsiteBackup, false);
     const liveStatus = await request('/api/system-status', { cookie: alphaLogin.cookie });
     assert.equal(liveStatus.response.status, 200);
     assert.equal(liveStatus.data.status, 'operational');

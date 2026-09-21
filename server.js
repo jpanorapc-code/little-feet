@@ -949,7 +949,7 @@ app.get('/api/production-readiness', (req, res) => {
     emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
     smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
     monitoring: Boolean(process.env.LF_MONITORING_DSN),
-    offsiteBackup: Boolean(process.env.LF_BACKUP_BUCKET)
+    offsiteBackup: false
   };
   const missingActions = [];
   if (!readiness.checks.database) missingActions.push('Connect a persistent PostgreSQL DATABASE_URL.');
@@ -3067,6 +3067,13 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     console.error('Microsoft sign-in failed:', error.message);
     res.redirect('/?oauthError=microsoft-sign-in-failed');
   }
+});
+
+app.use((req, res, next) => {
+  const blockedFile = /^\/(?:\.env|server\.js|backup-server\.js|littlefeet-replica\.json|littlefeet\.db(?:-(?:shm|wal))?|littlesteps\.db|package(?:-lock)?\.json|create_portal_documents\.py)$/i.test(req.path);
+  const blockedDirectory = /^\/(?:\.git|node_modules|output|tests|tmp|uploads)(?:\/|$)/i.test(req.path);
+  if (blockedFile || blockedDirectory) return res.sendStatus(404);
+  next();
 });
 
 // Wildcard Catch-All (Serves Frontend)
