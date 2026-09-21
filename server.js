@@ -13,8 +13,12 @@ const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
+const loginIpAttempts = new Map();
+const signingPinAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
+const MAX_LOGIN_IP_ATTEMPTS = 30;
+const MAX_SIGNING_PIN_ATTEMPTS = 5;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
@@ -75,6 +79,7 @@ const accountMatchesUsername = (account, value) => {
     || (account.loginAliases || []).some(alias => normalizeUsername(alias) === requested);
 };
 const findAccountByUsername = (username) => db.users.find(account => accountMatchesUsername(account, username));
+const accountVerificationPending = account => String(account?.verificationStatus || '').toLocaleLowerCase('en-US').includes('pending');
 const normalizeComparableText = (value) => String(value || '').trim().toLocaleLowerCase('en-US');
 const learnerRecordKey = (learner) => [learner?.studentName, learner?.className, learner?.contactEmail].map(normalizeComparableText).join('|');
 const normaliseAccessCode = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -173,11 +178,19 @@ const validateSignatureData = (value) => {
   return { signature };
 };
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
-const activeLoginAttempt = (key) => {
-  const entry = loginAttempts.get(key);
-  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) { loginAttempts.delete(key); return null; }
+const activeAttempt = (store, key) => {
+  const entry = store.get(key);
+  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) {
+    store.delete(key);
+    return null;
+  }
   return entry;
 };
+const incrementAttempt = (store, key) => {
+  const previous = activeAttempt(store, key);
+  store.set(key, { count: (previous?.count || 0) + 1, firstAttempt: previous?.firstAttempt || Date.now() });
+};
+const activeLoginAttempt = (key) => activeAttempt(loginAttempts, key);
 
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
@@ -211,7 +224,8 @@ const PUBLIC_ACTION_WINDOW_MS = 10 * 60 * 1000;
 const PUBLIC_ACTION_LIMITS = new Map([
   ['/api/signup', 12],
   ['/api/schools/enrich', 60],
-  ['/api/donations/intents', 30]
+  ['/api/donations/intents', 30],
+  ['/api/learner-access-codes/redeem', 20]
 ]);
 app.use((req, res, next) => {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
@@ -632,7 +646,7 @@ async function loadDatabaseState() {
 async function saveDatabaseState() {
   if (replicaMode) return;
   if (postgresPool) {
-    postgresSaveChain = postgresSaveChain.then(async () => {
+    postgresSaveChain = postgresSaveChain.catch(() => {}).then(async () => {
       const { records, metadata } = flattenPersistentState();
       const nextSnapshot = new Map();
       const client = await postgresPool.connect();
@@ -763,16 +777,19 @@ app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
   const normalizedUsername = normalizeUsername(username);
   const attemptKey = loginAttemptKey(req, normalizedUsername);
+  const ipAttemptKey = String(req.ip || 'unknown');
   const previousAttempts = activeLoginAttempt(attemptKey);
-  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS) {
+  const previousIpAttempts = activeAttempt(loginIpAttempts, ipAttemptKey);
+  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousIpAttempts?.count >= MAX_LOGIN_IP_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
   }
   const user = normalizedUsername && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
   if (user) {
-    if (String(user.verificationStatus || '').includes('verification pending')) {
+    if (accountVerificationPending(user)) {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
+    loginIpAttempts.delete(ipAttemptKey);
     if (pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     const safeUser = safeAccount(user);
     req.session.littleFeetUser = safeUser;
@@ -781,7 +798,8 @@ app.post('/api/login', (req, res) => {
       res.json({ user: safeUser });
     });
   } else {
-    loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
+    incrementAttempt(loginAttempts, attemptKey);
+    incrementAttempt(loginIpAttempts, ipAttemptKey);
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
 });
@@ -899,7 +917,8 @@ const safeAccount = ({ pin, pinHash, reportSigningPinHash, ...account }) => ({
 });
 const getSessionAccount = (req) => {
   const username = req.session?.littleFeetUser?.username;
-  return username ? findAccountByUsername(username) : null;
+  const account = username ? findAccountByUsername(username) : null;
+  return account && !accountVerificationPending(account) ? account : null;
 };
 const requireAdmin = (req) => {
   const account = getSessionAccount(req);
@@ -1617,7 +1636,12 @@ app.put('/api/accounts/:username', (req, res) => {
   if (username) account.username = String(username).trim();
   if (pin) account.pinHash = hashPin(pin);
   if (name) account.name = String(name).trim();
-  if (role && allowedRoles.includes(role)) account.role = role;
+  if (role && allowedRoles.includes(role)) {
+    if (account.role === 'admin' && role !== 'admin' && db.users.filter(entry => entry.role === 'admin' && isSameSchool(actor, entry)).length <= 1) {
+      return res.status(400).json({ message: 'Create another administrator before changing the final administrator role.' });
+    }
+    account.role = role;
+  }
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
   account.schoolName = actor.schoolName;
   account.schoolId = accountSchoolId(actor);
@@ -2542,8 +2566,10 @@ app.get('/api/release-notes', (req, res) => res.json((db.releaseNotes || []).sli
 app.post('/api/report-signing-pin', (req, res) => {
   const { pin } = req.body;
   const user = getSessionAccount(req);
-  if (!user || !pin || String(pin).length < 4) return res.status(400).json({ message: 'Choose a signing PIN with at least 4 characters.' });
+  if (!user || !['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'Report signing is not available for this role.' });
+  if (!pin || String(pin).length < 6) return res.status(400).json({ message: 'Choose a signing PIN with at least 6 characters.' });
   user.reportSigningPinHash = hashPin(pin);
+  signingPinAttempts.delete(`${req.ip}:${normalizeUsername(user.username)}`);
   res.json({ success: true });
 });
 
@@ -2555,6 +2581,7 @@ const reportReviewView = report => ({
 app.get('/api/report-reviews', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view reports.' });
+  if (!['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'Report access is not available for this role.' });
   const reports = user.role === 'parent'
     ? tenantRecords(db.reportReviews, user).filter(report => normalizeUsername(report.parentUsername) === normalizeUsername(user.username))
     : learnerRecordsVisibleTo(db.reportReviews, user);
@@ -2564,7 +2591,13 @@ app.post('/api/report-reviews', (req, res) => {
   const { studentName, reportTitle, period, parentUsername, signatureData, signingPin } = req.body;
   const teacher = getSessionAccount(req);
   const parent = findAccountByUsername(parentUsername);
-  if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
+  const signingAttemptKey = teacher ? `${req.ip}:${normalizeUsername(teacher.username)}` : `${req.ip}:anonymous`;
+  if (activeAttempt(signingPinAttempts, signingAttemptKey)?.count >= MAX_SIGNING_PIN_ATTEMPTS) return res.status(429).json({ message: 'Too many incorrect signing PIN attempts. Please wait 15 minutes.' });
+  if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) {
+    incrementAttempt(signingPinAttempts, signingAttemptKey);
+    return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
+  }
+  signingPinAttempts.delete(signingAttemptKey);
   if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
   if (!studentName || !reportTitle || !period || !parentUsername) return res.status(400).json({ message: 'Complete the report details and teacher signature.' });
   const signatureValidation = validateSignatureData(signatureData);
@@ -2578,7 +2611,13 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
   const user = getSessionAccount(req);
   const report = db.reportReviews.find(entry => entry.id === req.params.id && recordInSchool(entry, user));
   if (!report || !user || user.role !== 'parent' || normalizeUsername(report.parentUsername) !== normalizeUsername(user.username)) return res.status(403).json({ message: 'Only the linked parent account can sign this report.' });
-  if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
+  const signingAttemptKey = `${req.ip}:${normalizeUsername(user.username)}`;
+  if (activeAttempt(signingPinAttempts, signingAttemptKey)?.count >= MAX_SIGNING_PIN_ATTEMPTS) return res.status(429).json({ message: 'Too many incorrect signing PIN attempts. Please wait 15 minutes.' });
+  if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) {
+    incrementAttempt(signingPinAttempts, signingAttemptKey);
+    return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
+  }
+  signingPinAttempts.delete(signingAttemptKey);
   const signatureValidation = validateSignatureData(signatureData);
   if (signatureValidation.error) return res.status(400).json({ message: signatureValidation.error });
   report.parentSignature = encryptField(signatureValidation.signature);
@@ -2877,6 +2916,7 @@ app.get('/auth/google/callback',
     const email = req.user?.email;
     const account = findAccountByUsername(email);
     if (!account) return res.redirect('/?oauthError=account-not-linked');
+    if (accountVerificationPending(account)) return res.redirect('/?oauthError=account-pending');
     req.session.littleFeetUser = safeAccount(account);
     res.redirect('/?oauth=google');
   }
@@ -2919,6 +2959,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     const profile = await profileResponse.json();
     const account = findAccountByUsername(profile.email);
     if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
+    if (accountVerificationPending(account)) return res.redirect('/?oauthError=account-pending');
     req.session.littleFeetUser = safeAccount(account);
     res.redirect('/?oauth=yahoo');
   } catch (error) {
@@ -2977,6 +3018,7 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     const profile = await profileResponse.json();
     const account = findAccountByUsername(profile.mail || profile.userPrincipalName);
     if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
+    if (accountVerificationPending(account)) return res.redirect('/?oauthError=account-pending');
     req.session.littleFeetUser = safeAccount(account);
     res.redirect('/?oauth=microsoft');
   } catch (error) {
