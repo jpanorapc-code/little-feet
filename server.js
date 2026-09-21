@@ -24,6 +24,13 @@ let activeRequestCount = 0;
 let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
 const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
+const productionConfigurationErrors = [];
+if (isProduction && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
+if (isProduction && !fieldEncryptionConfigured) productionConfigurationErrors.push('LF_FIELD_ENCRYPTION_KEY');
+if (isProduction && !sessionSecretConfigured) productionConfigurationErrors.push('SESSION_SECRET');
+if (productionConfigurationErrors.length) {
+  throw new Error(`Production configuration is missing required secure settings: ${productionConfigurationErrors.join(', ')}`);
+}
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
 const CURRENT_RELEASE_NOTES = Object.freeze([
   Object.freeze({
@@ -86,6 +93,26 @@ const requestContainsBlockedLanguage = (value) => {
   if (Array.isArray(value)) return value.some(requestContainsBlockedLanguage);
   if (!value || typeof value !== 'object') return false;
   return Object.values(value).some(requestContainsBlockedLanguage);
+};
+const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
+const publicRateLimits = new Map();
+const enforcePublicRateLimit = (req, res, key, limit, windowMs) => {
+  const now = Date.now();
+  const id = `${key}:${req.ip}`;
+  let entry = publicRateLimits.get(id);
+  if (!entry || now - entry.startedAt >= windowMs) entry = { count: 0, startedAt: now };
+  entry.count += 1;
+  publicRateLimits.set(id, entry);
+  if (publicRateLimits.size > 10000) {
+    for (const [candidate, value] of publicRateLimits) {
+      if (now - value.startedAt >= windowMs) publicRateLimits.delete(candidate);
+      if (publicRateLimits.size <= 8000) break;
+    }
+  }
+  if (entry.count <= limit) return true;
+  res.setHeader('Retry-After', String(Math.max(1, Math.ceil((windowMs - (now - entry.startedAt)) / 1000))));
+  res.status(429).json({ message: 'Too many requests. Please wait and try again.' });
+  return false;
 };
 const generateLearnerAccessCode = () => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -153,6 +180,19 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), payment=(), usb=()');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+    "style-src 'self' 'unsafe-inline' https://unpkg.com",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self'"
+  ].join('; '));
+  if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
     res.setHeader('Cache-Control', 'no-store, private');
   }
@@ -166,6 +206,12 @@ app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method) || !requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
+});
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path === '/api/signup' && !enforcePublicRateLimit(req, res, 'signup', 20, 60 * 60 * 1000)) return;
+  if (req.method === 'POST' && req.path === '/api/schools/enrich' && !enforcePublicRateLimit(req, res, 'school-enrich', 60, 10 * 60 * 1000)) return;
+  if (req.method === 'POST' && req.path === '/api/donations/intents' && !enforcePublicRateLimit(req, res, 'donation-intent', 30, 60 * 60 * 1000)) return;
+  next();
 });
 app.set('trust proxy', 1);
 app.use((req, res, next) => {
@@ -185,7 +231,7 @@ app.use((req, res, next) => {
 const staticFileOptions = {
   setHeaders: (res, filePath) => {
     if (/\.html$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
-    else if (/\.(?:js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+    else if (/\.(?:js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     else if (/\.(?:png|jpe?g|webp|gif|svg|ico|mp3|wav|woff2?)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     else res.setHeader('Cache-Control', 'public, max-age=86400');
   }
@@ -193,7 +239,7 @@ const staticFileOptions = {
 app.use('/assets', express.static(path.join(__dirname, 'assets'), staticFileOptions));
 app.use('/output', express.static(path.join(__dirname, 'output'), staticFileOptions));
 const sendPublicRootFile = (req, res) => {
-  if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+  if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   res.sendFile(req.path.slice(1), { root: __dirname });
 };
@@ -312,6 +358,20 @@ app.use(session({
     maxAge: 60 * 60 * 1000
   }
 }));
+app.use((req, res, next) => {
+  if (!isProduction || !req.session?.littleFeetUser || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const source = req.get('origin') || req.get('referer');
+  if (!source) return res.status(403).json({ message: 'A same-origin browser request is required.' });
+  try {
+    const sourceUrl = new URL(source);
+    if (sourceUrl.host !== req.get('host') || sourceUrl.protocol !== `${req.protocol}:`) {
+      return res.status(403).json({ message: 'Cross-origin state changes are not allowed.' });
+    }
+  } catch {
+    return res.status(403).json({ message: 'Invalid request origin.' });
+  }
+  next();
+});
 
 const persistenceHash = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const persistenceRecordKey = (record, index) => {
@@ -757,7 +817,7 @@ app.post('/api/signup', (req, res) => {
   res.status(201).json({ success: true, account: safeAccount });
 });
 
-const safeAccount = ({ pin, pinHash, ...account }) => ({
+const safeAccount = ({ pin, pinHash, reportSigningPinHash, ...account }) => ({
   ...account,
   ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {})
 });
@@ -1979,7 +2039,7 @@ app.post('/api/chat/messages', (req, res) => {
     id: crypto.randomUUID(),
     sender: actor.username,
     message,
-    textColor: textColor || "#2dd4bf",
+    textColor: safeTextColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
   db.groupMessages[groupId].push(msgObj);
@@ -2025,7 +2085,7 @@ app.post('/api/chat/direct', (req, res) => {
     sender: senderAccount.username,
     recipient,
     message,
-    textColor: textColor || "#2dd4bf",
+    textColor: safeTextColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   db.directMessages.push(msgObj);
