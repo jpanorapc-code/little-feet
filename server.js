@@ -529,22 +529,46 @@ function migrateSchoolTenancy() {
     account.schoolId = account.schoolId || school.id;
     account.schoolName = school.name;
   });
-  const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
+
+  const knownSchoolIds = [...new Set(db.users.map(account => account.schoolId).filter(Boolean))];
+  const singleSchoolFallback = knownSchoolIds.length === 1 ? knownSchoolIds[0] : '';
+  const assignLegacySchool = (record, collectionName) => {
+    if (record.schoolId) return;
+    if (record.schoolName) {
+      record.schoolId = ensureSchool(record.schoolName).id;
+      return;
+    }
+    if (singleSchoolFallback) {
+      record.schoolId = singleSchoolFallback;
+      return;
+    }
+    throw new Error(`Ambiguous legacy tenant record in ${collectionName}; add an explicit schoolId before startup.`);
+  };
+
   const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
-    db[collection].forEach(record => {
-      if (!record.schoolId) record.schoolId = record.schoolName ? ensureSchool(record.schoolName).id : defaultSchoolId;
-    });
+    db[collection].forEach(record => assignLegacySchool(record, collection));
   });
-  Object.values(db.moduleRecords || {}).forEach(records => (records || []).forEach(record => {
-    if (!record.schoolId) record.schoolId = record.schoolName ? ensureSchool(record.schoolName).id : defaultSchoolId;
-  }));
-  db.students.forEach(record => { if (!record.schoolId) record.schoolId = defaultSchoolId; });
+  Object.entries(db.moduleRecords || {}).forEach(([moduleName, records]) => (records || []).forEach(record => assignLegacySchool(record, `moduleRecords.${moduleName}`)));
+  db.students.forEach(record => assignLegacySchool(record, 'students'));
+
   if (!db.schoolTerms || typeof db.schoolTerms !== 'object') db.schoolTerms = {};
-  if (!db.schoolTerms[defaultSchoolId]) db.schoolTerms[defaultSchoolId] = db.term;
+  if (singleSchoolFallback && !db.schoolTerms[singleSchoolFallback]) db.schoolTerms[singleSchoolFallback] = db.term;
   if (!db.schoolBilling || typeof db.schoolBilling !== 'object') db.schoolBilling = {};
-  if (!db.schoolBilling[defaultSchoolId] && db.subscriptionBilling) db.schoolBilling[defaultSchoolId] = db.subscriptionBilling;
+  if (singleSchoolFallback && !db.schoolBilling[singleSchoolFallback] && db.subscriptionBilling) db.schoolBilling[singleSchoolFallback] = db.subscriptionBilling;
+}
+
+function migrateSensitiveFields() {
+  const encryptKeys = (record, keys) => {
+    if (!record || typeof record !== 'object') return;
+    keys.forEach(key => {
+      if (record[key]) record[key] = encryptFieldIfNeeded(record[key]);
+    });
+  };
+  (db.students || []).forEach(record => encryptKeys(record, ['medicalNotes', 'emergencyContact', 'authorisedPickups']));
+  (db.registry || []).forEach(record => encryptKeys(record, ['dateOfBirth', 'guardianPhone', 'guardianEmail', 'address', 'emergencyContact', 'medicalNotes']));
+  (db.reportReviews || []).forEach(record => encryptKeys(record, ['teacherSignature', 'parentSignature']));
 }
 
 function removeLegacyDemoRecords() {
@@ -725,6 +749,7 @@ async function initialisePersistence() {
   if (!restoredFromDatabase) loadReplicaSnapshot();
   ensureBootstrapAdministrator();
   migrateSchoolTenancy();
+  migrateSensitiveFields();
   syncCurrentReleaseNotes();
   await saveDatabaseState();
   writeReplicaSnapshot();
@@ -815,10 +840,14 @@ app.get('/api/production-readiness', (req, res) => {
   const integrations = {
     paymentDestination: billingPaymentConfigured(billing.payment),
     signedPaymentWebhook: Boolean(process.env.LF_PAYMENT_WEBHOOK_SECRET),
-    emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
-    smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
-    monitoring: Boolean(process.env.LF_MONITORING_DSN),
-    offsiteBackup: Boolean(process.env.LF_BACKUP_BUCKET)
+    emailCredentialsPresent: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
+    smsCredentialsPresent: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
+    monitoringConfigured: Boolean(process.env.LF_MONITORING_DSN),
+    offsiteBackupConfigured: Boolean(process.env.LF_BACKUP_BUCKET),
+    emailDelivery: false,
+    smsDelivery: false,
+    monitoring: false,
+    offsiteBackup: false
   };
   const missingActions = [];
   if (!readiness.checks.database) missingActions.push('Connect a persistent PostgreSQL DATABASE_URL.');
@@ -882,6 +911,19 @@ const requireSchoolStaff = (req) => {
 };
 const learnerRecordsVisibleTo = (records, actor) => {
   const schoolRecords = tenantRecords(records, actor);
+  if (actor?.role === 'teacher') {
+    const assignedClasses = new Set(normaliseAssignedClasses(actor.assignedClasses));
+    if (!assignedClasses.size) return [];
+    const assignedLearners = new Set(
+      tenantRecords(db.students, actor)
+        .filter(student => assignedClasses.has(normalizeComparableText(student.className)))
+        .map(student => normalizeComparableText(student.studentName))
+    );
+    return schoolRecords.filter(record =>
+      assignedClasses.has(normalizeComparableText(record.className))
+      || assignedLearners.has(normalizeComparableText(record.studentName || record.learnerName))
+    );
+  }
   if (actor?.role !== 'parent') return schoolRecords;
   const linkedLearnerNames = new Set(
     tenantRecords(db.students, actor)
@@ -2393,19 +2435,75 @@ app.delete('/api/modules/:module/:id', (req, res) => {
   res.json({ success: true });
 });
 
+const registryRecordView = record => ({
+  ...record,
+  dateOfBirth: decryptFieldOrLegacy(record.dateOfBirth),
+  guardianPhone: decryptFieldOrLegacy(record.guardianPhone),
+  guardianEmail: decryptFieldOrLegacy(record.guardianEmail),
+  address: decryptFieldOrLegacy(record.address),
+  emergencyContact: decryptFieldOrLegacy(record.emergencyContact),
+  medicalNotes: decryptFieldOrLegacy(record.medicalNotes)
+});
 app.get('/api/registry', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view the learner register.' });
-  res.json(tenantRecords(db.registry, actor));
+  res.json(learnerRecordsVisibleTo(db.registry, actor).map(registryRecordView));
 });
 app.post('/api/registry', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
-  const required = ['learnerName', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
-  if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
+  const required = ['learnerName', 'className', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
+  if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields, including class/grade.' });
+
+  const record = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    learnerName: String(req.body.learnerName).trim(),
+    className: String(req.body.className).trim(),
+    guardianName: String(req.body.guardianName).trim(),
+    consent: String(req.body.consent || 'Pending verification'),
+    dateOfBirth: encryptField(String(req.body.dateOfBirth).trim()),
+    guardianPhone: encryptField(String(req.body.guardianPhone).trim()),
+    guardianEmail: encryptField(String(req.body.guardianEmail || '').trim()),
+    address: encryptField(String(req.body.address).trim()),
+    emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
+    medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
+    createdAt: new Date().toISOString(),
+    createdBy: actor.username
+  });
   db.registry.unshift(record);
-  res.json({ success: true, record });
+
+  const studentCandidate = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    studentName: record.learnerName,
+    className: record.className,
+    parentName: record.guardianName,
+    contactEmail: String(req.body.guardianEmail || '').trim(),
+    medicalNotes: record.medicalNotes,
+    emergencyContact: record.emergencyContact,
+    authorisedPickups: encryptField(''),
+    registeredAt: new Date().toISOString(),
+    registeredBy: actor.username
+  });
+  const duplicateStudent = tenantRecords(db.students, actor).some(student =>
+    normalizeComparableText(student.studentName) === normalizeComparableText(studentCandidate.studentName)
+    && normalizeComparableText(student.className) === normalizeComparableText(studentCandidate.className)
+  );
+  if (!duplicateStudent) {
+    db.students.push(studentCandidate);
+    let accessCode;
+    do { accessCode = generateLearnerAccessCode(); } while ((db.learnerAccessCodes || []).some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === accessCode));
+    db.learnerAccessCodes.unshift(tagSchoolRecord(actor, {
+      id: crypto.randomUUID(),
+      learnerKey: learnerRecordKey(studentCandidate),
+      codeEncrypted: encryptField(accessCode),
+      status: 'active',
+      issuedAt: new Date().toISOString(),
+      issuedBy: actor.username,
+      generatedAutomatically: true
+    }));
+  }
+
+  res.json({ success: true, record: registryRecordView(record) });
 });
 
 app.get('/api/consents', (req, res) => {
@@ -2449,24 +2547,31 @@ app.post('/api/report-signing-pin', (req, res) => {
   res.json({ success: true });
 });
 
+const reportReviewView = report => ({
+  ...report,
+  teacherSignature: report.teacherSignature ? decryptFieldOrLegacy(report.teacherSignature) : null,
+  parentSignature: report.parentSignature ? decryptFieldOrLegacy(report.parentSignature) : null
+});
 app.get('/api/report-reviews', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view reports.' });
   const reports = user.role === 'parent'
     ? tenantRecords(db.reportReviews, user).filter(report => normalizeUsername(report.parentUsername) === normalizeUsername(user.username))
-    : tenantRecords(db.reportReviews, user);
-  res.json(reports);
+    : learnerRecordsVisibleTo(db.reportReviews, user);
+  res.json(reports.map(reportReviewView));
 });
 app.post('/api/report-reviews', (req, res) => {
-  const { studentName, reportTitle, period, teacherUsername, parentUsername, signatureData, signingPin } = req.body;
+  const { studentName, reportTitle, period, parentUsername, signatureData, signingPin } = req.body;
   const teacher = getSessionAccount(req);
   const parent = findAccountByUsername(parentUsername);
   if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
   if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
-  if (!studentName || !reportTitle || !period || !parentUsername || !signatureData) return res.status(400).json({ message: 'Complete the report details and teacher signature.' });
-  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: signatureData, teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
+  if (!studentName || !reportTitle || !period || !parentUsername) return res.status(400).json({ message: 'Complete the report details and teacher signature.' });
+  const signatureValidation = validateSignatureData(signatureData);
+  if (signatureValidation.error) return res.status(400).json({ message: signatureValidation.error });
+  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: encryptField(signatureValidation.signature), teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
   db.reportReviews.unshift(report);
-  res.status(201).json({ success: true, report });
+  res.status(201).json({ success: true, report: reportReviewView(report) });
 });
 app.post('/api/report-reviews/:id/sign', (req, res) => {
   const { signatureData, signingPin } = req.body;
@@ -2474,11 +2579,12 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
   const report = db.reportReviews.find(entry => entry.id === req.params.id && recordInSchool(entry, user));
   if (!report || !user || user.role !== 'parent' || normalizeUsername(report.parentUsername) !== normalizeUsername(user.username)) return res.status(403).json({ message: 'Only the linked parent account can sign this report.' });
   if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
-  if (!signatureData) return res.status(400).json({ message: 'Add your signature before confirming.' });
-  report.parentSignature = signatureData;
+  const signatureValidation = validateSignatureData(signatureData);
+  if (signatureValidation.error) return res.status(400).json({ message: signatureValidation.error });
+  report.parentSignature = encryptField(signatureValidation.signature);
   report.parentSignedAt = new Date().toISOString();
   report.status = 'Complete - teacher and parent signed';
-  res.json({ success: true, report });
+  res.json({ success: true, report: reportReviewView(report) });
 });
 
 // School-controlled learner access codes. Codes are encrypted at rest and are
@@ -2567,11 +2673,9 @@ app.post('/api/learner-access-codes', (req, res) => {
   if (!learner) return res.status(404).json({ message: 'Learner record not found.' });
   const learnerKey = learnerRecordKey(learner);
   if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor))) return res.status(409).json({ message: 'This learner already has an active code. Replace it instead.' });
-  let accessCode = normaliseAccessCode(req.body?.manualCode);
-  if (accessCode && !/^LF-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(accessCode)) return res.status(400).json({ message: 'Use the format LF-AB12-CD34, or leave the field blank to generate a code.' });
-  const codeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && recordInSchool(entry, actor) && decryptField(entry.codeEncrypted) === candidate);
-  if (accessCode && codeInUse(accessCode)) return res.status(409).json({ message: 'That access code is already in use. Choose another code or generate one.' });
-  while (!accessCode || codeInUse(accessCode)) accessCode = generateLearnerAccessCode();
+  const codeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === candidate);
+  let accessCode;
+  do { accessCode = generateLearnerAccessCode(); } while (codeInUse(accessCode));
   const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username });
   db.learnerAccessCodes.unshift(record);
   res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) });
@@ -2586,7 +2690,7 @@ app.post('/api/learner-access-codes/:id/replace', (req, res) => {
   previous.replacedAt = new Date().toISOString();
   previous.replacedBy = actor.username;
   let accessCode;
-  do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && recordInSchool(entry, actor) && decryptField(entry.codeEncrypted) === accessCode));
+  do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === accessCode));
   db.learnerAccessCodes.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id }));
   const learner = db.students.find(entry => learnerRecordKey(entry) === previous.learnerKey && recordInSchool(entry, actor));
   res.json({ success: true, learner: learner ? learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) : null });
@@ -2631,19 +2735,31 @@ app.get('/api/students/search', (req, res) => {
   if (!requester) return res.status(401).json({ message: 'Sign in to search learner records.' });
   let results = tenantRecords(db.students, requester);
   if (requester.role === 'parent') results = results.filter(student => isParentLinkedToLearner(requester, student));
+  if (requester.role === 'teacher') {
+    const assignedClasses = new Set(normaliseAssignedClasses(requester.assignedClasses));
+    results = results.filter(student => assignedClasses.has(normalizeComparableText(student.className)));
+  }
   if (className) {
-    results = results.filter(s => s.className.toLowerCase().includes(className.toLowerCase()));
+    results = results.filter(s => String(s.className || '').toLowerCase().includes(className.toLowerCase()));
   }
   if (childName) {
-    results = results.filter(s => s.studentName.toLowerCase().includes(childName.toLowerCase()));
+    results = results.filter(s => String(s.studentName || '').toLowerCase().includes(childName.toLowerCase()));
   }
-  res.json(results.map(student => ({ ...student, medicalNotes: decryptField(student.medicalNotes), emergencyContact: decryptField(student.emergencyContact), authorisedPickups: decryptField(student.authorisedPickups) })));
+  if (requester.role === 'district') {
+    return res.json(results.map(student => ({
+      id: student.id,
+      studentName: student.studentName,
+      className: student.className,
+      schoolName: student.schoolName
+    })));
+  }
+  res.json(results.map(student => ({ ...student, medicalNotes: decryptFieldOrLegacy(student.medicalNotes), emergencyContact: decryptFieldOrLegacy(student.emergencyContact), authorisedPickups: decryptFieldOrLegacy(student.authorisedPickups) })));
 });
 
 app.get('/api/household', (req, res) => {
   const parent = getSessionAccount(req);
   if (!parent || parent.role !== 'parent') return res.status(403).json({ message: 'Only parent accounts can view linked learner records.' });
-  res.json(tenantRecords(db.students, parent).filter(student => isParentLinkedToLearner(parent, student)).map(student => ({ ...student, medicalNotes: decryptField(student.medicalNotes), emergencyContact: decryptField(student.emergencyContact), authorisedPickups: decryptField(student.authorisedPickups) })));
+  res.json(tenantRecords(db.students, parent).filter(student => isParentLinkedToLearner(parent, student)).map(student => ({ ...student, medicalNotes: decryptFieldOrLegacy(student.medicalNotes), emergencyContact: decryptFieldOrLegacy(student.emergencyContact), authorisedPickups: decryptFieldOrLegacy(student.authorisedPickups) })));
 });
 
 // Secure bulk learner import. The browser previews spreadsheet rows first; this
@@ -2678,7 +2794,8 @@ app.post('/api/students/import', (req, res) => {
     }
     seenInFile.add(key);
     knownRecords.add(key);
-    db.students.push(tagSchoolRecord(actor, {
+    const studentRecord = tagSchoolRecord(actor, {
+      id: crypto.randomUUID(),
       studentName,
       className,
       parentName,
@@ -2688,6 +2805,18 @@ app.post('/api/students/import', (req, res) => {
       authorisedPickups: encryptField(String(row?.authorisedPickups || '').trim()),
       importedAt: new Date().toISOString(),
       importedBy: actor.username
+    });
+    db.students.push(studentRecord);
+    let accessCode;
+    do { accessCode = generateLearnerAccessCode(); } while ((db.learnerAccessCodes || []).some(entry => entry.status === 'active' && decryptField(entry.codeEncrypted) === accessCode));
+    db.learnerAccessCodes.unshift(tagSchoolRecord(actor, {
+      id: crypto.randomUUID(),
+      learnerKey: learnerRecordKey(studentRecord),
+      codeEncrypted: encryptField(accessCode),
+      status: 'active',
+      issuedAt: new Date().toISOString(),
+      issuedBy: actor.username,
+      generatedAutomatically: true
     }));
     imported += 1;
   });
@@ -2857,21 +2986,23 @@ app.get('/auth/microsoft/callback', async (req, res) => {
 });
 
 // Wildcard Catch-All (Serves Frontend)
+app.get(/(.*)/, (req, res) => {
+  if (path.extname(req.path)) return res.status(404).end();
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 app.use((error, req, res, _next) => {
   const report = recordSystemError(error, req);
   console.error(`[${report.requestId || report.id}] ${report.method} ${report.route}: ${report.message}`);
-  if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
+  if (!replicaMode && (!req.method || req.method === 'GET')) {
+    void saveDatabaseState().catch(saveError => console.error('Unable to persist system error report:', saveError.message));
+  }
   scheduleReplicaSnapshot();
   res.status(Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500).json({
     message: 'An unexpected server error occurred. The administrator report has been created.',
     requestId: report.requestId || report.id
   });
-});
-
-app.get(/(.*)/, (req, res) => {
-  if (path.extname(req.path)) return res.status(404).end();
-  res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Start Server
