@@ -209,6 +209,24 @@ const ensureLearnerAccessCode = (actor, learner) => {
   db.learnerAccessCodes.unshift(record);
   return record;
 };
+const ensureAllLearnersHaveAccessCodes = () => {
+  (db.students || []).forEach(learner => {
+    const learnerKey = learnerRecordKey(learner);
+    if (!learner.schoolId || db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active' && entry.schoolId === learner.schoolId)) return;
+    const accessCode = createUniqueLearnerAccessCode();
+    db.learnerAccessCodes.unshift({
+      id: crypto.randomUUID(),
+      learnerKey,
+      codeEncrypted: encryptField(accessCode),
+      status: 'active',
+      issuedAt: new Date().toISOString(),
+      issuedBy: 'system',
+      source: 'automatic-legacy-migration',
+      schoolId: learner.schoolId,
+      schoolName: learner.schoolName || ''
+    });
+  });
+};
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
 const activeLoginAttempt = (key) => {
   const entry = loginAttempts.get(key);
@@ -778,6 +796,8 @@ async function initialisePersistence() {
   if (!restoredFromDatabase) loadReplicaSnapshot();
   ensureBootstrapAdministrator();
   migrateSchoolTenancy();
+  migrateSensitiveStoredFields();
+  ensureAllLearnersHaveAccessCodes();
   syncCurrentReleaseNotes();
   await saveDatabaseState();
   writeReplicaSnapshot();
@@ -1622,7 +1642,7 @@ app.post('/api/accounts', (req, res) => {
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
+  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'accounts', 'admin'];
   if (!username || !pin || !name || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'Administrators can create accounts only for their own school.' });
   if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
@@ -1638,7 +1658,7 @@ app.put('/api/accounts/:username', (req, res) => {
   const account = db.users.find(entry => entry.username === req.params.username);
   if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
-  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
+  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'accounts', 'admin'];
   if (username && username !== account.username && db.users.some(entry => entry.username.toLowerCase() === String(username).toLowerCase())) return res.status(409).json({ message: 'That username is already in use.' });
   if (username) account.username = String(username).trim();
   if (pin) account.pinHash = hashPin(pin);
@@ -2598,7 +2618,7 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
 // available only to the school roles that issue or print the physical handout.
 const findLearnerAccessCodeActor = (req) => {
   const actor = getSessionAccount(req);
-  return actor && ['admin', 'principal'].includes(actor.role) ? actor : null;
+  return actor && ['admin', 'principal', 'accounts'].includes(actor.role) ? actor : null;
 };
 
 const learnerAccessCodeView = (learner, actor, { includeCode = false, includeHistory = false } = {}) => {
@@ -2634,9 +2654,26 @@ const learnerAccessCodeView = (learner, actor, { includeCode = false, includeHis
 
 app.get('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
-  if (!actor) return res.status(403).json({ message: 'Only an administrator may manage codes, and a principal may print them.' });
+  if (!actor) return res.status(403).json({ message: 'Only administrators, principals, and accounts staff may view learner codes.' });
   const isAdmin = actor.role === 'admin';
-  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: isAdmin, includeHistory: isAdmin })));
+  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: isAdmin })));
+});
+
+app.get('/api/learner-access-codes/printable-list', (req, res) => {
+  const actor = findLearnerAccessCodeActor(req);
+  if (!actor) return res.status(403).json({ message: 'Only administrators, principals, and accounts staff may print the learner-code register.' });
+  const learners = tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: false }));
+  res.json({
+    schoolName: actor.schoolName,
+    generatedAt: new Date().toISOString(),
+    learners: learners.filter(entry => entry.accessCode).map(entry => ({
+      learnerName: entry.learnerName,
+      className: entry.className,
+      parentName: entry.parentName,
+      accessCode: entry.accessCode,
+      issuedAt: entry.issuedAt
+    }))
+  });
 });
 
 // This is deliberately a separate, credential-free view. It lets an
@@ -2675,18 +2712,12 @@ app.get('/api/learner-access-codes/:learnerKey/printable', (req, res) => {
 
 app.post('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
-  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can issue learner access codes.' });
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator can repair a missing learner access code.' });
   const learner = db.students.find(entry => learnerRecordKey(entry) === String(req.body?.learnerKey || '') && recordInSchool(entry, actor));
   if (!learner) return res.status(404).json({ message: 'Learner record not found.' });
   const learnerKey = learnerRecordKey(learner);
-  if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor))) return res.status(409).json({ message: 'This learner already has an active code. Replace it instead.' });
-  let accessCode = normaliseAccessCode(req.body?.manualCode);
-  if (accessCode && !/^LF-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(accessCode)) return res.status(400).json({ message: 'Use the format LF-AB12-CD34, or leave the field blank to generate a code.' });
-  const codeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && recordInSchool(entry, actor) && decryptField(entry.codeEncrypted) === candidate);
-  if (accessCode && codeInUse(accessCode)) return res.status(409).json({ message: 'That access code is already in use. Choose another code or generate one.' });
-  while (!accessCode || codeInUse(accessCode)) accessCode = generateLearnerAccessCode();
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username });
-  db.learnerAccessCodes.unshift(record);
+  if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor))) return res.status(409).json({ message: 'This learner already has an active code. Regenerate it instead.' });
+  ensureLearnerAccessCode(actor, learner);
   res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) });
 });
 
@@ -2698,9 +2729,8 @@ app.post('/api/learner-access-codes/:id/replace', (req, res) => {
   previous.status = 'replaced';
   previous.replacedAt = new Date().toISOString();
   previous.replacedBy = actor.username;
-  let accessCode;
-  do { accessCode = generateLearnerAccessCode(); } while (db.learnerAccessCodes.some(entry => entry.status === 'active' && recordInSchool(entry, actor) && decryptField(entry.codeEncrypted) === accessCode));
-  db.learnerAccessCodes.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id }));
+  const accessCode = createUniqueLearnerAccessCode();
+  db.learnerAccessCodes.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey: previous.learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, replaces: previous.id, source: 'administrator-regeneration' }));
   const learner = db.students.find(entry => learnerRecordKey(entry) === previous.learnerKey && recordInSchool(entry, actor));
   res.json({ success: true, learner: learner ? learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) : null });
 });
