@@ -2808,6 +2808,10 @@ function switchChatMode(mode) {
   }
 }
 
+function safeChatColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
+}
+
 async function loadChatGroups() {
   try {
     const res = await fetch('/api/chat/groups');
@@ -2816,7 +2820,7 @@ async function loadChatGroups() {
     if (!select) return;
 
     select.innerHTML = groups.length
-      ? groups.map(g => `<option value="${g.id}">${g.groupName}</option>`).join('')
+      ? groups.map(g => `<option value="${escapeWorkspaceText(g.id)}">${escapeWorkspaceText(g.groupName)}</option>`).join('')
       : '<option value="" selected>No group channels yet</option>';
     select.disabled = !groups.length;
     
@@ -2869,7 +2873,7 @@ async function loadGroupChatMessages() {
             ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${groupId}','${m.id}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${m.textColor || 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
+              <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
               <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
             </div>`;
         }).join('')
@@ -2943,7 +2947,7 @@ async function loadDirectChatUsers() {
     const filtered = users.filter(u => u.username !== currentUser.username);
     const prompt = currentUser.role === 'parent' ? 'Select your child\'s teacher or principal...' : 'Select approved school contact...';
     select.innerHTML = `<option value="">${prompt}</option>` +
-      filtered.map(u => `<option value="${u.username}">${u.name || u.username} (${u.role.toUpperCase()})</option>`).join('');
+      filtered.map(u => `<option value="${escapeWorkspaceText(u.username)}">${escapeWorkspaceText(u.name || u.username)} (${escapeWorkspaceText(String(u.role || '').toUpperCase())})</option>`).join('');
   } catch (e) {
     logAppError('ERR_DIRECT_USERS', 'Failed to retrieve direct messaging contacts.');
   }
@@ -2969,7 +2973,7 @@ async function loadDirectChatMessages() {
             ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${m.id}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${m.textColor || 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
+              <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
               <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
             </div>`;
         }).join('')
