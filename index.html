@@ -7,14 +7,14 @@
   <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <title>Little Feet | ECD Portal</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
   <!-- Leaflet Maps CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
   <style>
     :root {
       --primary-color: #0d9488;
@@ -1990,6 +1990,10 @@
           <div class="card-header-bar">
             <h2>Broadcast Log & Read Receipts</h2>
           </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+            <button type="button" class="action-btn btn-blue" onclick="enableAlertLocationFiltering()">📍 Use my location for area alerts</button>
+            <span id="alertLocationFilterStatus" class="meta">Location filtering is off until you choose to enable it.</span>
+          </div>
           <div id="broadcastList">Loading active broadcasts...</div>
         </div>
       </div>
@@ -2102,9 +2106,9 @@
         <div class="card"><div class="card-header-bar"><h2>📝 Report Review &amp; Sign-off</h2><span class="badge-tag info">SIGNED RECORD</span></div>
           <p style="color:var(--text-muted);margin-bottom:14px;">A report becomes complete only after the teacher and linked parent have both signed it. Each signer uses their own PIN to prevent a child or unauthorised person signing.</p>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Set or change signing PIN</h3><p>Choose a separate four-digit-or-longer PIN for report signatures. Never share it with a child.</p><form id="signingPinForm"><input id="reportSigningPin" type="password" autocomplete="new-password" minlength="4" placeholder="New signing PIN" required><button class="submit-btn">Save signing PIN</button></form></div>
-            <div id="teacherReportPublisher" class="workspace-card role-teacher role-admin"><h3>Publish a report for review</h3><form id="reportPublishForm"><input id="reportStudent" placeholder="Learner name" required><input id="reportTitle" placeholder="Report or test title" required><input id="reportPeriod" placeholder="Month and year, e.g. August 2026" required><input id="reportParentUsername" placeholder="Linked parent account email" required><input id="reportTeacherPin" type="password" autocomplete="current-password" placeholder="Your signing PIN" required><label>Teacher signature</label><canvas id="teacherSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('teacherSignaturePad')">Clear signature</button><button class="submit-btn">Publish for parent signature</button></form></div>
-            <div id="parentReportSigner" class="workspace-card"><h3>Parent signature</h3><p>Select an awaiting report below, sign with your finger or mouse, and enter your signing PIN.</p><form id="parentReportPinForm" onsubmit="return false;"><input id="parentReportPin" type="password" autocomplete="current-password" placeholder="Your signing PIN"></form><label>Parent signature</label><canvas id="parentSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('parentSignaturePad')">Clear signature</button></div>
+            <div class="workspace-card"><h3>Set or change signing PIN</h3><p>Choose a separate four-digit-or-longer PIN for report signatures. Never share it with a child.</p><form id="signingPinForm"><input id="reportSigningUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="reportSigningPin" type="password" autocomplete="new-password" minlength="4" placeholder="New signing PIN" required><button class="submit-btn">Save signing PIN</button></form></div>
+            <div id="teacherReportPublisher" class="workspace-card role-teacher role-admin"><h3>Publish a report for review</h3><form id="reportPublishForm"><input id="reportTeacherUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="reportStudent" placeholder="Learner name" required><input id="reportTitle" placeholder="Report or test title" required><input id="reportPeriod" placeholder="Month and year, e.g. August 2026" required><input id="reportParentUsername" autocomplete="off" placeholder="Linked parent account email" required><input id="reportTeacherPin" type="password" autocomplete="current-password" placeholder="Your signing PIN" required><label>Teacher signature</label><canvas id="teacherSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('teacherSignaturePad')">Clear signature</button><button class="submit-btn">Publish for parent signature</button></form></div>
+            <div id="parentReportSigner" class="workspace-card"><h3>Parent signature</h3><p>Select an awaiting report below, sign with your finger or mouse, and enter your signing PIN.</p><form id="parentReportPinForm" onsubmit="return false;"><input id="parentReportUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="parentReportPin" type="password" autocomplete="current-password" placeholder="Your signing PIN"></form><label>Parent signature</label><canvas id="parentSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('parentSignaturePad')">Clear signature</button></div>
           </div><div id="reportReviewList" class="record-list"></div>
         </div>
       </div>
@@ -2139,7 +2143,7 @@
           <form id="accountForm" class="workspace-grid">
             <input type="hidden" id="accountOriginalUsername">
             <div><label for="accountName">Full name *</label><input id="accountName" required placeholder="e.g. Amina Jacobs"></div>
-            <div><label for="accountUsername">Username / email *</label><input id="accountUsername" required placeholder="e.g. amina@school.com"></div>
+            <div><label for="accountUsername">Username / email *</label><input id="accountUsername" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="e.g. amina@school.com"></div>
             <div><label for="accountPin">Password / PIN <span id="accountPinHint">*</span></label><input id="accountPin" type="password" autocomplete="new-password" placeholder="Required for a new account"></div>
             <div><label for="accountRole">Role *</label><select id="accountRole" required><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option></select></div>
             <div><label for="accountSchoolName">Linked school name *</label><input id="accountSchoolName" required placeholder="e.g. Little Feet ECD Portal"></div>
