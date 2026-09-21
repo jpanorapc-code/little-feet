@@ -342,6 +342,7 @@ function showOAuthSignInMessage(error) {
     'microsoft-not-configured': ['Microsoft sign-in is not ready yet', 'An administrator still needs to add the Microsoft connection details in Render.'],
     'account-not-linked': ['Account not linked', 'This email is not linked to an approved Little Feet account. Please use your approved school, teacher, parent, principal, or district email.'],
     'account-pending': ['Account approval pending', 'This account is linked, but the school has not approved it yet. Please contact your school administrator.'],
+    'session-failed': ['Secure session failed', 'Little Feet could not establish a secure sign-in session. Please try again.'],
     'yahoo-sign-in-failed': ['Yahoo sign-in could not finish', 'Please try again. If this continues, an administrator should check the Yahoo app connection.'],
     'microsoft-sign-in-failed': ['Microsoft sign-in could not finish', 'Please try again. If this continues, an administrator should check the Microsoft app connection.']
   };
@@ -2520,13 +2521,13 @@ async function loadTickets(checkForNew = false) {
                 <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket(decodeURIComponent('${encodeWorkspaceActionValue(t.id)}'))" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
-              <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
+              <button type="button" onclick="editTicketModal(decodeURIComponent('${encodeWorkspaceActionValue(t.id)}'), '${t.status === 'Completed' ? 'Completed' : 'Open'}', '${encodeWorkspaceActionValue(t.feedback || '')}', '${encodeWorkspaceActionValue(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
             </div>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
@@ -2545,10 +2546,10 @@ async function loadTickets(checkForNew = false) {
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
             <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
-            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket(decodeURIComponent('${encodeWorkspaceActionValue(t.id)}'))" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
-          <p style="font-size:0.85rem; margin-top:4px;">${t.message}</p>
-          ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${t.feedback}</p>` : ''}
+          <p style="font-size:0.85rem; margin-top:4px;">${escapeWorkspaceText(t.message)}</p>
+          ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${escapeWorkspaceText(t.feedback)}</p>` : ''}
         </div>
       `).join('');
     }
@@ -2597,7 +2598,7 @@ function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
     <form id="editTicketForm">
       <div>
         <label>Admin Feedback & Notes</label>
-        <textarea id="editFeedback" rows="3" required>${currentFeedback || ''}</textarea>
+        <textarea id="editFeedback" rows="3" required>${escapeWorkspaceText(currentFeedback || '')}</textarea>
       </div>
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
@@ -2794,27 +2795,33 @@ async function scanVisitorPassCode() {
 
 // Chat System Operations
 function switchChatMode(mode) {
-  if (currentUser?.role === 'parent' && mode === 'group') mode = 'direct';
+  const parentDirectOnly = currentUser?.role === 'parent';
+  if (parentDirectOnly && mode === 'group') mode = 'direct';
   const groupSec = document.getElementById('groupChatSection');
   const directSec = document.getElementById('directChatSection');
   const btnGroup = document.getElementById('btnGroupChatMode');
   const btnDirect = document.getElementById('btnDirectChatMode');
 
+  btnGroup?.classList.toggle('hidden', parentDirectOnly);
   if (mode === 'group') {
-    groupSec.classList.remove('hidden');
-    directSec.classList.add('hidden');
-    btnGroup.style.opacity = '1';
-    btnDirect.style.opacity = '0.65';
+    groupSec?.classList.remove('hidden');
+    directSec?.classList.add('hidden');
+    if (btnGroup) btnGroup.style.opacity = '1';
+    if (btnDirect) btnDirect.style.opacity = '0.65';
   } else {
-    groupSec.classList.add('hidden');
-    directSec.classList.remove('hidden');
-    btnGroup.style.opacity = '0.65';
-    btnDirect.style.opacity = '1';
+    groupSec?.classList.add('hidden');
+    directSec?.classList.remove('hidden');
+    if (btnGroup) btnGroup.style.opacity = '0.65';
+    if (btnDirect) btnDirect.style.opacity = '1';
     loadDirectChatUsers();
   }
 }
 
 async function loadChatGroups() {
+  if (currentUser?.role === 'parent') {
+    switchChatMode('direct');
+    return;
+  }
   try {
     const res = await fetch('/api/chat/groups');
     const groups = await res.json();
@@ -2840,6 +2847,10 @@ async function loadChatGroups() {
 }
 
 async function loadGroupChatMessages() {
+  if (currentUser?.role === 'parent') {
+    switchChatMode('direct');
+    return;
+  }
   const select = document.getElementById('chatGroupSelect');
   if (!select) return;
   const groupId = select.value;
