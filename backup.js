@@ -862,8 +862,8 @@ function logAppError(code, reason) {
 
   if (errorBox && errorList) {
     errorBox.style.display = 'block';
-    errorList.innerHTML = errorLog.map(err => 
-      `<li><strong>[${err.code}]</strong> ${err.reason} <em>(${err.timestamp})</em></li>`
+    errorList.innerHTML = errorLog.map(err =>
+      `<li><strong>[${escapeWorkspaceText(err.code)}]</strong> ${escapeWorkspaceText(err.reason)} <em>(${escapeWorkspaceText(err.timestamp)})</em></li>`
     ).join('');
   }
 }
@@ -1880,18 +1880,22 @@ async function loadPosts() {
     const res = await fetch('/api/posts');
     const posts = await res.json();
     document.getElementById('postList').innerHTML = posts.length
-      ? posts.map(p => `
+      ? posts.map(p => {
+          const mediaUrl = safeWorkspaceImageUrl(p.mediaUrl);
+          const actionId = encodeWorkspaceActionValue(p.id);
+          return `
           <div class="item-row" style="flex-direction: column; align-items: flex-start;">
             <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
               <div>
-                <span class="badge-tag info">Audience: ${p.audience || 'All'}</span>
-                <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${p.caption}</p>
+                <span class="badge-tag info">Audience: ${escapeWorkspaceText(p.audience || 'All')}</span>
+                <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${escapeWorkspaceText(p.caption)}</p>
               </div>
-              <button type="button" onclick="deletePost('${p.id}')" class="action-btn btn-red">🗑️ Delete</button>
+              <button type="button" onclick="deletePost(decodeURIComponent('${actionId}'))" class="action-btn btn-red">🗑️ Delete</button>
             </div>
-            ${p.mediaUrl ? `<img src="${p.mediaUrl}" class="post-item" onclick="openModal('Media File Preview', '<img src=\\'${p.mediaUrl}\\' style=\\'max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;\\'>')">` : ''}
-            <div class="meta"><span>Posted by Staff (${p.createdAt || 'Recent'})</span></div>
-          </div>`).join('')
+            ${mediaUrl ? `<img src="${escapeWorkspaceText(mediaUrl)}" class="post-item" alt="School update attachment" onclick="viewWorkspaceImage(this.src, 'Media File Preview')">` : ''}
+            <div class="meta"><span>Posted by Staff (${escapeWorkspaceText(p.createdAt || 'Recent')})</span></div>
+          </div>`;
+        }).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No updates published yet.</p>';
   } catch (err) {
     logAppError('ERR_POST_001', 'Failed to retrieve Activity Feed posts.');
@@ -1938,11 +1942,11 @@ async function loadSchedules() {
       ? list.map(s => `
           <div class="item-row">
             <div>
-              <span class="badge-tag">${s.dayOfWeek}</span>
-              <strong>${s.studentName}</strong> - <span style="color:#0d9488; font-weight:600;">${s.timeSlot}</span>
-              <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${s.activity}</p>
+              <span class="badge-tag">${escapeWorkspaceText(s.dayOfWeek)}</span>
+              <strong>${escapeWorkspaceText(s.studentName)}</strong> - <span style="color:#0d9488; font-weight:600;">${escapeWorkspaceText(s.timeSlot)}</span>
+              <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${escapeWorkspaceText(s.activity)}</p>
             </div>
-            <button type="button" onclick="deleteSchedule('${s.id}')" class="action-btn btn-red">🗑️ Delete</button>
+            <button type="button" onclick="deleteSchedule(decodeURIComponent('${encodeWorkspaceActionValue(s.id)}'))" class="action-btn btn-red">🗑️ Delete</button>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active schedule records found.</p>';
   } catch (err) {
@@ -2046,8 +2050,8 @@ async function loadWorksheets() {
           <div class="item-row" style="flex-direction: column; align-items: flex-start;">
             <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
               <div>
-                <strong>${w.studentName}</strong> — ${w.title} 
-                <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${w.grade}%</span>
+                <strong>${escapeWorkspaceText(w.studentName)}</strong> — ${escapeWorkspaceText(w.title)}
+                <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${escapeWorkspaceText(w.grade)}%</span>
               </div>
               <div>
                 ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${w.id}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
@@ -2056,8 +2060,8 @@ async function loadWorksheets() {
             </div>
             
             <div class="meta" style="margin-top:8px;">
-              <span>Submitted By: <strong style="color:var(--primary-color);">${w.submittedBy || 'Educator'}</strong></span>
-              <span>• Upload Date: ${w.uploadedAt || 'Recently'}</span>
+              <span>Submitted By: <strong style="color:var(--primary-color);">${escapeWorkspaceText(w.submittedBy || 'Educator')}</strong></span>
+              <span>• Upload Date: ${escapeWorkspaceText(w.uploadedAt || 'Recently')}</span>
             </div>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No graded worksheets uploaded.</p>';
@@ -2071,11 +2075,12 @@ async function viewWorksheetFile(id) {
     const res = await fetch('/api/worksheets');
     const list = await res.json();
     const item = list.find(w => w.id === id);
-    if (item && item.photoUrl) {
+    const safePhotoUrl = item ? safeWorkspaceImageUrl(item.photoUrl) : '';
+    if (item && safePhotoUrl) {
       openModal(`Submission File View: ${item.studentName}`, `
         <div style="text-align:center;">
-          <p style="font-size:0.85rem; margin-bottom:10px;">Submitted by: <strong>${item.submittedBy}</strong> | Title: ${item.title}</p>
-          <img src="${item.photoUrl}" style="max-width:100%; max-height:75vh; border-radius:6px; border:1px solid var(--border-color); object-fit:contain;">
+          <p style="font-size:0.85rem; margin-bottom:10px;">Submitted by: <strong>${escapeWorkspaceText(item.submittedBy || 'Educator')}</strong> | Title: ${escapeWorkspaceText(item.title)}</p>
+          <img src="${escapeWorkspaceText(safePhotoUrl)}" alt="Worksheet submission" style="max-width:100%; max-height:75vh; border-radius:6px; border:1px solid var(--border-color); object-fit:contain;">
         </div>
       `);
     } else {
@@ -2228,12 +2233,12 @@ async function loadBadges() {
       ? list.map(b => `
           <div class="item-row" style="justify-content: space-between; align-items: flex-start;">
             <div>
-              <span class="badge-tag" style="background:#10b981;">${b.category}</span>
-              <strong style="font-size:1.05rem; color:#fff;">${b.title || b.awardName}</strong>
-              <span style="color:#a7f3d0;">— ${b.studentName}</span>
-              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${b.note}"</p>
+              <span class="badge-tag" style="background:#10b981;">${escapeWorkspaceText(b.category)}</span>
+              <strong style="font-size:1.05rem; color:#fff;">${escapeWorkspaceText(b.title || b.awardName)}</strong>
+              <span style="color:#a7f3d0;">— ${escapeWorkspaceText(b.studentName)}</span>
+              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${escapeWorkspaceText(b.note)}"</p>
             </div>
-            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${b.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${canManageBadges() ? `<button type="button" onclick="deleteBadge(decodeURIComponent('${encodeWorkspaceActionValue(b.id)}'))" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No milestone badges awarded yet.</p>';
   } catch (err) {
@@ -2342,13 +2347,13 @@ async function loadAttendance() {
       ? list.map(a => `
           <div class="item-row">
             <div>
-              <strong>${a.studentName}</strong> <span class="meta" style="display:inline;">(${a.status} at ${a.timestamp || 'Today'})</span>
+              <strong>${escapeWorkspaceText(a.studentName)}</strong> <span class="meta" style="display:inline;">(${escapeWorkspaceText(a.status)} at ${escapeWorkspaceText(a.timestamp || 'Today')})</span>
             </div>
             <div>
-              <button type="button" onclick="toggleAttendance('${a.id}', '${a.status === 'Checked In' ? 'Checked Out' : 'Checked In'}')" class="action-btn ${a.status === 'Checked In' ? 'btn-red' : 'btn-green'}">
+              <button type="button" onclick="toggleAttendance(decodeURIComponent('${encodeWorkspaceActionValue(a.id)}'), '${a.status === 'Checked In' ? 'Checked Out' : 'Checked In'}')" class="action-btn ${a.status === 'Checked In' ? 'btn-red' : 'btn-green'}">
                 ${a.status === 'Checked In' ? 'Mark Out' : 'Mark In'}
               </button>
-              <button type="button" onclick="removeAttendance('${a.id}')" class="action-btn btn-red" style="padding: 4px 8px; font-size: 0.75rem;">🗑️ Delete</button>
+              <button type="button" onclick="removeAttendance(decodeURIComponent('${encodeWorkspaceActionValue(a.id)}'))" class="action-btn btn-red" style="padding: 4px 8px; font-size: 0.75rem;">🗑️ Delete</button>
             </div>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No students checked in today.</p>';
@@ -2510,16 +2515,16 @@ async function loadTickets(checkForNew = false) {
           <div class="item-row" style="flex-direction: column; align-items: flex-start;">
             <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
               <div>
-                <span class="badge-tag">${t.department}</span> 
-                <span class="badge-tag urgent">${t.priority} Priority</span>
-                <strong>${t.subject}</strong>
+                <span class="badge-tag">${escapeWorkspaceText(t.department)}</span>
+                <span class="badge-tag urgent">${escapeWorkspaceText(t.priority)} Priority</span>
+                <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
               ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
-            <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${t.message}</p>
+            <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
-            ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${t.updatedBy}:</strong> ${t.feedback}</div>` : ''}
+            ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
               <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
             </div>` : ''}
@@ -2535,11 +2540,11 @@ async function loadTickets(checkForNew = false) {
 
     let completedHtml = '';
     for (const [month, list] of Object.entries(grouped)) {
-      completedHtml += `<h3 style="font-size:0.95rem; color:var(--primary-color); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📅 Submitted Category: ${month}</h3>`;
+      completedHtml += `<h3 style="font-size:0.95rem; color:var(--primary-color); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📅 Submitted Category: ${escapeWorkspaceText(month)}</h3>`;
       completedHtml += list.map(t => `
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-            <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${t.subject}</strong></div>
+            <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
             ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
           <p style="font-size:0.85rem; margin-top:4px;">${t.message}</p>
@@ -3976,8 +3981,8 @@ async function loadStoreItems() {
     document.getElementById('storeWelcome').textContent = `${store.schoolName} store`;
     window.schoolStoreProducts = store.products || [];
     const productCards = store.products?.length ? store.products.map(product => `<article class="store-item"><span class="badge-tag info">IN STOCK: ${product.stockQuantity}</span><h3 style="margin:10px 0 6px;">${escapeWorkspaceText(product.name)}</h3><strong style="font-size:1.2rem;color:#2dd4bf;">${formatSubscriptionMoney(product.price)}</strong><p style="margin:8px 0 12px;color:var(--text-muted);font-size:.82rem;">Payment reference and confirmed total are shown before you continue to payment.</p>${currentUser.role === 'parent' ? `<button type="button" class="submit-btn" onclick="openStoreCheckout('${product.id}')" ${product.stockQuantity < 1 ? 'disabled' : ''}>${product.stockQuantity < 1 ? 'Out of stock' : 'Buy item'}</button>` : ''}${store.canManage ? `<button type="button" class="action-btn btn-red" style="margin-top:8px;" onclick="removeStoreProduct('${product.id}')">Remove item</button>` : ''}</article>`).join('') : `<article class="store-item" style="grid-column:1/-1;text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🛍️</div><h3 style="margin-bottom:8px;">No store items yet</h3><p style="color:var(--text-muted);margin:0;">An administrator can add uniforms, stationery, activity packs or other school items here.</p></article>`;
-    const safeStoreUrl = typeof store.webStoreUrl === 'string' && /^https:\/\//i.test(store.webStoreUrl) ? store.webStoreUrl : '';
-    const externalStore = safeStoreUrl ? `<article class="store-item" style="grid-column:1/-1;"><span class="badge-tag info">OFFICIAL EXTERNAL SCHOOL STORE</span><h3 style="margin:10px 0 5px;">${escapeWorkspaceText(store.schoolName)} web store</h3><p style="margin:0 0 12px;color:var(--text-muted);">Browse items managed by the school’s linked web-store provider.</p><a class="action-btn btn-blue" style="display:inline-block;text-decoration:none;" href="${safeStoreUrl}" target="_blank" rel="noopener noreferrer">Visit official web store</a></article>` : '';
+    const safeStoreUrl = safeWorkspaceExternalUrl(store.webStoreUrl);
+    const externalStore = safeStoreUrl ? `<article class="store-item" style="grid-column:1/-1;"><span class="badge-tag info">OFFICIAL EXTERNAL SCHOOL STORE</span><h3 style="margin:10px 0 5px;">${escapeWorkspaceText(store.schoolName)} web store</h3><p style="margin:0 0 12px;color:var(--text-muted);">Browse items managed by the school’s linked web-store provider.</p><a class="action-btn btn-blue" style="display:inline-block;text-decoration:none;" href="${escapeWorkspaceText(safeStoreUrl)}" target="_blank" rel="noopener noreferrer">Visit official web store</a></article>` : '';
     const manager = store.canManage ? `<article class="store-item" style="grid-column:1/-1;"><h3 style="margin-bottom:7px;">Add school-store item</h3><form onsubmit="addStoreProduct(event)" style="display:grid;grid-template-columns:minmax(180px,1fr) 130px 130px auto;gap:8px;align-items:end;"><label>Item name<input name="name" required placeholder="e.g. School jersey"></label><label>Price (R)<input name="price" type="number" min="0.01" step="0.01" required></label><label>Stock quantity<input name="stockQuantity" type="number" min="0" step="1" required></label><button class="submit-btn">Add item</button></form></article>` : '';
     box.innerHTML = productCards + externalStore + manager;
   } catch { box.textContent = 'Unable to load school store items.'; }
@@ -4087,6 +4092,39 @@ async function signParentReport(id) {
 
 function escapeWorkspaceText(value) {
   return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function encodeWorkspaceActionValue(value) {
+  return encodeURIComponent(String(value || '')).replace(/'/g, '%27');
+}
+
+function safeWorkspaceImageUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(raw)) return raw;
+  try {
+    const parsed = new URL(raw, window.location.origin);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function safeWorkspaceExternalUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'https:' ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function viewWorkspaceImage(source, title = 'Image preview') {
+  const safeUrl = safeWorkspaceImageUrl(source);
+  if (!safeUrl) return alert('This image could not be opened safely.');
+  openModal(title, `<img src="${escapeWorkspaceText(safeUrl)}" alt="${escapeWorkspaceText(title)}" style="max-width:100%;max-height:80vh;object-fit:contain;border-radius:6px;">`);
 }
 
 function showProviderSetup(providerName) {
