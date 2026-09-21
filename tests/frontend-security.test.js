@@ -58,7 +58,7 @@ assert.ok(server.includes("item: supportTicketView(item)"));
 assert.ok(server.includes("ticket: supportTicketView(ticket)"));
 assert.ok(frontend.includes("const response = await fetch('/api/auth/logout'"));
 assert.ok(frontend.includes("if (!signedOut) return;"));
-assert.ok(frontend.includes("department: 'IT & Portal Support'"));
+assert.ok(frontend.includes("department.value = 'IT & Portal Support'"));
 assert.ok(frontend.includes("department: 'Finance & Billing'"));
 
 console.log('Frontend and server security regression test passed.');
