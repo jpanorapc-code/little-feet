@@ -227,11 +227,16 @@ app.use(express.json({
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
+const renderExternalOrigin = (() => {
+  try { return process.env.RENDER_EXTERNAL_URL ? new URL(process.env.RENDER_EXTERNAL_URL).origin : ''; }
+  catch { return ''; }
+})();
 const trustedOrigins = new Set([
   'https://littlefeet.co.za',
   'https://www.littlefeet.co.za',
+  renderExternalOrigin,
   ...(process.env.LF_TRUSTED_ORIGINS || '').split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean)
-]);
+].filter(Boolean));
 const publicActionAttempts = new Map();
 const PUBLIC_ACTION_WINDOW_MS = 10 * 60 * 1000;
 const PUBLIC_ACTION_LIMITS = new Map([
@@ -2126,16 +2131,44 @@ app.get('/api/tickets', (req, res) => {
   res.json(visibleTickets.map(supportTicketView));
 });
 app.post('/api/tickets', (req, res) => {
-  const { createdBy, assignedTo, ...ticketDetails } = req.body;
   const creator = getSessionAccount(req);
   if (!creator) return res.status(401).json({ message: 'Sign in to create a support ticket.' });
-  const assignedAccount = creator.role === 'admin' ? findAccountByUsername(assignedTo) : null;
+
+  const allowedDepartments = new Set([
+    'Administration & Admissions',
+    'Academics & Classroom',
+    'Attendance & Learner Records',
+    'Finance & Billing',
+    'Safeguarding & Wellbeing',
+    'Care, Health & Allergies',
+    'Facilities, Security & Transport',
+    'IT & Portal Support',
+    'Meals, Supplies & Inventory',
+    'Human Resources & Staff',
+    'Principal & School Leadership'
+  ]);
+  const allowedPriorities = new Set(['Low', 'Medium', 'High']);
+  const department = String(req.body?.department || '').trim();
+  const priority = String(req.body?.priority || '').trim();
+  const subject = String(req.body?.subject || '').trim().slice(0, 240);
+  const message = String(req.body?.message || '').trim().slice(0, 4000);
+  const assignedTo = String(req.body?.assignedTo || '').trim();
+
+  if (!allowedDepartments.has(department) || !allowedPriorities.has(priority) || !subject || !message) {
+    return res.status(400).json({ message: 'Choose a valid department and priority, then complete the subject and message.' });
+  }
+
+  const assignedAccount = creator.role === 'admin' && assignedTo ? findAccountByUsername(assignedTo) : null;
   if (assignedTo && (!assignedAccount || !isSameSchool(creator, assignedAccount))) {
     return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
   }
+
   const item = tagSchoolRecord(creator, {
-    ...ticketDetails,
     id: crypto.randomUUID(),
+    department,
+    priority,
+    subject,
+    message,
     createdBy: creator.username,
     createdByName: creator.name || creator.username,
     assignedTo: assignedAccount?.username || '',
@@ -2144,7 +2177,7 @@ app.post('/api/tickets', (req, res) => {
     createdAt: new Date().toISOString()
   });
   db.tickets.unshift(item);
-  res.json({ success: true, item });
+  res.json({ success: true, item: supportTicketView(item) });
 });
 app.post('/api/tickets/update', (req, res) => {
   const { id, status, feedback, updatedBy, assignedTo } = req.body;
@@ -2166,7 +2199,7 @@ app.post('/api/tickets/update', (req, res) => {
   }
   if (feedback !== undefined) ticket.feedback = String(feedback || '').trim().slice(0, 4000);
   ticket.updatedBy = actor.username;
-  res.json({ success: true, ticket });
+  res.json({ success: true, ticket: supportTicketView(ticket) });
 });
 app.delete('/api/tickets/:id', (req, res) => {
   const actor = requireAdmin(req);
@@ -2998,7 +3031,15 @@ app.get('/api/auth/session', (req, res) => {
   res.json({ authenticated: true, user: safeAccount(account) });
 });
 app.post('/api/auth/logout', (req, res) => {
-  req.session?.destroy(() => res.json({ success: true }));
+  if (!req.session) {
+    res.clearCookie('littlefeet.sid', { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/' });
+    return res.json({ success: true });
+  }
+  req.session.destroy(error => {
+    if (error) return res.status(503).json({ message: 'Unable to end the secure session. Please try again.' });
+    res.clearCookie('littlefeet.sid', { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/' });
+    res.json({ success: true });
+  });
 });
 
 app.get('/auth/google', (req, res, next) => {
