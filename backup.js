@@ -2648,16 +2648,20 @@ async function loadBroadcasts() {
     broadcastsLoaded = true;
 
     listEl.innerHTML = visibleBroadcasts.length
-      ? visibleBroadcasts.map(b => `
+      ? visibleBroadcasts.map(b => {
+          const broadcastId = encodeWorkspaceActionValue(b.id);
+          const staffView = ['admin','principal'].includes(currentUser?.role);
+          return `
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-              <span class="badge-tag urgent">${b.bcPriority || 'Urgent Notice'}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${b.timestamp || 'Recent'}${b.radiusKm ? ` · ${b.radiusKm}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${b.id}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+              <span class="badge-tag urgent">${escapeWorkspaceText(b.bcPriority || 'Urgent Notice')}</span>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${staffView ? `<button type="button" onclick="deleteBroadcast(decodeURIComponent('${broadcastId}'))" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
             </div>
-            <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${b.bcMessage}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${b.id}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
+            <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${escapeWorkspaceText(b.bcMessage)}</p>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead(decodeURIComponent('${broadcastId}'))" class="action-btn btn-blue" style="padding:4px 8px;display:${staffView ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${staffView ? 'inline' : 'none'};">${Number(b.readBy?.length || 0)} recipient acknowledgement(s)</span></div>
           </div>
-        `).join('')
+        `;
+        }).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
   } catch (e) {
     logAppError('ERR_BC_001', 'Unable to fetch campus broadcast alerts.');
@@ -3145,11 +3149,13 @@ function setupFormListeners() {
 
       if (!alertLocation) return alert('Use your current location before dispatching an area-based alert.');
 
-      await fetch('/api/broadcasts', {
+      const response = await fetch('/api/broadcasts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      const result = await response.json();
+      if (!response.ok) return alert(result.message || 'Unable to dispatch this emergency alert.');
 
       bcForm.reset();
       alertLocation = null;
