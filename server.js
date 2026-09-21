@@ -765,6 +765,20 @@ const requireAdmin = (req) => {
   const account = getSessionAccount(req);
   return account?.role === 'admin' ? account : null;
 };
+const requireSchoolStaff = (req) => {
+  const account = getSessionAccount(req);
+  return account && ['teacher', 'principal', 'admin'].includes(account.role) ? account : null;
+};
+const learnerRecordsVisibleTo = (records, actor) => {
+  const schoolRecords = tenantRecords(records, actor);
+  if (actor?.role !== 'parent') return schoolRecords;
+  const linkedLearnerNames = new Set(
+    tenantRecords(db.students, actor)
+      .filter(student => isParentLinkedToLearner(actor, student))
+      .map(student => normalizeComparableText(student.studentName))
+  );
+  return schoolRecords.filter(record => linkedLearnerNames.has(normalizeComparableText(record.studentName || record.learnerName)));
+};
 const recordSystemError = (error, req = null, extra = {}) => {
   if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
   const actor = req ? getSessionAccount(req) : null;
@@ -1676,7 +1690,7 @@ app.delete('/api/posts/:id', (req, res) => {
 app.get('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view schedules.' });
-  res.json(tenantRecords(db.schedules, actor));
+  res.json(learnerRecordsVisibleTo(db.schedules, actor));
 });
 app.post('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
@@ -1706,7 +1720,7 @@ app.delete('/api/schedules/:id', (req, res) => {
 app.get('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view learning files.' });
-  res.json(tenantRecords(db.worksheets, actor));
+  res.json(learnerRecordsVisibleTo(db.worksheets, actor));
 });
 app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
@@ -1784,7 +1798,7 @@ app.get('/api/analytics/:studentName', (req, res) => {
 app.get('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view attendance.' });
-  res.json(tenantRecords(db.attendance, actor));
+  res.json(learnerRecordsVisibleTo(db.attendance, actor));
 });
 app.post('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
@@ -2241,8 +2255,8 @@ app.get('/api/store/orders', (req, res) => {
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
 app.get('/api/modules/:module', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to view this workspace.' });
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can view workspace records.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
   res.json(tenantRecords(records, actor));
@@ -2268,8 +2282,8 @@ app.delete('/api/modules/:module/:id', (req, res) => {
 });
 
 app.get('/api/registry', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to view the register.' });
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can view the learner register.' });
   res.json(tenantRecords(db.registry, actor));
 });
 app.post('/api/registry', (req, res) => {
@@ -2283,8 +2297,8 @@ app.post('/api/registry', (req, res) => {
 });
 
 app.get('/api/consents', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to view consent records.' });
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can view consent records.' });
   res.json(tenantRecords(db.consentRecords, actor));
 });
 app.post('/api/consents', (req, res) => {
@@ -2308,8 +2322,8 @@ app.post('/api/pickups/verify', (req, res) => {
   res.status(201).json({ success: true, entry: { ...entry, verificationCode: undefined } });
 });
 app.get('/api/pickups', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to view pickup records.' });
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can view pickup records.' });
   res.json(tenantRecords(db.pickupLogs, actor).map(({ verificationCode, ...entry }) => entry));
 });
 
