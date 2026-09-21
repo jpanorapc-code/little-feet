@@ -928,6 +928,19 @@ const requireSchoolStaff = (req) => {
   const account = getSessionAccount(req);
   return account && ['teacher', 'principal', 'admin'].includes(account.role) ? account : null;
 };
+const teacherCanAccessLearnerRecord = (actor, record) => {
+  if (!actor || actor.role !== 'teacher') return true;
+  const assignedClasses = new Set(normaliseAssignedClasses(actor.assignedClasses));
+  if (!assignedClasses.size) return false;
+  const recordClass = normalizeComparableText(record?.className);
+  if (recordClass && assignedClasses.has(recordClass)) return true;
+  const learnerName = normalizeComparableText(record?.studentName || record?.learnerName);
+  if (!learnerName) return false;
+  return tenantRecords(db.students, actor).some(student =>
+    normalizeComparableText(student.studentName) === learnerName
+    && assignedClasses.has(normalizeComparableText(student.className))
+  );
+};
 const learnerRecordsVisibleTo = (records, actor) => {
   const schoolRecords = tenantRecords(records, actor);
   if (actor?.role === 'teacher') {
@@ -1883,6 +1896,7 @@ app.get('/api/schedules', (req, res) => {
 app.post('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create schedules.' });
+  if (!teacherCanAccessLearnerRecord(actor, req.body || {})) return res.status(403).json({ message: 'Teachers may only create schedules for learners in their assigned classes.' });
   const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body });
   db.schedules.push(item);
   res.json({ success: true, item });
@@ -1892,14 +1906,16 @@ app.post('/api/schedules/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import schedules.' });
   const { schedules } = req.body;
   if (Array.isArray(schedules)) {
-    db.schedules.push(...schedules.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    const incoming = schedules.slice(0, 2000);
+    if (actor.role === 'teacher' && incoming.some(item => !teacherCanAccessLearnerRecord(actor, item))) return res.status(403).json({ message: 'Teachers may only import schedules for learners in their assigned classes.' });
+    db.schedules.push(...incoming.map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
   }
   res.json({ success: true });
 });
 app.delete('/api/schedules/:id', (req, res) => {
   const actor = getSessionAccount(req);
   const item = db.schedules.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
-  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Schedule item not found.' });
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role) || !teacherCanAccessLearnerRecord(actor, item)) return res.status(404).json({ message: 'Schedule item not found.' });
   db.schedules = db.schedules.filter(s => s !== item);
   res.json({ success: true });
 });
@@ -1913,6 +1929,7 @@ app.get('/api/worksheets', (req, res) => {
 app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
+  if (!teacherCanAccessLearnerRecord(actor, req.body || {})) return res.status(403).json({ message: 'Teachers may only add learning files for learners in their assigned classes.' });
   const item = tagSchoolRecord(actor, { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
@@ -1920,7 +1937,7 @@ app.post('/api/worksheets', (req, res) => {
 app.delete('/api/worksheets/:id', (req, res) => {
   const actor = getSessionAccount(req);
   const item = db.worksheets.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
-  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Learning file not found.' });
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role) || !teacherCanAccessLearnerRecord(actor, item)) return res.status(404).json({ message: 'Learning file not found.' });
   db.worksheets = db.worksheets.filter(w => w !== item);
   res.json({ success: true });
 });
@@ -1929,15 +1946,7 @@ app.delete('/api/worksheets/:id', (req, res) => {
 app.get('/api/badges', (req, res) => {
   const requester = getSessionAccount(req);
   if (!requester) return res.status(401).json({ message: 'Sign in to view badges.' });
-  const badges = tenantRecords(db.badges, requester);
-  if (requester.role !== 'parent') return res.json(badges);
-
-  const linkedLearners = new Set(
-    tenantRecords(db.students, requester)
-      .filter(student => isParentLinkedToLearner(requester, student))
-      .map(student => String(student.studentName).toLocaleLowerCase('en-US'))
-  );
-  res.json(badges.filter(badge => linkedLearners.has(String(badge.studentName || '').toLocaleLowerCase('en-US'))));
+  res.json(learnerRecordsVisibleTo(db.badges, requester));
 });
 app.post('/api/badges', (req, res) => {
   const actor = getSessionAccount(req);
@@ -1945,6 +1954,7 @@ app.post('/api/badges', (req, res) => {
     return res.status(403).json({ message: 'Only authorised school staff can award badges.' });
   }
   const { actorUsername: _actorUsername, ...item } = req.body;
+  if (!teacherCanAccessLearnerRecord(actor, item)) return res.status(403).json({ message: 'Teachers may only award badges to learners in their assigned classes.' });
   item.awardedBy = actor.username;
   db.badges.unshift(tagSchoolRecord(actor, item));
   res.json({ success: true, item });
@@ -1955,7 +1965,7 @@ app.delete('/api/badges/:id', (req, res) => {
     return res.status(403).json({ message: 'Only authorised school staff can remove badges.' });
   }
   const badge = db.badges.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
-  if (!badge) return res.status(404).json({ message: 'Badge not found.' });
+  if (!badge || !teacherCanAccessLearnerRecord(actor, badge)) return res.status(404).json({ message: 'Badge not found.' });
   db.badges = db.badges.filter(b => b !== badge);
   res.json({ success: true });
 });
@@ -1968,7 +1978,8 @@ app.get('/api/analytics/:studentName', (req, res) => {
   const student = tenantRecords(db.students, requester).find(entry => normalizeComparableText(entry.studentName) === normalizeComparableText(name));
   if (!student) return res.status(404).json({ message: 'Learner record not found.' });
   if (requester.role === 'parent' && !isParentLinkedToLearner(requester, student)) return res.status(403).json({ message: 'Parents may only view analytics for their linked learner.' });
-  const studentWorksheets = tenantRecords(db.worksheets, requester).filter(w => w.studentName.toLowerCase() === name.toLowerCase() && Number.isFinite(Number(w.grade))).reverse();
+  if (requester.role === 'teacher' && !teacherCanAccessLearnerRecord(requester, student)) return res.status(403).json({ message: 'Teachers may only view analytics for learners in their assigned classes.' });
+  const studentWorksheets = learnerRecordsVisibleTo(db.worksheets, requester).filter(w => String(w.studentName || '').toLowerCase() === name.toLowerCase() && Number.isFinite(Number(w.grade))).reverse();
   if (!studentWorksheets.length) return res.json({ totalAssessments: 0, subscription: requester.subscription || 'school', studentName: name });
   const scores = studentWorksheets.map(item => Number(item.grade));
   const averageScore = Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 10) / 10;
@@ -1991,6 +2002,7 @@ app.get('/api/attendance', (req, res) => {
 app.post('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record attendance.' });
+  if (!teacherCanAccessLearnerRecord(actor, req.body || {})) return res.status(403).json({ message: 'Teachers may only record attendance for learners in their assigned classes.' });
   const item = tagSchoolRecord(actor, { ...req.body, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
   db.attendance.unshift(item);
   res.json({ success: true, item });
@@ -2000,7 +2012,9 @@ app.post('/api/attendance/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import attendance.' });
   const { attendance } = req.body;
   if (Array.isArray(attendance)) {
-    db.attendance.unshift(...attendance.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    const incoming = attendance.slice(0, 2000);
+    if (actor.role === 'teacher' && incoming.some(item => !teacherCanAccessLearnerRecord(actor, item))) return res.status(403).json({ message: 'Teachers may only import attendance for learners in their assigned classes.' });
+    db.attendance.unshift(...incoming.map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
   }
   res.json({ success: true });
 });
@@ -2008,21 +2022,21 @@ app.post('/api/attendance/toggle', (req, res) => {
   const actor = getSessionAccount(req);
   const { id, status } = req.body;
   const item = db.attendance.find(a => a.id === id && recordInSchool(a, actor));
-  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Attendance record not found.' });
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role) || !teacherCanAccessLearnerRecord(actor, item)) return res.status(404).json({ message: 'Attendance record not found.' });
   if (item) item.status = status;
   res.json({ success: true });
 });
 app.delete('/api/attendance/:id', (req, res) => {
   const actor = getSessionAccount(req);
   const item = db.attendance.find(a => a.id === req.params.id && recordInSchool(a, actor));
-  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Attendance record not found.' });
+  if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role) || !teacherCanAccessLearnerRecord(actor, item)) return res.status(404).json({ message: 'Attendance record not found.' });
   db.attendance = db.attendance.filter(a => a !== item);
   res.json({ success: true });
 });
 app.post('/api/attendance/clear', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can clear attendance.' });
-  db.attendance = db.attendance.filter(item => !recordInSchool(item, actor));
+  db.attendance = db.attendance.filter(item => !recordInSchool(item, actor) || (actor.role === 'teacher' && !teacherCanAccessLearnerRecord(actor, item)));
   res.json({ success: true });
 });
 
@@ -2486,6 +2500,7 @@ app.get('/api/registry', (req, res) => {
 app.post('/api/registry', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
+  if (!teacherCanAccessLearnerRecord(actor, { learnerName: req.body?.learnerName, className: req.body?.className })) return res.status(403).json({ message: 'Teachers may only register learners in their assigned classes.' });
   const required = ['learnerName', 'className', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
   if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields, including class/grade.' });
 
@@ -2543,12 +2558,13 @@ app.post('/api/registry', (req, res) => {
 app.get('/api/consents', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view consent records.' });
-  res.json(tenantRecords(db.consentRecords, actor));
+  res.json(learnerRecordsVisibleTo(db.consentRecords, actor));
 });
 app.post('/api/consents', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save consent records.' });
   const { learnerName, guardianName, internalUpdates, marketingPhotos } = req.body;
+  if (!teacherCanAccessLearnerRecord(actor, { learnerName })) return res.status(403).json({ message: 'Teachers may only manage consent for learners in their assigned classes.' });
   if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required.' });
   const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), guardianName: String(guardianName), internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
   db.consentRecords = db.consentRecords.filter(entry => !recordInSchool(entry, actor) || entry.learnerName.toLowerCase() !== record.learnerName.toLowerCase());
@@ -2560,6 +2576,7 @@ app.post('/api/pickups/verify', (req, res) => {
   const actor = getSessionAccount(req);
   const { learnerName, pickupAdult, verificationCode, action } = req.body;
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record pickups.' });
+  if (!teacherCanAccessLearnerRecord(actor, { learnerName })) return res.status(403).json({ message: 'Teachers may only record pickups for learners in their assigned classes.' });
   if (!learnerName || !pickupAdult || !verificationCode || !action) return res.status(400).json({ message: 'Learner, pickup adult, verification code, and action are required.' });
   const entry = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), pickupAdult: String(pickupAdult), verificationCode: hashPin(verificationCode), action: String(action), recordedBy: actor.username, timestamp: new Date().toISOString() });
   db.pickupLogs.unshift(entry);
@@ -2568,7 +2585,7 @@ app.post('/api/pickups/verify', (req, res) => {
 app.get('/api/pickups', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view pickup records.' });
-  res.json(tenantRecords(db.pickupLogs, actor).map(({ verificationCode, ...entry }) => entry));
+  res.json(learnerRecordsVisibleTo(db.pickupLogs, actor).map(({ verificationCode, ...entry }) => entry));
 });
 
 app.get('/api/release-notes', (req, res) => res.json((db.releaseNotes || []).slice().sort((first, second) => Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || ''))));
@@ -2609,6 +2626,9 @@ app.post('/api/report-reviews', (req, res) => {
   }
   signingPinAttempts.delete(signingAttemptKey);
   if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
+  const reportLearner = tenantRecords(db.students, teacher).find(student => normalizeComparableText(student.studentName) === normalizeComparableText(studentName));
+  if (!reportLearner || !isParentLinkedToLearner(parent, reportLearner)) return res.status(400).json({ message: 'Choose a learner and the parent account linked to that learner.' });
+  if (!teacherCanAccessLearnerRecord(teacher, reportLearner)) return res.status(403).json({ message: 'Teachers may only publish reports for learners in their assigned classes.' });
   if (!studentName || !reportTitle || !period || !parentUsername) return res.status(400).json({ message: 'Complete the report details and teacher signature.' });
   const signatureValidation = validateSignatureData(signatureData);
   if (signatureValidation.error) return res.status(400).json({ message: signatureValidation.error });
