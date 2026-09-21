@@ -144,8 +144,9 @@ const rawRequest = async (route) => {
     assert.equal(alphaCodes.data.length, 1);
     assert.equal(bravoCodes.data.length, 0);
 
-    const issued = await request('/api/learner-access-codes', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerKey: alphaCodes.data[0].learnerKey } });
-    assert.equal(issued.response.status, 201);
+    assert.ok(alphaCodes.data[0].accessCode, 'Imported learners should receive an automatically generated access code.');
+    const duplicateIssue = await request('/api/learner-access-codes', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerKey: alphaCodes.data[0].learnerKey } });
+    assert.equal(duplicateIssue.response.status, 409);
     const blockedPrint = await request(`/api/learner-access-codes/${encodeURIComponent(alphaCodes.data[0].learnerKey)}/printable`, { cookie: bravoLogin.cookie });
     assert.equal(blockedPrint.response.status, 404);
 
@@ -165,16 +166,20 @@ const rawRequest = async (route) => {
     assert.deepEqual(parentWorksheets.data.map(item => item.studentName), ['Alpha Learner']);
     assert.deepEqual(parentAttendance.data.map(item => item.studentName), ['Alpha Learner']);
 
-    const registryRecord = await request('/api/registry', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', dateOfBirth: '2020-01-01', guardianName: 'Alpha Parent', guardianPhone: '0000000000', address: 'Test address' } });
+    const registryRecord = await request('/api/registry', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', className: 'A1', dateOfBirth: '2020-01-01', guardianName: 'Alpha Parent', guardianPhone: '0000000000', guardianEmail: 'alpha.parent@example.test', address: 'Test address', medicalNotes: 'Peanut allergy', emergencyContact: 'Alpha Parent · 0000000000' } });
     const consentRecord = await request('/api/consents', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', guardianName: 'Alpha Parent', internalUpdates: true, marketingPhotos: false } });
     const pickupRecord = await request('/api/pickups/verify', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', pickupAdult: 'Alpha Parent', verificationCode: '2468', action: 'Pickup' } });
     assert.equal(registryRecord.response.status, 200);
+    assert.equal(registryRecord.data.record.medicalNotes, 'Peanut allergy');
+    assert.equal(registryRecord.data.record.address, 'Test address');
     assert.equal(consentRecord.response.status, 201);
     assert.equal(pickupRecord.response.status, 201);
     assert.equal((await request('/api/registry', { cookie: alphaParentLogin.cookie })).response.status, 403);
     assert.equal((await request('/api/consents', { cookie: alphaParentLogin.cookie })).response.status, 403);
     assert.equal((await request('/api/pickups', { cookie: alphaParentLogin.cookie })).response.status, 403);
-    assert.equal((await request('/api/registry', { cookie: alphaTeacherLogin.cookie })).data.length, 1);
+    const teacherRegistry = await request('/api/registry', { cookie: alphaTeacherLogin.cookie });
+    assert.equal(teacherRegistry.data.length, 1);
+    assert.equal(teacherRegistry.data[0].className, 'A1');
     assert.equal((await request('/api/consents', { cookie: alphaPrincipalLogin.cookie })).data.length, 1);
     assert.equal((await request('/api/pickups', { cookie: alphaTeacherLogin.cookie })).data.length, 1);
     assert.equal((await request('/api/registry', { cookie: alphaDistrictLogin.cookie })).response.status, 403);
@@ -183,6 +188,16 @@ const rawRequest = async (route) => {
     assert.equal((await request('/api/registry', { cookie: bravoLogin.cookie })).data.length, 0);
     assert.equal((await request('/api/consents', { cookie: bravoLogin.cookie })).data.length, 0);
     assert.equal((await request('/api/pickups', { cookie: bravoLogin.cookie })).data.length, 0);
+
+    const teacherSearch = await request('/api/students/search', { cookie: alphaTeacherLogin.cookie });
+    assert.deepEqual(teacherSearch.data.map(student => student.className), ['A1']);
+    const districtSearch = await request('/api/students/search', { cookie: alphaDistrictLogin.cookie });
+    assert.ok(districtSearch.data.every(student => !Object.hasOwn(student, 'medicalNotes') && !Object.hasOwn(student, 'emergencyContact') && !Object.hasOwn(student, 'authorisedPickups')));
+
+    const signingPin = await request('/api/report-signing-pin', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { pin: '2468' } });
+    assert.equal(signingPin.response.status, 200);
+    const teacherSessionAfterSigningPin = await request('/api/auth/session', { cookie: alphaTeacherLogin.cookie });
+    assert.equal(Object.hasOwn(teacherSessionAfterSigningPin.data.user, 'reportSigningPinHash'), false);
 
     const product = await request('/api/store/products', { method: 'POST', cookie: alphaLogin.cookie, body: { name: 'Alpha School Shirt', price: 50, stockQuantity: 12 } });
     assert.equal(product.response.status, 201);
