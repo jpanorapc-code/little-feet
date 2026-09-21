@@ -163,6 +163,52 @@ const canUseDirectChat = (first, second) => {
 };
 const encryptField = (value) => { const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', fieldKey, iv); const content = Buffer.concat([cipher.update(String(value || ''), 'utf8'), cipher.final()]); return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${content.toString('base64')}`; };
 const decryptField = (value) => { try { const [iv, tag, content] = String(value || '').split('.').map(part => Buffer.from(part, 'base64')); const decipher = crypto.createDecipheriv('aes-256-gcm', fieldKey, iv); decipher.setAuthTag(tag); return Buffer.concat([decipher.update(content), decipher.final()]).toString('utf8'); } catch { return ''; } };
+const looksEncryptedField = (value) => {
+  const parts = String(value || '').split('.');
+  return parts.length === 3 && parts.every(part => /^[A-Za-z0-9+/=_-]*$/.test(part));
+};
+const decryptStoredField = (value) => looksEncryptedField(value) ? decryptField(value) : String(value || '');
+const encryptStoredField = (value) => looksEncryptedField(value) ? String(value) : encryptField(value);
+const validSignatureData = (value) => {
+  const signature = String(value || '');
+  return signature.length <= 512 * 1024 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature);
+};
+const studentSensitiveView = (student) => ({
+  ...student,
+  dateOfBirth: decryptStoredField(student.dateOfBirth),
+  medicalNotes: decryptStoredField(student.medicalNotes),
+  emergencyContact: decryptStoredField(student.emergencyContact),
+  authorisedPickups: decryptStoredField(student.authorisedPickups)
+});
+const registryRecordView = (record) => ({
+  ...record,
+  dateOfBirth: decryptStoredField(record.dateOfBirth),
+  guardianPhone: decryptStoredField(record.guardianPhone),
+  guardianEmail: decryptStoredField(record.guardianEmail),
+  address: decryptStoredField(record.address),
+  emergencyContact: decryptStoredField(record.emergencyContact),
+  medicalNotes: decryptStoredField(record.medicalNotes)
+});
+const reportReviewView = (report) => ({
+  ...report,
+  teacherSignature: report.teacherSignature ? decryptStoredField(report.teacherSignature) : null,
+  parentSignature: report.parentSignature ? decryptStoredField(report.parentSignature) : null
+});
+const accessCodeInUse = (candidate) => db.learnerAccessCodes.some(entry => entry.status === 'active' && decryptStoredField(entry.codeEncrypted) === candidate);
+const createUniqueLearnerAccessCode = () => {
+  let code;
+  do { code = generateLearnerAccessCode(); } while (accessCodeInUse(code));
+  return code;
+};
+const ensureLearnerAccessCode = (actor, learner) => {
+  const learnerKey = learnerRecordKey(learner);
+  const existing = db.learnerAccessCodes.find(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor));
+  if (existing) return existing;
+  const accessCode = createUniqueLearnerAccessCode();
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerKey, codeEncrypted: encryptField(accessCode), status: 'active', issuedAt: new Date().toISOString(), issuedBy: actor.username, source: 'automatic-learner-creation' });
+  db.learnerAccessCodes.unshift(record);
+  return record;
+};
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
 const activeLoginAttempt = (key) => {
   const entry = loginAttempts.get(key);
@@ -499,6 +545,7 @@ function applySavedState(saved) {
   syncCurrentReleaseNotes();
   removeLegacyDemoRecords();
   migrateSchoolTenancy();
+  migrateSensitiveStoredFields();
   return true;
 }
 
@@ -538,6 +585,19 @@ function migrateSchoolTenancy() {
   if (!db.schoolTerms[defaultSchoolId]) db.schoolTerms[defaultSchoolId] = db.term;
   if (!db.schoolBilling || typeof db.schoolBilling !== 'object') db.schoolBilling = {};
   if (!db.schoolBilling[defaultSchoolId] && db.subscriptionBilling) db.schoolBilling[defaultSchoolId] = db.subscriptionBilling;
+}
+
+function migrateSensitiveStoredFields() {
+  const registryFields = ['dateOfBirth', 'guardianPhone', 'guardianEmail', 'address', 'emergencyContact', 'medicalNotes'];
+  (db.registry || []).forEach(record => {
+    registryFields.forEach(field => {
+      if (record[field] !== undefined && record[field] !== null && record[field] !== '') record[field] = encryptStoredField(record[field]);
+    });
+  });
+  (db.reportReviews || []).forEach(report => {
+    if (report.teacherSignature) report.teacherSignature = encryptStoredField(report.teacherSignature);
+    if (report.parentSignature) report.parentSignature = encryptStoredField(report.parentSignature);
+  });
 }
 
 function removeLegacyDemoRecords() {
@@ -875,13 +935,29 @@ const requireSchoolStaff = (req) => {
 };
 const learnerRecordsVisibleTo = (records, actor) => {
   const schoolRecords = tenantRecords(records, actor);
-  if (actor?.role !== 'parent') return schoolRecords;
-  const linkedLearnerNames = new Set(
-    tenantRecords(db.students, actor)
-      .filter(student => isParentLinkedToLearner(actor, student))
-      .map(student => normalizeComparableText(student.studentName))
-  );
-  return schoolRecords.filter(record => linkedLearnerNames.has(normalizeComparableText(record.studentName || record.learnerName)));
+  if (actor?.role === 'parent') {
+    const linkedLearnerNames = new Set(
+      tenantRecords(db.students, actor)
+        .filter(student => isParentLinkedToLearner(actor, student))
+        .map(student => normalizeComparableText(student.studentName))
+    );
+    return schoolRecords.filter(record => linkedLearnerNames.has(normalizeComparableText(record.studentName || record.learnerName)));
+  }
+  if (actor?.role === 'teacher') {
+    const assignedClasses = new Set(normaliseAssignedClasses(actor.assignedClasses));
+    if (!assignedClasses.size) return [];
+    const assignedLearners = new Set(
+      tenantRecords(db.students, actor)
+        .filter(student => assignedClasses.has(normalizeComparableText(student.className)))
+        .map(student => normalizeComparableText(student.studentName))
+    );
+    return schoolRecords.filter(record => {
+      const recordClass = normalizeComparableText(record.className);
+      if (recordClass) return assignedClasses.has(recordClass);
+      return assignedLearners.has(normalizeComparableText(record.studentName || record.learnerName));
+    });
+  }
+  return schoolRecords;
 };
 const recordSystemError = (error, req = null, extra = {}) => {
   if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
@@ -2388,16 +2464,57 @@ app.delete('/api/modules/:module/:id', (req, res) => {
 app.get('/api/registry', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view the learner register.' });
-  res.json(tenantRecords(db.registry, actor));
+  res.json(learnerRecordsVisibleTo(db.registry, actor).map(registryRecordView));
 });
 app.post('/api/registry', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
   const required = ['learnerName', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
   if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
+  const learnerName = String(req.body.learnerName || '').trim();
+  const className = String(req.body.className || '').trim();
+  if (actor.role === 'teacher' && (!className || !normaliseAssignedClasses(actor.assignedClasses).includes(normalizeComparableText(className)))) {
+    return res.status(403).json({ message: 'Teachers can register learners only in their assigned classes.' });
+  }
+  const record = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    learnerName,
+    className,
+    dateOfBirth: encryptField(String(req.body.dateOfBirth || '').trim()),
+    guardianName: String(req.body.guardianName || '').trim(),
+    guardianPhone: encryptField(String(req.body.guardianPhone || '').trim()),
+    guardianEmail: encryptField(String(req.body.guardianEmail || '').trim()),
+    address: encryptField(String(req.body.address || '').trim()),
+    emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
+    medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
+    consent: String(req.body.consent || 'Pending verification'),
+    createdAt: new Date().toISOString(),
+    createdBy: actor.username
+  });
   db.registry.unshift(record);
-  res.json({ success: true, record });
+
+  let learner = tenantRecords(db.students, actor).find(student =>
+    normalizeComparableText(student.studentName) === normalizeComparableText(learnerName)
+    && normalizeComparableText(student.className) === normalizeComparableText(className)
+  );
+  if (!learner) {
+    learner = tagSchoolRecord(actor, {
+      id: crypto.randomUUID(),
+      studentName: learnerName,
+      className,
+      parentName: String(req.body.guardianName || '').trim(),
+      contactEmail: String(req.body.guardianEmail || '').trim(),
+      dateOfBirth: encryptField(String(req.body.dateOfBirth || '').trim()),
+      medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
+      emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
+      authorisedPickups: encryptField(''),
+      registeredAt: new Date().toISOString(),
+      registeredBy: actor.username
+    });
+    db.students.push(learner);
+    ensureLearnerAccessCode(actor, learner);
+  }
+  res.status(201).json({ success: true, record: registryRecordView(record), learnerKey: learnerRecordKey(learner) });
 });
 
 app.get('/api/consents', (req, res) => {
@@ -2444,21 +2561,25 @@ app.post('/api/report-signing-pin', (req, res) => {
 app.get('/api/report-reviews', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view reports.' });
+  if (!['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'This role cannot access learner reports.' });
   const reports = user.role === 'parent'
     ? tenantRecords(db.reportReviews, user).filter(report => normalizeUsername(report.parentUsername) === normalizeUsername(user.username))
-    : tenantRecords(db.reportReviews, user);
-  res.json(reports);
+    : learnerRecordsVisibleTo(db.reportReviews, user);
+  res.json(reports.map(reportReviewView));
 });
 app.post('/api/report-reviews', (req, res) => {
-  const { studentName, reportTitle, period, teacherUsername, parentUsername, signatureData, signingPin } = req.body;
+  const { studentName, reportTitle, period, parentUsername, signatureData, signingPin } = req.body;
   const teacher = getSessionAccount(req);
   const parent = findAccountByUsername(parentUsername);
   if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
   if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
-  if (!studentName || !reportTitle || !period || !parentUsername || !signatureData) return res.status(400).json({ message: 'Complete the report details and teacher signature.' });
-  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: signatureData, teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
+  const learner = learnerRecordsVisibleTo(db.students, teacher).find(entry => normalizeComparableText(entry.studentName) === normalizeComparableText(studentName));
+  if (!learner) return res.status(403).json({ message: 'You do not have access to that learner.' });
+  if (!isParentLinkedToLearner(parent, learner)) return res.status(400).json({ message: 'Choose the approved parent account linked to this learner.' });
+  if (!studentName || !reportTitle || !period || !parentUsername || !validSignatureData(signatureData)) return res.status(400).json({ message: 'Complete the report details and provide a valid signature.' });
+  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), className: learner.className || '', reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: encryptField(signatureData), teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
   db.reportReviews.unshift(report);
-  res.status(201).json({ success: true, report });
+  res.status(201).json({ success: true, report: reportReviewView(report) });
 });
 app.post('/api/report-reviews/:id/sign', (req, res) => {
   const { signatureData, signingPin } = req.body;
@@ -2466,11 +2587,11 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
   const report = db.reportReviews.find(entry => entry.id === req.params.id && recordInSchool(entry, user));
   if (!report || !user || user.role !== 'parent' || normalizeUsername(report.parentUsername) !== normalizeUsername(user.username)) return res.status(403).json({ message: 'Only the linked parent account can sign this report.' });
   if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
-  if (!signatureData) return res.status(400).json({ message: 'Add your signature before confirming.' });
-  report.parentSignature = signatureData;
+  if (!validSignatureData(signatureData)) return res.status(400).json({ message: 'Add a valid signature before confirming.' });
+  report.parentSignature = encryptField(signatureData);
   report.parentSignedAt = new Date().toISOString();
   report.status = 'Complete - teacher and parent signed';
-  res.json({ success: true, report });
+  res.json({ success: true, report: reportReviewView(report) });
 });
 
 // School-controlled learner access codes. Codes are encrypted at rest and are
@@ -2621,21 +2742,24 @@ app.get('/api/students/search', (req, res) => {
   const { className, childName } = req.query;
   const requester = getSessionAccount(req);
   if (!requester) return res.status(401).json({ message: 'Sign in to search learner records.' });
-  let results = tenantRecords(db.students, requester);
-  if (requester.role === 'parent') results = results.filter(student => isParentLinkedToLearner(requester, student));
+  let results = learnerRecordsVisibleTo(db.students, requester);
   if (className) {
     results = results.filter(s => s.className.toLowerCase().includes(className.toLowerCase()));
   }
   if (childName) {
     results = results.filter(s => s.studentName.toLowerCase().includes(childName.toLowerCase()));
   }
-  res.json(results.map(student => ({ ...student, medicalNotes: decryptField(student.medicalNotes), emergencyContact: decryptField(student.emergencyContact), authorisedPickups: decryptField(student.authorisedPickups) })));
+  if (requester.role === 'district') {
+    return res.json(results.map(student => ({ id: student.id || null, studentName: student.studentName, className: student.className })));
+  }
+  if (!['parent', 'teacher', 'principal', 'admin'].includes(requester.role)) return res.status(403).json({ message: 'This role cannot access learner records.' });
+  res.json(results.map(studentSensitiveView));
 });
 
 app.get('/api/household', (req, res) => {
   const parent = getSessionAccount(req);
   if (!parent || parent.role !== 'parent') return res.status(403).json({ message: 'Only parent accounts can view linked learner records.' });
-  res.json(tenantRecords(db.students, parent).filter(student => isParentLinkedToLearner(parent, student)).map(student => ({ ...student, medicalNotes: decryptField(student.medicalNotes), emergencyContact: decryptField(student.emergencyContact), authorisedPickups: decryptField(student.authorisedPickups) })));
+  res.json(tenantRecords(db.students, parent).filter(student => isParentLinkedToLearner(parent, student)).map(studentSensitiveView));
 });
 
 // Secure bulk learner import. The browser previews spreadsheet rows first; this
@@ -2670,7 +2794,8 @@ app.post('/api/students/import', (req, res) => {
     }
     seenInFile.add(key);
     knownRecords.add(key);
-    db.students.push(tagSchoolRecord(actor, {
+    const learner = tagSchoolRecord(actor, {
+      id: crypto.randomUUID(),
       studentName,
       className,
       parentName,
@@ -2680,7 +2805,9 @@ app.post('/api/students/import', (req, res) => {
       authorisedPickups: encryptField(String(row?.authorisedPickups || '').trim()),
       importedAt: new Date().toISOString(),
       importedBy: actor.username
-    }));
+    });
+    db.students.push(learner);
+    ensureLearnerAccessCode(actor, learner);
     imported += 1;
   });
 
