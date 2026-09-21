@@ -39,5 +39,12 @@ assert.ok(server.includes('Strict-Transport-Security'));
 assert.ok(server.includes('teacherCanAccessLearnerRecord'));
 assert.ok(server.includes('pg_try_advisory_lock'));
 assert.ok(server.includes('Refusing to start production without required secret'));
+assert.ok(server.includes('req.session.regenerate'));
+assert.ok(server.includes("Staff group channels are available only to authorised school staff."));
+assert.ok(server.includes("Staff group messages are available only to authorised school staff."));
+assert.ok(frontend.includes("if (currentUser?.role === 'parent')"));
+assert.ok(frontend.includes("btnGroup?.classList.toggle('hidden', parentDirectOnly)"));
+assert.ok(frontend.includes('escapeWorkspaceText(t.feedback)'));
+assert.ok(frontend.includes('escapeWorkspaceText(currentFeedback ||'));
 
 console.log('Frontend and server security regression test passed.');
