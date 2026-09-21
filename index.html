@@ -7,14 +7,14 @@
   <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <title>Little Feet | ECD Portal</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
+  <script src="/vendor/xlsx.js"></script>
+  <script src="/vendor/qrcode.js"></script>
   <!-- Leaflet Maps CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
+  <script src="/vendor/leaflet.js"></script>
+  <script src="/vendor/leaflet-markercluster.js"></script>
   <style>
     :root {
       --primary-color: #0d9488;
@@ -46,6 +46,7 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+    .sr-only { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
     
     body { 
       background-color: var(--bg-dark); 
