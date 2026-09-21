@@ -287,10 +287,23 @@ const rawRequest = async (route) => {
     assert.equal(Object.hasOwn(teacherSessionAfterSigningPin.data.user, 'reportSigningPinHash'), false);
 
     const maliciousTicketId = '<img src=x onerror=alert(1)>';
-    const createdTicket = await request('/api/tickets', { method: 'POST', cookie: alphaParentLogin.cookie, body: { id: maliciousTicketId, department: 'Admin', priority: 'Normal', subject: 'Safe support test', message: '<img src=x onerror=alert(1)>' } });
+    const createdTicket = await request('/api/tickets', { method: 'POST', cookie: alphaParentLogin.cookie, body: {
+      id: maliciousTicketId,
+      schoolId: 'school_bravo',
+      status: 'Completed',
+      applicationEncrypted: 'attacker-controlled',
+      department: 'Administration & Admissions',
+      priority: 'Medium',
+      subject: 'Safe support test',
+      message: '<img src=x onerror=alert(1)>'
+    } });
     assert.equal(createdTicket.response.status, 200);
     assert.notEqual(createdTicket.data.item.id, maliciousTicketId);
     assert.match(createdTicket.data.item.id, /^[0-9a-f-]{36}$/i);
+    assert.equal(createdTicket.data.item.status, 'Open');
+    assert.equal(Object.hasOwn(createdTicket.data.item, 'applicationEncrypted'), false);
+    assert.notEqual(createdTicket.data.item.schoolId, 'school_bravo');
+    assert.equal((await request('/api/tickets', { method: 'POST', cookie: alphaParentLogin.cookie, body: { department: 'Made Up Department', priority: 'Medium', subject: 'Invalid', message: 'Must be rejected.' } })).response.status, 400);
     const invalidTicketStatus = await request('/api/tickets/update', { method: 'POST', cookie: alphaLogin.cookie, body: { id: createdTicket.data.item.id, status: '<script>alert(1)</script>', feedback: 'No unsafe status values.' } });
     assert.equal(invalidTicketStatus.response.status, 400);
     const completedTicket = await request('/api/tickets/update', { method: 'POST', cookie: alphaLogin.cookie, body: { id: createdTicket.data.item.id, status: 'Completed', feedback: '<img src=x onerror=alert(1)>' } });
@@ -368,6 +381,15 @@ const rawRequest = async (route) => {
     assert.equal(alphaLedger.data.length, 3);
     assert.deepEqual(new Set(alphaLedger.data.map(entry => entry.targetType)), new Set(['subscription', 'parent_subscription', 'parent_payment']));
     assert.equal(bravoLedger.data.length, 0);
+
+    const districtCookieBeforeLogout = alphaDistrictLogin.cookie;
+    const logoutResult = await request('/api/auth/logout', { method: 'POST', cookie: districtCookieBeforeLogout });
+    assert.equal(logoutResult.response.status, 200);
+    assert.equal(logoutResult.data.success, true);
+    const sessionAfterLogout = await request('/api/auth/session', { cookie: districtCookieBeforeLogout });
+    assert.equal(sessionAfterLogout.response.status, 200);
+    assert.equal(sessionAfterLogout.data.authenticated, false);
+    assert.equal(sessionAfterLogout.data.user, null);
 
     console.log('Tenant isolation test passed.');
   } catch (error) {
