@@ -1873,8 +1873,12 @@ app.get('/api/posts', (req, res) => {
 app.post('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
-  const post = tagSchoolRecord(actor, req.body || {});
-  post.createdAt = post.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const post = tagSchoolRecord(actor, {
+    ...(req.body || {}),
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    createdBy: actor.username
+  });
   db.posts.unshift(post);
   res.json({ success: true, post });
 });
@@ -1897,7 +1901,7 @@ app.post('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create schedules.' });
   if (!teacherCanAccessLearnerRecord(actor, req.body || {})) return res.status(403).json({ message: 'Teachers may only create schedules for learners in their assigned classes.' });
-  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body });
+  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID() });
   db.schedules.push(item);
   res.json({ success: true, item });
 });
@@ -1908,7 +1912,7 @@ app.post('/api/schedules/import', (req, res) => {
   if (Array.isArray(schedules)) {
     const incoming = schedules.slice(0, 2000);
     if (actor.role === 'teacher' && incoming.some(item => !teacherCanAccessLearnerRecord(actor, item))) return res.status(403).json({ message: 'Teachers may only import schedules for learners in their assigned classes.' });
-    db.schedules.push(...incoming.map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    db.schedules.push(...incoming.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID() })));
   }
   res.json({ success: true });
 });
@@ -1930,7 +1934,7 @@ app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
   if (!teacherCanAccessLearnerRecord(actor, req.body || {})) return res.status(403).json({ message: 'Teachers may only add learning files for learners in their assigned classes.' });
-  const item = tagSchoolRecord(actor, { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
+  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
 });
@@ -1955,6 +1959,7 @@ app.post('/api/badges', (req, res) => {
   }
   const { actorUsername: _actorUsername, ...item } = req.body;
   if (!teacherCanAccessLearnerRecord(actor, item)) return res.status(403).json({ message: 'Teachers may only award badges to learners in their assigned classes.' });
+  item.id = crypto.randomUUID();
   item.awardedBy = actor.username;
   db.badges.unshift(tagSchoolRecord(actor, item));
   res.json({ success: true, item });
@@ -2003,7 +2008,7 @@ app.post('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record attendance.' });
   if (!teacherCanAccessLearnerRecord(actor, req.body || {})) return res.status(403).json({ message: 'Teachers may only record attendance for learners in their assigned classes.' });
-  const item = tagSchoolRecord(actor, { ...req.body, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), timestamp: new Date().toISOString() });
   db.attendance.unshift(item);
   res.json({ success: true, item });
 });
@@ -2014,7 +2019,7 @@ app.post('/api/attendance/import', (req, res) => {
   if (Array.isArray(attendance)) {
     const incoming = attendance.slice(0, 2000);
     if (actor.role === 'teacher' && incoming.some(item => !teacherCanAccessLearnerRecord(actor, item))) return res.status(403).json({ message: 'Teachers may only import attendance for learners in their assigned classes.' });
-    db.attendance.unshift(...incoming.map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    db.attendance.unshift(...incoming.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID() })));
   }
   res.json({ success: true });
 });
@@ -2269,8 +2274,8 @@ app.post('/api/broadcasts', (req, res) => {
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
   if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
   const item = tagSchoolRecord(actor, {
-    id: Date.now().toString(),
     ...req.body,
+    id: crypto.randomUUID(),
     issuedBy: actor.username,
     issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -2468,7 +2473,7 @@ app.post('/api/modules/:module', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save workspace records.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
+  const record = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), createdAt: new Date().toISOString(), recordedBy: actor.username });
   records.unshift(record);
   res.json({ success: true, record });
 });
@@ -2500,9 +2505,9 @@ app.get('/api/registry', (req, res) => {
 app.post('/api/registry', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
-  if (!teacherCanAccessLearnerRecord(actor, { learnerName: req.body?.learnerName, className: req.body?.className })) return res.status(403).json({ message: 'Teachers may only register learners in their assigned classes.' });
   const required = ['learnerName', 'className', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
   if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields, including class/grade.' });
+  if (!teacherCanAccessLearnerRecord(actor, { learnerName: req.body.learnerName, className: req.body.className })) return res.status(403).json({ message: 'Teachers may only register learners in their assigned classes.' });
 
   const record = tagSchoolRecord(actor, {
     id: crypto.randomUUID(),
