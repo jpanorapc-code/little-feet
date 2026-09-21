@@ -22,6 +22,7 @@ const students = Array.from({ length: 2000 }, (_, index) => {
 });
 
 fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'server.js'));
+fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory, 'auth-crypto.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({ schools, users, students, learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {} }));
 
 const child = spawn(process.execPath, ['server.js'], { cwd: temporaryDirectory, env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test' }, stdio: ['ignore', 'ignore', 'pipe'] });

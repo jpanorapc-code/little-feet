@@ -6,6 +6,7 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 const { Pool } = require('pg');
 const session = require('express-session');
+const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,12 +59,6 @@ const CURRENT_RELEASE_NOTES = Object.freeze([
 ]);
 if (!fieldEncryptionConfigured) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
 if (!sessionSecretConfigured) console.warn('Using a development session secret. Set SESSION_SECRET before production.');
-const hashPin = (pin) => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
-const matchesPin = (pin, hash) => {
-  const expected = Buffer.from(hash || '', 'hex');
-  const actual = Buffer.from(hashPin(pin), 'hex');
-  return expected.length === actual.length && crypto.timingSafeEqual(actual, expected);
-};
 // Usernames and email addresses are identifiers, not secrets. Store their display
 // casing, but compare a trimmed, case-insensitive value at every authentication boundary.
 const normalizeUsername = (value) => String(value || '').trim().toLocaleLowerCase('en-US');
@@ -638,6 +633,7 @@ app.post('/api/login', (req, res) => {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
+    if (pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     const safeUser = safeAccount(user);
     req.session.littleFeetUser = safeUser;
     req.session.save(error => {

@@ -15,6 +15,7 @@ const schools = [
 ];
 
 fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'server.js'));
+fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory, 'auth-crypto.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({
   schools,
   users: [
@@ -89,6 +90,8 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
     assert.equal(bravoParentLogin.response.status, 200);
+    const migratedAlphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
+    assert.equal(migratedAlphaLogin.response.status, 200);
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
