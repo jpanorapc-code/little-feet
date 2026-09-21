@@ -1486,8 +1486,10 @@ async function startHealthMonitor() {
   const checkStatus = async () => {
     const statusEl = document.getElementById('serverStatus');
     const statusText = document.getElementById('serverStatusText');
+    const controller = new AbortController();
+    const requestTimeout = window.setTimeout(() => controller.abort(), 10000);
     try {
-      const res = await fetch('/api/health');
+      const res = await fetch('/api/health', { cache: 'no-store', signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const health = await res.json();
       consecutiveFailures = 0;
@@ -1513,6 +1515,8 @@ async function startHealthMonitor() {
         sessionStorage.setItem('lf_failover_redirected', '1');
         window.location.replace(configuredBackupUrl);
       }
+    } finally {
+      window.clearTimeout(requestTimeout);
     }
   };
 

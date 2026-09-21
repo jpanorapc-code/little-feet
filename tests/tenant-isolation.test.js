@@ -76,6 +76,9 @@ const rawRequest = async (route) => {
 (async () => {
   try {
     await waitForServer();
+    const health = await request('/api/health');
+    assert.equal(health.response.status, 200);
+    assert.equal(health.response.headers.get('cache-control'), 'no-store');
     const readiness = await request('/api/ready');
     assert.equal(readiness.response.status, 503);
     assert.equal(readiness.data.checks.database, false);
