@@ -250,7 +250,7 @@ app.use((req, res, next) => {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+    "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://unpkg.com",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
@@ -355,6 +355,42 @@ const sendPublicRootFile = (req, res) => {
 };
 app.get('/backup.js', sendPublicRootFile);
 app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
+
+const browserVendorSources = Object.freeze({
+  'xlsx.js': 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'qrcode.js': 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+  'leaflet.js': 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'leaflet-markercluster.js': 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js'
+});
+const browserVendorCache = new Map();
+app.get('/vendor/:asset', async (req, res, next) => {
+  const source = browserVendorSources[req.params.asset];
+  if (!source) return res.status(404).end();
+  try {
+    let script = browserVendorCache.get(req.params.asset);
+    if (!script) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const response = await fetch(source, { signal: controller.signal, redirect: 'follow' });
+        if (!response.ok) throw new Error(`Vendor download failed with HTTP ${response.status}`);
+        script = await response.text();
+      } finally {
+        clearTimeout(timeout);
+      }
+      script = script
+        .replace(/\n?\/\/# sourceMappingURL=.*$/gm, '')
+        .replace(/\/\*# sourceMappingURL=[\s\S]*?\*\//g, '');
+      browserVendorCache.set(req.params.asset, script);
+    }
+    res.type('application/javascript');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(script);
+  } catch (error) {
+    error.status = 502;
+    next(error);
+  }
+});
 
 // In-Memory Database Store
 const db = {
