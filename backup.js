@@ -622,13 +622,38 @@ function setupFormTemplates() {
 }
 
 function setupRuntimeErrorHelpdesk() {
-  window.addEventListener('error', event => routeErrorToHelpdesk({ code: 'WEB_RUNTIME_ERROR', message: event.message || 'Unexpected browser error', line: event.lineno, column: event.colno, source: event.filename }));
-  window.addEventListener('unhandledrejection', event => routeErrorToHelpdesk({ code: 'WEB_PROMISE_ERROR', message: event.reason?.message || String(event.reason || 'Unexpected background error') }));
+  window.addEventListener('error', event => {
+    const resource = event.target && event.target !== window ? event.target : null;
+    if (resource) {
+      const source = resource.src || resource.href || '';
+      if (source) routeErrorToHelpdesk({ code: 'WEB_RESOURCE_ERROR', message: 'A browser resource failed to load.', source });
+      return;
+    }
+    routeErrorToHelpdesk({
+      code: 'WEB_RUNTIME_ERROR',
+      message: event.message || 'Unexpected browser error',
+      line: event.lineno,
+      column: event.colno,
+      source: event.filename,
+      stack: event.error?.stack || ''
+    });
+  }, true);
+  window.addEventListener('unhandledrejection', event => routeErrorToHelpdesk({
+    code: 'WEB_PROMISE_ERROR',
+    message: event.reason?.message || String(event.reason || 'Unexpected background error'),
+    stack: event.reason?.stack || ''
+  }));
 }
 
 function routeErrorToHelpdesk(error) {
-  captureDebugEvent({ category: 'Browser runtime', ...error });
-  const details = `${error.code}: ${error.message}${error.source ? `\nSource: ${error.source}` : ''}${error.line ? `\nLine: ${error.line}${error.column ? `, column ${error.column}` : ''}` : ''}`;
+  const redactedCrossOriginError = /^Script error\.?$/i.test(String(error.message || '').trim()) && !error.source;
+  const diagnosticMessage = redactedCrossOriginError
+    ? 'A cross-origin script failed, but the browser redacted its source. External libraries now load with CORS diagnostics so reproducing the fault should identify the exact file and line.'
+    : error.message;
+  const safeStack = String(error.stack || '').split('\n').slice(0, 5).join('\n');
+  const enrichedError = { ...error, message: diagnosticMessage, originalMessage: redactedCrossOriginError ? error.message : undefined };
+  captureDebugEvent({ category: 'Browser runtime', ...enrichedError });
+  const details = `${error.code}: ${diagnosticMessage}${error.source ? `\nSource: ${error.source}` : ''}${error.line ? `\nLine: ${error.line}${error.column ? `, column ${error.column}` : ''}` : ''}${safeStack ? `\nStack: ${safeStack}` : ''}`;
   console.error(details);
   if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
   sessionStorage.setItem(`lf_error_${details}`, '1');
@@ -1058,6 +1083,11 @@ function openSelectedWorkspace() {
 function setupSession() {
   loadPortalAudioPreference();
   applyRolePermissions(currentUser.role);
+  ['reportSigningUsername', 'reportTeacherUsername', 'parentReportUsername'].forEach(id => {
+    const field = document.getElementById(id);
+    if (field) field.value = currentUser?.username || '';
+  });
+  updateAlertLocationFilterStatus();
   const isParent = currentUser.role === 'parent';
   const subscriptionEntry = document.getElementById('subscriptionEntryButton');
   const subscriptionFooter = document.getElementById('subscriptionFooterLink');
@@ -2627,7 +2657,7 @@ function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
 // Emergency Broadcasts
 async function loadBroadcasts() {
   try {
-    const userPosition = await getCurrentPositionQuietly();
+    const userPosition = getCachedAlertPosition();
     const locationQuery = userPosition ? `?lat=${encodeURIComponent(userPosition.latitude)}&lng=${encodeURIComponent(userPosition.longitude)}` : '';
     const res = await fetch(`/api/broadcasts${locationQuery}`);
     const broadcasts = await res.json();
@@ -2644,6 +2674,7 @@ async function loadBroadcasts() {
     localStorage.setItem('lf_known_alert_ids', JSON.stringify([...knownAlertIds].slice(-100)));
     broadcastsLoaded = true;
 
+    updateAlertLocationFilterStatus();
     listEl.innerHTML = visibleBroadcasts.length
       ? visibleBroadcasts.map(b => `
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
@@ -3941,18 +3972,63 @@ function distanceInKm(lat1, lng1, lat2, lng2) {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function getCurrentPositionQuietly() {
+const ALERT_LOCATION_SESSION_KEY = 'lf_alert_location';
+
+function getCachedAlertPosition() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(ALERT_LOCATION_SESSION_KEY) || 'null');
+    if (!cached || !Number.isFinite(Number(cached.latitude)) || !Number.isFinite(Number(cached.longitude))) return null;
+    return { latitude: Number(cached.latitude), longitude: Number(cached.longitude), capturedAt: cached.capturedAt || null };
+  } catch {
+    return null;
+  }
+}
+
+function cacheAlertPosition(position) {
+  const cached = {
+    latitude: Number(Number(position.latitude).toFixed(5)),
+    longitude: Number(Number(position.longitude).toFixed(5)),
+    capturedAt: new Date().toISOString()
+  };
+  sessionStorage.setItem(ALERT_LOCATION_SESSION_KEY, JSON.stringify(cached));
+  return cached;
+}
+
+function updateAlertLocationFilterStatus() {
+  const status = document.getElementById('alertLocationFilterStatus');
+  if (!status) return;
+  const cached = getCachedAlertPosition();
+  status.textContent = cached
+    ? `Location filtering enabled for this browser tab · last refreshed ${new Date(cached.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Location filtering is off until you choose to enable it.';
+}
+
+function requestCurrentPositionFromUserGesture() {
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(position => resolve(position.coords), () => resolve(null), { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+    navigator.geolocation.getCurrentPosition(
+      position => resolve(position.coords),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+    );
   });
 }
 
+async function enableAlertLocationFiltering() {
+  const position = await requestCurrentPositionFromUserGesture();
+  if (!position) return alert('Location access was not available. Little Feet will continue without location-based filtering.');
+  cacheAlertPosition(position);
+  updateAlertLocationFilterStatus();
+  loadBroadcasts();
+}
+
 async function setAlertLocation() {
-  const position = await getCurrentPositionQuietly();
+  const position = await requestCurrentPositionFromUserGesture();
   if (!position) return alert('Location access is required to create an area-based alert.');
+  cacheAlertPosition(position);
   alertLocation = { lat: position.latitude, lng: position.longitude };
   document.getElementById('bcLocation').value = `${position.latitude.toFixed(5)}, ${position.longitude.toFixed(5)}`;
+  updateAlertLocationFilterStatus();
 }
 
 async function deleteBroadcast(id) {
