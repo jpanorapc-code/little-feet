@@ -599,9 +599,9 @@ function setupFormTemplates() {
   ], template => { const [start, end] = template.time.split(' - '); document.getElementById('schDay').value = template.day; document.getElementById('schStartTime').value = start; document.getElementById('schEndTime').value = end; document.getElementById('schActivity').value = template.activity; });
 
   addFormTemplates(document.getElementById('ticketForm'), 'support request', [
-    { label: 'Fee or payment question', department: 'Finance', priority: 'Normal', subject: 'Request for account assistance', message: 'Please review the account and advise on the next steps.' },
-    { label: 'Medical information update', department: 'Medical', priority: 'High', subject: 'Learner medical information update', message: 'Please contact me to confirm the correct process for updating this learner’s medical information.' },
-    { label: 'General school query', department: 'Admin', priority: 'Normal', subject: 'School administration query', message: 'Please provide guidance or arrange a suitable time to discuss this request.' }
+    { label: 'Fee or payment question', department: 'Finance & Billing', priority: 'Medium', subject: 'Request for account assistance', message: 'Please review the account and advise on the next steps.' },
+    { label: 'Medical information update', department: 'Care, Health & Allergies', priority: 'High', subject: 'Learner medical information update', message: 'Please contact me to confirm the correct process for updating this learner’s medical information.' },
+    { label: 'General school query', department: 'Administration & Admissions', priority: 'Medium', subject: 'School administration query', message: 'Please provide guidance or arrange a suitable time to discuss this request.' }
   ], template => { document.getElementById('ticketDept').value = template.department; document.getElementById('ticketPriority').value = template.priority; document.getElementById('ticketSubject').value = template.subject; document.getElementById('ticketMessage').value = template.message; });
 
   addFormTemplates(document.getElementById('broadcastForm'), 'alert', [
@@ -651,7 +651,7 @@ function openRuntimeErrorSupport() {
   const priority = document.getElementById('ticketPriority');
   const subject = document.getElementById('ticketSubject');
   const message = document.getElementById('ticketMessage');
-  if (department) department.value = 'Technical Support';
+  if (department) department.value = 'IT & Portal Support';
   if (priority) priority.value = 'High';
   if (subject) subject.value = `Technical issue: ${pending.code}`;
   if (message) {
@@ -1146,7 +1146,19 @@ function renderRoleHomePanel() {
   panel.innerHTML = `<div class="role-home-content"><div><span class="portal-welcome-kicker">YOUR LITTLE FEET WORKSPACE</span><h1>${escapeWorkspaceText(experience.title)}</h1><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
 }
 
-function logout() {
+async function logout() {
+  try {
+    const response = await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      alert(result.message || 'Little Feet could not end your secure session. Please try again.');
+      return false;
+    }
+  } catch {
+    alert('Little Feet could not reach the server to end your secure session. Please try again.');
+    return false;
+  }
+
   clearTimeout(wallpaperIdleTimer);
   if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
   schoolStatusTimer = null;
@@ -1164,17 +1176,18 @@ function logout() {
   if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
   knownTicketIds = new Set();
   ticketsLoaded = false;
-  void fetch('/api/auth/logout', { method: 'POST' });
   document.getElementById('dashboardSection').classList.add('hidden');
   document.getElementById('authSection').classList.remove('hidden');
   document.body.classList.remove('portal-active');
   document.getElementById('stickyNotesOverlay')?.replaceChildren();
   document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
   document.getElementById('stickyNotesLauncher')?.classList.add('hidden');
+  return true;
 }
 
-function switchUser() {
-  logout();
+async function switchUser() {
+  const signedOut = await logout();
+  if (!signedOut) return;
   const usernameInput = document.getElementById('loginUsername');
   const pinInput = document.getElementById('loginPin');
   if (usernameInput) usernameInput.value = '';
@@ -2573,12 +2586,10 @@ if (ticketForm) {
   ticketForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const body = {
-      id: Date.now().toString(),
       department: document.getElementById('ticketDept').value,
       priority: document.getElementById('ticketPriority').value,
       subject: document.getElementById('ticketSubject').value,
       message: document.getElementById('ticketMessage').value,
-      createdBy: currentUser?.username,
       assignedTo: currentUser?.role === 'admin' ? document.getElementById('ticketAssignee')?.value : ''
     };
     const response = await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
