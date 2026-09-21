@@ -140,7 +140,7 @@
 
     h2 { color: var(--text-dark); font-size: 1.15rem; font-weight: 700; }
     
-    label { font-size: 0.82rem; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; display: block; }
+    label, .form-label { font-size: 0.82rem; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; display: block; }
     label .req { color: #e11d48; margin-left: 2px; }
 
     input, select, textarea { 
@@ -458,7 +458,7 @@
     .card-header-bar { gap:12px; padding-bottom:12px; margin-bottom:18px; }
     .card-header-bar h2 { letter-spacing:-.015em; }
     h3 { line-height:1.3; }
-    label { margin-bottom:6px; letter-spacing:.01em; }
+    label, .form-label { margin-bottom:6px; letter-spacing:.01em; }
     input, select, textarea { min-height:44px; padding:11px 13px; border-radius:9px; background-color:color-mix(in srgb,var(--input-bg) 92%, #ffffff 8%); }
     textarea { min-height:96px; line-height:1.45; resize:vertical; }
     input::placeholder, textarea::placeholder { color:color-mix(in srgb,var(--text-muted) 85%, transparent); }
@@ -1658,7 +1658,7 @@
                 </select>
               </div>
               <div style="flex: 1;">
-                <label>Time Slot Block <span class="req">*</span></label>
+                <label for="schStartTime">Time Slot Block <span class="req">*</span></label>
                 <div style="display:flex;gap:8px;align-items:center;"><input type="time" id="schStartTime" aria-label="Start time" required><span aria-hidden="true">to</span><input type="time" id="schEndTime" aria-label="End time" required></div>
               </div>
             </div>
@@ -1677,7 +1677,7 @@
           </div>
           
           <div class="role-admin role-teacher" style="margin-bottom: 15px; background-color: var(--input-bg); border: 1px dashed var(--border-color); padding: 12px; border-radius: 6px;">
-            <label>Import schedule template (Excel .xlsx or .csv)</label>
+            <label for="excelFileInput">Import schedule template (Excel .xlsx or .csv)</label>
             <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 5px;">
             <button type="button" onclick="importScheduleExcel()" class="action-btn btn-blue">Import timetable</button>
           </div>
@@ -1731,11 +1731,11 @@
           <form id="badgeForm">
             <div class="badge-form-lead">
               <div>
-                <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Student Name *</label>
+                <label for="badgeStudentName" style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Student Name *</label>
                 <input id="badgeStudentName" type="text" placeholder="e.g. Noah Miller" required style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;" />
               </div>
               <div>
-                <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Milestone Category *</label>
+                <label for="badgeCategory" style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Milestone Category *</label>
                 <select id="badgeCategory" class="visually-hidden-select" aria-hidden="true" tabindex="-1">
                   <option value="🏆 Athletics & Physical Motor">🏆 Athletics & Physical Motor</option>
                   <option value="🎨 Creative & Visual Arts">🎨 Creative & Visual Arts</option>
@@ -1764,12 +1764,12 @@
             </div>
 
             <div style="margin-bottom: 15px;">
-              <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Badge Award Name *</label>
+              <label for="badgeTitle" style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Badge Award Name *</label>
               <input id="badgeTitle" type="text" placeholder="e.g. Star Sharer & Team Helper" required style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;" />
             </div>
 
             <div style="margin-bottom: 15px;">
-              <label style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Educator's Evaluation Note *</label>
+              <label for="badgeNote" style="display: block; color: #fff; margin-bottom: 5px; font-weight: bold;">Educator's Evaluation Note *</label>
               <textarea id="badgeNote" placeholder="Write why the student achieved this award..." style="width: 100%; height: 90px; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; resize: vertical;"></textarea>
             </div>
 
@@ -1826,7 +1826,7 @@
         </div>
 
         <div class="card role-admin role-teacher" style="margin-bottom: 20px; background-color: var(--input-bg); border: 1px dashed var(--border-color); padding: 15px; border-radius: 6px;">
-          <label>Import attendance roster (Excel .xlsx or .csv)</label>
+          <label for="attExcelFileInput">Import attendance roster (Excel .xlsx or .csv)</label>
           <input type="file" id="attExcelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 8px;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" onclick="downloadAttendanceTemplate()" class="action-btn btn-blue">⬇ Download template</button><button type="button" onclick="importAttendanceExcel()" class="action-btn btn-green">Import attendance</button></div>
         </div>
@@ -1896,7 +1896,7 @@
                 <button type="submit" class="submit-btn" style="margin-bottom: 0; width: auto; padding: 11px 25px;">Send message</button>
               </div>
               <div style="display: flex; gap: 10px; align-items: center; font-size: 0.78rem;">
-                <label style="margin-bottom:0;">Message Text Color:</label>
+                <label for="chatColorPicker" style="margin-bottom:0;">Message Text Color:</label>
                 <input type="color" id="chatColorPicker" value="#2dd4bf" style="width: 35px; height: 25px; padding: 0; margin-bottom: 0; cursor: pointer;">
               </div>
             </form>
@@ -1906,7 +1906,7 @@
             <div class="card-header-bar">
               <h2>Private Conversation</h2>
               <div style="display: flex; gap: 8px; align-items: center;">
-                <label style="margin-bottom:0; font-size:0.8rem;">Approved Contact:</label>
+                <label for="directRecipientSelect" style="margin-bottom:0; font-size:0.8rem;">Approved Contact:</label>
                 <select id="directRecipientSelect" onchange="loadDirectChatMessages()" style="margin-bottom: 0; padding: 5px; font-size: 0.8rem; width: auto;">
                   <option value="">Select an approved school contact...</option>
                 </select>
@@ -1923,7 +1923,7 @@
                 <button type="submit" class="submit-btn" style="margin-bottom: 0; width: auto; padding: 11px 25px;">Send message</button>
               </div>
               <div style="display: flex; gap: 10px; align-items: center; font-size: 0.78rem;">
-                <label style="margin-bottom:0;">Message Text Color:</label>
+                <label for="directChatColorPicker" style="margin-bottom:0;">Message Text Color:</label>
                 <input type="color" id="directChatColorPicker" value="#2dd4bf" style="width: 35px; height: 25px; padding: 0; margin-bottom: 0; cursor: pointer;">
               </div>
             </form>
@@ -2108,8 +2108,8 @@
           <p style="color:var(--text-muted);margin-bottom:14px;">A report becomes complete only after the teacher and linked parent have both signed it. Each signer uses their own PIN to prevent a child or unauthorised person signing.</p>
           <div class="workspace-grid">
             <div class="workspace-card"><h3>Set or change signing PIN</h3><p>Choose a separate four-digit-or-longer PIN for report signatures. Never share it with a child.</p><form id="signingPinForm"><input id="reportSigningUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="reportSigningPin" type="password" autocomplete="new-password" minlength="4" placeholder="New signing PIN" required><button class="submit-btn">Save signing PIN</button></form></div>
-            <div id="teacherReportPublisher" class="workspace-card role-teacher role-admin"><h3>Publish a report for review</h3><form id="reportPublishForm"><input id="reportTeacherUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="reportStudent" placeholder="Learner name" required><input id="reportTitle" placeholder="Report or test title" required><input id="reportPeriod" placeholder="Month and year, e.g. August 2026" required><input id="reportParentUsername" autocomplete="off" placeholder="Linked parent account email" required><input id="reportTeacherPin" type="password" autocomplete="current-password" placeholder="Your signing PIN" required><label>Teacher signature</label><canvas id="teacherSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('teacherSignaturePad')">Clear signature</button><button class="submit-btn">Publish for parent signature</button></form></div>
-            <div id="parentReportSigner" class="workspace-card"><h3>Parent signature</h3><p>Select an awaiting report below, sign with your finger or mouse, and enter your signing PIN.</p><form id="parentReportPinForm" onsubmit="return false;"><input id="parentReportUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="parentReportPin" type="password" autocomplete="current-password" placeholder="Your signing PIN"></form><label>Parent signature</label><canvas id="parentSignaturePad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('parentSignaturePad')">Clear signature</button></div>
+            <div id="teacherReportPublisher" class="workspace-card role-teacher role-admin"><h3>Publish a report for review</h3><form id="reportPublishForm"><input id="reportTeacherUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="reportStudent" placeholder="Learner name" required><input id="reportTitle" placeholder="Report or test title" required><input id="reportPeriod" placeholder="Month and year, e.g. August 2026" required><input id="reportParentUsername" autocomplete="off" placeholder="Linked parent account email" required><input id="reportTeacherPin" type="password" autocomplete="current-password" placeholder="Your signing PIN" required><span class="form-label">Teacher signature</span><canvas id="teacherSignaturePad" aria-label="Teacher signature pad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('teacherSignaturePad')">Clear signature</button><button class="submit-btn">Publish for parent signature</button></form></div>
+            <div id="parentReportSigner" class="workspace-card"><h3>Parent signature</h3><p>Select an awaiting report below, sign with your finger or mouse, and enter your signing PIN.</p><form id="parentReportPinForm" onsubmit="return false;"><input id="parentReportUsername" name="username" autocomplete="username" class="sr-only" tabindex="-1" aria-hidden="true"><input id="parentReportPin" type="password" autocomplete="current-password" placeholder="Your signing PIN"></form><span class="form-label">Parent signature</span><canvas id="parentSignaturePad" aria-label="Parent signature pad" class="signature-pad" width="520" height="140"></canvas><button type="button" class="action-btn btn-blue" onclick="clearSignature('parentSignaturePad')">Clear signature</button></div>
           </div><div id="reportReviewList" class="record-list"></div>
         </div>
       </div>
@@ -2118,11 +2118,11 @@
         <div class="card"><div class="card-header-bar"><h2>📋 Learner Register</h2><span class="badge-tag info">STAFF ACCESS</span></div>
           <p style="color:var(--text-muted);margin-bottom:14px;">Record the core enrolment and emergency information required before a learner is placed in a class.</p>
           <form id="registryForm" class="workspace-grid">
-            <div><label>Learner full name *</label><input name="learnerName" required></div><div><label>Date of birth *</label><input name="dateOfBirth" type="date" required></div>
-            <div><label>Grade / class</label><input name="className" placeholder="e.g. Toddlers"></div><div><label>Parent / guardian name *</label><input name="guardianName" required></div>
-            <div><label>Guardian phone *</label><input name="guardianPhone" type="tel" required></div><div><label>Guardian email</label><input name="guardianEmail" type="email"></div>
-            <div><label>Home address *</label><input name="address" required></div><div><label>Emergency contact & phone</label><input name="emergencyContact" placeholder="Name · phone"></div>
-            <div><label>Medical / allergy notes</label><input name="medicalNotes" placeholder="Allergies, medication, care notes"></div><div><label>Consent status</label><select name="consent"><option>Pending verification</option><option>Parent consent received</option></select></div>
+            <div><label for="registryLearnerName">Learner full name *</label><input id="registryLearnerName" name="learnerName" required></div><div><label for="registryDateOfBirth">Date of birth *</label><input id="registryDateOfBirth" name="dateOfBirth" type="date" required></div>
+            <div><label for="registryClassName">Grade / class</label><input id="registryClassName" name="className" placeholder="e.g. Toddlers"></div><div><label for="registryGuardianName">Parent / guardian name *</label><input id="registryGuardianName" name="guardianName" required></div>
+            <div><label for="registryGuardianPhone">Guardian phone *</label><input id="registryGuardianPhone" name="guardianPhone" type="tel" required></div><div><label for="registryGuardianEmail">Guardian email</label><input id="registryGuardianEmail" name="guardianEmail" type="email"></div>
+            <div><label for="registryAddress">Home address *</label><input id="registryAddress" name="address" required></div><div><label for="registryEmergencyContact">Emergency contact & phone</label><input id="registryEmergencyContact" name="emergencyContact" placeholder="Name · phone"></div>
+            <div><label for="registryMedicalNotes">Medical / allergy notes</label><input id="registryMedicalNotes" name="medicalNotes" placeholder="Allergies, medication, care notes"></div><div><label for="registryConsent">Consent status</label><select id="registryConsent" name="consent"><option>Pending verification</option><option>Parent consent received</option></select></div>
             <div style="grid-column:1/-1;"><button class="submit-btn">Save learner record</button></div>
           </form><div id="registryList" class="record-list"></div>
         </div>
