@@ -89,6 +89,10 @@ const rawRequest = async (route) => {
     const publicBundle = await rawRequest('/backup.js');
     assert.equal(publicBundle.response.status, 200);
     assert.match(publicBundle.body, /function logout\(/);
+    const anonymousSession = await request('/api/auth/session');
+    assert.equal(anonymousSession.response.status, 200);
+    assert.equal(anonymousSession.data.authenticated, false);
+    assert.equal(anonymousSession.data.user, null);
     const alphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     const alphaTeacherLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-teacher', pin: 'TeacherPass1' } });
     const alphaPrincipalLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-principal', pin: 'PrincipalPass1' } });
