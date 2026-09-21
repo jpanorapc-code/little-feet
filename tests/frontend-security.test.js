@@ -51,5 +51,14 @@ assert.ok(server.includes('applicationEncrypted: encryptJsonField(application)')
 assert.ok(server.includes('delete ticket.application'));
 assert.ok(server.includes('MAX_VISITOR_PASS_ATTEMPTS'));
 assert.ok(server.includes('radiusKm < 1 || radiusKm > 50'));
+assert.ok(server.includes('RENDER_EXTERNAL_URL'));
+assert.ok(server.includes("res.clearCookie('littlefeet.sid'"));
+assert.ok(server.includes("const allowedDepartments = new Set(["));
+assert.ok(server.includes("item: supportTicketView(item)"));
+assert.ok(server.includes("ticket: supportTicketView(ticket)"));
+assert.ok(frontend.includes("const response = await fetch('/api/auth/logout'"));
+assert.ok(frontend.includes("if (!signedOut) return;"));
+assert.ok(frontend.includes("department: 'IT & Portal Support'"));
+assert.ok(frontend.includes("department: 'Finance & Billing'"));
 
 console.log('Frontend and server security regression test passed.');
