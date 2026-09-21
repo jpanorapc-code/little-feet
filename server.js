@@ -9,7 +9,7 @@ const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 10000;
 const isProduction = process.env.NODE_ENV === 'production';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
@@ -3025,8 +3025,8 @@ app.get(/(.*)/, (req, res) => {
 
 // Start Server
 persistenceReady.then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }).catch(error => {
   console.error('Database startup failed:', error.message);
