@@ -107,9 +107,12 @@ const rawRequest = async (route) => {
     assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
     assert.equal(bravoParentLogin.response.status, 200);
-    const migratedAlphaLogin = await request('/api/login', { method: 'POST', cookie: alphaLogin.cookie, body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
+    const previousAlphaSession = alphaLogin.cookie;
+    const migratedAlphaLogin = await request('/api/login', { method: 'POST', cookie: previousAlphaSession, body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     assert.equal(migratedAlphaLogin.response.status, 200);
-    assert.notEqual(migratedAlphaLogin.cookie, alphaLogin.cookie, 'Successful authentication must rotate the session identifier.');
+    assert.notEqual(migratedAlphaLogin.cookie, previousAlphaSession, 'Successful authentication must rotate the session identifier.');
+    assert.equal((await request('/api/system-diagnostics', { cookie: previousAlphaSession })).response.status, 403, 'The pre-authentication session must be invalidated after rotation.');
+    alphaLogin.cookie = migratedAlphaLogin.cookie;
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
