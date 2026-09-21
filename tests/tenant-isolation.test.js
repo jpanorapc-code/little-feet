@@ -107,8 +107,15 @@ const rawRequest = async (route) => {
     assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
     assert.equal(bravoParentLogin.response.status, 200);
-    const migratedAlphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
+    const originalAlphaCookie = alphaLogin.cookie;
+    const migratedAlphaLogin = await request('/api/login', { method: 'POST', cookie: originalAlphaCookie, body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     assert.equal(migratedAlphaLogin.response.status, 200);
+    assert.notEqual(migratedAlphaLogin.cookie, originalAlphaCookie);
+    const replacedAlphaSession = await request('/api/auth/session', { cookie: originalAlphaCookie });
+    assert.equal(replacedAlphaSession.response.status, 200);
+    assert.equal(replacedAlphaSession.data.authenticated, false);
+    assert.equal(replacedAlphaSession.data.user, null);
+    alphaLogin.cookie = migratedAlphaLogin.cookie;
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
@@ -144,8 +151,8 @@ const rawRequest = async (route) => {
     assert.equal(alphaCodes.data.length, 1);
     assert.equal(bravoCodes.data.length, 0);
 
-    const issued = await request('/api/learner-access-codes', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerKey: alphaCodes.data[0].learnerKey } });
-    assert.equal(issued.response.status, 201);
+    const duplicateCode = await request('/api/learner-access-codes', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerKey: alphaCodes.data[0].learnerKey } });
+    assert.equal(duplicateCode.response.status, 409);
     const blockedPrint = await request(`/api/learner-access-codes/${encodeURIComponent(alphaCodes.data[0].learnerKey)}/printable`, { cookie: bravoLogin.cookie });
     assert.equal(blockedPrint.response.status, 404);
 
@@ -168,7 +175,7 @@ const rawRequest = async (route) => {
     const registryRecord = await request('/api/registry', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', dateOfBirth: '2020-01-01', guardianName: 'Alpha Parent', guardianPhone: '0000000000', address: 'Test address' } });
     const consentRecord = await request('/api/consents', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', guardianName: 'Alpha Parent', internalUpdates: true, marketingPhotos: false } });
     const pickupRecord = await request('/api/pickups/verify', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerName: 'Alpha Learner', pickupAdult: 'Alpha Parent', verificationCode: '2468', action: 'Pickup' } });
-    assert.equal(registryRecord.response.status, 200);
+    assert.equal(registryRecord.response.status, 201);
     assert.equal(consentRecord.response.status, 201);
     assert.equal(pickupRecord.response.status, 201);
     assert.equal((await request('/api/registry', { cookie: alphaParentLogin.cookie })).response.status, 403);
@@ -256,6 +263,15 @@ const rawRequest = async (route) => {
     assert.equal(alphaLedger.data.length, 3);
     assert.deepEqual(new Set(alphaLedger.data.map(entry => entry.targetType)), new Set(['subscription', 'parent_subscription', 'parent_payment']));
     assert.equal(bravoLedger.data.length, 0);
+
+    const bravoParentCookie = bravoParentLogin.cookie;
+    const logout = await request('/api/auth/logout', { method: 'POST', cookie: bravoParentCookie });
+    assert.equal(logout.response.status, 200);
+    assert.equal(logout.data.success, true);
+    const loggedOutBravoSession = await request('/api/auth/session', { cookie: bravoParentCookie });
+    assert.equal(loggedOutBravoSession.response.status, 200);
+    assert.equal(loggedOutBravoSession.data.authenticated, false);
+    assert.equal(loggedOutBravoSession.data.user, null);
 
     console.log('Tenant isolation test passed.');
   } catch (error) {

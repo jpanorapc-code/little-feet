@@ -816,6 +816,15 @@ persistenceReady = initialisePersistence();
 
 // API Endpoints
 // Auth
+const establishAuthenticatedSession = (req, account, callback) => {
+  const safeUser = safeAccount(account);
+  req.session.regenerate(regenerateError => {
+    if (regenerateError) return callback(regenerateError);
+    req.session.littleFeetUser = safeUser;
+    req.session.save(saveError => callback(saveError, safeUser));
+  });
+};
+
 app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
   const normalizedUsername = normalizeUsername(username);
@@ -831,9 +840,7 @@ app.post('/api/login', (req, res) => {
     }
     loginAttempts.delete(attemptKey);
     if (pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
-    const safeUser = safeAccount(user);
-    req.session.littleFeetUser = safeUser;
-    req.session.save(error => {
+    establishAuthenticatedSession(req, user, (error, safeUser) => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
       res.json({ user: safeUser });
     });
@@ -2892,7 +2899,16 @@ app.get('/api/auth/session', (req, res) => {
   res.json({ authenticated: true, user: safeAccount(account) });
 });
 app.post('/api/auth/logout', (req, res) => {
-  req.session?.destroy(() => res.json({ success: true }));
+  const clearSessionCookie = () => res.clearCookie('littlefeet.sid', { path: '/', secure: isProduction, httpOnly: true, sameSite: 'lax' });
+  if (!req.session) {
+    clearSessionCookie();
+    return res.json({ success: true });
+  }
+  req.session.destroy(error => {
+    clearSessionCookie();
+    if (error) return res.status(500).json({ message: 'Unable to complete sign out. Please try again.' });
+    res.json({ success: true });
+  });
 });
 
 app.get('/auth/google', (req, res, next) => {
@@ -2906,8 +2922,7 @@ app.get('/auth/google/callback',
     const email = req.user?.email;
     const account = findAccountByUsername(email);
     if (!account) return res.redirect('/?oauthError=account-not-linked');
-    req.session.littleFeetUser = safeAccount(account);
-    res.redirect('/?oauth=google');
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=google'));
   }
 );
 
@@ -2948,8 +2963,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     const profile = await profileResponse.json();
     const account = findAccountByUsername(profile.email);
     if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
-    req.session.littleFeetUser = safeAccount(account);
-    res.redirect('/?oauth=yahoo');
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'));
   } catch (error) {
     console.error('Yahoo sign-in failed:', error.message);
     res.redirect('/?oauthError=yahoo-sign-in-failed');
@@ -3006,8 +3020,7 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     const profile = await profileResponse.json();
     const account = findAccountByUsername(profile.mail || profile.userPrincipalName);
     if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
-    req.session.littleFeetUser = safeAccount(account);
-    res.redirect('/?oauth=microsoft');
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'));
   } catch (error) {
     console.error('Microsoft sign-in failed:', error.message);
     res.redirect('/?oauthError=microsoft-sign-in-failed');
