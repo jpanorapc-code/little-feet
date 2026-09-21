@@ -285,9 +285,9 @@ function observeProfessionalIcons() {
 
 async function completeProviderLogin() {
   try {
-    const response = await fetch('/api/auth/session');
+    const response = await fetch('/api/auth/session', { cache: 'no-store' });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to complete provider sign-in.');
+    if (!response.ok || !data.authenticated || !data.user) throw new Error(data.message || 'Unable to complete provider sign-in.');
     currentUser = data.user;
     window.history.replaceState({}, document.title, '/');
     setupSession();
@@ -302,6 +302,7 @@ async function restoreAuthenticatedSession() {
     const response = await fetch('/api/auth/session', { cache: 'no-store' });
     if (!response.ok) return;
     const data = await response.json();
+    if (!data.authenticated || !data.user) return;
     currentUser = data.user;
     setupSession();
   } catch { /* The sign-in screen remains available if the session check is unavailable. */ }
