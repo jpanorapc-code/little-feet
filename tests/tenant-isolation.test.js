@@ -9,6 +9,8 @@ const root = path.resolve(__dirname, '..');
 const temporaryDirectory = fs.mkdtempSync(path.join(root, 'tmp', 'tenant-isolation-'));
 const port = 5600 + Math.floor(Math.random() * 300);
 const pinHash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
+const validPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const oversizedPng = `data:image/png;base64,${Buffer.alloc(5 * 1024 * 1024 + 1, 0xff).toString('base64')}`;
 const schools = [
   { id: 'school-alpha', name: 'Alpha School', status: 'active' },
   { id: 'school-bravo', name: 'Bravo School', status: 'active' }
@@ -36,7 +38,7 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
   env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
-  stdio: ['ignore', 'pipe', 'pipe']
+  stdio: ['ignore', 'ignore', 'pipe']
 });
 let childErrorOutput = '';
 child.stderr.on('data', chunk => { childErrorOutput += chunk.toString(); });
@@ -279,6 +281,28 @@ const rawRequest = async (route) => {
     assert.equal(loggedOutBravoSession.data.authenticated, false);
     assert.equal(loggedOutBravoSession.data.user, null);
 
+    const unauthenticatedMedia = await request('/api/posts', { method: 'POST', body: { caption: 'Unauthorised', mediaUrl: validPng } });
+    assert.equal(unauthenticatedMedia.response.status, 403);
+    const parentMedia = await request('/api/posts', { method: 'POST', cookie: alphaParentLogin.cookie, body: { caption: 'Parent cannot post', mediaUrl: validPng } });
+    assert.equal(parentMedia.response.status, 403);
+    const validPost = await request('/api/posts', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { caption: 'Valid media', mediaUrl: validPng } });
+    assert.equal(validPost.response.status, 200);
+    const invalidMedia = [
+      'data:image/png;base64,SGVsbG8=',
+      validPng.replace('data:image/png', 'data:image/jpeg'),
+      'javascript:alert(1)',
+      oversizedPng
+    ];
+    for (const mediaUrl of invalidMedia) {
+      const rejectedPost = await request('/api/posts', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { caption: 'Rejected media', mediaUrl } });
+      assert.equal(rejectedPost.response.status, 400);
+    }
+    const validWorksheet = await request('/api/worksheets', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { studentName: 'Media Test Learner', title: 'Valid image', grade: 90, photoUrl: validPng } });
+    assert.equal(validWorksheet.response.status, 200);
+    const invalidWorksheet = await request('/api/worksheets', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { studentName: 'Media Test Learner', title: 'Invalid image', grade: 90, photoUrl: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' } });
+    assert.equal(invalidWorksheet.response.status, 400);
+    const bravoPosts = await request('/api/posts', { cookie: bravoLogin.cookie });
+    assert.equal(bravoPosts.data.length, 0);
     console.log('Tenant isolation test passed.');
   } catch (error) {
     console.error(error);

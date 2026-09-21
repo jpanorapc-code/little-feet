@@ -169,10 +169,25 @@ const looksEncryptedField = (value) => {
 };
 const decryptStoredField = (value) => looksEncryptedField(value) ? decryptField(value) : String(value || '');
 const encryptStoredField = (value) => looksEncryptedField(value) ? String(value) : encryptField(value);
-const validSignatureData = (value) => {
-  const signature = String(value || '');
-  return signature.length <= 512 * 1024 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature);
+const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
+const MEDIA_SIGNATURES = Object.freeze({
+  'image/png': bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/jpeg': bytes => bytes.length >= 3 && bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])),
+  'image/gif': bytes => bytes.length >= 6 && (bytes.subarray(0, 6).toString('ascii') === 'GIF87a' || bytes.subarray(0, 6).toString('ascii') === 'GIF89a'),
+  'image/webp': bytes => bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP'
+});
+const decodeImageDataUrl = (value, allowedMimeTypes = Object.keys(MEDIA_SIGNATURES), maxBytes = MAX_MEDIA_BYTES) => {
+  if (typeof value !== 'string') return null;
+  const match = /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match || !allowedMimeTypes.includes(match[1]) || match[2].length % 4 !== 0) return null;
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > maxBytes || !MEDIA_SIGNATURES[match[1]](bytes)) return null;
+  return { mimeType: match[1], bytes };
 };
+const validPostMediaData = value => Boolean(decodeImageDataUrl(value, ['image/png', 'image/jpeg', 'image/webp']));
+const validWorksheetMediaData = value => Boolean(decodeImageDataUrl(value));
+const validSignatureData = value => Boolean(decodeImageDataUrl(value, ['image/png'], 512 * 1024));
+const safeStoredMedia = (value, validator = validWorksheetMediaData) => value == null ? value : (validator(value) ? value : null);
 const studentSensitiveView = (student) => ({
   ...student,
   dateOfBirth: decryptStoredField(student.dateOfBirth),
@@ -451,6 +466,7 @@ let stateDatabase = null;
 let postgresPool = null;
 let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
+let replicaSnapshotVersion = '';
 
 class PostgresSessionStore extends session.Store {
   constructor() {
@@ -792,8 +808,11 @@ async function saveDatabaseState() {
 function loadReplicaSnapshot() {
   try {
     if (!fs.existsSync(replicaFile)) return;
+    const snapshotStat = fs.statSync(replicaFile);
+    const snapshotVersion = `${snapshotStat.mtimeMs}:${snapshotStat.size}`;
+    if (snapshotVersion === replicaSnapshotVersion) return;
     const saved = JSON.parse(fs.readFileSync(replicaFile, 'utf8'));
-    applySavedState(saved);
+    if (applySavedState(saved)) replicaSnapshotVersion = snapshotVersion;
   } catch (error) {
     console.error('Unable to load standby snapshot:', error.message);
   }
@@ -1925,11 +1944,12 @@ app.post('/api/term', (req, res) => {
 app.get('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view the school feed.' });
-  res.json(tenantRecords(db.posts, actor));
+  res.json(tenantRecords(db.posts, actor).map(post => ({ ...post, mediaUrl: safeStoredMedia(post.mediaUrl, validPostMediaData) })));
 });
 app.post('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
+  if (req.body?.mediaUrl !== undefined && req.body.mediaUrl !== null && !validPostMediaData(req.body.mediaUrl)) return res.status(400).json({ message: 'Attached media must be a supported PNG, JPEG, or WebP image under 5 MB.' });
   const post = tagSchoolRecord(actor, req.body || {});
   post.createdAt = post.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   db.posts.unshift(post);
@@ -1978,11 +1998,12 @@ app.delete('/api/schedules/:id', (req, res) => {
 app.get('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view learning files.' });
-  res.json(learnerRecordsVisibleTo(db.worksheets, actor));
+  res.json(learnerRecordsVisibleTo(db.worksheets, actor).map(worksheet => ({ ...worksheet, photoUrl: safeStoredMedia(worksheet.photoUrl) })));
 });
 app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
+  if (req.body?.photoUrl !== undefined && req.body.photoUrl !== null && !validWorksheetMediaData(req.body.photoUrl)) return res.status(400).json({ message: 'Attached evidence must be a supported PNG, JPEG, GIF, or WebP image under 5 MB.' });
   const item = tagSchoolRecord(actor, { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
