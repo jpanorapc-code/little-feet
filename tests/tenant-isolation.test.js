@@ -194,7 +194,7 @@ const rawRequest = async (route) => {
     const districtSearch = await request('/api/students/search', { cookie: alphaDistrictLogin.cookie });
     assert.ok(districtSearch.data.every(student => !Object.hasOwn(student, 'medicalNotes') && !Object.hasOwn(student, 'emergencyContact') && !Object.hasOwn(student, 'authorisedPickups')));
 
-    const signingPin = await request('/api/report-signing-pin', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { pin: '2468' } });
+    const signingPin = await request('/api/report-signing-pin', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { pin: '246824' } });
     assert.equal(signingPin.response.status, 200);
     const teacherSessionAfterSigningPin = await request('/api/auth/session', { cookie: alphaTeacherLogin.cookie });
     assert.equal(Object.hasOwn(teacherSessionAfterSigningPin.data.user, 'reportSigningPinHash'), false);
