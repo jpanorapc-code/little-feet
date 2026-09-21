@@ -16,6 +16,7 @@ const schools = [
 
 fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'server.js'));
 fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory, 'auth-crypto.js'));
+fs.copyFileSync(path.join(root, 'backup.js'), path.join(temporaryDirectory, 'backup.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({
   schools,
   users: [
@@ -67,6 +68,11 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
   return { response, data, cookie: response.headers.get('set-cookie')?.split(';')[0] || cookie };
 };
 
+const rawRequest = async (route) => {
+  const response = await fetch(`http://127.0.0.1:${port}${route}`);
+  return { response, body: await response.text() };
+};
+
 (async () => {
   try {
     await waitForServer();
@@ -76,6 +82,13 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     const keepalive = await request('/api/keepalive');
     assert.equal(keepalive.response.status, 200);
     assert.equal(keepalive.data.status, 'OK');
+    for (const privatePath of ['/server.js', '/auth-crypto.js', '/package.json', '/littlefeet-replica.json', '/littlefeet.db']) {
+      const privateFile = await rawRequest(privatePath);
+      assert.equal(privateFile.response.status, 404);
+    }
+    const publicBundle = await rawRequest('/backup.js');
+    assert.equal(publicBundle.response.status, 200);
+    assert.match(publicBundle.body, /function logout\(/);
     const alphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     const alphaTeacherLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-teacher', pin: 'TeacherPass1' } });
     const alphaPrincipalLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-principal', pin: 'PrincipalPass1' } });

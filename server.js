@@ -180,17 +180,25 @@ app.use((req, res, next) => {
     next();
   }).catch(next);
 });
-// The entry page always revalidates after a deploy. Static media and the
-// versioned client bundle can be reused aggressively, keeping repeat visits
-// fast even on slower school connections.
-app.use(express.static(__dirname, {
+// Serve only explicit public assets. Serving the repository root would also
+// expose backend source, configuration manifests, and local database files.
+const staticFileOptions = {
   setHeaders: (res, filePath) => {
     if (/\.html$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
     else if (/\.(?:js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
     else if (/\.(?:png|jpe?g|webp|gif|svg|ico|mp3|wav|woff2?)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     else res.setHeader('Cache-Control', 'public, max-age=86400');
   }
-}));
+};
+app.use('/assets', express.static(path.join(__dirname, 'assets'), staticFileOptions));
+app.use('/output', express.static(path.join(__dirname, 'output'), staticFileOptions));
+const sendPublicRootFile = (req, res) => {
+  if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+  else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.sendFile(req.path.slice(1), { root: __dirname });
+};
+app.get('/backup.js', sendPublicRootFile);
+app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
 
 // In-Memory Database Store
 const db = {
@@ -2753,6 +2761,8 @@ app.use((error, req, res, _next) => {
 });
 
 app.get(/(.*)/, (req, res) => {
+  if (path.extname(req.path)) return res.status(404).end();
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
