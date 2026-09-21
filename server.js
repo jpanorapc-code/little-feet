@@ -279,18 +279,33 @@ app.use((req, res, next) => {
 });
 app.set('trust proxy', 1);
 app.use((req, res, next) => {
-  persistenceReady.then(() => {
+  persistenceReady.then(async () => {
     activeRequestCount += 1;
     let requestReleased = false;
+    let mutationLockClient = null;
+    let mutationLockReleased = false;
     const releaseRequest = () => {
       if (requestReleased) return;
       requestReleased = true;
       activeRequestCount = Math.max(0, activeRequestCount - 1);
     };
-    res.on('finish', releaseRequest);
-    res.on('close', releaseRequest);
+    const releaseMutationLock = async () => {
+      if (mutationLockReleased || !mutationLockClient) return;
+      mutationLockReleased = true;
+      await mutationLockClient.query('SELECT pg_advisory_unlock(12801337)').catch(() => {});
+      mutationLockClient.release();
+      mutationLockClient = null;
+    };
+    res.on('finish', () => { releaseRequest(); void releaseMutationLock(); });
+    res.on('close', () => { releaseRequest(); void releaseMutationLock(); });
 
     if (!req.method || req.method === 'GET' || replicaMode) return next();
+
+    if (postgresPool) {
+      mutationLockClient = await postgresPool.connect();
+      await mutationLockClient.query('SELECT pg_advisory_lock(12801337)');
+      await loadDatabaseState();
+    }
 
     const originalJson = res.json.bind(res);
     let persistenceResponsePending = false;
@@ -299,12 +314,15 @@ app.use((req, res, next) => {
         return originalJson(body);
       }
       persistenceResponsePending = true;
-      void saveDatabaseState().then(() => {
+      void saveDatabaseState().then(async () => {
         req.persistenceCommitted = true;
         scheduleReplicaSnapshot();
+        await releaseMutationLock();
         originalJson(body);
-      }).catch(error => {
+      }).catch(async error => {
         console.error('Refusing to acknowledge an unpersisted mutation:', error.message);
+        await loadDatabaseState().catch(() => {});
+        await releaseMutationLock();
         if (!res.headersSent) {
           res.status(503);
           originalJson({
@@ -390,7 +408,6 @@ let replicaTimer = null;
 let replicaSnapshotTimer = null;
 let stateDatabase = null;
 let postgresPool = null;
-let postgresWriterLockClient = null;
 let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 
@@ -511,15 +528,6 @@ async function openPostgresDatabase() {
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: false
   });
-  if (!replicaMode) {
-    postgresWriterLockClient = await postgresPool.connect();
-    const lockResult = await postgresWriterLockClient.query('SELECT pg_try_advisory_lock(12801337) AS locked');
-    if (!lockResult.rows[0]?.locked) {
-      postgresWriterLockClient.release();
-      postgresWriterLockClient = null;
-      throw new Error('Another Little Feet primary writer is already active. Refusing to start a second writable instance.');
-    }
-  }
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS little_feet_app_state (
       state_key TEXT PRIMARY KEY,
@@ -643,6 +651,7 @@ async function loadDatabaseState() {
           postgresPool.query('SELECT state_key, payload FROM little_feet_metadata ORDER BY state_key')
         ]);
         const saved = {};
+        postgresPersistenceSnapshot = new Map();
         recordResult.rows.forEach(row => {
           const [kind, name] = row.collection.split(':', 2);
           if (kind === 'array') (saved[name] ||= []).push(row.payload);
@@ -1642,7 +1651,7 @@ app.post('/api/accounts', (req, res) => {
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'accounts', 'admin'];
+  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (!username || !pin || !name || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'Administrators can create accounts only for their own school.' });
   if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
@@ -1658,7 +1667,7 @@ app.put('/api/accounts/:username', (req, res) => {
   const account = db.users.find(entry => entry.username === req.params.username);
   if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
-  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'accounts', 'admin'];
+  const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (username && username !== account.username && db.users.some(entry => entry.username.toLowerCase() === String(username).toLowerCase())) return res.status(409).json({ message: 'That username is already in use.' });
   if (username) account.username = String(username).trim();
   if (pin) account.pinHash = hashPin(pin);
@@ -2618,7 +2627,7 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
 // available only to the school roles that issue or print the physical handout.
 const findLearnerAccessCodeActor = (req) => {
   const actor = getSessionAccount(req);
-  return actor && ['admin', 'principal', 'accounts'].includes(actor.role) ? actor : null;
+  return actor && ['admin', 'principal'].includes(actor.role) ? actor : null;
 };
 
 const learnerAccessCodeView = (learner, actor, { includeCode = false, includeHistory = false } = {}) => {
@@ -2654,14 +2663,14 @@ const learnerAccessCodeView = (learner, actor, { includeCode = false, includeHis
 
 app.get('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
-  if (!actor) return res.status(403).json({ message: 'Only administrators, principals, and accounts staff may view learner codes.' });
+  if (!actor) return res.status(403).json({ message: 'Only administrators and principals may view learner codes.' });
   const isAdmin = actor.role === 'admin';
   res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: isAdmin })));
 });
 
 app.get('/api/learner-access-codes/printable-list', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
-  if (!actor) return res.status(403).json({ message: 'Only administrators, principals, and accounts staff may print the learner-code register.' });
+  if (!actor) return res.status(403).json({ message: 'Only administrators and principals may print the learner-code register.' });
   const learners = tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: false }));
   res.json({
     schoolName: actor.schoolName,
