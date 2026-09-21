@@ -46,5 +46,10 @@ assert.ok(frontend.includes("if (currentUser?.role === 'parent')"));
 assert.ok(frontend.includes("btnGroup?.classList.toggle('hidden', parentDirectOnly)"));
 assert.ok(frontend.includes('escapeWorkspaceText(t.feedback)'));
 assert.ok(frontend.includes('escapeWorkspaceText(currentFeedback ||'));
+assert.ok(frontend.includes('escapeWorkspaceText(b.bcMessage)'));
+assert.ok(server.includes('applicationEncrypted: encryptJsonField(application)'));
+assert.ok(server.includes('delete ticket.application'));
+assert.ok(server.includes('MAX_VISITOR_PASS_ATTEMPTS'));
+assert.ok(server.includes('radiusKm < 1 || radiusKm > 50'));
 
 console.log('Frontend and server security regression test passed.');
