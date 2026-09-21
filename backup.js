@@ -581,6 +581,8 @@ function addFormTemplates(form, label, templates, applyTemplate) {
   bar.className = 'form-template-bar';
   const select = document.createElement('select');
   select.name = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_template`;
+  select.id = `${form.id || 'form'}_template`;
+  select.autocomplete = 'off';
   select.setAttribute('aria-label', `${label} template`);
   select.innerHTML = `<option value="">Choose a ${label.toLowerCase()} template…</option>${templates.map((template, index) => `<option value="${index}">${template.label}</option>`).join('')}`;
   const button = document.createElement('button');
