@@ -1526,7 +1526,7 @@
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-safety"></use></svg><span>Safety</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
         <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('broadcastsTab', this)">Safety Alerts</button></li>
-        <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('safetyNetworkTab', this)">Safety Network</button></li>
+        <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('safetyNetworkTab', this)">Safety Network</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('careTab', this)">Care Records</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('safeguardingTab', this)">Safeguarding</button></li>
         </ul>
@@ -2114,7 +2114,7 @@
           <p style="color:var(--text-muted);margin-bottom:14px;">Record the core enrolment and emergency information required before a learner is placed in a class.</p>
           <form id="registryForm" class="workspace-grid">
             <div><label>Learner full name *</label><input name="learnerName" required></div><div><label>Date of birth *</label><input name="dateOfBirth" type="date" required></div>
-            <div><label>Grade / class</label><input name="className" placeholder="e.g. Toddlers"></div><div><label>Parent / guardian name *</label><input name="guardianName" required></div>
+            <div><label>Grade / class *</label><input name="className" placeholder="e.g. Toddlers" required></div><div><label>Parent / guardian name *</label><input name="guardianName" required></div>
             <div><label>Guardian phone *</label><input name="guardianPhone" type="tel" required></div><div><label>Guardian email</label><input name="guardianEmail" type="email"></div>
             <div><label>Home address *</label><input name="address" required></div><div><label>Emergency contact & phone</label><input name="emergencyContact" placeholder="Name · phone"></div>
             <div><label>Medical / allergy notes</label><input name="medicalNotes" placeholder="Allergies, medication, care notes"></div><div><label>Consent status</label><select name="consent"><option>Pending verification</option><option>Parent consent received</option></select></div>
@@ -2429,7 +2429,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-support-banner" defer></script>
+  <script src="backup.js?v=20260921-hardening" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
