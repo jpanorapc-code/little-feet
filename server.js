@@ -771,9 +771,18 @@ async function initialisePersistence() {
 
 persistenceReady = initialisePersistence();
 
+const establishAuthenticatedSession = (req, account) => new Promise((resolve, reject) => {
+  const safeUser = safeAccount(account);
+  req.session.regenerate(error => {
+    if (error) return reject(error);
+    req.session.littleFeetUser = safeUser;
+    req.session.save(saveError => saveError ? reject(saveError) : resolve(safeUser));
+  });
+});
+
 // API Endpoints
 // Auth
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, pin } = req.body;
   const normalizedUsername = normalizeUsername(username);
   const attemptKey = loginAttemptKey(req, normalizedUsername);
@@ -791,12 +800,12 @@ app.post('/api/login', (req, res) => {
     loginAttempts.delete(attemptKey);
     loginIpAttempts.delete(ipAttemptKey);
     if (pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
-    const safeUser = safeAccount(user);
-    req.session.littleFeetUser = safeUser;
-    req.session.save(error => {
-      if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
+    try {
+      const safeUser = await establishAuthenticatedSession(req, user);
       res.json({ user: safeUser });
-    });
+    } catch {
+      res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
+    }
   } else {
     incrementAttempt(loginAttempts, attemptKey);
     incrementAttempt(loginIpAttempts, ipAttemptKey);
@@ -2099,7 +2108,7 @@ app.post('/api/tickets', (req, res) => {
   }
   const item = tagSchoolRecord(creator, {
     ...ticketDetails,
-    id: String(ticketDetails.id || crypto.randomUUID()),
+    id: crypto.randomUUID(),
     createdBy: creator.username,
     createdByName: creator.name || creator.username,
     assignedTo: assignedAccount?.username || '',
@@ -2124,8 +2133,11 @@ app.post('/api/tickets/update', (req, res) => {
     if (assignedTo && (!assignedAccount || !isSameSchool(actor, assignedAccount))) return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
     ticket.assignedTo = assignedAccount?.username || '';
   }
-  if (status) ticket.status = status;
-  if (feedback !== undefined) ticket.feedback = feedback;
+  if (status !== undefined) {
+    if (!['Open', 'Completed'].includes(String(status))) return res.status(400).json({ message: 'Choose a valid ticket status.' });
+    ticket.status = String(status);
+  }
+  if (feedback !== undefined) ticket.feedback = String(feedback || '').trim().slice(0, 4000);
   ticket.updatedBy = actor.username;
   res.json({ success: true, ticket });
 });
@@ -2140,16 +2152,17 @@ app.delete('/api/tickets/:id', (req, res) => {
 
 // Chat - Groups
 app.get('/api/chat/groups', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to view school chat groups.' });
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Staff group channels are available only to authorised school staff.' });
   res.json(tenantRecords(db.chatGroups, actor));
 });
 app.post('/api/chat/groups', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create groups.' });
-  const { groupName } = req.body;
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can create groups.' });
+  const groupName = String(req.body?.groupName || '').trim().slice(0, 120);
+  if (!groupName) return res.status(400).json({ message: 'Enter a group channel name.' });
   const id = crypto.randomUUID();
-  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName: String(groupName || '').trim().slice(0, 120) }));
+  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName }));
   db.groupMessages[id] = [];
   res.json({ success: true, id });
 });
@@ -2166,17 +2179,21 @@ app.delete('/api/chat/groups/:id', (req, res) => {
 
 // Chat - Messages
 app.get('/api/chat/messages/:groupId', (req, res) => {
-  const actor = getSessionAccount(req);
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Staff group messages are available only to authorised school staff.' });
   const group = db.chatGroups.find(entry => entry.id === req.params.groupId && recordInSchool(entry, actor));
-  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
   const msgs = db.groupMessages[req.params.groupId] || [];
   res.json(msgs);
 });
 app.post('/api/chat/messages', (req, res) => {
-  const { groupId, sender, message, textColor } = req.body;
-  const actor = getSessionAccount(req);
+  const { groupId, textColor } = req.body;
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Staff group messages are available only to authorised school staff.' });
   const group = db.chatGroups.find(entry => entry.id === groupId && recordInSchool(entry, actor));
-  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
+  const message = String(req.body?.message || '').trim().slice(0, 4000);
+  if (!message) return res.status(400).json({ message: 'A message is required.' });
   if (!db.groupMessages[groupId]) db.groupMessages[groupId] = [];
   const msgObj = {
     id: crypto.randomUUID(),
@@ -2222,12 +2239,13 @@ app.post('/api/chat/direct', (req, res) => {
   const senderAccount = getSessionAccount(req);
   const recipientAccount = findAccountByUsername(recipient);
   if (!canUseDirectChat(senderAccount, recipientAccount)) return res.status(403).json({ message: 'You can only message approved contacts at your school.' });
-  if (!String(message || '').trim()) return res.status(400).json({ message: 'A message is required.' });
+  const safeMessage = String(message || '').trim().slice(0, 4000);
+  if (!safeMessage) return res.status(400).json({ message: 'A message is required.' });
   const msgObj = tagSchoolRecord(senderAccount, {
     id: crypto.randomUUID(),
     sender: senderAccount.username,
-    recipient,
-    message,
+    recipient: recipientAccount.username,
+    message: safeMessage,
     textColor: normaliseChatColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
@@ -2945,15 +2963,19 @@ app.get('/auth/google', (req, res, next) => {
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
-app.get('/auth/google/callback', 
+app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/' }),
-  (req, res) => {
+  async (req, res) => {
     const email = req.user?.email;
     const account = findAccountByUsername(email);
     if (!account) return res.redirect('/?oauthError=account-not-linked');
     if (accountVerificationPending(account)) return res.redirect('/?oauthError=account-pending');
-    req.session.littleFeetUser = safeAccount(account);
-    res.redirect('/?oauth=google');
+    try {
+      await establishAuthenticatedSession(req, account);
+      res.redirect('/?oauth=google');
+    } catch {
+      res.redirect('/?oauthError=session-failed');
+    }
   }
 );
 
@@ -2995,7 +3017,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     const account = findAccountByUsername(profile.email);
     if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
     if (accountVerificationPending(account)) return res.redirect('/?oauthError=account-pending');
-    req.session.littleFeetUser = safeAccount(account);
+    await establishAuthenticatedSession(req, account);
     res.redirect('/?oauth=yahoo');
   } catch (error) {
     console.error('Yahoo sign-in failed:', error.message);
@@ -3054,7 +3076,7 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     const account = findAccountByUsername(profile.mail || profile.userPrincipalName);
     if (!profileResponse.ok || !account) return res.redirect('/?oauthError=account-not-linked');
     if (accountVerificationPending(account)) return res.redirect('/?oauthError=account-pending');
-    req.session.littleFeetUser = safeAccount(account);
+    await establishAuthenticatedSession(req, account);
     res.redirect('/?oauth=microsoft');
   } catch (error) {
     console.error('Microsoft sign-in failed:', error.message);
