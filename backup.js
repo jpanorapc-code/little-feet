@@ -2816,7 +2816,7 @@ async function loadChatGroups() {
     if (!select) return;
 
     select.innerHTML = groups.length
-      ? groups.map(g => `<option value="${g.id}">${g.groupName}</option>`).join('')
+      ? groups.map(g => `<option value="${escapeWorkspaceText(g.id)}">${escapeWorkspaceText(g.groupName)}</option>`).join('')
       : '<option value="" selected>No group channels yet</option>';
     select.disabled = !groups.length;
     
@@ -2869,7 +2869,7 @@ async function loadGroupChatMessages() {
             ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${groupId}','${m.id}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${m.textColor || 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
+              <strong style="color:${/^#[0-9a-f]{6}$/i.test(String(m.textColor || '')) ? m.textColor : 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
               <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
             </div>`;
         }).join('')
@@ -2943,7 +2943,7 @@ async function loadDirectChatUsers() {
     const filtered = users.filter(u => u.username !== currentUser.username);
     const prompt = currentUser.role === 'parent' ? 'Select your child\'s teacher or principal...' : 'Select approved school contact...';
     select.innerHTML = `<option value="">${prompt}</option>` +
-      filtered.map(u => `<option value="${u.username}">${u.name || u.username} (${u.role.toUpperCase()})</option>`).join('');
+      filtered.map(u => `<option value="${escapeWorkspaceText(u.username)}">${escapeWorkspaceText(u.name || u.username)} (${escapeWorkspaceText(String(u.role || '').toUpperCase())})</option>`).join('');
   } catch (e) {
     logAppError('ERR_DIRECT_USERS', 'Failed to retrieve direct messaging contacts.');
   }
@@ -2969,7 +2969,7 @@ async function loadDirectChatMessages() {
             ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${m.id}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${m.textColor || 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
+              <strong style="color:${/^#[0-9a-f]{6}$/i.test(String(m.textColor || '')) ? m.textColor : 'inherit'};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
               <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
             </div>`;
         }).join('')
@@ -3761,13 +3761,13 @@ function openLearnerCodeIssue(encodedKey) {
   if (currentUser?.role !== 'admin') return alert('Only an administrator can issue a learner access code.');
   const record = learnerCodeRecord(encodedKey);
   if (!record) return alert('Learner record not found. Refresh the code list and try again.');
-  openModal('Issue learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Issue a physical code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Leave the field blank to generate a secure school code automatically, or enter a school-approved code in the shown format.</p><label for="manualLearnerAccessCode">Manual code (optional)</label><input id="manualLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}')">Issue code</button>`);
+  openModal('Generate learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Generate a secure school-controlled code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Codes are created by Little Feet and cannot be chosen manually.</p><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}')">Generate code</button>`);
 }
 
 async function issueLearnerAccessCode(encodedKey) {
   const response = await fetch('/api/learner-access-codes', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actorUsername: currentUser?.username, learnerKey: decodeURIComponent(encodedKey), manualCode: document.getElementById('manualLearnerAccessCode')?.value || '' })
+    body: JSON.stringify({ actorUsername: currentUser?.username, learnerKey: decodeURIComponent(encodedKey) })
   });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to issue this learner code.');
