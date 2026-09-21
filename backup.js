@@ -341,6 +341,7 @@ function showOAuthSignInMessage(error) {
     'yahoo-not-configured': ['Yahoo sign-in is not ready yet', 'An administrator still needs to add the Yahoo connection details in Render.'],
     'microsoft-not-configured': ['Microsoft sign-in is not ready yet', 'An administrator still needs to add the Microsoft connection details in Render.'],
     'account-not-linked': ['Account not linked', 'This email is not linked to an approved Little Feet account. Please use your approved school, teacher, parent, principal, or district email.'],
+    'account-pending': ['Account approval pending', 'This account is linked, but the school has not approved it yet. Please contact your school administrator.'],
     'yahoo-sign-in-failed': ['Yahoo sign-in could not finish', 'Please try again. If this continues, an administrator should check the Yahoo app connection.'],
     'microsoft-sign-in-failed': ['Microsoft sign-in could not finish', 'Please try again. If this continues, an administrator should check the Microsoft app connection.']
   };
@@ -3166,16 +3167,22 @@ function setupFormListeners() {
         const box = document.getElementById('lookupResults');
 
         box.innerHTML = results.length
-          ? results.map(s => `
-              <div class="item-row" style="flex-direction: column; align-items: flex-start;">
-                <strong>${s.studentName}</strong> <span class="badge-tag info">${s.className}</span>
-                <div style="font-size:0.85rem; margin-top:4px;">
-                  <p>Guardian: <strong>${s.parentName}</strong> (${s.contactEmail})</p>
-                  <p style="color:#ef4444; margin-top:2px;"><strong>⚕ Medical / allergy card:</strong> ${s.medicalNotes}</p>
-                  <p style="margin-top:2px;"><strong>Emergency:</strong> ${s.emergencyContact || 'Not recorded'}<br><strong>Authorised pickup:</strong> ${s.authorisedPickups || 'Not recorded'}</p>
-                </div>
-              </div>
-            `).join('')
+          ? results.map(s => {
+              const safeName = escapeWorkspaceText(s.studentName || 'Learner');
+              const safeClass = escapeWorkspaceText(s.className || 'Class not recorded');
+              const districtSummary = currentUser?.role === 'district'
+                ? `<p style="margin-top:4px;">School: <strong>${escapeWorkspaceText(s.schoolName || currentUser.schoolName || 'School')}</strong></p>`
+                : `<div style="font-size:0.85rem; margin-top:4px;">
+                    <p>Guardian: <strong>${escapeWorkspaceText(s.parentName || 'Not recorded')}</strong> (${escapeWorkspaceText(s.contactEmail || 'Not recorded')})</p>
+                    <p style="color:#ef4444; margin-top:2px;"><strong>⚕ Medical / allergy card:</strong> ${escapeWorkspaceText(s.medicalNotes || 'Not recorded')}</p>
+                    <p style="margin-top:2px;"><strong>Emergency:</strong> ${escapeWorkspaceText(s.emergencyContact || 'Not recorded')}<br><strong>Authorised pickup:</strong> ${escapeWorkspaceText(s.authorisedPickups || 'Not recorded')}</p>
+                  </div>`;
+              return `
+                <div class="item-row" style="flex-direction: column; align-items: flex-start;">
+                  <strong>${safeName}</strong> <span class="badge-tag info">${safeClass}</span>
+                  ${districtSummary}
+                </div>`;
+            }).join('')
           : '<p style="font-size:0.85rem; color:var(--text-muted);">No student records matched your query parameters.</p>';
       } catch (err) {
         logAppError('ERR_LOOKUP_500', 'Failed to perform student information query.');
