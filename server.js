@@ -15,10 +15,12 @@ const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const loginIpAttempts = new Map();
 const signingPinAttempts = new Map();
+const visitorPassAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const MAX_LOGIN_IP_ATTEMPTS = 30;
 const MAX_SIGNING_PIN_ATTEMPTS = 5;
+const MAX_VISITOR_PASS_ATTEMPTS = 10;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
@@ -169,6 +171,17 @@ const encryptFieldIfNeeded = (value) => {
   const text = String(value || '');
   if (!text) return '';
   return decodeEncryptedField(text).ok ? text : encryptField(text);
+};
+const encryptJsonField = (value) => encryptField(JSON.stringify(value));
+const decryptJsonField = (value) => {
+  const decoded = decodeEncryptedField(value);
+  if (!decoded.ok) return null;
+  try {
+    const parsed = JSON.parse(decoded.value);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 const normaliseChatColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
 const validateSignatureData = (value) => {
@@ -583,6 +596,13 @@ function migrateSensitiveFields() {
   (db.students || []).forEach(record => encryptKeys(record, ['medicalNotes', 'emergencyContact', 'authorisedPickups']));
   (db.registry || []).forEach(record => encryptKeys(record, ['dateOfBirth', 'guardianPhone', 'guardianEmail', 'address', 'emergencyContact', 'medicalNotes']));
   (db.reportReviews || []).forEach(record => encryptKeys(record, ['teacherSignature', 'parentSignature']));
+  (db.tickets || []).forEach(ticket => {
+    if (ticket.application && !ticket.applicationEncrypted) {
+      ticket.applicationEncrypted = encryptJsonField(ticket.application);
+      delete ticket.application;
+      if (ticket.category === 'School application') ticket.subject = 'School application';
+    }
+  });
 }
 
 function removeLegacyDemoRecords() {
@@ -2055,6 +2075,13 @@ app.post('/api/attendance/clear', (req, res) => {
 });
 
 // Tickets
+const supportTicketView = (ticket) => {
+  const { applicationEncrypted, application, ...view } = ticket;
+  const decodedApplication = applicationEncrypted ? decryptJsonField(applicationEncrypted) : null;
+  if (decodedApplication || application) view.application = decodedApplication || application;
+  return view;
+};
+
 app.post('/api/school-applications', (req, res) => {
   const applicant = getSessionAccount(req);
   if (!applicant || String(applicant.verificationStatus || '').toLowerCase().includes('pending')) {
@@ -2079,8 +2106,8 @@ app.post('/api/school-applications', (req, res) => {
   if (!principal) return res.status(409).json({ message: 'This school is not yet available for Little Feet applications. Ask the school to activate its principal account first.' });
   const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, homeArea, notes };
   const ticket = {
-    id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
-    message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
+    id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: 'School application',
+    message: `Application for ${schoolName}`, applicationEncrypted: encryptJsonField(application), schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
     assignedTo: principal.username, schoolId: accountSchoolId(principal), status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt: new Date().toISOString()
   };
   db.tickets.unshift(ticket);
@@ -2091,12 +2118,12 @@ app.get('/api/tickets', (req, res) => {
   const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'Sign in to view your support tickets.' });
   const schoolTickets = tenantRecords(db.tickets, viewer);
-  if (viewer.role === 'admin') return res.json(schoolTickets);
+  if (viewer.role === 'admin') return res.json(schoolTickets.map(supportTicketView));
   const visibleTickets = schoolTickets.filter(ticket =>
     normalizeUsername(ticket.createdBy) === normalizeUsername(viewer.username) ||
     normalizeUsername(ticket.assignedTo) === normalizeUsername(viewer.username)
   );
-  res.json(visibleTickets);
+  res.json(visibleTickets.map(supportTicketView));
 });
 app.post('/api/tickets', (req, res) => {
   const { createdBy, assignedTo, ...ticketDetails } = req.body;
@@ -2290,10 +2317,20 @@ app.get('/api/broadcasts', (req, res) => {
 app.post('/api/broadcasts', (req, res) => {
   const actor = requireSafetyStaff(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
-  if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
+  const bcMessage = String(req.body?.bcMessage || '').trim().slice(0, 2000);
+  const bcPriority = String(req.body?.bcPriority || '').trim();
+  const radiusKm = Number(req.body?.radiusKm);
+  const latitude = Number(req.body?.location?.lat);
+  const longitude = Number(req.body?.location?.lng);
+  if (!bcMessage || !['Urgent Medical', 'Weather Alert', 'Campus Notice'].includes(bcPriority)) return res.status(400).json({ message: 'Choose a valid alert type and enter a message.' });
+  if (!Number.isFinite(radiusKm) || radiusKm < 1 || radiusKm > 50) return res.status(400).json({ message: 'Alert radius must be between 1 and 50 km.' });
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return res.status(400).json({ message: 'A valid alert location is required.' });
   const item = tagSchoolRecord(actor, {
-    ...req.body,
     id: crypto.randomUUID(),
+    bcPriority,
+    bcMessage,
+    radiusKm,
+    location: { lat: latitude, lng: longitude },
     issuedBy: actor.username,
     issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -2395,7 +2432,7 @@ app.post('/api/visitor-meetings/:id/approve-visitor', (req, res) => {
   const principal = getSessionAccount(req);
   const meeting = db.visitorMeetings.find(entry => entry.id === req.params.id && recordInSchool(entry, principal));
   if (!principal || !meeting || !['principal', 'admin'].includes(principal.role) || !isSameSchool(principal, meeting) || meeting.status !== 'awaiting-principal-approval') return res.status(403).json({ message: 'Only the principal or administrator can issue visitor authorisation after both parties agree.' });
-  const passCode = `LFV-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  const passCode = `LFV-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
   const visitor = tagSchoolRecord(principal, { id: crypto.randomUUID(), meetingId: meeting.id, visitorName: meeting.parentName, purpose: meeting.purpose, host: meeting.hostName, expectedDate: meeting.agreedAt, status: 'approved', approvedBy: principal.username, approvedAt: new Date().toISOString(), passCodeHash: hashPin(passCode) });
   db.campusVisitors.unshift(visitor);
   meeting.status = 'visitor-authorised';
@@ -2408,8 +2445,14 @@ app.post('/api/campus-visitors/check-in', (req, res) => {
   const actor = requireSafetyStaff(req);
   const passCode = String(req.body?.passCode || '').trim().toUpperCase();
   if (!actor || !passCode) return res.status(403).json({ message: 'An authorised staff member and visitor pass are required.' });
+  const attemptKey = `${req.ip}:${accountSchoolId(actor)}`;
+  if (activeAttempt(visitorPassAttempts, attemptKey)?.count >= MAX_VISITOR_PASS_ATTEMPTS) return res.status(429).json({ message: 'Too many unsuccessful visitor-pass attempts. Please wait 15 minutes.' });
   const visitor = db.campusVisitors.find(entry => entry.status === 'approved' && recordInSchool(entry, actor) && matchesPin(passCode, entry.passCodeHash));
-  if (!visitor) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
+  if (!visitor) {
+    incrementAttempt(visitorPassAttempts, attemptKey);
+    return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
+  }
+  visitorPassAttempts.delete(attemptKey);
   visitor.status = 'checked-in';
   visitor.checkedInAt = new Date().toISOString();
   visitor.checkedInBy = actor.username;
