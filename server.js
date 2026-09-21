@@ -1032,7 +1032,13 @@ const subscriptionBillingState = (actor = null) => {
   const schoolId = actor ? accountSchoolId(actor) : null;
   if (schoolId) {
     if (!db.schoolBilling || typeof db.schoolBilling !== 'object') db.schoolBilling = {};
-    if (!db.schoolBilling[schoolId]) db.schoolBilling[schoolId] = db.subscriptionBilling || {};
+    if (!db.schoolBilling[schoolId]) {
+      db.schoolBilling[schoolId] = {
+        payment: { ...(db.subscriptionBilling?.payment || {}) },
+        pricing: {},
+        orders: []
+      };
+    }
   }
   const existing = schoolId ? db.schoolBilling[schoolId] : (db.subscriptionBilling || {});
   const state = {
@@ -1266,10 +1272,14 @@ app.put('/api/subscription-billing', async (req, res) => {
   billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', payMePayloadEncrypted, branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
   billing.updatedAt = new Date().toISOString();
   db.subscriptionBilling = {
-    ...billing,
-    pricing: { ...billing.pricing, bundles: { ...billing.pricing.bundles } },
+    ...(db.subscriptionBilling || {}),
     payment: { ...billing.payment },
-    orders: Array.isArray(db.subscriptionBilling?.orders) ? db.subscriptionBilling.orders : []
+    pricing: {
+      ...(db.subscriptionBilling?.pricing || billingDefaults().pricing),
+      bundles: { ...((db.subscriptionBilling?.pricing || billingDefaults().pricing).bundles || {}) }
+    },
+    orders: Array.isArray(db.subscriptionBilling?.orders) ? db.subscriptionBilling.orders : [],
+    updatedAt: new Date().toISOString()
   };
   // Payment destinations must survive a restart. Commit this high-value setting
   // before acknowledging the request instead of relying only on the normal
