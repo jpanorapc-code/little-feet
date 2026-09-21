@@ -24,6 +24,13 @@ let activeRequestCount = 0;
 let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
 const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
+if (isProduction && (!fieldEncryptionConfigured || !sessionSecretConfigured)) {
+  const missing = [
+    !fieldEncryptionConfigured ? 'LF_FIELD_ENCRYPTION_KEY' : '',
+    !sessionSecretConfigured ? 'SESSION_SECRET' : ''
+  ].filter(Boolean).join(', ');
+  throw new Error(`Refusing to start production without required secret(s): ${missing}`);
+}
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
 const CURRENT_RELEASE_NOTES = Object.freeze([
   Object.freeze({
@@ -135,7 +142,36 @@ const canUseDirectChat = (first, second) => {
   return normaliseAssignedClasses(staffMember.assignedClasses).some(className => learnerClasses.has(className));
 };
 const encryptField = (value) => { const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', fieldKey, iv); const content = Buffer.concat([cipher.update(String(value || ''), 'utf8'), cipher.final()]); return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${content.toString('base64')}`; };
-const decryptField = (value) => { try { const [iv, tag, content] = String(value || '').split('.').map(part => Buffer.from(part, 'base64')); const decipher = crypto.createDecipheriv('aes-256-gcm', fieldKey, iv); decipher.setAuthTag(tag); return Buffer.concat([decipher.update(content), decipher.final()]).toString('utf8'); } catch { return ''; } };
+const decodeEncryptedField = (value) => {
+  try {
+    const parts = String(value || '').split('.');
+    if (parts.length !== 3) return { ok: false, value: '' };
+    const [iv, tag, content] = parts.map(part => Buffer.from(part, 'base64'));
+    if (iv.length !== 12 || tag.length !== 16) return { ok: false, value: '' };
+    const decipher = crypto.createDecipheriv('aes-256-gcm', fieldKey, iv);
+    decipher.setAuthTag(tag);
+    return { ok: true, value: Buffer.concat([decipher.update(content), decipher.final()]).toString('utf8') };
+  } catch {
+    return { ok: false, value: '' };
+  }
+};
+const decryptField = (value) => decodeEncryptedField(value).value;
+const decryptFieldOrLegacy = (value) => {
+  const decoded = decodeEncryptedField(value);
+  return decoded.ok ? decoded.value : String(value || '');
+};
+const encryptFieldIfNeeded = (value) => {
+  const text = String(value || '');
+  if (!text) return '';
+  return decodeEncryptedField(text).ok ? text : encryptField(text);
+};
+const normaliseChatColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
+const validateSignatureData = (value) => {
+  const signature = String(value || '');
+  if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature)) return { error: 'Signature data must be a PNG drawing.' };
+  if (Buffer.byteLength(signature, 'utf8') > 350000) return { error: 'Signature image is too large.' };
+  return { signature };
+};
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
 const activeLoginAttempt = (key) => {
   const entry = loginAttempts.get(key);
@@ -153,6 +189,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), payment=(), usb=()');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self'");
+  if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
     res.setHeader('Cache-Control', 'no-store, private');
   }
@@ -163,6 +201,42 @@ app.use(express.json({
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
+const trustedOrigins = new Set([
+  'https://littlefeet.co.za',
+  'https://www.littlefeet.co.za',
+  ...(process.env.LF_TRUSTED_ORIGINS || '').split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean)
+]);
+const publicActionAttempts = new Map();
+const PUBLIC_ACTION_WINDOW_MS = 10 * 60 * 1000;
+const PUBLIC_ACTION_LIMITS = new Map([
+  ['/api/signup', 12],
+  ['/api/schools/enrich', 60],
+  ['/api/donations/intents', 30]
+]);
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  if (req.path === '/api/payments/webhook') return next();
+  const origin = String(req.get('origin') || '').replace(/\/$/, '');
+  const fetchSite = String(req.get('sec-fetch-site') || '').toLowerCase();
+  if (fetchSite === 'cross-site' || (isProduction && origin && !trustedOrigins.has(origin))) {
+    return res.status(403).json({ message: 'Cross-site request blocked.' });
+  }
+  next();
+});
+app.use((req, res, next) => {
+  const limit = PUBLIC_ACTION_LIMITS.get(req.path);
+  if (!limit || req.method !== 'POST') return next();
+  const key = `${req.ip}:${req.path}`;
+  const now = Date.now();
+  const entry = publicActionAttempts.get(key);
+  if (!entry || now - entry.startedAt > PUBLIC_ACTION_WINDOW_MS) {
+    publicActionAttempts.set(key, { count: 1, startedAt: now });
+    return next();
+  }
+  entry.count += 1;
+  if (entry.count > limit) return res.status(429).json({ message: 'Too many requests. Please wait a few minutes and try again.' });
+  next();
+});
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method) || !requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
@@ -173,10 +247,33 @@ app.use((req, res, next) => {
     activeRequestCount += 1;
     res.on('finish', () => {
       activeRequestCount = Math.max(0, activeRequestCount - 1);
-      if (!req.method || req.method === 'GET' || replicaMode || req.persistenceCommitted) return;
-      void saveDatabaseState();
-      scheduleReplicaSnapshot();
     });
+
+    const originalEnd = res.end.bind(res);
+    let deferredEndStarted = false;
+    res.end = function (...args) {
+      const mutating = req.method && !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+      if (!mutating || replicaMode || req.persistenceCommitted || deferredEndStarted) return originalEnd(...args);
+      deferredEndStarted = true;
+      void saveDatabaseState().then(() => {
+        req.persistenceCommitted = true;
+        scheduleReplicaSnapshot();
+        originalEnd(...args);
+      }).catch(error => {
+        const report = recordSystemError(error, req, { severity: 'critical' });
+        console.error(`[${report.requestId || report.id}] persistence failure: ${report.message}`);
+        if (!res.headersSent) {
+          res.statusCode = 503;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          return originalEnd(JSON.stringify({
+            message: 'The change could not be saved safely. Please retry.',
+            requestId: report.requestId || report.id
+          }));
+        }
+        return originalEnd(...args);
+      });
+      return res;
+    };
     next();
   }).catch(next);
 });
@@ -193,7 +290,7 @@ const staticFileOptions = {
 app.use('/assets', express.static(path.join(__dirname, 'assets'), staticFileOptions));
 app.use('/output', express.static(path.join(__dirname, 'output'), staticFileOptions));
 const sendPublicRootFile = (req, res) => {
-  if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+  if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   res.sendFile(req.path.slice(1), { root: __dirname });
 };
@@ -252,6 +349,7 @@ let replicaTimer = null;
 let replicaSnapshotTimer = null;
 let stateDatabase = null;
 let postgresPool = null;
+let postgresWriterLockClient = null;
 let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 
@@ -358,6 +456,13 @@ async function openPostgresDatabase() {
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: false
   });
+  postgresWriterLockClient = await postgresPool.connect();
+  const writerLock = await postgresWriterLockClient.query('SELECT pg_try_advisory_lock($1::bigint) AS locked', ['1893567001']);
+  if (!writerLock.rows[0]?.locked) {
+    postgresWriterLockClient.release();
+    postgresWriterLockClient = null;
+    throw new Error('Another writable Little Feet instance already owns the PostgreSQL writer lock.');
+  }
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS little_feet_app_state (
       state_key TEXT PRIMARY KEY,
@@ -542,6 +647,7 @@ async function saveDatabaseState() {
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         console.error('Unable to save normalized PostgreSQL state:', error.message);
+        throw error;
       } finally {
         client.release();
       }
@@ -559,6 +665,7 @@ async function saveDatabaseState() {
     `).run('primary', JSON.stringify(db), new Date().toISOString());
   } catch (error) {
     console.error('Unable to save SQLite application state:', error.message);
+    throw error;
   }
 }
 function loadReplicaSnapshot() {
@@ -757,7 +864,7 @@ app.post('/api/signup', (req, res) => {
   res.status(201).json({ success: true, account: safeAccount });
 });
 
-const safeAccount = ({ pin, pinHash, ...account }) => ({
+const safeAccount = ({ pin, pinHash, reportSigningPinHash, ...account }) => ({
   ...account,
   ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {})
 });
@@ -1107,6 +1214,7 @@ app.put('/api/subscription-billing', async (req, res) => {
   // before acknowledging the request instead of relying only on the normal
   // post-response persistence queue.
   await saveDatabaseState();
+  req.persistenceCommitted = true;
   if (postgresPool) {
     const schoolBillingKey = `schoolBilling:${accountSchoolId(actor)}`;
     const persisted = await postgresPool.query(
@@ -1979,7 +2087,7 @@ app.post('/api/chat/messages', (req, res) => {
     id: crypto.randomUUID(),
     sender: actor.username,
     message,
-    textColor: textColor || "#2dd4bf",
+    textColor: normaliseChatColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
   db.groupMessages[groupId].push(msgObj);
@@ -2025,7 +2133,7 @@ app.post('/api/chat/direct', (req, res) => {
     sender: senderAccount.username,
     recipient,
     message,
-    textColor: textColor || "#2dd4bf",
+    textColor: normaliseChatColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   db.directMessages.push(msgObj);
