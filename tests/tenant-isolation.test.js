@@ -107,8 +107,9 @@ const rawRequest = async (route) => {
     assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
     assert.equal(bravoParentLogin.response.status, 200);
-    const migratedAlphaLogin = await request('/api/login', { method: 'POST', body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
+    const migratedAlphaLogin = await request('/api/login', { method: 'POST', cookie: alphaLogin.cookie, body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     assert.equal(migratedAlphaLogin.response.status, 200);
+    assert.notEqual(migratedAlphaLogin.cookie, alphaLogin.cookie, 'Successful authentication must rotate the session identifier.');
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
@@ -145,6 +146,26 @@ const rawRequest = async (route) => {
     assert.equal(bravoCodes.data.length, 0);
 
     assert.ok(alphaCodes.data[0].accessCode, 'Imported learners should receive an automatically generated access code.');
+
+    const staffGroup = await request('/api/chat/groups', { method: 'POST', cookie: alphaLogin.cookie, body: { groupName: 'Alpha Staff Lounge' } });
+    assert.equal(staffGroup.response.status, 200);
+    assert.equal((await request('/api/chat/groups', { cookie: alphaParentLogin.cookie })).response.status, 403);
+    assert.equal((await request('/api/chat/messages/' + staffGroup.data.id, { cookie: alphaParentLogin.cookie })).response.status, 403);
+    assert.equal((await request('/api/chat/messages', { method: 'POST', cookie: alphaParentLogin.cookie, body: { groupId: staffGroup.data.id, message: 'Parent must not enter staff lounge.' } })).response.status, 403);
+    const teacherGroups = await request('/api/chat/groups', { cookie: alphaTeacherLogin.cookie });
+    assert.equal(teacherGroups.response.status, 200);
+    assert.equal(teacherGroups.data.length, 1);
+    const teacherGroupMessage = await request('/api/chat/messages', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: { groupId: staffGroup.data.id, message: 'Staff-only message.' } });
+    assert.equal(teacherGroupMessage.response.status, 200);
+    const parentDirectUsers = await request('/api/chat/direct/users', { cookie: alphaParentLogin.cookie });
+    assert.equal(parentDirectUsers.response.status, 200);
+    assert.ok(parentDirectUsers.data.some(account => account.username === 'alpha-teacher'));
+    const parentDirectMessage = await request('/api/chat/direct', { method: 'POST', cookie: alphaParentLogin.cookie, body: { recipient: 'alpha-teacher', message: 'Direct parent-to-teacher message still works.' } });
+    assert.equal(parentDirectMessage.response.status, 200);
+    const teacherDirectConversation = await request('/api/chat/direct/alpha-teacher/alpha-parent', { cookie: alphaTeacherLogin.cookie });
+    assert.equal(teacherDirectConversation.response.status, 200);
+    assert.equal(teacherDirectConversation.data.at(-1).message, 'Direct parent-to-teacher message still works.');
+
     const duplicateIssue = await request('/api/learner-access-codes', { method: 'POST', cookie: alphaLogin.cookie, body: { learnerKey: alphaCodes.data[0].learnerKey } });
     assert.equal(duplicateIssue.response.status, 409);
     const blockedPrint = await request(`/api/learner-access-codes/${encodeURIComponent(alphaCodes.data[0].learnerKey)}/printable`, { cookie: bravoLogin.cookie });
@@ -227,6 +248,16 @@ const rawRequest = async (route) => {
     assert.equal(signingPin.response.status, 200);
     const teacherSessionAfterSigningPin = await request('/api/auth/session', { cookie: alphaTeacherLogin.cookie });
     assert.equal(Object.hasOwn(teacherSessionAfterSigningPin.data.user, 'reportSigningPinHash'), false);
+
+    const maliciousTicketId = '<img src=x onerror=alert(1)>';
+    const createdTicket = await request('/api/tickets', { method: 'POST', cookie: alphaParentLogin.cookie, body: { id: maliciousTicketId, department: 'Admin', priority: 'Normal', subject: 'Safe support test', message: '<img src=x onerror=alert(1)>' } });
+    assert.equal(createdTicket.response.status, 200);
+    assert.notEqual(createdTicket.data.item.id, maliciousTicketId);
+    assert.match(createdTicket.data.item.id, /^[0-9a-f-]{36}$/i);
+    const invalidTicketStatus = await request('/api/tickets/update', { method: 'POST', cookie: alphaLogin.cookie, body: { id: createdTicket.data.item.id, status: '<script>alert(1)</script>', feedback: 'No unsafe status values.' } });
+    assert.equal(invalidTicketStatus.response.status, 400);
+    const completedTicket = await request('/api/tickets/update', { method: 'POST', cookie: alphaLogin.cookie, body: { id: createdTicket.data.item.id, status: 'Completed', feedback: '<img src=x onerror=alert(1)>' } });
+    assert.equal(completedTicket.response.status, 200);
 
     const product = await request('/api/store/products', { method: 'POST', cookie: alphaLogin.cookie, body: { name: 'Alpha School Shirt', price: 50, stockQuantity: 12 } });
     assert.equal(product.response.status, 201);
