@@ -355,6 +355,11 @@ const sendPublicRootFile = (req, res) => {
 };
 app.get('/backup.js', sendPublicRootFile);
 app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
+app.get('/favicon.ico', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.type('image/png');
+  res.sendFile('logo.png', { root: __dirname });
+});
 
 const browserVendorSources = Object.freeze({
   'xlsx.js': 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
