@@ -2622,8 +2622,8 @@ if (googleSignInConfigured) passport.use(new GoogleStrategy({
 app.get('/api/auth/providers', (req, res) => res.json({ google: googleSignInConfigured, yahoo: yahooSignInConfigured, microsoft: microsoftSignInConfigured }));
 app.get('/api/auth/session', (req, res) => {
   const account = getSessionAccount(req);
-  if (!account) return res.status(401).json({ message: 'No active sign-in session.' });
-  res.json({ user: safeAccount(account) });
+  if (!account) return res.json({ authenticated: false, user: null });
+  res.json({ authenticated: true, user: safeAccount(account) });
 });
 app.post('/api/auth/logout', (req, res) => {
   req.session?.destroy(() => res.json({ success: true }));
