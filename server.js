@@ -217,12 +217,40 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   persistenceReady.then(() => {
     activeRequestCount += 1;
-    res.on('finish', () => {
+    let requestReleased = false;
+    const releaseRequest = () => {
+      if (requestReleased) return;
+      requestReleased = true;
       activeRequestCount = Math.max(0, activeRequestCount - 1);
-      if (!req.method || req.method === 'GET' || replicaMode || req.persistenceCommitted) return;
-      void saveDatabaseState();
-      scheduleReplicaSnapshot();
-    });
+    };
+    res.on('finish', releaseRequest);
+    res.on('close', releaseRequest);
+
+    if (!req.method || req.method === 'GET' || replicaMode) return next();
+
+    const originalJson = res.json.bind(res);
+    let persistenceResponsePending = false;
+    res.json = (body) => {
+      if (res.statusCode >= 400 || req.persistenceCommitted || persistenceResponsePending) {
+        return originalJson(body);
+      }
+      persistenceResponsePending = true;
+      void saveDatabaseState().then(() => {
+        req.persistenceCommitted = true;
+        scheduleReplicaSnapshot();
+        originalJson(body);
+      }).catch(error => {
+        console.error('Refusing to acknowledge an unpersisted mutation:', error.message);
+        if (!res.headersSent) {
+          res.status(503);
+          originalJson({
+            message: 'Your change could not be committed to durable storage. Nothing has been confirmed; please retry after the database recovers.',
+            requestId: req.requestId
+          });
+        }
+      });
+      return res;
+    };
     next();
   }).catch(next);
 });
@@ -298,6 +326,7 @@ let replicaTimer = null;
 let replicaSnapshotTimer = null;
 let stateDatabase = null;
 let postgresPool = null;
+let postgresWriterLockClient = null;
 let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 
@@ -418,6 +447,15 @@ async function openPostgresDatabase() {
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: false
   });
+  if (!replicaMode) {
+    postgresWriterLockClient = await postgresPool.connect();
+    const lockResult = await postgresWriterLockClient.query('SELECT pg_try_advisory_lock(12801337) AS locked');
+    if (!lockResult.rows[0]?.locked) {
+      postgresWriterLockClient.release();
+      postgresWriterLockClient = null;
+      throw new Error('Another Little Feet primary writer is already active. Refusing to start a second writable instance.');
+    }
+  }
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS little_feet_app_state (
       state_key TEXT PRIMARY KEY,
@@ -563,7 +601,7 @@ async function loadDatabaseState() {
 async function saveDatabaseState() {
   if (replicaMode) return;
   if (postgresPool) {
-    postgresSaveChain = postgresSaveChain.then(async () => {
+    postgresSaveChain = postgresSaveChain.catch(() => {}).then(async () => {
       const { records, metadata } = flattenPersistentState();
       const nextSnapshot = new Map();
       const client = await postgresPool.connect();
@@ -602,6 +640,7 @@ async function saveDatabaseState() {
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         console.error('Unable to save normalized PostgreSQL state:', error.message);
+        throw error;
       } finally {
         client.release();
       }
@@ -619,6 +658,7 @@ async function saveDatabaseState() {
     `).run('primary', JSON.stringify(db), new Date().toISOString());
   } catch (error) {
     console.error('Unable to save SQLite application state:', error.message);
+    throw error;
   }
 }
 function loadReplicaSnapshot() {
