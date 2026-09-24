@@ -253,24 +253,71 @@ function createIceShelf() {
 }
 
 function createWater() {
-  const geometry = new THREE.PlaneGeometry(44, 44, 18, 18);
-  const material = new THREE.MeshPhysicalMaterial({
-    color: 0x19aee7,
+  // Lightweight GPU water: preserve animated waves, depth colour, glossy
+  // highlights and edge shine without MeshPhysicalMaterial transmission.
+  // Transmission on a full-screen surface is disproportionately expensive.
+  const geometry = new THREE.PlaneGeometry(44, 44, 32, 32);
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uOpacity: { value: .58 },
+      uShallow: { value: new THREE.Color(0x2fc9ef) },
+      uDeep: { value: new THREE.Color(0x0876b7) },
+      uHighlight: { value: new THREE.Color(0xc8fbff) }
+    },
+    vertexShader: `
+      uniform float uTime;
+      varying vec3 vNormal;
+      varying vec3 vWorldPosition;
+      varying float vWave;
+
+      void main() {
+        vec3 p = position;
+        float waveA = sin(p.x * 0.72 + uTime * 1.25) * 0.055;
+        float waveB = cos(p.y * 0.56 + uTime * 0.90) * 0.042;
+        p.z += waveA + waveB;
+        vWave = waveA + waveB;
+
+        float dzdx = cos(p.x * 0.72 + uTime * 1.25) * 0.0396;
+        float dzdy = -sin(p.y * 0.56 + uTime * 0.90) * 0.02352;
+        vec3 localNormal = normalize(vec3(-dzdx, -dzdy, 1.0));
+        vNormal = normalize(normalMatrix * localNormal);
+
+        vec4 world = modelMatrix * vec4(p, 1.0);
+        vWorldPosition = world.xyz;
+        gl_Position = projectionMatrix * viewMatrix * world;
+      }
+    `,
+    fragmentShader: `
+      uniform float uOpacity;
+      uniform vec3 uShallow;
+      uniform vec3 uDeep;
+      uniform vec3 uHighlight;
+      varying vec3 vNormal;
+      varying vec3 vWorldPosition;
+      varying float vWave;
+
+      void main() {
+        vec3 n = normalize(vNormal);
+        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+        float fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 2.2);
+        vec3 lightDir = normalize(vec3(-0.35, 0.88, 0.28));
+        vec3 halfDir = normalize(lightDir + viewDir);
+        float specular = pow(max(dot(n, halfDir), 0.0), 52.0);
+        float waveTint = clamp(vWave * 4.0 + 0.5, 0.0, 1.0);
+
+        vec3 base = mix(uDeep, uShallow, 0.48 + waveTint * 0.20);
+        base += uHighlight * (fresnel * 0.28 + specular * 0.48);
+        gl_FragColor = vec4(base, uOpacity);
+      }
+    `,
     transparent: true,
-    opacity: .58,
-    roughness: .12,
-    metalness: .04,
-    transmission: .38,
-    thickness: .35,
-    clearcoat: 1,
-    clearcoatRoughness: .05,
+    depthWrite: false,
     side: THREE.DoubleSide
   });
   const water = new THREE.Mesh(geometry, material);
   water.rotation.x = -Math.PI / 2;
   water.position.y = -.25;
-  water.receiveShadow = true;
-  water.userData.basePositions = Float32Array.from(geometry.attributes.position.array);
   return water;
 }
 
@@ -864,7 +911,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = '30';
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v1';
+  stage.dataset.compressionProfile = 'safe-webgl-v2-gpu-water';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1534,24 +1581,8 @@ function initCinematicJourney() {
     pointer.y = nextY;
   }, { passive: true });
 
-  let waterUpdateCount = 0;
-  const updateWater = (time, refreshNormals = false) => {
-    const attr = water.geometry.attributes.position;
-    const base = water.userData.basePositions;
-    const stride = attr.itemSize;
-    for (let i = 0; i < attr.count; i += 1) {
-      const offset = i * stride;
-      const x = base[offset];
-      const y = base[offset + 1];
-      attr.array[offset + 2] = Math.sin(x * .72 + time * 1.25) * .055 + Math.cos(y * .56 + time * .9) * .042;
-    }
-    attr.needsUpdate = true;
-    waterUpdateCount += 1;
-    // Vertex-normal recomputation is one of the most expensive CPU steps in this
-    // scene. The waves are deliberately shallow, so refreshing roughly twice per
-    // second keeps the lighting alive without burning a full CPU pass every few
-    // frames on integrated GPUs.
-    if (refreshNormals || waterUpdateCount % 30 === 0) water.geometry.computeVertexNormals();
+  const updateWater = time => {
+    water.material.uniforms.uTime.value = time;
   };
 
   const sampleSourceSwimBone = (boneName, cycle) => {
@@ -2235,7 +2266,7 @@ function initCinematicJourney() {
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
     ice.visible = smoothProgress < .42;
-    water.material.opacity = lerp(.58, .23, submerged);
+    water.material.uniforms.uOpacity.value = lerp(.58, .23, submerged);
     cyanLight.intensity = lerp(6, 14, submerged) + splash * 3.5;
     violetLight.intensity = lerp(2, 11, smoothstep(.45, .85, smoothProgress));
     sun.intensity = lerp(5, 1.7, submerged);
