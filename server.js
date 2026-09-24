@@ -402,7 +402,8 @@ const browserVendorSources = Object.freeze({
   'xlsx.js': 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
   'qrcode.js': 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
   'leaflet.js': 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'leaflet-markercluster.js': 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js'
+  'leaflet-markercluster.js': 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
+  'three.module.js': 'https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js'
 });
 const browserVendorCache = new Map();
 app.get('/vendor/:asset', async (req, res, next) => {
