@@ -793,7 +793,7 @@ function initCinematicJourney() {
   const depthLabel = document.getElementById('cinematicDepthLabel');
   const stopContainer = document.getElementById('cinematicDepthMeter');
   const pauseButton = document.getElementById('cinematicPause');
-  const portraitBackdrop = stage?.querySelector('.cinematic-portrait-backdrop');
+  const depthBackdropImage = document.getElementById('cinematicDepthBackdrop');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
@@ -1004,7 +1004,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v8-slow-scroll-pause-depth2d';
+  stage.dataset.compressionProfile = 'safe-webgl-v9-raster-depth-backdrop';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2317,10 +2317,11 @@ function initCinematicJourney() {
     setCinematicAudioMix(submerged, journey.classList.contains('is-active'));
 
     const deepening = smoothstep(.32, .95, smoothProgress);
-    if (portraitBackdrop) {
-      const depthShift = lerp(0, -window.innerHeight * .18, smoothProgress);
-      portraitBackdrop.style.transform = `translate3d(0,${depthShift.toFixed(1)}px,0) scale(1.08)`;
-      portraitBackdrop.style.filter = `saturate(${(1.08 + deepening * .28).toFixed(2)}) contrast(${(1.02 + deepening * .08).toFixed(2)})`;
+    if (depthBackdropImage) {
+      const depthTravel = Math.max(0, depthBackdropImage.offsetHeight - stage.clientHeight);
+      const depthShift = -depthTravel * smoothProgress;
+      depthBackdropImage.style.transform =
+        `translate3d(-50%,${depthShift.toFixed(1)}px,0) scale(1.035)`;
     }
     scene.fog.density = lerp(.008, .034, submerged) + deepening * .006;
     scene.fog.color.setRGB(
