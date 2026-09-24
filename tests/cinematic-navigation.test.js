@@ -36,6 +36,11 @@ assert.match(cinematic, /ResizeObserver/);
 assert.match(cinematic, /MutationObserver/);
 assert.match(cinematic, /dashboard\.classList\.contains\('hidden'\)/);
 assert.match(cinematic, /refreshStationTargets/);
+assert.match(cinematic, /diveKeyframes/);
+assert.match(cinematic, /sampleDivePath/);
+assert.match(cinematic, /mascot\.position\.y \+ 4\.25/);
+assert.match(styles, /#homeTab\.tab-content\.active/);
+assert.match(styles, /transform: none !important/);
 assert.doesNotMatch(cinematic, /fetch\(/);
 assert.doesNotMatch(cinematic, /innerHTML\s*=/);
 
