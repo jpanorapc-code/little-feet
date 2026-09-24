@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="iceBase" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f4ffff"/>
+    <stop offset=".28" stop-color="#bdefff"/>
+    <stop offset=".62" stop-color="#74c9ea"/>
+    <stop offset="1" stop-color="#d9f8ff"/>
+  </linearGradient>
+  <filter id="ice" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".0045" numOctaves="4" seed="8" result="cloud"/>
+    <feTurbulence type="turbulence" baseFrequency=".002 .026" numOctaves="2" seed="21" result="veins"/>
+    <feColorMatrix in="veins" type="matrix" values="2.2 0 0 0 -.72  0 2.2 0 0 -.72  0 0 2.2 0 -.72  0 0 0 .75 0" result="cracks"/>
+    <feBlend in="SourceGraphic" in2="cloud" mode="screen" result="frost"/>
+    <feBlend in="frost" in2="cracks" mode="multiply"/>
+  </filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#iceBase)" filter="url(#ice)"/>
+</svg>
