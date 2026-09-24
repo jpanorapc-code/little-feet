@@ -351,7 +351,8 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use((req, res, next) => {
-  if (!replicaMode || !req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const allowReplicaWritesForTests = process.env.NODE_ENV === 'test' && process.env.LF_TEST_ALLOW_REPLICA_WRITES === '1';
+  if (!replicaMode || allowReplicaWritesForTests || !req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   // Standby replicas are deliberately read-only. Authentication is allowed so
   // users can inspect the latest snapshot during failover, but business-data
   // writes must never return success when there is no durable write path.
