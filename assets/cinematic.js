@@ -871,7 +871,98 @@ function initCinematicJourney() {
   const quality = SCENE_DETAIL;
   let performanceTier = 'balanced';
   let renderPixelRatioTarget = .78;
-  const MAX_RENDER_PIXELS = 1280 * 720;
+  let maxRenderPixels = 1280 * 720;
+  let displayPixelRatioLimit = .88;
+  let renderFpsCap = 30;
+  let measuredRefreshHz = 60;
+
+  const classifyViewport = () => {
+    const viewportWidth = Math.max(1, Math.round(window.visualViewport?.width || window.innerWidth));
+    const viewportHeight = Math.max(1, Math.round(window.visualViewport?.height || window.innerHeight));
+    const shortSide = Math.min(viewportWidth, viewportHeight);
+    const longSide = Math.max(viewportWidth, viewportHeight);
+    const aspect = longSide / Math.max(1, shortSide);
+    const dpr = Math.max(.5, Number(window.devicePixelRatio || 1));
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+
+    let name = 'desktop';
+    if (shortSide <= 520 || (coarse && longSide <= 950)) name = 'phone';
+    else if (coarse || (shortSide <= 900 && longSide <= 1400)) name = 'tablet';
+    else if (viewportHeight <= 720) name = 'legacy-low-height';
+    else if (aspect >= 1.7 && viewportWidth >= 1600) name = 'wide-tv-monitor';
+
+    return { name, viewportWidth, viewportHeight, shortSide, longSide, aspect, dpr, coarse };
+  };
+
+  let viewportProfile = classifyViewport();
+
+  const applyViewportProfile = () => {
+    viewportProfile = classifyViewport();
+    if (viewportProfile.name === 'phone') {
+      maxRenderPixels = 960 * 540;
+      displayPixelRatioLimit = .90;
+    } else if (viewportProfile.name === 'tablet') {
+      maxRenderPixels = 1152 * 648;
+      displayPixelRatioLimit = .86;
+    } else if (viewportProfile.name === 'legacy-low-height') {
+      maxRenderPixels = 960 * 540;
+      displayPixelRatioLimit = .78;
+    } else {
+      // 1080p/1440p/4K TVs and monitors still render the cinematic internally
+      // near 720p. CSS scales it to the panel, avoiding a 4K GPU/CPU penalty.
+      maxRenderPixels = 1280 * 720;
+      displayPixelRatioLimit = .88;
+    }
+
+    stage.dataset.viewportClass = viewportProfile.name;
+    stage.dataset.viewportCss = `${viewportProfile.viewportWidth}x${viewportProfile.viewportHeight}`;
+    stage.dataset.devicePixelRatio = viewportProfile.dpr.toFixed(2);
+  };
+
+  const fpsCapForRefresh = hz => {
+    if (!Number.isFinite(hz) || hz <= 0) return 30;
+    if (hz < 28) return Math.max(15, Math.min(30, Math.round(hz)));
+    if (hz < 38) return 30;
+    if (hz < 56) return Math.max(20, Math.min(30, Math.round(hz / 2)));
+    return 30;
+  };
+
+  const measureDisplayRefresh = () => {
+    if (typeof window.requestAnimationFrame !== 'function') return;
+    const samples = [];
+    let previous = null;
+
+    const sample = timestamp => {
+      if (document.hidden) {
+        previous = null;
+        window.requestAnimationFrame(sample);
+        return;
+      }
+      if (previous !== null) {
+        const delta = timestamp - previous;
+        if (delta >= 5 && delta <= 80) samples.push(delta);
+      }
+      previous = timestamp;
+
+      if (samples.length < 24) {
+        window.requestAnimationFrame(sample);
+        return;
+      }
+
+      samples.sort((a, b) => a - b);
+      const median = samples[Math.floor(samples.length / 2)];
+      measuredRefreshHz = Math.max(1, Math.round(1000 / median));
+      renderFpsCap = fpsCapForRefresh(measuredRefreshHz);
+      stage.dataset.displayRefreshHz = String(measuredRefreshHz);
+      stage.dataset.renderFpsCap = String(renderFpsCap);
+    };
+
+    window.requestAnimationFrame(sample);
+  };
+
+  applyViewportProfile();
+  measureDisplayRefresh();
+
   let renderer;
   let rendererError = null;
   const rendererOptions = {
@@ -909,9 +1000,9 @@ function initCinematicJourney() {
   stage.dataset.cinematicQuality = quality;
   stage.dataset.cinematicBatching = 'instanced-v1';
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
-  stage.dataset.renderFpsCap = '30';
+  stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v5-scroll-hold-batched-particles';
+  stage.dataset.compressionProfile = 'safe-webgl-v6-display-adaptive';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1533,11 +1624,13 @@ function initCinematicJourney() {
     // Three.js recommends limiting drawing-buffer pixel count for heavy scenes.
     // Keep the CSS canvas full-size while rendering internally at a bounded
     // resolution, then let the browser upscale it.
+    applyViewportProfile();
     const cssPixels = Math.max(1, rect.width * rect.height);
-    const pixelBudgetRatio = Math.sqrt(MAX_RENDER_PIXELS / cssPixels);
+    const pixelBudgetRatio = Math.sqrt(maxRenderPixels / cssPixels);
     const safePixelRatio = Math.min(
       window.devicePixelRatio || 1,
       renderPixelRatioTarget,
+      displayPixelRatioLimit,
       pixelBudgetRatio
     );
     renderer.setPixelRatio(Math.max(.5, safePixelRatio));
@@ -1568,6 +1661,7 @@ function initCinematicJourney() {
 
   window.addEventListener('scroll', calculateScroll, { passive: true });
   window.addEventListener('resize', syncVisibleStage, { passive: true });
+  window.visualViewport?.addEventListener('resize', syncVisibleStage, { passive: true });
 
   const resizeObserver = typeof ResizeObserver === 'function'
     ? new ResizeObserver(() => syncVisibleStage())
@@ -2046,7 +2140,6 @@ function initCinematicJourney() {
   let waterInterval = 1 / 15;
   let worldInterval = 1 / 24;
   let bubbleInterval = 1 / 20;
-  const renderFpsCap = 30;
   let perfFrameCount = 0;
   let perfFrameTotalMs = 0;
   let perfGoodWindows = 0;
@@ -2076,6 +2169,7 @@ function initCinematicJourney() {
     sun.castShadow = false;
 
     stage.dataset.performanceTier = tier;
+    stage.dataset.renderFpsCap = String(renderFpsCap);
     resize();
   };
 
