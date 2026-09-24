@@ -41,7 +41,7 @@ assert.match(cinematic, /diveKeyframes/);
 assert.match(cinematic, /sampleDivePath/);
 assert.match(cinematic, /mascot\.position\.y \+ 4\.35/);
 assert.match(cinematic, /headRig/);
-assert.match(cinematic, /requestedYaw = pointer\.smoothX \* 1\.02/);
+assert.match(cinematic, /requestedYaw = lerp\(pointer\.smoothX \* 1\.02/);
 assert.match(cinematic, /eyeX = pointer\.smoothX \* \.155/);
 assert.match(cinematic, /window\.addEventListener\('pointermove'/);
 assert.match(cinematic, /pointer\.activity/);
