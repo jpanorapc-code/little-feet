@@ -1108,22 +1108,6 @@ function initCinematicJourney() {
     catch { return false; }
   };
 
-  const portalIntroThemePlaying = () => {
-    try {
-      return typeof window.isPortalIntroThemePlaying === 'function'
-        ? window.isPortalIntroThemePlaying()
-        : false;
-    } catch {
-      return false;
-    }
-  };
-
-  const stopPortalIntroTheme = () => {
-    try {
-      if (typeof window.stopPortalIntroTheme === 'function') window.stopPortalIntroTheme();
-    } catch { /* Intro handoff is optional. */ }
-  };
-
   const portalContext = () => {
     try {
       if (typeof window.getPortalAudioContext !== 'function') return null;
@@ -1219,7 +1203,7 @@ function initCinematicJourney() {
     const audio = ensureCinematicAudio();
     if (!audio) return;
     const now = audio.ctx.currentTime;
-    const muted = portalSoundMuted() || portalIntroThemePlaying() || !audible || document.hidden;
+    const muted = portalSoundMuted() || !audible || document.hidden;
     const masterTarget = muted ? 0.0001 : 0.12;
     const surfaceTarget = muted ? 0.0001 : Math.max(0.0001, (1 - submerged) * .72);
     const underwaterTarget = muted ? 0.0001 : Math.max(0.0001, submerged * .58);
@@ -1268,7 +1252,7 @@ function initCinematicJourney() {
   };
 
   const playMascotChirp = (variant = 0) => {
-    if (!mascotSoundUnlocked || portalSoundMuted() || portalIntroThemePlaying() || document.hidden) return false;
+    if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return false;
     if (!journey.classList.contains('is-active')) return false;
 
     const nowMs = performance.now();
@@ -1321,7 +1305,7 @@ function initCinematicJourney() {
   };
 
   const playWaterSplash = () => {
-    if (!mascotSoundUnlocked || portalSoundMuted() || portalIntroThemePlaying() || document.hidden) return;
+    if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
     const ctx = portalContext();
     if (!ctx || ctx.state !== 'running') return;
     try {
@@ -1377,15 +1361,6 @@ function initCinematicJourney() {
     const muted = Boolean(event.detail?.muted);
     if (!muted) unlockMascotSound();
     setCinematicAudioMix(smoothProgress > .225 ? 1 : 0, !muted && journey.classList.contains('is-active'));
-  });
-
-  window.addEventListener('littlefeet:introthemechange', event => {
-    const active = Boolean(event.detail?.active);
-    if (!active) unlockMascotSound();
-    setCinematicAudioMix(
-      smoothProgress > .225 ? 1 : 0,
-      !active && !portalSoundMuted() && journey.classList.contains('is-active')
-    );
   });
 
   // A deterministic dive path keeps the mascot tied to the same scroll
@@ -1509,7 +1484,6 @@ function initCinematicJourney() {
     const raw = (window.scrollY - journeyTop) / journeyTravel;
     const insideJourney = window.scrollY >= journeyTop && window.scrollY <= journeyEnd;
     scrollProgress = clamp(raw);
-    if (raw > .012 && portalIntroThemePlaying()) stopPortalIntroTheme();
     journey.classList.toggle('is-active', insideJourney);
     journey.classList.toggle('is-after', window.scrollY > journeyEnd);
     stage.dataset.exitHoldActive = String(raw >= 1 && insideJourney);
