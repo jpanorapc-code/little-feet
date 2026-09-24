@@ -790,6 +790,7 @@ function initCinematicJourney() {
   let lastMascotChirpAt = 0;
   let lastMascotSoundBand = -1;
   let mascotChirpUntil = 0;
+  let splashSoundArmed = true;
 
   const portalSoundMuted = () => {
     try { return localStorage.getItem('lf_portal_audio_muted_last') === 'true'; }
@@ -831,11 +832,44 @@ function initCinematicJourney() {
     } catch { /* Mascot sound remains optional if a browser blocks Web Audio. */ }
   };
 
+  const playWaterSplash = () => {
+    if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
+    try {
+      const getContext = typeof window.getPortalAudioContext === 'function' ? window.getPortalAudioContext : null;
+      const ctx = getContext ? getContext() : null;
+      if (!ctx || ctx.state === 'suspended') return;
+
+      const duration = .42;
+      const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let index = 0; index < data.length; index += 1) {
+        const fade = 1 - index / data.length;
+        data[index] = (Math.random() * 2 - 1) * fade * fade;
+      }
+
+      const source = ctx.createBufferSource();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(900, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(280, ctx.currentTime + duration);
+      filter.Q.value = .7;
+      gain.gain.setValueAtTime(.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.075, ctx.currentTime + .018);
+      gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + duration);
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      source.buffer = buffer;
+      source.start();
+    } catch { /* Splash audio is non-critical and must never break the portal. */ }
+  };
+
   const unlockMascotSound = () => {
     mascotSoundUnlocked = true;
   };
-  stage.addEventListener('pointerdown', unlockMascotSound, { once: true, passive: true });
-  stage.addEventListener('keydown', unlockMascotSound, { once: true });
+  window.addEventListener('pointerdown', unlockMascotSound, { once: true, passive: true });
+  window.addEventListener('keydown', unlockMascotSound, { once: true });
 
   // A deterministic dive path keeps the mascot tied to the same scroll
   // milestones as the underwater stations instead of letting camera math
@@ -1317,6 +1351,11 @@ function initCinematicJourney() {
     // Water entry reads as an event: ring burst at the surface plus a short
     // brightening. The ring is visual-only and cannot interfere with portal UI.
     const splash = smoothstep(.17, .205, smoothProgress) * (1 - smoothstep(.225, .29, smoothProgress));
+    if (smoothProgress < .155) splashSoundArmed = true;
+    if (smoothProgress > .195 && splashSoundArmed) {
+      splashSoundArmed = false;
+      playWaterSplash();
+    }
     const entryPath = sampleDivePath(.22);
     splashRing.position.x = entryPath.x;
     splashRing.material.opacity = splash * .78;
