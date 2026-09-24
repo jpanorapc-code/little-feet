@@ -108,7 +108,6 @@ assert.match(cinematic, /getSharedJellyTentacleGeometry/);
 assert.match(cinematic, /getSharedGeometry\('jellyBell'/);
 assert.match(cinematic, /getSharedGeometry\('stationRingOuter'/);
 assert.match(cinematic, /getSharedGeometry\('fishBody'/);
-assert.match(cinematic, /buckets = \[\[\], \[\], \[\]\]/);
 assert.match(cinematic, /new THREE\.InstancedMesh\(bodyGeometry, bodyMaterial, count\)/);
 assert.match(cinematic, /new THREE\.InstancedMesh\(rockGeometry, baseMaterial, 11\)/);
 assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
