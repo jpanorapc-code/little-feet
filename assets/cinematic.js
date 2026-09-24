@@ -86,25 +86,16 @@ function accessibleNavTarget(candidates) {
   return { tabId: 'homeTab', label: 'Home' };
 }
 
-function createMascot(featherTexture = null) {
+function createMascot() {
   const group = new THREE.Group();
-  const blue = new THREE.MeshPhysicalMaterial({
-    color: 0x1267a5, roughness: .52, metalness: .01,
-    clearcoat: .20, clearcoatRoughness: .42,
-    sheen: 1, sheenColor: new THREE.Color(0x72cfff), sheenRoughness: .64,
-    bumpMap: featherTexture, bumpScale: .024
+  const blue = new THREE.MeshStandardMaterial({
+    color: 0x1267a5, roughness: .58, metalness: 0
   });
-  const blueDark = new THREE.MeshPhysicalMaterial({
-    color: 0x07375f, roughness: .48, metalness: 0,
-    clearcoat: .16, clearcoatRoughness: .46,
-    sheen: .85, sheenColor: new THREE.Color(0x4ba6d7), sheenRoughness: .70,
-    bumpMap: featherTexture, bumpScale: .021
+  const blueDark = new THREE.MeshStandardMaterial({
+    color: 0x07375f, roughness: .62, metalness: 0
   });
-  const white = new THREE.MeshPhysicalMaterial({
-    color: 0xf4fbfc, roughness: .62, metalness: 0,
-    clearcoat: .08, clearcoatRoughness: .62,
-    sheen: .58, sheenColor: new THREE.Color(0xd8f7ff), sheenRoughness: .78,
-    bumpMap: featherTexture, bumpScale: .010
+  const white = new THREE.MeshStandardMaterial({
+    color: 0xf4fbfc, roughness: .72, metalness: 0
   });
   const orange = new THREE.MeshStandardMaterial({ color: 0xffa61b, roughness: .45, metalness: .02 });
   const glass = new THREE.MeshPhysicalMaterial({ color: 0x87f5ff, roughness: .08, metalness: .18, transmission: .55, transparent: true, opacity: .78, emissive: 0x0b5d79, emissiveIntensity: .35 });
@@ -258,15 +249,12 @@ function roughenIceGeometry(geometry, strength = .10) {
   return geometry;
 }
 
-function createIceShelf(iceTexture = null) {
+function createIceShelf() {
   const group = new THREE.Group();
   const top = new THREE.Mesh(
     roughenIceGeometry(new THREE.CylinderGeometry(3.45, 3.05, .62, 52, 4), .075),
     new THREE.MeshPhysicalMaterial({
       color: 0xe9fbff,
-      map: iceTexture,
-      bumpMap: iceTexture,
-      bumpScale: .065,
       roughness: .27,
       metalness: .01,
       clearcoat: .84,
@@ -285,9 +273,6 @@ function createIceShelf(iceTexture = null) {
     roughenIceGeometry(new THREE.CylinderGeometry(3.0, 2.05, 1.42, 44, 4), .12),
     new THREE.MeshPhysicalMaterial({
       color: 0x7fcde8,
-      map: iceTexture,
-      bumpMap: iceTexture,
-      bumpScale: .085,
       roughness: .36,
       clearcoat: .38,
       clearcoatRoughness: .26,
@@ -400,56 +385,6 @@ function createBubbles(count, spread, depth, size) {
   return points;
 }
 
-function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
-  const group = new THREE.Group();
-  const bell = new THREE.Mesh(
-    getSharedGeometry('jellyBell', () => new THREE.SphereGeometry(.88, 30, 20, 0, Math.PI * 2, 0, Math.PI * .56)),
-    new THREE.MeshPhysicalMaterial({
-      color,
-      emissive: accent,
-      emissiveIntensity: .7,
-      transparent: true,
-      opacity: .56,
-      roughness: .08,
-      transmission: .7,
-      thickness: .8,
-      clearcoat: 1,
-      side: THREE.DoubleSide
-    })
-  );
-  bell.scale.y = .72;
-  group.add(bell);
-
-  const core = new THREE.Mesh(
-    getSharedGeometry('jellyCore', () => new THREE.SphereGeometry(.22, 10, 8)),
-    new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: .78,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    })
-  );
-  core.scale.set(1.55, .72, 1.55);
-  core.position.y = .05;
-  group.add(core);
-
-  const tentacles = new THREE.Mesh(
-    getSharedJellyTentacleGeometry(),
-    new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: .45,
-      blending: THREE.AdditiveBlending
-    })
-  );
-  group.add(tentacles);
-
-  group.userData.bell = bell;
-  group.userData.tentacles = tentacles;
-  return group;
-}
-
 function createStationRing(color) {
   const group = new THREE.Group();
   const ring = new THREE.Mesh(
@@ -466,92 +401,6 @@ function createStationRing(color) {
   return group;
 }
 
-
-function createFishSchool(count, color, accent = 0xffffff) {
-  const school = new THREE.Group();
-  const bodyMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9 });
-  const accentMaterial = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: .72 });
-  const bodyGeometry = getSharedGeometry('fishBody', () => new THREE.SphereGeometry(.16, 10, 7));
-  const tailGeometry = getSharedGeometry('fishTail', () => new THREE.ConeGeometry(.13, .28, 3));
-
-  // Fish are visually identical geometry repeated many times. Instancing keeps
-  // every fish while collapsing the school to two draw calls: bodies + tails.
-  const bodies = new THREE.InstancedMesh(bodyGeometry, bodyMaterial, count);
-  const tails = new THREE.InstancedMesh(tailGeometry, accentMaterial, count);
-  bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  tails.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  school.add(bodies, tails);
-
-  const fish = [];
-  for (let index = 0; index < count; index += 1) {
-    const lane = (index % 4) - 1.5;
-    const row = Math.floor(index / 4);
-    const base = new THREE.Vector3(
-      -row * .62 - (index % 2) * .22,
-      lane * .34 + Math.sin(index * 1.7) * .11,
-      Math.sin(index * 2.1) * .65
-    );
-    fish.push({
-      phase: index * 1.37,
-      base,
-      speed: .85 + (index % 3) * .11,
-      size: .72 + (index % 5) * .055,
-      position: base.clone(),
-      rotationY: 0,
-      rotationZ: 0
-    });
-  }
-  school.userData = {
-    fish, bodies, tails,
-    base: new THREE.Vector3(), speed: 1, phase: 0, span: 12,
-    matrixObject: new THREE.Object3D()
-  };
-  return school;
-}
-
-function createMantaRay(color = 0x77d9ff) {
-  const group = new THREE.Group();
-  const material = new THREE.MeshPhysicalMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: .7,
-    roughness: .28,
-    transparent: true,
-    opacity: .78,
-    clearcoat: .7,
-    side: THREE.DoubleSide
-  });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(.48, 18, 12), material);
-  body.scale.set(1.35, .32, 1.7);
-  group.add(body);
-
-  const makeWing = side => {
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0);
-    shape.quadraticCurveTo(side * 1.35, .34, side * 2.15, -.05);
-    shape.quadraticCurveTo(side * 1.15, -.62, 0, -.18);
-    shape.lineTo(0, 0);
-    const wing = new THREE.Mesh(new THREE.ShapeGeometry(shape, 10), material);
-    wing.rotation.x = -Math.PI / 2;
-    return wing;
-  };
-  const wingL = makeWing(-1);
-  const wingR = makeWing(1);
-  group.add(wingL, wingR);
-
-  const tailCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0, -.65),
-    new THREE.Vector3(.03, -.02, -1.55),
-    new THREE.Vector3(-.05, .01, -2.65)
-  ]);
-  const tail = new THREE.Mesh(
-    new THREE.TubeGeometry(tailCurve, 18, .025, 6, false),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .5 })
-  );
-  group.add(tail);
-  group.userData = { wingL, wingR, baseScale: group.scale.clone(), phase: 0, speed: .18 };
-  return group;
-}
 
 function createCausticBeams(count = 4) {
   const group = new THREE.Group();
@@ -597,6 +446,11 @@ function initCinematicJourney() {
   const parallaxFar = document.getElementById('cinematicParallaxFar');
   const parallaxNear = document.getElementById('cinematicParallaxNear');
   const seabed2d = document.getElementById('cinematicSeabed2d');
+  const fish2dA = document.getElementById('cinematicFish2dA');
+  const fish2dB = document.getElementById('cinematicFish2dB');
+  const jelly2dA = document.getElementById('cinematicJelly2dA');
+  const jelly2dB = document.getElementById('cinematicJelly2dB');
+  const manta2d = document.getElementById('cinematicManta2d');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
@@ -807,7 +661,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v12-compact-realism';
+  stage.dataset.compressionProfile = 'safe-webgl-v13-2d-sealife-no-fake-textures';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -847,36 +701,14 @@ function initCinematicJourney() {
   violetLight.position.set(5, -19, -2);
   scene.add(violetLight);
 
-  const highTextureDetail =
-    (viewportProfile.name === 'desktop' || viewportProfile.name === 'wide-tv-monitor') &&
-    viewportProfile.viewportWidth >= 1440 &&
-    viewportProfile.viewportHeight >= 760;
-  const textureSuffix = highTextureDetail ? '4k' : '1k';
-  const textureLoader = new THREE.TextureLoader();
-
-  const featherTexture = textureLoader.load(`/assets/textures/penguin-feather-${textureSuffix}.svg`);
-  featherTexture.wrapS = THREE.RepeatWrapping;
-  featherTexture.wrapT = THREE.RepeatWrapping;
-  featherTexture.repeat.set(3.5, 5.0);
-  featherTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-
-  const iceTexture = textureLoader.load(`/assets/textures/ice-crystal-${textureSuffix}.svg`);
-  iceTexture.wrapS = THREE.RepeatWrapping;
-  iceTexture.wrapT = THREE.RepeatWrapping;
-  iceTexture.repeat.set(1.8, 1.8);
-  iceTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  if ('colorSpace' in iceTexture && THREE.SRGBColorSpace) iceTexture.colorSpace = THREE.SRGBColorSpace;
-
-  stage.dataset.textureDetail = textureSuffix;
-
-  const ice = createIceShelf(iceTexture);
+  const ice = createIceShelf();
   ice.position.set(-2.2, .30, -.25);
   scene.add(ice);
 
   const water = createWater();
   scene.add(water);
 
-  const mascot = createMascot(featherTexture);
+  const mascot = createMascot();
   mascot.position.set(-2.15, 2.0, .35);
   mascot.rotation.y = 0;
   scene.add(mascot);
@@ -918,19 +750,6 @@ function initCinematicJourney() {
   dust.position.y = -2;
   scene.add(dust);
 
-  const jellyA = createJellyfish(0x8afff7, 0x1668ff);
-  jellyA.position.set(5.3, -8.5, -2.5);
-  jellyA.scale.setScalar(.75);
-  scene.add(jellyA);
-  const jellyB = createJellyfish(0xff79e7, 0x7b4dff);
-  jellyB.position.set(-5.1, -20.2, -1.7);
-  jellyB.scale.setScalar(1.05);
-  scene.add(jellyB);
-  const jellyC = createJellyfish(0xb9ff64, 0x16b8b1);
-  jellyC.position.set(4.2, -30.2, -3);
-  jellyC.scale.setScalar(.62);
-  scene.add(jellyC);
-
   const ringData = [
     { y: -7.7, x: -4.3, color: 0x55fff2 },
     { y: -15.5, x: 4.4, color: 0x3ac8ff },
@@ -946,70 +765,6 @@ function initCinematicJourney() {
 
   // Depth is now supplied by the portrait background and lightweight 2D parallax.
   // The old 3D mist/terrace/haze backdrop created the blob silhouettes, so it is not added.
-
-  // Layered autonomous sea life. These live entirely inside the cinematic
-  // scene and never touch portal data/navigation state.
-  const fishPerSchool = quality === 'high' ? 13 : quality === 'medium' ? 8 : 5;
-  const fishSchools = [
-    createFishSchool(fishPerSchool, 0x62fff4, 0xe8ffff),
-    createFishSchool(Math.max(5, fishPerSchool - 2), 0xff76dd, 0xffd7f6),
-    createFishSchool(Math.max(5, fishPerSchool - 3), 0xbaff57, 0xf4ffd3),
-    createFishSchool(Math.max(4, fishPerSchool - 5), 0x55b9ff, 0xbde9ff)
-  ];
-  const schoolSpecs = [
-    { x: -7.4, y: -6.4, z: -5.8, speed: .72, phase: .2, span: 15 },
-    { x:  6.8, y: -13.7, z: -7.2, speed: .54, phase: 2.1, span: 18 },
-    { x: -6.2, y: -23.2, z: -6.5, speed: .62, phase: 4.0, span: 17 },
-    { x:  5.8, y: -31.0, z: -8.0, speed: .48, phase: 5.4, span: 16 }
-  ];
-  fishSchools.forEach((school, index) => {
-    const spec = schoolSpecs[index];
-    school.position.set(spec.x, spec.y, spec.z);
-    school.userData.base.copy(school.position);
-    school.userData.speed = spec.speed;
-    school.userData.phase = spec.phase;
-    school.userData.span = spec.span;
-    scene.add(school);
-  });
-
-  const mantaA = createMantaRay(0x69dcff);
-  mantaA.position.set(-10, -11.7, -10);
-  mantaA.scale.setScalar(.75);
-  mantaA.userData.phase = .4;
-  mantaA.userData.speed = .17;
-  mantaA.userData.base = mantaA.position.clone();
-  scene.add(mantaA);
-
-  const mantaB = createMantaRay(0xa16dff);
-  mantaB.position.set(9.5, -27.2, -11.5);
-  mantaB.scale.setScalar(.54);
-  mantaB.userData.phase = 3.3;
-  mantaB.userData.speed = -.13;
-  mantaB.userData.base = mantaB.position.clone();
-  if (quality !== 'low') scene.add(mantaB);
-
-  const extraJellies = [];
-  if (quality !== 'low') {
-    const jellyD = createJellyfish(0x62d9ff, 0x3477ff);
-    jellyD.position.set(-7.4, -12.4, -7.5);
-    jellyD.scale.setScalar(.48);
-    scene.add(jellyD);
-    extraJellies.push(jellyD);
-
-    const jellyE = createJellyfish(0xffa7ed, 0x993cff);
-    jellyE.position.set(7.2, -25.7, -6.8);
-    jellyE.scale.setScalar(.58);
-    scene.add(jellyE);
-    extraJellies.push(jellyE);
-
-    if (quality === 'high') {
-      const jellyF = createJellyfish(0xbfff79, 0x2cfcc0);
-      jellyF.position.set(-1.8, -33.1, -9.2);
-      jellyF.scale.setScalar(.43);
-      scene.add(jellyF);
-      extraJellies.push(jellyF);
-    }
-  }
 
   const causticBeams = createCausticBeams(quality === 'high' ? 5 : quality === 'medium' ? 4 : 3);
   scene.add(causticBeams);
@@ -1812,85 +1567,19 @@ function initCinematicJourney() {
   };
 
   const animateWorld = (time, dt, progress) => {
-    fishSchools.forEach((school, schoolIndex) => {
-      const data = school.userData;
-      const wave = time * data.speed + data.phase;
-      const direction = Math.cos(wave) >= 0 ? 1 : -1;
-      school.position.x = data.base.x + Math.sin(wave) * data.span * .55;
-      school.position.y = data.base.y + Math.sin(wave * .43 + schoolIndex) * .52;
-      school.position.z = data.base.z + Math.cos(wave * .62) * 1.15;
-
-      // Schools react to the mascot instead of behaving like looping wallpaper.
-      const avoidX = school.position.x - mascot.position.x;
-      const avoidY = school.position.y - mascot.position.y;
-      const avoidZ = school.position.z - mascot.position.z;
-      const avoidDistance = Math.max(.001, Math.hypot(avoidX, avoidY, avoidZ));
-      const panicTarget = 1 - smoothstep(3.0, 7.0, avoidDistance);
-      data.panic = damp(data.panic || 0, panicTarget, 5.5, dt);
-      if (data.panic > .001) {
-        const force = data.panic * 1.25;
-        school.position.x += (avoidX / avoidDistance) * force;
-        school.position.y += (avoidY / avoidDistance) * force * .42;
-        school.position.z += (avoidZ / avoidDistance) * force * .55;
-      }
-
-      school.rotation.y = damp(school.rotation.y, direction > 0 ? 0 : Math.PI, 3.4 + data.panic * 5, dt);
-      const matrixObject = data.matrixObject;
-      data.fish.forEach((fishData, fishIndex) => {
-        const flutter = time * ((5.2 + data.panic * 5.8) * fishData.speed) + fishData.phase;
-        fishData.position.set(
-          fishData.base.x + Math.sin(flutter * .31) * (.10 + data.panic * .14),
-          fishData.base.y + Math.sin(flutter) * (.06 + data.panic * .11),
-          fishData.base.z + Math.cos(flutter * .67) * (.08 + data.panic * .12)
-        );
-        fishData.rotationZ = Math.sin(flutter) * (.08 + data.panic * .12);
-        fishData.rotationY = Math.sin(flutter * .52) * (.05 + data.panic * .08);
-
-        matrixObject.position.copy(fishData.position);
-        matrixObject.rotation.set(0, fishData.rotationY, fishData.rotationZ);
-        matrixObject.scale.set(1.85 * fishData.size, .66 * fishData.size, .62 * fishData.size);
-        matrixObject.updateMatrix();
-        data.bodies.setMatrixAt(fishIndex, matrixObject.matrix);
-
-        matrixObject.position.set(
-          fishData.position.x - .34 * Math.cos(fishData.rotationY) * fishData.size,
-          fishData.position.y,
-          fishData.position.z + .34 * Math.sin(fishData.rotationY) * fishData.size
-        );
-        matrixObject.rotation.set(0, fishData.rotationY, Math.PI / 2 + fishData.rotationZ);
-        matrixObject.scale.set(.95 * fishData.size, fishData.size, .7 * fishData.size);
-        matrixObject.updateMatrix();
-        data.tails.setMatrixAt(fishIndex, matrixObject.matrix);
-      });
-      data.bodies.instanceMatrix.needsUpdate = true;
-      data.tails.instanceMatrix.needsUpdate = true;
-    });
-
-    [mantaA, mantaB].forEach((manta, index) => {
-      if (!manta.parent) return;
-      const data = manta.userData;
-      const phase = time * Math.abs(data.speed) + data.phase;
-      const direction = data.speed >= 0 ? 1 : -1;
-      manta.position.x = data.base.x + Math.sin(phase) * 10.5;
-      manta.position.y = data.base.y + Math.sin(phase * .48 + index) * .75;
-      manta.position.z = data.base.z + Math.cos(phase * .36) * 1.4;
-      manta.rotation.y = direction > 0 ? 0 : Math.PI;
-      const wingBeat = Math.sin(time * 1.65 + index);
-      data.wingL.rotation.z = wingBeat * .18;
-      data.wingR.rotation.z = -wingBeat * .18;
-      manta.rotation.z = Math.sin(phase * .55) * .06;
-    });
-
-    const allJellies = [jellyA, jellyB, jellyC, ...extraJellies];
-    allJellies.forEach((jelly, index) => {
-      if (!jelly.userData.basePosition) jelly.userData.basePosition = jelly.position.clone();
-      const base = jelly.userData.basePosition;
-      jelly.rotation.y = time * (.07 + index * .018) + index;
-      jelly.position.x = base.x + Math.sin(time * .48 + index * 1.7) * (.22 + index * .015);
-      jelly.position.y = base.y + Math.sin(time * .62 + index) * .18;
-      const pulse = 1 + Math.sin(time * 1.45 + index) * .065;
-      jelly.userData.bell.scale.set(pulse, .72 / pulse, pulse);
-    });
+    // Background sea life is strictly 2D. Five compositor transforms replace
+    // dozens of live meshes, instanced-matrix rewrites and physical materials.
+    const drift = progress * 100;
+    if (fish2dA) fish2dA.style.transform =
+      `translate3d(${(Math.sin(time * .16) * 7 - drift * .10).toFixed(1)}vw,${(Math.sin(time * .23) * 12).toFixed(1)}px,0) scale(.86)`;
+    if (fish2dB) fish2dB.style.transform =
+      `translate3d(${(Math.cos(time * .12) * -8 + drift * .08).toFixed(1)}vw,${(Math.cos(time * .19) * 10).toFixed(1)}px,0) scale(.68)`;
+    if (jelly2dA) jelly2dA.style.transform =
+      `translate3d(${(Math.sin(time * .11) * 14).toFixed(1)}px,${(-progress * 70 + Math.sin(time * .34) * 11).toFixed(1)}px,0) scale(.72)`;
+    if (jelly2dB) jelly2dB.style.transform =
+      `translate3d(${(Math.cos(time * .09) * 18).toFixed(1)}px,${(-progress * 105 + Math.cos(time * .28) * 13).toFixed(1)}px,0) scale(.56)`;
+    if (manta2d) manta2d.style.transform =
+      `translate3d(${(Math.sin(time * .075) * 11).toFixed(1)}vw,${(-progress * 48 + Math.sin(time * .15) * 8).toFixed(1)}px,0) scale(.76)`;
 
     causticBeams.userData.beams.forEach((beam, index) => {
       beam.rotation.z = -.16 + index * .08 + Math.sin(time * .23 + beam.userData.phase) * .055;
