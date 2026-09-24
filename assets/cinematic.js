@@ -457,6 +457,40 @@ function initCinematicJourney() {
   let scrollProgress = 0;
   let smoothProgress = 0;
 
+  // A deterministic dive path keeps the mascot tied to the same scroll
+  // milestones as the underwater stations instead of letting camera math
+  // accidentally make it appear to float upward.
+  const diveKeyframes = [
+    { at: 0.00, x: -2.15, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
+    { at: 0.11, x: -2.10, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
+    { at: 0.16, x: -1.70, y:  2.55, z:  0.20, pitch: 0.18, roll: -0.18 },
+    { at: 0.22, x: -0.65, y:  0.55, z:  0.05, pitch: 0.82, roll: -0.38 },
+    { at: 0.27, x:  0.35, y: -1.10, z: -0.10, pitch: 1.02, roll: -0.20 },
+    { at: 0.43, x: -2.85, y: -7.45, z: -0.55, pitch: 0.88, roll:  0.12 },
+    { at: 0.62, x:  2.70, y: -15.25, z: 0.20, pitch: 0.82, roll: -0.10 },
+    { at: 0.79, x: -2.90, y: -23.35, z: -0.42, pitch: 0.86, roll:  0.10 },
+    { at: 0.94, x:  2.55, y: -31.35, z: 0.05, pitch: 0.78, roll: -0.08 },
+    { at: 1.00, x:  0.00, y: -35.80, z: 0.00, pitch: 0.66, roll:  0.00 }
+  ];
+
+  const sampleDivePath = (progress) => {
+    const p = clamp(progress);
+    for (let index = 0; index < diveKeyframes.length - 1; index += 1) {
+      const from = diveKeyframes[index];
+      const to = diveKeyframes[index + 1];
+      if (p > to.at) continue;
+      const t = smoothstep(from.at, to.at, p);
+      return {
+        x: lerp(from.x, to.x, t),
+        y: lerp(from.y, to.y, t),
+        z: lerp(from.z, to.z, t),
+        pitch: lerp(from.pitch, to.pitch, t),
+        roll: lerp(from.roll, to.roll, t)
+      };
+    }
+    return diveKeyframes[diveKeyframes.length - 1];
+  };
+
   const resize = () => {
     const rect = stage.getBoundingClientRect();
     // The dashboard starts display:none before login. Never lock the WebGL buffer
@@ -520,24 +554,25 @@ function initCinematicJourney() {
 
   const animateMascot = (progress, time) => {
     const data = mascot.userData;
-    const dive = smoothstep(.12, .31, progress);
-    const underwater = smoothstep(.24, .98, progress);
+    const path = sampleDivePath(progress);
+    const underwater = smoothstep(.22, .31, progress);
+    const swim = smoothstep(.27, .38, progress);
     const swimWave = Math.sin(time * 3.5);
-    const xPath = -2.15 + dive * 3.6 + Math.sin(progress * Math.PI * 5) * 1.7 * underwater;
-    const ySurface = 2.0 + Math.sin(time * 1.7) * .035;
-    const jumpArc = Math.sin(dive * Math.PI) * 2.7;
-    const yPath = lerp(ySurface + jumpArc, 1.05 - progress * 35.5, underwater);
-    mascot.position.set(xPath, yPath, Math.sin(progress * Math.PI * 4) * .5);
-    mascot.rotation.z = -dive * .62 + underwater * Math.sin(time * 1.15) * .12;
-    mascot.rotation.x = underwater * (.82 + Math.sin(time * 1.7) * .08);
-    mascot.rotation.y = -.24 + underwater * Math.sin(progress * Math.PI * 4) * .28;
+    const idleBob = (1 - underwater) * Math.sin(time * 1.7) * .035;
 
-    data.leftFlipper.rotation.z = -.48 + Math.sin(time * (underwater ? 5.2 : 1.9)) * (underwater ? .72 : .09);
-    data.rightFlipper.rotation.z = .48 - Math.sin(time * (underwater ? 5.2 : 1.9)) * (underwater ? .72 : .09);
-    data.leftFlipper.rotation.x = -.14 + underwater * .9;
-    data.rightFlipper.rotation.x = -.14 + underwater * .9;
-    data.footL.rotation.x = underwater * (swimWave * .5);
-    data.footR.rotation.x = underwater * (-swimWave * .5);
+    mascot.position.set(path.x, path.y + idleBob, path.z);
+    mascot.rotation.z = path.roll + swim * Math.sin(time * 1.15) * .10;
+    mascot.rotation.x = path.pitch + swim * Math.sin(time * 1.7) * .055;
+    mascot.rotation.y = -.24 + swim * Math.sin(progress * Math.PI * 4) * .22;
+
+    const flipperSpeed = swim > .05 ? 5.2 : 1.9;
+    const flipperRange = swim > .05 ? .72 : .09;
+    data.leftFlipper.rotation.z = -.48 + Math.sin(time * flipperSpeed) * flipperRange;
+    data.rightFlipper.rotation.z = .48 - Math.sin(time * flipperSpeed) * flipperRange;
+    data.leftFlipper.rotation.x = -.14 + swim * .9;
+    data.rightFlipper.rotation.x = -.14 + swim * .9;
+    data.footL.rotation.x = swim * (swimWave * .5);
+    data.footR.rotation.x = swim * (-swimWave * .5);
 
     const blink = (time % 4.8) > 4.68 ? .08 : 1;
     data.eyeL.scale.y = blink;
@@ -552,16 +587,18 @@ function initCinematicJourney() {
     animateMascot(smoothProgress, time);
     updateWater(time);
 
-    const submerged = smoothstep(.19, .34, smoothProgress);
-    const targetY = lerp(3.8, 2.4 - smoothProgress * 34.6, submerged);
-    const targetZ = lerp(11.8, 8.1, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .45;
-    const targetX = lerp(.8, Math.sin(smoothProgress * Math.PI * 4) * 1.35, submerged);
-    camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * 1.05, 5.2, dt);
-    camera.position.y = damp(camera.position.y, targetY + pointer.smoothY * .5, 5.2, dt);
-    camera.position.z = damp(camera.position.z, targetZ, 5.2, dt);
+    const submerged = smoothstep(.20, .30, smoothProgress);
+    const followHeight = lerp(3.8, mascot.position.y + 4.25, submerged);
+    const targetZ = lerp(11.8, 8.9, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .28;
+    const targetX = lerp(.8, mascot.position.x * .34, submerged);
+    camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * 1.05, 4.5, dt);
+    // Follow more slowly on Y than the mascot moves. The small lag makes the
+    // entry visibly read as a downward dive instead of the camera outrunning it.
+    camera.position.y = damp(camera.position.y, followHeight + pointer.smoothY * .5, 3.1, dt);
+    camera.position.z = damp(camera.position.z, targetZ, 4.8, dt);
     camera.lookAt(
-      mascot.position.x * .62 + pointer.smoothX * .55,
-      mascot.position.y - .2 + pointer.smoothY * .34,
+      mascot.position.x * .58 + pointer.smoothX * .55,
+      mascot.position.y - lerp(.2, .65, submerged) + pointer.smoothY * .34,
       mascot.position.z
     );
 
