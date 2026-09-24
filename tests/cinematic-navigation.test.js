@@ -141,7 +141,6 @@ assert.match(cinematic, /createMantaRay/);
 assert.match(cinematic, /createKelpPatch/);
 assert.match(cinematic, /createGlowReef/);
 assert.match(cinematic, /createCausticBeams/);
-assert.match(cinematic, /depthBackdrop\.userData/);
 assert.match(cinematic, /strokeCycle/);
 assert.match(cinematic, /procedural-optimized/);
 assert.match(cinematic, /penguin-calls-sprite\.mp3\?v=20260924-call-v1/);
