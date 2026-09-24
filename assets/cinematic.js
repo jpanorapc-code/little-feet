@@ -792,6 +792,8 @@ function initCinematicJourney() {
   const progressBar = document.getElementById('cinematicProgressBar');
   const depthLabel = document.getElementById('cinematicDepthLabel');
   const stopContainer = document.getElementById('cinematicDepthMeter');
+  const pauseButton = document.getElementById('cinematicPause');
+  const portraitBackdrop = stage?.querySelector('.cinematic-portrait-backdrop');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
@@ -1002,7 +1004,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v7-directional-swim-idle';
+  stage.dataset.compressionProfile = 'safe-webgl-v8-slow-scroll-pause-depth2d';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2245,7 +2247,7 @@ function initCinematicJourney() {
     }
     previousRawProgress = scrollProgress;
 
-    smoothProgress = damp(smoothProgress, scrollProgress, 7.2, dt);
+    smoothProgress = damp(smoothProgress, scrollProgress, 5.0, dt);
     pointer.smoothX = damp(pointer.smoothX, pointer.x, 13.5, dt);
     pointer.smoothY = damp(pointer.smoothY, pointer.y, 13.5, dt);
     pointer.activity = damp(pointer.activity, 0, 2.6, dt);
@@ -2315,6 +2317,11 @@ function initCinematicJourney() {
     setCinematicAudioMix(submerged, journey.classList.contains('is-active'));
 
     const deepening = smoothstep(.32, .95, smoothProgress);
+    if (portraitBackdrop) {
+      const depthShift = lerp(0, -window.innerHeight * .18, smoothProgress);
+      portraitBackdrop.style.transform = `translate3d(0,${depthShift.toFixed(1)}px,0) scale(1.08)`;
+      portraitBackdrop.style.filter = `saturate(${(1.08 + deepening * .28).toFixed(2)}) contrast(${(1.02 + deepening * .08).toFixed(2)})`;
+    }
     scene.fog.density = lerp(.008, .034, submerged) + deepening * .006;
     scene.fog.color.setRGB(
       lerp(.02, .004, deepening),
@@ -2404,16 +2411,27 @@ function initCinematicJourney() {
     }
   };
 
-  // Hard runtime gate: when the cinematic is not actually being viewed,
-  // stop the WebGL animation loop completely. This freezes water, fish, kelp,
-  // jellyfish, bubbles, mascot idle motion and every other background update.
+  // Hard runtime gate: when the cinematic is not actually being viewed or the
+  // client pauses it, stop every cinematic update completely.
   let journeyInViewport = false;
   let cinematicLoopRunning = false;
+  let cinematicUserPaused = false;
+  try {
+    cinematicUserPaused = localStorage.getItem('lf_cinematic_paused') === 'true';
+  } catch { /* Storage can be unavailable in locked-down browsers. */ }
+
+  const syncPauseUi = () => {
+    journey.classList.toggle('is-user-paused', cinematicUserPaused);
+    if (!pauseButton) return;
+    pauseButton.setAttribute('aria-pressed', String(cinematicUserPaused));
+    pauseButton.textContent = cinematicUserPaused ? 'Resume cinematic' : 'Pause cinematic';
+  };
 
   const cinematicShouldRun = () => {
     const home = document.getElementById('homeTab');
     const dashboardVisible = !dashboard || !dashboard.classList.contains('hidden');
     return !renderFailed &&
+      !cinematicUserPaused &&
       !document.hidden &&
       dashboardVisible &&
       Boolean(home?.classList.contains('active')) &&
@@ -2427,6 +2445,11 @@ function initCinematicJourney() {
     renderer.setAnimationLoop(null);
     stage.dataset.cinematicRuntime = 'paused';
     setCinematicAudioMix(smoothProgress > .225 ? 1 : 0, false);
+    if (activePenguinCallSource) {
+      try { activePenguinCallSource.stop(); } catch { /* Already ended. */ }
+      activePenguinCallSource = null;
+      activePenguinCallUntil = 0;
+    }
   };
 
   const startCinematicLoop = () => {
@@ -2442,6 +2465,20 @@ function initCinematicJourney() {
     if (cinematicShouldRun()) startCinematicLoop();
     else stopCinematicLoop();
   };
+
+  pauseButton?.addEventListener('click', () => {
+    cinematicUserPaused = !cinematicUserPaused;
+    try { localStorage.setItem('lf_cinematic_paused', String(cinematicUserPaused)); } catch { /* Optional preference. */ }
+    syncPauseUi();
+    if (cinematicUserPaused) {
+      stopCinematicLoop();
+      stage.dataset.cinematicIdle = 'paused-by-user';
+    } else {
+      markCinematicActivity();
+      syncCinematicRuntime();
+    }
+  });
+  syncPauseUi();
 
   const journeyObserver = typeof IntersectionObserver === 'function'
     ? new IntersectionObserver(entries => {
