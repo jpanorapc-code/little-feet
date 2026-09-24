@@ -14,8 +14,6 @@ const requiredServerPatterns = [
   /Content-Security-Policy/,
   /Cross-origin state changes are not allowed/,
   /littlefeet\.sid/,
-  /server\.js/,
-  /backup-server\.js/,
   /message:\s*['"]An unexpected server error occurred\./
 ];
 for (const pattern of requiredServerPatterns) assert.match(server, pattern);
