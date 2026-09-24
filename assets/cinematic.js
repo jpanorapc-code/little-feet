@@ -38,7 +38,7 @@ const stationBlueprints = [
 
 function accessibleNavTarget(candidates) {
   for (const [tabId, label] of candidates) {
-    const button = [...document.querySelectorAll('.nav-btn')].find(candidate => candidate.getAttribute('onclick')?.includes(\`'\${tabId}'\`));
+    const button = [...document.querySelectorAll('.nav-btn')].find(candidate => candidate.getAttribute('onclick')?.includes("'" + tabId + "'"));
     if (button && !button.closest('li')?.classList.contains('hidden')) return { tabId, label };
   }
   return { tabId: 'homeTab', label: 'Home' };
@@ -306,12 +306,12 @@ function initCinematicJourney() {
     kicker.textContent = station.kicker;
     copy.textContent = station.text;
     [...stopContainer.children].forEach((button, buttonIndex) => button.classList.toggle('is-current', buttonIndex === index));
-    if (openButton) openButton.textContent = \`Open \${station.target.label}\`;
+    if (openButton) openButton.textContent = 'Open ' + station.target.label;
   };
 
   const updateProgressUI = (progress) => {
-    progressBar.style.width = \`\${(progress * 100).toFixed(2)}%\`;
-    const depth = progress < .22 ? 'Surface' : \`\${Math.round((progress - .18) * 42)} m below\`;
+    progressBar.style.width = (progress * 100).toFixed(2) + '%';
+    const depth = progress < .22 ? 'Surface' : Math.round((progress - .18) * 42) + ' m below';
     depthLabel.textContent = depth;
     let nearest = 0;
     let distance = Infinity;
