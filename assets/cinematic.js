@@ -9,36 +9,6 @@ const smoothstep = (a, b, value) => {
 };
 const damp = (current, target, lambda, dt) => THREE.MathUtils.lerp(current, target, 1 - Math.exp(-lambda * dt));
 
-// Merge static meshes that share a material into one GPU buffer. This keeps
-// all authored geometry while reducing draw calls on weaker machines.
-const mergeStaticGeometries = geometries => {
-  const prepared = geometries.map(geometry => {
-    const copy = geometry.index ? geometry.toNonIndexed() : geometry.clone();
-    return copy;
-  });
-  const attributes = ['position', 'normal', 'uv'];
-  const merged = new THREE.BufferGeometry();
-
-  attributes.forEach(name => {
-    const present = prepared.map(geometry => geometry.getAttribute(name));
-    if (present.some(attribute => !attribute)) return;
-    const itemSize = present[0].itemSize;
-    const ArrayType = present[0].array.constructor;
-    const totalLength = present.reduce((sum, attribute) => sum + attribute.array.length, 0);
-    const values = new ArrayType(totalLength);
-    let offset = 0;
-    present.forEach(attribute => {
-      values.set(attribute.array, offset);
-      offset += attribute.array.length;
-    });
-    merged.setAttribute(name, new THREE.BufferAttribute(values, itemSize, present[0].normalized));
-  });
-
-  prepared.forEach(geometry => geometry.dispose());
-  merged.computeBoundingSphere();
-  return merged;
-};
-
 // Keep the authored scene at full detail. Runtime performance is managed
 // separately so a machine is never punished just because it reports more RAM,
 // CPU cores, a high-DPI display, or a high-refresh monitor.
@@ -49,25 +19,6 @@ const getSharedGeometry = (key, factory) => {
   if (!sharedGeometry[key]) sharedGeometry[key] = factory();
   return sharedGeometry[key];
 };
-
-const getSharedJellyTentacleGeometry = () => getSharedGeometry('jellyTentacles', () => {
-  const geometries = [];
-  for (let i = 0; i < 8; i += 1) {
-    const angle = (i / 8) * Math.PI * 2;
-    const x = Math.cos(angle) * .47;
-    const z = Math.sin(angle) * .47;
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x, -.18, z),
-      new THREE.Vector3(x * .72 + Math.sin(i) * .16, -.95, z * .72),
-      new THREE.Vector3(x * .45 - Math.cos(i) * .14, -1.85, z * .44),
-      new THREE.Vector3(x * .25, -2.65 - (i % 3) * .22, z * .2)
-    ]);
-    geometries.push(new THREE.TubeGeometry(curve, 22, .025 + (i % 2) * .011, 7, false));
-  }
-  const merged = mergeStaticGeometries(geometries);
-  geometries.forEach(geometry => geometry.dispose());
-  return merged;
-});
 
 const stationBlueprints = [
   { at: 0.05, title: 'Surface', kicker: 'Little Feet · cinematic home', text: 'Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.', candidates: [['feedTab','School Feed']] },
