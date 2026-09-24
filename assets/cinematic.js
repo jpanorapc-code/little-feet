@@ -37,225 +37,262 @@ function accessibleNavTarget(candidates) {
   return { tabId: 'homeTab', label: 'Home' };
 }
 
-function shapePenguinGeometry(radius = 1, segments = 32, rings = 24, profile = 'body') {
-  const geometry = new THREE.SphereGeometry(radius, segments, rings);
-  const attr = geometry.attributes.position;
+function addFeatherVertexColors(geometry, light = 0x2389c6, dark = 0x0a4b78, variation = .10) {
+  const pos = geometry.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const lightColor = new THREE.Color(light);
+  const darkColor = new THREE.Color(dark);
+  const color = new THREE.Color();
 
-  for (let index = 0; index < attr.count; index += 1) {
-    let x = attr.getX(index);
-    let y = attr.getY(index);
-    let z = attr.getZ(index);
-    const ny = y / radius;
-    const front = Math.max(0, z / radius);
-
-    if (profile === 'body') {
-      // Pear-shaped penguin torso: narrower chest, fuller lower body, subtly
-      // projected breast. This keeps the silhouette readable from every angle.
-      const lowerFullness = 1 + (1 - Math.abs(ny + .18)) * .12;
-      const shoulderTaper = 1 - Math.max(0, ny) * .18;
-      x *= lowerFullness * shoulderTaper;
-      z *= 1 + (1 - Math.abs(ny)) * .035;
-      z += front * (1 - Math.abs(ny)) * .045;
-      y *= 1.02;
-    } else if (profile === 'head') {
-      // Slightly broader crown and flatter face instead of a perfect sphere.
-      x *= 1 + Math.max(0, ny) * .04;
-      z *= 1 - front * .035;
-      y *= .98;
-    } else if (profile === 'belly') {
-      x *= .98;
-      z *= .72;
-      y *= 1.06;
-    } else if (profile === 'flipper') {
-      x *= 1 - Math.max(0, ny) * .14;
-      z *= .62;
-      y *= 1.08;
-    }
-
-    attr.setXYZ(index, x, y, z);
+  for (let index = 0; index < pos.count; index += 1) {
+    const x = pos.getX(index);
+    const y = pos.getY(index);
+    const z = pos.getZ(index);
+    const grain =
+      Math.sin(x * 13.7 + y * 7.1) * .42 +
+      Math.cos(z * 17.3 - y * 11.9) * .34 +
+      Math.sin((x + z) * 23.1) * .24;
+    const t = clamp(.50 + grain * variation, .08, .92);
+    color.copy(darkColor).lerp(lightColor, t);
+    colors[index * 3] = color.r;
+    colors[index * 3 + 1] = color.g;
+    colors[index * 3 + 2] = color.b;
   }
 
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function createPearBodyGeometry() {
+  const profile = [
+    new THREE.Vector2(.30, -1.04),
+    new THREE.Vector2(.58, -.94),
+    new THREE.Vector2(.77, -.70),
+    new THREE.Vector2(.88, -.38),
+    new THREE.Vector2(.91, -.06),
+    new THREE.Vector2(.86, .28),
+    new THREE.Vector2(.76, .58),
+    new THREE.Vector2(.62, .82),
+    new THREE.Vector2(.44, .98)
+  ];
+  const geometry = new THREE.LatheGeometry(profile, 40);
+  geometry.scale(1, 1.08, .88);
+  geometry.computeVertexNormals();
+  return addFeatherVertexColors(geometry, 0x278fca, 0x0b4e7d, .15);
+}
+
+function createFlipperGeometry() {
+  const geometry = new THREE.SphereGeometry(.48, 24, 18);
+  const attr = geometry.attributes.position;
+  for (let i = 0; i < attr.count; i += 1) {
+    let x = attr.getX(i);
+    let y = attr.getY(i);
+    let z = attr.getZ(i);
+    const taper = 1 - Math.max(-.4, y) * .30;
+    x *= .48 * taper;
+    y *= 1.16;
+    z *= .30;
+    x += Math.sign(x || 1) * Math.max(0, -.15 - y) * .08;
+    attr.setXYZ(i, x, y, z);
+  }
   attr.needsUpdate = true;
   geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  return geometry;
+  return addFeatherVertexColors(geometry, 0x176fa8, 0x06375f, .12);
+}
+
+function createWebbedFootGeometry() {
+  // Three overlapping flattened toes read much closer to the reference than
+  // the old orange oval while staying extremely cheap.
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xf3a31f, roughness: .70, metalness: 0
+  });
+  [-.20, 0, .20].forEach((x, index) => {
+    const toe = new THREE.Mesh(new THREE.SphereGeometry(.22, 16, 10), material);
+    toe.scale.set(index === 1 ? 1.20 : 1.0, .24, index === 1 ? .92 : .82);
+    toe.position.set(x, 0, index === 1 ? .05 : 0);
+    toe.rotation.z = x * -.28;
+    group.add(toe);
+  });
+  return group;
 }
 
 function createMascot() {
   const group = new THREE.Group();
-  group.name = 'LittleFeetMascotV2';
+  group.name = 'LittleFeetMascotV3';
 
-  // Match the video/reference mascot without using expensive transmission or
-  // procedural texture maps. The surface reads soft and slightly velvety under
-  // the existing scene lights while keeping the material path cheap.
-  const blue = new THREE.MeshStandardMaterial({
-    color: 0x1979b9,
-    roughness: .70,
+  const featherBlue = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: .90,
     metalness: 0
   });
-  const blueDark = new THREE.MeshStandardMaterial({
-    color: 0x083d6c,
-    roughness: .74,
+  const featherDark = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: .92,
     metalness: 0
   });
   const white = new THREE.MeshStandardMaterial({
-    color: 0xf5fbfd,
-    roughness: .82,
+    color: 0xf6fbfc,
+    roughness: .94,
     metalness: 0
   });
   const orange = new THREE.MeshStandardMaterial({
-    color: 0xf4a31d,
-    roughness: .62,
+    color: 0xf3a31f,
+    roughness: .70,
     metalness: 0
   });
   const orangeDark = new THREE.MeshStandardMaterial({
-    color: 0xc96e12,
-    roughness: .68,
+    color: 0xc76a10,
+    roughness: .74,
     metalness: 0
   });
   const frame = new THREE.MeshStandardMaterial({
-    color: 0x16364f,
-    roughness: .38,
-    metalness: .12
+    color: 0x112d43,
+    roughness: .32,
+    metalness: .08
   });
   const lens = new THREE.MeshBasicMaterial({
-    color: 0xaeefff,
+    color: 0xc9f5ff,
     transparent: true,
-    opacity: .16,
+    opacity: .12,
     depthWrite: false
   });
   const black = new THREE.MeshStandardMaterial({
-    color: 0x02080d,
-    roughness: .26,
-    metalness: 0
+    color: 0x020507,
+    roughness: .28
   });
 
-  const body = new THREE.Mesh(shapePenguinGeometry(1, 34, 26, 'body'), blue);
-  body.scale.set(.88, 1.38, .70);
-  body.position.y = -.02;
+  // Chunky reference silhouette: short pear body, broad lower belly.
+  const body = new THREE.Mesh(createPearBodyGeometry(), featherBlue);
+  body.scale.set(1.02, 1.04, 1.0);
+  body.position.y = -.18;
   group.add(body);
 
-  // White chest patch follows the body instead of looking like a separate ball.
-  const belly = new THREE.Mesh(shapePenguinGeometry(.76, 30, 22, 'belly'), white);
-  belly.scale.set(.74, 1.12, .30);
-  belly.position.set(0, -.20, .60);
+  // Large white belly inset into the front, not a second separate torso.
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(.78, 30, 22), white);
+  belly.scale.set(.86, 1.02, .26);
+  belly.position.set(0, -.30, .79);
   group.add(belly);
 
   const chestRig = new THREE.Group();
-  chestRig.position.set(0, .24, 0);
+  chestRig.position.set(0, .12, 0);
   group.add(chestRig);
 
+  // Head sinks into the shoulders like the Meshy reference: no visible neck.
   const headRig = new THREE.Group();
-  headRig.position.set(0, 1.16, .03);
+  headRig.position.set(0, .76, .03);
   chestRig.add(headRig);
 
-  const head = new THREE.Mesh(shapePenguinGeometry(.82, 34, 26, 'head'), blueDark);
-  head.scale.set(.99, .94, .92);
-  head.position.y = .01;
+  const headGeometry = new THREE.SphereGeometry(.82, 34, 26);
+  headGeometry.scale(1.03, .96, .94);
+  addFeatherVertexColors(headGeometry, 0x176fa8, 0x052f58, .16);
+  const head = new THREE.Mesh(headGeometry, featherDark);
   headRig.add(head);
 
-  // Reference has a soft white mask wrapping the cheeks and lower face.
-  const facePatch = new THREE.Mesh(shapePenguinGeometry(.61, 28, 20, 'belly'), white);
-  facePatch.scale.set(.86, .78, .26);
-  facePatch.position.set(0, -.08, .63);
+  // Broad heart/cheek mask from the video model.
+  const facePatch = new THREE.Mesh(new THREE.SphereGeometry(.65, 28, 20), white);
+  facePatch.scale.set(.94, .78, .27);
+  facePatch.position.set(0, -.08, .66);
   headRig.add(facePatch);
 
-  const cheekL = new THREE.Mesh(new THREE.SphereGeometry(.16, 16, 12), white);
-  const cheekR = cheekL.clone();
-  cheekL.scale.set(1.12, .72, .35);
+  const cheekGeo = new THREE.SphereGeometry(.22, 18, 12);
+  const cheekL = new THREE.Mesh(cheekGeo, white);
+  const cheekR = new THREE.Mesh(cheekGeo, white);
+  cheekL.scale.set(1.05, .80, .34);
   cheekR.scale.copy(cheekL.scale);
-  cheekL.position.set(-.26, -.02, .69);
-  cheekR.position.set(.26, -.02, .69);
+  cheekL.position.set(-.29, -.01, .71);
+  cheekR.position.set(.29, -.01, .71);
   headRig.add(cheekL, cheekR);
 
-  // Short rounded beak, broad from the front and compact in profile.
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(.19, .38, 4, 1, false), orange);
-  beak.rotation.x = Math.PI / 2;
-  beak.rotation.z = Math.PI / 4;
-  beak.scale.set(1.42, .64, .88);
-  beak.position.set(0, -.16, .97);
-  headRig.add(beak);
-
-  const lowerBeak = new THREE.Mesh(new THREE.SphereGeometry(.17, 18, 10), orangeDark);
-  lowerBeak.scale.set(1.12, .30, .54);
-  lowerBeak.position.set(0, -.225, .93);
-  headRig.add(lowerBeak);
-
-  const eyeGeo = new THREE.SphereGeometry(.102, 18, 14);
+  // Eyes sit inside the oversized low-set glasses.
+  const eyeGeo = new THREE.SphereGeometry(.105, 18, 14);
   const eyeL = new THREE.Mesh(eyeGeo, black);
   const eyeR = new THREE.Mesh(eyeGeo, black);
-  eyeL.position.set(-.235, .105, .84);
-  eyeR.position.set(.235, .105, .84);
+  eyeL.position.set(-.24, .10, .82);
+  eyeR.position.set(.24, .10, .82);
   headRig.add(eyeL, eyeR);
 
-  // Chunkier dark frames with very cheap translucent lenses.
-  const ringGeo = new THREE.TorusGeometry(.235, .048, 10, 28);
+  const ringGeo = new THREE.TorusGeometry(.27, .052, 10, 30);
   const ringL = new THREE.Mesh(ringGeo, frame);
   const ringR = new THREE.Mesh(ringGeo, frame);
-  ringL.position.set(-.25, .105, .945);
-  ringR.position.set(.25, .105, .945);
-  const lensGeo = new THREE.CircleGeometry(.205, 24);
+  ringL.position.set(-.28, .08, .94);
+  ringR.position.set(.28, .08, .94);
+
+  const lensGeo = new THREE.CircleGeometry(.235, 24);
   const lensL = new THREE.Mesh(lensGeo, lens);
   const lensR = new THREE.Mesh(lensGeo, lens);
-  lensL.position.set(-.25, .105, .950);
-  lensR.position.set(.25, .105, .950);
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(.17, .05, .05), frame);
-  bridge.position.set(0, .105, .945);
-  const templeL = new THREE.Mesh(new THREE.BoxGeometry(.34, .035, .035), frame);
-  const templeR = templeL.clone();
-  templeL.position.set(-.46, .11, .86);
-  templeR.position.set(.46, .11, .86);
-  templeL.rotation.y = -.22;
-  templeR.rotation.y = .22;
+  lensL.position.set(-.28, .08, .945);
+  lensR.position.set(.28, .08, .945);
+
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(.18, .055, .045), frame);
+  bridge.position.set(0, .08, .945);
+
+  const templeGeo = new THREE.BoxGeometry(.34, .038, .04);
+  const templeL = new THREE.Mesh(templeGeo, frame);
+  const templeR = new THREE.Mesh(templeGeo, frame);
+  templeL.position.set(-.50, .09, .85);
+  templeR.position.set(.50, .09, .85);
+  templeL.rotation.y = -.24;
+  templeR.rotation.y = .24;
   headRig.add(lensL, lensR, ringL, ringR, bridge, templeL, templeR);
 
+  // Larger rounded beak from the video reference.
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(.21, .39, 4, 1, false), orange);
+  beak.rotation.x = Math.PI / 2;
+  beak.rotation.z = Math.PI / 4;
+  beak.scale.set(1.52, .68, .92);
+  beak.position.set(0, -.18, 1.00);
+  headRig.add(beak);
+
+  const lowerBeak = new THREE.Mesh(new THREE.SphereGeometry(.18, 18, 10), orangeDark);
+  lowerBeak.scale.set(1.16, .30, .55);
+  lowerBeak.position.set(0, -.245, .96);
+  headRig.add(lowerBeak);
+
+  // Short thick flippers instead of the old long arms.
   const leftShoulder = new THREE.Group();
   const rightShoulder = new THREE.Group();
-  leftShoulder.position.set(-.72, .18, -.02);
-  rightShoulder.position.set(.72, .18, -.02);
+  leftShoulder.position.set(-.77, .06, -.02);
+  rightShoulder.position.set(.77, .06, -.02);
   chestRig.add(leftShoulder, rightShoulder);
 
-  const flipperGeometry = shapePenguinGeometry(.52, 24, 16, 'flipper');
-  const leftFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
-  const rightFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
-  leftFlipperMesh.scale.set(.42, 1.42, .31);
+  const flipperGeometry = createFlipperGeometry();
+  const leftFlipperMesh = new THREE.Mesh(flipperGeometry, featherDark);
+  const rightFlipperMesh = new THREE.Mesh(flipperGeometry.clone(), featherDark);
+  leftFlipperMesh.scale.set(1.0, .92, 1.0);
   rightFlipperMesh.scale.copy(leftFlipperMesh.scale);
-  leftFlipperMesh.position.set(-.12, -.49, -.02);
-  rightFlipperMesh.position.set(.12, -.49, -.02);
-  leftFlipperMesh.rotation.z = .10;
-  rightFlipperMesh.rotation.z = -.10;
+  leftFlipperMesh.position.set(-.03, -.27, -.03);
+  rightFlipperMesh.position.set(.03, -.27, -.03);
+  leftFlipperMesh.rotation.z = .28;
+  rightFlipperMesh.rotation.z = -.28;
   leftShoulder.add(leftFlipperMesh);
   rightShoulder.add(rightFlipperMesh);
 
+  // Big webbed feet, visibly wider than the old oval feet.
   const leftHip = new THREE.Group();
   const rightHip = new THREE.Group();
-  leftHip.position.set(-.35, -1.06, .18);
-  rightHip.position.set(.35, -1.06, .18);
+  leftHip.position.set(-.38, -1.10, .24);
+  rightHip.position.set(.38, -1.10, .24);
   group.add(leftHip, rightHip);
 
-  const footGeo = shapePenguinGeometry(.34, 20, 14, 'belly');
-  const footLMesh = new THREE.Mesh(footGeo, orange);
-  const footRMesh = new THREE.Mesh(footGeo, orange);
-  footLMesh.scale.set(1.12, .24, .72);
+  const footLMesh = createWebbedFootGeometry();
+  const footRMesh = createWebbedFootGeometry();
+  footLMesh.scale.set(1.0, 1.0, 1.0);
   footRMesh.scale.copy(footLMesh.scale);
-  footLMesh.position.set(-.03, -.27, .04);
-  footRMesh.position.set(.03, -.27, .04);
   footLMesh.rotation.z = -.06;
   footRMesh.rotation.z = .06;
   leftHip.add(footLMesh);
   rightHip.add(footRMesh);
 
   const tailRig = new THREE.Group();
-  tailRig.position.set(0, -.83, -.55);
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(.27, .64, 5), blueDark);
+  tailRig.position.set(0, -.82, -.62);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(.25, .52, 5), featherDark);
   tail.rotation.x = Math.PI / 2;
-  tail.scale.set(1.06, 1, .40);
-  tail.position.z = -.19;
+  tail.scale.set(1.0, 1, .42);
+  tail.position.z = -.16;
   tailRig.add(tail);
   group.add(tailRig);
 
-  // Keep the established animation contract intact so the existing swim,
-  // return-swim, idle, gaze, feet and tail logic continue working unchanged.
   group.userData = {
     body, belly, chestRig, head, headRig, beak, lowerBeak,
     leftFlipper: leftShoulder, rightFlipper: rightShoulder,
@@ -268,7 +305,7 @@ function createMascot() {
     beakBaseScale: beak.scale.clone(), lowerBeakBaseScale: lowerBeak.scale.clone()
   };
 
-  group.scale.setScalar(.92);
+  group.scale.setScalar(.98);
   return group;
 }
 
@@ -653,8 +690,8 @@ function initCinematicJourney() {
   // The downloaded Riley action is kept only as an archived/reference asset.
   // Do not load or evaluate it in the browser: the procedural mascot rig below
   // provides the swim motion without per-frame imported-bone sampling.
-  stage.dataset.swimSource = 'little-feet-mascot-v2';
-  stage.dataset.mascotModel = 'video-reference-v2';
+  stage.dataset.swimSource = 'little-feet-mascot-v3';
+  stage.dataset.mascotModel = 'video-reference-v3';
 
   // Microbubble wake for strong underwater strokes. It is hidden on the
   // surface and fades in only when the mascot is actually propelling.
