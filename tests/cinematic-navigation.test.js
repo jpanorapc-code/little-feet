@@ -183,6 +183,6 @@ assert.doesNotMatch(cinematicLoader, /innerHTML\s*=/);
 
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(styles, /\.cinematic-fallback/);
-assert.match(styles, /backdrop-filter/);
+assert.doesNotMatch(styles, /backdrop-filter:\s*blur\(/);
 
 console.log('Cinematic navigation regression test passed.');
