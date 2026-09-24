@@ -75,6 +75,15 @@ function getPortalAudioContext() {
   return portalAudioContext;
 }
 
+window.getPortalAudioContext = getPortalAudioContext;
+window.isPortalAudioMuted = () => portalAudioMuted;
+
+function announcePortalAudioState() {
+  try {
+    window.dispatchEvent(new CustomEvent('littlefeet:audiochange', { detail: { muted: portalAudioMuted } }));
+  } catch { /* Audio state broadcast is optional. */ }
+}
+
 function unlockPortalAudio() {
   try {
     if (portalAudioMuted) return;
@@ -456,6 +465,7 @@ function loadPortalAudioPreference() {
   } catch { portalAudioMuted = false; }
   if (portalAudioMuted) stopAllPortalAudio();
   updatePortalAudioControls();
+  announcePortalAudioState();
 }
 
 function togglePortalAudioMute() {
@@ -478,6 +488,7 @@ function togglePortalAudioMute() {
     playStartupChime();
   }
   updatePortalAudioControls();
+  announcePortalAudioState();
 }
 
 // A five-second login cue taken from the supplied main theme keeps the same musical identity.
