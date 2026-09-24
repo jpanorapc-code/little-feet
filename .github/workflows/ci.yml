@@ -1,0 +1,49 @@
+name: Little Feet CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Syntax checks
+        run: |
+          node --check server.js
+          node --check backup.js
+          node --check backup-server.js
+          node --check auth-crypto.js
+
+      - name: Full regression suite
+        run: npm test
+
+      - name: Capacity smoke test
+        run: npm run test:capacity
+
+      - name: High severity dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Diff hygiene
+        run: git diff --check HEAD^ HEAD || git diff --check
