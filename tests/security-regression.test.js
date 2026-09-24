@@ -24,7 +24,8 @@ assert.match(server, /account\s*!==\s*target/);
 assert.match(server, /\^\[0-9a-f\]\{64\}\$/);
 assert.doesNotMatch(page, /autocomplete="section-managed-account url"/);
 assert.match(page, /id="accountStoreUrl"[^>]*autocomplete="off"/);
-assert.match(page, /id="accountDeleteButton"/);\nassert.match(page, /Delete this user\/account/);
+assert.match(page, /id="accountDeleteButton"/);
+assert.match(page, /Delete this user\/account/);
 assert.match(client, /Are you sure you want to delete this user\/account\? This cannot be undone\./);
 assert.match(client, /function deleteSelectedAccount\(/);
 
