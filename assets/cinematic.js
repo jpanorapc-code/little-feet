@@ -1461,7 +1461,7 @@ function initCinematicJourney() {
 
     const sourceMap = sourceSwimAction?.mapping;
     const sourceBlend = sourceSwimAction
-      ? propulsion * (1 - streamline) * (1 - stationHold * .92)
+      ? clamp(propulsion * (1 - streamline) * (1 - stationHold * .92) * 1.12, 0, 1)
       : 0;
     const sourceBodyLower = sourceMap ? sampleSourceSwimBone(sourceMap.bodyLower, strokeCycle) : [0, 0, 0];
     const sourceBodyUpper = sourceMap ? sampleSourceSwimBone(sourceMap.bodyUpper, strokeCycle) : [0, 0, 0];
@@ -1470,6 +1470,8 @@ function initCinematicJourney() {
     const sourceRightTip = sourceMap ? sampleSourceSwimBone(sourceMap.rightFlipperTip, strokeCycle) : [0, 0, 0];
     const sourceLeftRoot = sourceMap ? sampleSourceSwimBone(sourceMap.leftFlipperRoot, strokeCycle) : [0, 0, 0];
     const sourceLeftTip = sourceMap ? sampleSourceSwimBone(sourceMap.leftFlipperTip, strokeCycle) : [0, 0, 0];
+    const sourceUpperRight = sourceMap ? sampleSourceSwimBone(sourceMap.upperRight, strokeCycle) : [0, 0, 0];
+    const sourceUpperLeft = sourceMap ? sampleSourceSwimBone(sourceMap.upperLeft, strokeCycle) : [0, 0, 0];
     const idleBreath = Math.sin(time * 2.05);
     const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .045;
     const idleBob = surface * Math.sin(time * 1.55) * .035;
@@ -1562,6 +1564,19 @@ function initCinematicJourney() {
       data.bellyBaseScale.z
     );
 
+    // Preserve the Little Feet mascot mesh, but let the uploaded Riley action
+    // drive the torso with its authored body wave instead of only influencing
+    // the shoulders. When the source action is unavailable these damp to zero.
+    const authoredBodyPitch = sourceBlend * (sourceBodyLower[0] * .26 + sourceBodyUpper[0] * .34);
+    const authoredBodyYaw = sourceBlend * (sourceBodyLower[1] * .24 + sourceChest[1] * .20);
+    const authoredBodyRoll = sourceBlend * (sourceBodyLower[2] * .34 + sourceChest[2] * .26);
+    data.body.rotation.x = damp(data.body.rotation.x, authoredBodyPitch, 9.5, dt);
+    data.body.rotation.y = damp(data.body.rotation.y, authoredBodyYaw, 9.5, dt);
+    data.body.rotation.z = damp(data.body.rotation.z, authoredBodyRoll, 9.5, dt);
+    data.belly.rotation.x = damp(data.belly.rotation.x, authoredBodyPitch * .72, 9, dt);
+    data.belly.rotation.y = damp(data.belly.rotation.y, authoredBodyYaw * .62, 9, dt);
+    data.belly.rotation.z = damp(data.belly.rotation.z, authoredBodyRoll * .72, 9, dt);
+
     // Rigid shoulder-driven flippers emulate underwater "flight": strong
     // symmetrical power strokes, controlled recovery, then a glide.
     const flapAmplitude = .26 + effort * .56 + firstStrokeBurst * .18;
@@ -1617,17 +1632,47 @@ function initCinematicJourney() {
       dt
     );
 
+    // The uploaded rig has a second animated flipper segment on each side.
+    // Map those authored tip rotations onto the visible capsule children so the
+    // stroke bends through the whole flipper instead of pivoting at one joint.
+    data.leftFlipperMesh.rotation.x = damp(data.leftFlipperMesh.rotation.x, sourceBlend * sourceLeftTip[0] * .88, 12.5, dt);
+    data.leftFlipperMesh.rotation.y = damp(data.leftFlipperMesh.rotation.y, sourceBlend * sourceLeftTip[1] * .78, 12.5, dt);
+    data.leftFlipperMesh.rotation.z = damp(data.leftFlipperMesh.rotation.z, sourceBlend * sourceLeftTip[2] * .90, 12.5, dt);
+    data.rightFlipperMesh.rotation.x = damp(data.rightFlipperMesh.rotation.x, sourceBlend * sourceRightTip[0] * .88, 12.5, dt);
+    data.rightFlipperMesh.rotation.y = damp(data.rightFlipperMesh.rotation.y, sourceBlend * sourceRightTip[1] * .78, 12.5, dt);
+    data.rightFlipperMesh.rotation.z = damp(data.rightFlipperMesh.rotation.z, sourceBlend * sourceRightTip[2] * .90, 12.5, dt);
+
     // Feet tuck against the body at speed and act as rudders during a turn,
     // matching real penguin steering behaviour rather than kicking constantly.
     const feetTuck = propulsion * (.40 + effort * .16) + streamline * .46;
     const launchKick = launch * -.28;
     const rudder = motion.yaw * propulsion;
-    data.footL.rotation.x = damp(data.footL.rotation.x, launchKick + feetTuck + powerStroke * effort * .10, 9.5, dt);
-    data.footR.rotation.x = damp(data.footR.rotation.x, launchKick + feetTuck + powerStroke * effort * .10, 9.5, dt);
-    data.footL.rotation.y = damp(data.footL.rotation.y, rudder * .48, 8, dt);
-    data.footR.rotation.y = damp(data.footR.rotation.y, rudder * .48, 8, dt);
-    data.footL.rotation.z = damp(data.footL.rotation.z, surface * Math.sin(time * 1.2) * .035, 7, dt);
-    data.footR.rotation.z = damp(data.footR.rotation.z, -surface * Math.sin(time * 1.2) * .035, 7, dt);
+    data.footL.rotation.x = damp(
+      data.footL.rotation.x,
+      launchKick + feetTuck + powerStroke * effort * .10 + sourceBlend * sourceUpperLeft[0] * .34,
+      9.5,
+      dt
+    );
+    data.footR.rotation.x = damp(
+      data.footR.rotation.x,
+      launchKick + feetTuck + powerStroke * effort * .10 + sourceBlend * sourceUpperRight[0] * .34,
+      9.5,
+      dt
+    );
+    data.footL.rotation.y = damp(data.footL.rotation.y, rudder * .48 + sourceBlend * sourceUpperLeft[1] * .24, 8, dt);
+    data.footR.rotation.y = damp(data.footR.rotation.y, rudder * .48 + sourceBlend * sourceUpperRight[1] * .24, 8, dt);
+    data.footL.rotation.z = damp(
+      data.footL.rotation.z,
+      surface * Math.sin(time * 1.2) * .035 + sourceBlend * sourceUpperLeft[2] * .28,
+      7,
+      dt
+    );
+    data.footR.rotation.z = damp(
+      data.footR.rotation.z,
+      -surface * Math.sin(time * 1.2) * .035 + sourceBlend * sourceUpperRight[2] * .28,
+      7,
+      dt
+    );
 
     data.tailRig.rotation.y = damp(data.tailRig.rotation.y, -rudder * .62, 8.5, dt);
     data.tailRig.rotation.x = damp(
