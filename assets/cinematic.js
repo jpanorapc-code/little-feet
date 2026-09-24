@@ -86,24 +86,39 @@ function accessibleNavTarget(candidates) {
   return { tabId: 'homeTab', label: 'Home' };
 }
 
-function createMascot() {
+function createMascot(featherTexture = null) {
   const group = new THREE.Group();
-  const blue = new THREE.MeshPhysicalMaterial({ color: 0x1267a5, roughness: .34, metalness: .04, clearcoat: .82, clearcoatRoughness: .2 });
-  const blueDark = new THREE.MeshPhysicalMaterial({ color: 0x083f74, roughness: .28, clearcoat: .72 });
-  const white = new THREE.MeshPhysicalMaterial({ color: 0xf1fbff, roughness: .28, clearcoat: .55 });
+  const blue = new THREE.MeshPhysicalMaterial({
+    color: 0x1267a5, roughness: .52, metalness: .01,
+    clearcoat: .20, clearcoatRoughness: .42,
+    sheen: 1, sheenColor: new THREE.Color(0x72cfff), sheenRoughness: .64,
+    bumpMap: featherTexture, bumpScale: .024
+  });
+  const blueDark = new THREE.MeshPhysicalMaterial({
+    color: 0x07375f, roughness: .48, metalness: 0,
+    clearcoat: .16, clearcoatRoughness: .46,
+    sheen: .85, sheenColor: new THREE.Color(0x4ba6d7), sheenRoughness: .70,
+    bumpMap: featherTexture, bumpScale: .021
+  });
+  const white = new THREE.MeshPhysicalMaterial({
+    color: 0xf4fbfc, roughness: .62, metalness: 0,
+    clearcoat: .08, clearcoatRoughness: .62,
+    sheen: .58, sheenColor: new THREE.Color(0xd8f7ff), sheenRoughness: .78,
+    bumpMap: featherTexture, bumpScale: .010
+  });
   const orange = new THREE.MeshStandardMaterial({ color: 0xffa61b, roughness: .45, metalness: .02 });
   const glass = new THREE.MeshPhysicalMaterial({ color: 0x87f5ff, roughness: .08, metalness: .18, transmission: .55, transparent: true, opacity: .78, emissive: 0x0b5d79, emissiveIntensity: .35 });
   const black = new THREE.MeshStandardMaterial({ color: 0x06121d, roughness: .22 });
 
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 32), blue);
-  body.scale.set(.92, 1.28, .72);
+  body.scale.set(.86, 1.36, .68);
   body.castShadow = true;
   body.receiveShadow = true;
   group.add(body);
 
   const belly = new THREE.Mesh(new THREE.SphereGeometry(.72, 36, 28), white);
-  belly.scale.set(.78, 1.08, .38);
-  belly.position.set(0, -.13, .55);
+  belly.scale.set(.72, 1.04, .34);
+  belly.position.set(0, -.18, .54);
   belly.castShadow = true;
   group.add(belly);
 
@@ -116,16 +131,16 @@ function createMascot() {
   const headRig = new THREE.Group();
   // Keep a real neck gap above the torso. The previous lower pivot let strong
   // cursor pitch drive the skull through the chest mesh.
-  headRig.position.set(0, 1.15, .07);
+  headRig.position.set(0, 1.18, .05);
   chestRig.add(headRig);
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(.79, 40, 30), blueDark);
-  head.scale.set(1, .94, .94);
+  head.scale.set(.96, .90, .91);
   head.castShadow = true;
   headRig.add(head);
 
   const facePatch = new THREE.Mesh(new THREE.SphereGeometry(.58, 32, 24), white);
-  facePatch.scale.set(.88, .82, .28);
+  facePatch.scale.set(.82, .78, .25);
   facePatch.position.set(0, -.05, .60);
   headRig.add(facePatch);
 
@@ -149,20 +164,20 @@ function createMascot() {
   headRig.add(lowerBeak);
 
   const leftShoulder = new THREE.Group();
-  leftShoulder.position.set(-.78, .22, .02);
+  leftShoulder.position.set(-.72, .18, -.01);
   const rightShoulder = new THREE.Group();
-  rightShoulder.position.set(.78, .22, .02);
+  rightShoulder.position.set(.72, .18, -.01);
   chestRig.add(leftShoulder, rightShoulder);
 
   const flipperGeometry = new THREE.CapsuleGeometry(.18, 1.05, 7, 16);
   const leftFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
-  leftFlipperMesh.scale.set(.72, 1, .38);
+  leftFlipperMesh.scale.set(.60, 1.08, .29);
   leftFlipperMesh.position.set(-.16, -.50, 0);
   leftFlipperMesh.castShadow = true;
   leftShoulder.add(leftFlipperMesh);
 
   const rightFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
-  rightFlipperMesh.scale.set(.72, 1, .38);
+  rightFlipperMesh.scale.set(.60, 1.08, .29);
   rightFlipperMesh.position.set(.16, -.50, 0);
   rightFlipperMesh.castShadow = true;
   rightShoulder.add(rightFlipperMesh);
@@ -192,7 +207,7 @@ function createMascot() {
 
   const footLMesh = new THREE.Mesh(footGeo, orange);
   const footRMesh = new THREE.Mesh(footGeo, orange);
-  footLMesh.scale.set(1.2,.24,.72);
+  footLMesh.scale.set(1.0,.18,.62);
   footRMesh.scale.copy(footLMesh.scale);
   footLMesh.position.set(0,-.27,0);
   footRMesh.position.set(0,-.27,0);
@@ -223,18 +238,42 @@ function createMascot() {
   return group;
 }
 
-function createIceShelf() {
+function roughenIceGeometry(geometry, strength = .10) {
+  const attr = geometry.attributes.position;
+  for (let index = 0; index < attr.count; index += 1) {
+    const x = attr.getX(index);
+    const y = attr.getY(index);
+    const z = attr.getZ(index);
+    const angle = Math.atan2(z, x);
+    const edgeNoise =
+      Math.sin(angle * 5.0 + y * 2.7) * .46 +
+      Math.sin(angle * 9.0 - y * 4.1) * .29 +
+      Math.cos(angle * 13.0 + y * 1.8) * .18;
+    const radial = 1 + edgeNoise * strength;
+    attr.setXYZ(index, x * radial, y + Math.sin(angle * 7.0) * strength * .16, z * radial);
+  }
+  attr.needsUpdate = true;
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createIceShelf(iceTexture = null) {
   const group = new THREE.Group();
   const top = new THREE.Mesh(
-    new THREE.CylinderGeometry(3.45, 3.05, .62, 42, 2),
+    roughenIceGeometry(new THREE.CylinderGeometry(3.45, 3.05, .62, 52, 4), .075),
     new THREE.MeshPhysicalMaterial({
-      color: 0xdffcff,
-      roughness: .18,
-      metalness: .03,
-      clearcoat: 1,
-      clearcoatRoughness: .08,
-      transmission: .12,
-      thickness: .7
+      color: 0xe9fbff,
+      map: iceTexture,
+      bumpMap: iceTexture,
+      bumpScale: .065,
+      roughness: .27,
+      metalness: .01,
+      clearcoat: .84,
+      clearcoatRoughness: .16,
+      transmission: .16,
+      ior: 1.31,
+      thickness: .82
     })
   );
   top.position.y = .02;
@@ -243,8 +282,19 @@ function createIceShelf() {
   group.add(top);
 
   const underside = new THREE.Mesh(
-    new THREE.CylinderGeometry(3.0, 2.15, 1.35, 34, 2),
-    new THREE.MeshPhysicalMaterial({ color: 0x79c9e9, roughness: .3, clearcoat: .5 })
+    roughenIceGeometry(new THREE.CylinderGeometry(3.0, 2.05, 1.42, 44, 4), .12),
+    new THREE.MeshPhysicalMaterial({
+      color: 0x7fcde8,
+      map: iceTexture,
+      bumpMap: iceTexture,
+      bumpScale: .085,
+      roughness: .36,
+      clearcoat: .38,
+      clearcoatRoughness: .26,
+      transmission: .08,
+      ior: 1.31,
+      thickness: 1.1
+    })
   );
   underside.position.y = -.88;
   underside.castShadow = true;
@@ -757,7 +807,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v11-compact-2d-seabed';
+  stage.dataset.compressionProfile = 'safe-webgl-v12-compact-realism';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -797,14 +847,36 @@ function initCinematicJourney() {
   violetLight.position.set(5, -19, -2);
   scene.add(violetLight);
 
-  const ice = createIceShelf();
+  const highTextureDetail =
+    (viewportProfile.name === 'desktop' || viewportProfile.name === 'wide-tv-monitor') &&
+    viewportProfile.viewportWidth >= 1440 &&
+    viewportProfile.viewportHeight >= 760;
+  const textureSuffix = highTextureDetail ? '4k' : '1k';
+  const textureLoader = new THREE.TextureLoader();
+
+  const featherTexture = textureLoader.load(`/assets/textures/penguin-feather-${textureSuffix}.svg`);
+  featherTexture.wrapS = THREE.RepeatWrapping;
+  featherTexture.wrapT = THREE.RepeatWrapping;
+  featherTexture.repeat.set(3.5, 5.0);
+  featherTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+
+  const iceTexture = textureLoader.load(`/assets/textures/ice-crystal-${textureSuffix}.svg`);
+  iceTexture.wrapS = THREE.RepeatWrapping;
+  iceTexture.wrapT = THREE.RepeatWrapping;
+  iceTexture.repeat.set(1.8, 1.8);
+  iceTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  if ('colorSpace' in iceTexture && THREE.SRGBColorSpace) iceTexture.colorSpace = THREE.SRGBColorSpace;
+
+  stage.dataset.textureDetail = textureSuffix;
+
+  const ice = createIceShelf(iceTexture);
   ice.position.set(-2.2, .30, -.25);
   scene.add(ice);
 
   const water = createWater();
   scene.add(water);
 
-  const mascot = createMascot();
+  const mascot = createMascot(featherTexture);
   mascot.position.set(-2.15, 2.0, .35);
   mascot.rotation.y = 0;
   scene.add(mascot);
