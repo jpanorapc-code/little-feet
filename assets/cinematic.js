@@ -87,11 +87,24 @@ function createMascot() {
   facePatch.position.set(0, -.05, .60);
   headRig.add(facePatch);
 
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(.23, .48, 4), orange);
+  // Two-piece beak: wide at the face, short in profile, with a darker lower
+  // mandible. This avoids the old diamond/cone mouth that looked detached.
+  const beak = new THREE.Mesh(
+    new THREE.ConeGeometry(.18, .42, 4, 1, false),
+    orange
+  );
   beak.rotation.x = Math.PI / 2;
-  beak.rotation.z = Math.PI / 4;
-  beak.position.set(0, -.16, .99);
+  beak.scale.set(1.38, .64, .92);
+  beak.position.set(0, -.16, .96);
   headRig.add(beak);
+
+  const lowerBeak = new THREE.Mesh(
+    new THREE.SphereGeometry(.16, 18, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd97a12, roughness: .52, metalness: .01 })
+  );
+  lowerBeak.scale.set(1.15, .34, .58);
+  lowerBeak.position.set(0, -.225, .92);
+  headRig.add(lowerBeak);
 
   const leftShoulder = new THREE.Group();
   leftShoulder.position.set(-.78, .22, .02);
@@ -154,7 +167,7 @@ function createMascot() {
   group.add(tailRig);
 
   group.userData = {
-    body, belly, chestRig, head, headRig, beak,
+    body, belly, chestRig, head, headRig, beak, lowerBeak,
     leftFlipper: leftShoulder, rightFlipper: rightShoulder,
     leftFlipperMesh, rightFlipperMesh,
     eyeL, eyeR, footL: leftHip, footR: rightHip, footLMesh, footRMesh,
@@ -162,7 +175,7 @@ function createMascot() {
     eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone(),
     headRigBase: headRig.position.clone(),
     bodyBaseScale: body.scale.clone(), bellyBaseScale: belly.scale.clone(),
-    beakBaseScale: beak.scale.clone()
+    beakBaseScale: beak.scale.clone(), lowerBeakBaseScale: lowerBeak.scale.clone()
   };
   group.scale.setScalar(.92);
   return group;
@@ -797,72 +810,196 @@ function initCinematicJourney() {
   let lastMascotSoundBand = -1;
   let mascotChirpUntil = 0;
   let splashSoundArmed = true;
+  let cinematicAudio = null;
+  let cinematicAudioStarting = false;
 
   const portalSoundMuted = () => {
+    if (typeof window.isPortalAudioMuted === 'function') return window.isPortalAudioMuted();
     try { return localStorage.getItem('lf_portal_audio_muted_last') === 'true'; }
     catch { return false; }
+  };
+
+  const portalContext = () => {
+    try {
+      if (typeof window.getPortalAudioContext !== 'function') return null;
+      return window.getPortalAudioContext();
+    } catch {
+      return null;
+    }
+  };
+
+  const ensureCinematicAudio = () => {
+    if (cinematicAudio || cinematicAudioStarting || portalSoundMuted()) return cinematicAudio;
+    const ctx = portalContext();
+    if (!ctx || ctx.state !== 'running') return null;
+    cinematicAudioStarting = true;
+    try {
+      const master = ctx.createGain();
+      const surfaceGain = ctx.createGain();
+      const underwaterGain = ctx.createGain();
+      master.gain.value = 0.0001;
+      surfaceGain.gain.value = 0.0001;
+      underwaterGain.gain.value = 0.0001;
+      surfaceGain.connect(master);
+      underwaterGain.connect(master);
+      master.connect(ctx.destination);
+
+      const makeNoiseLoop = (seconds = 2.2) => {
+        const length = Math.floor(ctx.sampleRate * seconds);
+        const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let previous = 0;
+        for (let index = 0; index < length; index += 1) {
+          const white = Math.random() * 2 - 1;
+          previous = previous * .94 + white * .06;
+          data[index] = previous;
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        return source;
+      };
+
+      // Surface surf: filtered broadband wash with a slow swell.
+      const surf = makeNoiseLoop(2.7);
+      const surfFilter = ctx.createBiquadFilter();
+      surfFilter.type = 'bandpass';
+      surfFilter.frequency.value = 1150;
+      surfFilter.Q.value = .6;
+      const surfTone = ctx.createOscillator();
+      const surfToneGain = ctx.createGain();
+      surfTone.type = 'sine';
+      surfTone.frequency.value = .19;
+      surfToneGain.gain.value = .015;
+      surf.connect(surfFilter);
+      surfFilter.connect(surfaceGain);
+      surfTone.connect(surfToneGain);
+      surfToneGain.connect(surfaceGain);
+
+      // Underwater ambience: low-passed current plus a very quiet deep hum.
+      const underwater = makeNoiseLoop(3.1);
+      const underwaterFilter = ctx.createBiquadFilter();
+      underwaterFilter.type = 'lowpass';
+      underwaterFilter.frequency.value = 360;
+      underwaterFilter.Q.value = .45;
+      const deepHum = ctx.createOscillator();
+      const deepHumGain = ctx.createGain();
+      deepHum.type = 'sine';
+      deepHum.frequency.value = 74;
+      deepHumGain.gain.value = .018;
+      underwater.connect(underwaterFilter);
+      underwaterFilter.connect(underwaterGain);
+      deepHum.connect(deepHumGain);
+      deepHumGain.connect(underwaterGain);
+
+      surf.start();
+      surfTone.start();
+      underwater.start();
+      deepHum.start();
+
+      cinematicAudio = {
+        ctx, master, surfaceGain, underwaterGain,
+        sources: [surf, surfTone, underwater, deepHum]
+      };
+      cinematicAudioStarting = false;
+      return cinematicAudio;
+    } catch {
+      cinematicAudioStarting = false;
+      cinematicAudio = null;
+      return null;
+    }
+  };
+
+  const setCinematicAudioMix = (submerged, audible) => {
+    const audio = ensureCinematicAudio();
+    if (!audio) return;
+    const now = audio.ctx.currentTime;
+    const muted = portalSoundMuted() || !audible || document.hidden;
+    const masterTarget = muted ? 0.0001 : 0.12;
+    const surfaceTarget = muted ? 0.0001 : Math.max(0.0001, (1 - submerged) * .72);
+    const underwaterTarget = muted ? 0.0001 : Math.max(0.0001, submerged * .58);
+    audio.master.gain.cancelScheduledValues(now);
+    audio.surfaceGain.gain.cancelScheduledValues(now);
+    audio.underwaterGain.gain.cancelScheduledValues(now);
+    audio.master.gain.setTargetAtTime(masterTarget, now, .16);
+    audio.surfaceGain.gain.setTargetAtTime(surfaceTarget, now, .22);
+    audio.underwaterGain.gain.setTargetAtTime(underwaterTarget, now, .22);
   };
 
   const playMascotChirp = (variant = 0) => {
     if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
     const nowMs = performance.now();
-    if (nowMs - lastMascotChirpAt < 1100) return;
+    if (nowMs - lastMascotChirpAt < 900) return;
     lastMascotChirpAt = nowMs;
-    mascotChirpUntil = nowMs + 360;
+    mascotChirpUntil = nowMs + 420;
+
+    const ctx = portalContext();
+    if (!ctx || ctx.state !== 'running') return;
+
     try {
-      const getContext = typeof window.getPortalAudioContext === 'function' ? window.getPortalAudioContext : null;
-      const ctx = getContext ? getContext() : null;
-      if (!ctx || ctx.state === 'suspended') return;
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.0001, ctx.currentTime);
-      master.gain.exponentialRampToValueAtTime(0.055, ctx.currentTime + .012);
-      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + .32);
+      master.gain.exponentialRampToValueAtTime(0.11, ctx.currentTime + .012);
+      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + .46);
       master.connect(ctx.destination);
-      const patterns = [[920,1180],[760,1040,1320],[1080,860]];
+
+      const patterns = [
+        [760, 1040, 880],
+        [690, 930, 1180, 980],
+        [860, 720, 970]
+      ];
       const tones = patterns[variant % patterns.length];
       tones.forEach((frequency, index) => {
         const osc = ctx.createOscillator();
+        const harmonic = ctx.createOscillator();
         const gain = ctx.createGain();
-        const start = ctx.currentTime + index * .075;
-        osc.type = index % 2 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(frequency, start);
-        osc.frequency.exponentialRampToValueAtTime(frequency * 1.04, start + .06);
+        const harmonicGain = ctx.createGain();
+        const start = ctx.currentTime + index * .085;
+        const length = .105 + (index % 2) * .025;
+
+        osc.type = 'triangle';
+        harmonic.type = 'sine';
+        osc.frequency.setValueAtTime(frequency * .94, start);
+        osc.frequency.exponentialRampToValueAtTime(frequency * 1.07, start + length);
+        harmonic.frequency.setValueAtTime(frequency * 2.02, start);
+
         gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(.7, start + .008);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + .09);
-        osc.connect(gain);
-        gain.connect(master);
-        osc.start(start);
-        osc.stop(start + .11);
+        gain.gain.exponentialRampToValueAtTime(.82, start + .01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+        harmonicGain.gain.setValueAtTime(0.0001, start);
+        harmonicGain.gain.exponentialRampToValueAtTime(.16, start + .012);
+        harmonicGain.gain.exponentialRampToValueAtTime(0.0001, start + length * .9);
+
+        osc.connect(gain); gain.connect(master);
+        harmonic.connect(harmonicGain); harmonicGain.connect(master);
+        osc.start(start); harmonic.start(start);
+        osc.stop(start + length + .02); harmonic.stop(start + length + .02);
       });
-    } catch { /* Mascot sound remains optional if a browser blocks Web Audio. */ }
+    } catch { /* Mascot sound is non-critical. */ }
   };
 
   const playWaterSplash = () => {
     if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
+    const ctx = portalContext();
+    if (!ctx || ctx.state !== 'running') return;
     try {
-      const getContext = typeof window.getPortalAudioContext === 'function' ? window.getPortalAudioContext : null;
-      const ctx = getContext ? getContext() : null;
-      if (!ctx || ctx.state === 'suspended') return;
-
-      const duration = .42;
+      const duration = .48;
       const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let index = 0; index < data.length; index += 1) {
         const fade = 1 - index / data.length;
         data[index] = (Math.random() * 2 - 1) * fade * fade;
       }
-
       const source = ctx.createBufferSource();
       const filter = ctx.createBiquadFilter();
       const gain = ctx.createGain();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(900, ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(280, ctx.currentTime + duration);
-      filter.Q.value = .7;
-      gain.gain.setValueAtTime(.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.075, ctx.currentTime + .018);
-      gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + duration);
+      filter.frequency.setValueAtTime(1150, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(320, ctx.currentTime + duration);
+      filter.Q.value = .65;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.11, ctx.currentTime + .018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
       source.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
@@ -872,17 +1009,38 @@ function initCinematicJourney() {
   };
 
   const unlockMascotSound = () => {
-    mascotSoundUnlocked = true;
+    const ctx = portalContext();
+    mascotSoundUnlocked = Boolean(ctx && ctx.state === 'running') || mascotSoundUnlocked;
+    if (ctx?.state === 'suspended' && !portalSoundMuted()) {
+      ctx.resume().then(() => {
+        mascotSoundUnlocked = true;
+        ensureCinematicAudio();
+      }).catch(() => {});
+    } else if (mascotSoundUnlocked) {
+      ensureCinematicAudio();
+    }
   };
-  window.addEventListener('pointerdown', unlockMascotSound, { once: true, passive: true });
-  window.addEventListener('keydown', unlockMascotSound, { once: true });
+
+  // The portal may already have unlocked audio during sign-in. Reuse that state
+  // so a user who immediately starts scrolling still hears the mascot.
+  const existingPortalContext = portalContext();
+  mascotSoundUnlocked = Boolean(existingPortalContext && existingPortalContext.state === 'running');
+
+  window.addEventListener('pointerdown', unlockMascotSound, { passive: true });
+  window.addEventListener('keydown', unlockMascotSound);
+  window.addEventListener('touchstart', unlockMascotSound, { passive: true });
+  window.addEventListener('littlefeet:audiochange', event => {
+    const muted = Boolean(event.detail?.muted);
+    if (!muted) unlockMascotSound();
+    setCinematicAudioMix(smoothProgress > .225 ? 1 : 0, !muted && journey.classList.contains('is-active'));
+  });
 
   // A deterministic dive path keeps the mascot tied to the same scroll
   // milestones as the underwater stations instead of letting camera math
   // accidentally make it appear to float upward.
   const diveKeyframes = [
-    { at: 0.00, x: -2.15, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
-    { at: 0.10, x: -2.15, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
+    { at: 0.00, x: -2.20, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
+    { at: 0.10, x: -2.20, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
     { at: 0.14, x: -2.05, y:  1.82, z:  0.34, pitch: 0.08, roll:  0.00 },
     { at: 0.17, x: -1.25, y:  2.55, z:  0.28, pitch: 0.16, roll: -0.08 },
     { at: 0.20, x:  0.65, y:  2.28, z:  0.18, pitch: 0.34, roll: -0.13 },
@@ -1067,14 +1225,20 @@ function initCinematicJourney() {
     const swimYaw = motion.yaw + Math.sin(progress * Math.PI * 4) * propulsion * .08;
     const swimRoll = path.roll + motion.bank + glideWave * effort * .07;
     const uprightPitch = stationPose.index === 0 ? 0 : .06;
-    const uprightYaw = pointer.smoothX * .07;
+    const uprightYaw = stationPose.index === 0 ? 0 : pointer.smoothX * .045;
     const uprightRoll = 0;
     const surfaceFront = 1 - smoothstep(.11, .22, progress);
     const uprightBlend = Math.max(stationHold, surfaceFront);
 
-    mascot.rotation.x = damp(mascot.rotation.x, lerp(swimPitch, uprightPitch, uprightBlend), 8.4, dt);
-    mascot.rotation.y = damp(mascot.rotation.y, lerp(swimYaw, uprightYaw, uprightBlend), 7.8, dt);
-    mascot.rotation.z = damp(mascot.rotation.z, lerp(swimRoll, uprightRoll, uprightBlend), 8.2, dt);
+    mascot.rotation.x = damp(mascot.rotation.x, lerp(swimPitch, uprightPitch, uprightBlend), surfaceFront > .7 ? 12 : 8.4, dt);
+    mascot.rotation.y = damp(mascot.rotation.y, lerp(swimYaw, uprightYaw, uprightBlend), surfaceFront > .7 ? 12 : 7.8, dt);
+    mascot.rotation.z = damp(mascot.rotation.z, lerp(swimRoll, uprightRoll, uprightBlend), surfaceFront > .7 ? 13 : 8.2, dt);
+
+    if (surfaceFront > .82) {
+      mascot.position.x = damp(mascot.position.x, -2.20, 10, dt);
+      data.chestRig.rotation.y = damp(data.chestRig.rotation.y, 0, 10, dt);
+      data.chestRig.rotation.z = damp(data.chestRig.rotation.z, 0, 10, dt);
+    }
 
     // Chest/spine articulation gives the procedural mesh a bone-like follow
     // through instead of moving as one rigid toy.
@@ -1211,12 +1375,18 @@ function initCinematicJourney() {
     mascot.scale.z = .92;
 
     const chirping = performance.now() < mascotChirpUntil;
-    const beakPulse = chirping ? 1 + Math.sin(time * 34) * .13 : 1;
+    const chirpOpen = chirping ? (Math.sin(time * 38) * .5 + .5) : 0;
     data.beak.scale.set(
       data.beakBaseScale.x,
-      data.beakBaseScale.y * beakPulse,
-      data.beakBaseScale.z * beakPulse
+      data.beakBaseScale.y,
+      data.beakBaseScale.z
     );
+    data.lowerBeak.scale.set(
+      data.lowerBeakBaseScale.x,
+      data.lowerBeakBaseScale.y * (1 + chirpOpen * .42),
+      data.lowerBeakBaseScale.z
+    );
+    data.lowerBeak.position.y = -.225 - chirpOpen * .025;
 
     // When the cursor is actively moving the stare wins over blinking. During
     // calm moments a natural single/double blink cycle resumes.
@@ -1374,6 +1544,8 @@ function initCinematicJourney() {
     splashRing.position.x = entryPath.x;
     splashRing.material.opacity = splash * .78;
     splashRing.scale.setScalar(.7 + splash * 2.3);
+
+    setCinematicAudioMix(submerged, journey.classList.contains('is-active'));
 
     scene.fog.density = lerp(.008, .027, submerged);
     renderer.setClearColor(new THREE.Color().setRGB(
