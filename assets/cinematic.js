@@ -1405,7 +1405,11 @@ function initCinematicJourney() {
     }
     attr.needsUpdate = true;
     waterUpdateCount += 1;
-    if (refreshNormals || waterUpdateCount % 8 === 0) water.geometry.computeVertexNormals();
+    // Vertex-normal recomputation is one of the most expensive CPU steps in this
+    // scene. The waves are deliberately shallow, so refreshing roughly twice per
+    // second keeps the lighting alive without burning a full CPU pass every few
+    // frames on integrated GPUs.
+    if (refreshNormals || waterUpdateCount % 30 === 0) water.geometry.computeVertexNormals();
   };
 
   const sampleSourceSwimBone = (boneName, cycle) => {
@@ -1876,18 +1880,15 @@ function initCinematicJourney() {
     depthData.near.position.x = pointer.smoothX * .92;
     depthData.near.position.y = pointer.smoothY * .34;
 
+    // Keep the depth mist alive without rewriting hundreds of particle vertices
+    // every update. Moving each particle layer as a whole preserves parallax and
+    // drift while leaving the static GPU buffers untouched.
     [depthData.farMist, depthData.midMist, depthData.nearMist].forEach((mist, layerIndex) => {
-      const positions = mist.geometry.attributes.position;
-      const phases = mist.geometry.attributes.phase;
-      const base = mist.userData.basePositions;
       const drift = [.035, .065, .11][layerIndex];
-      for (let pointIndex = 0; pointIndex < positions.count; pointIndex += 1) {
-        const offset = pointIndex * 3;
-        const phase = phases.array[pointIndex];
-        positions.array[offset] = base[offset] + Math.sin(time * drift + phase) * (.18 + layerIndex * .12);
-        positions.array[offset + 1] = base[offset + 1] + Math.cos(time * drift * .72 + phase) * (.10 + layerIndex * .08);
-      }
-      positions.needsUpdate = true;
+      const phase = layerIndex * 1.73;
+      mist.position.x = Math.sin(time * drift + phase) * (.18 + layerIndex * .12);
+      mist.position.y = Math.cos(time * drift * .72 + phase) * (.10 + layerIndex * .08);
+      mist.rotation.z = Math.sin(time * drift * .42 + phase) * (.0015 + layerIndex * .0012);
     });
 
     rings.forEach((ring, index) => {
@@ -1899,10 +1900,17 @@ function initCinematicJourney() {
     });
   };
 
-  let worldFrame = 0;
+  let waterBudget = 0;
+  let worldBudget = 0;
+  let bubbleBudget = 0;
+  const waterInterval = quality === 'high' ? 1 / 18 : quality === 'medium' ? 1 / 12 : 1 / 10;
+  const worldInterval = quality === 'high' ? 1 / 30 : quality === 'medium' ? 1 / 20 : 1 / 15;
+  const bubbleInterval = quality === 'high' ? 1 / 24 : quality === 'medium' ? 1 / 16 : 1 / 12;
+
   const updateScene = (dt, time) => {
-    worldFrame += 1;
-    const updateHeavyWorld = quality === 'high' || worldFrame % 2 === 0;
+    waterBudget += dt;
+    worldBudget += dt;
+    bubbleBudget += dt;
     const rawMotion = Math.abs(scrollProgress - previousRawProgress) / Math.max(.001, dt);
     scrollMotion = damp(scrollMotion, clamp(rawMotion * .55, 0, 1), 7.5, dt);
     previousRawProgress = scrollProgress;
@@ -1913,9 +1921,17 @@ function initCinematicJourney() {
     pointer.activity = damp(pointer.activity, 0, 2.6, dt);
 
     animateMascot(smoothProgress, time, dt);
-    if (updateHeavyWorld) {
+
+    // Decouple expensive environment animation from the mascot/camera render.
+    // The hero motion can stay responsive while background simulation runs at a
+    // lower, fixed cadence that is much kinder to integrated GPUs and work PCs.
+    if (waterBudget >= waterInterval) {
       updateWater(time);
-      animateWorld(time, dt * (quality === 'high' ? 1 : 2), smoothProgress);
+      waterBudget %= waterInterval;
+    }
+    if (worldBudget >= worldInterval) {
+      animateWorld(time, worldBudget, smoothProgress);
+      worldBudget %= worldInterval;
     }
 
     const submerged = smoothstep(.20, .30, smoothProgress);
@@ -1981,12 +1997,13 @@ function initCinematicJourney() {
       lerp(.93, .15, submerged)
     ), 1);
 
-    if (updateHeavyWorld) {
+    if (bubbleBudget >= bubbleInterval) {
       animateBubbleField(bubbles, time, 1);
       animateBubbleField(dust, time, .34);
       animateBubbleField(mascotTrail, time, 1.8);
       bubbles.rotation.y = time * .018;
       dust.rotation.y = -time * .012;
+      bubbleBudget %= bubbleInterval;
     }
     bubbles.material.opacity = lerp(.34, .54, submerged);
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
