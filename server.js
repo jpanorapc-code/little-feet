@@ -117,6 +117,11 @@ const enforcePublicRateLimit = (req, res, key, limit, windowMs) => {
       if (now - value.startedAt >= windowMs) publicRateLimits.delete(candidate);
       if (publicRateLimits.size <= 8000) break;
     }
+    // A distributed spray can leave every entry "active". Keep the limiter
+    // itself bounded rather than letting hostile source churn exhaust memory.
+    while (publicRateLimits.size > 10000) {
+      publicRateLimits.delete(publicRateLimits.keys().next().value);
+    }
   }
   if (entry.count <= limit) return true;
   res.setHeader('Retry-After', String(Math.max(1, Math.ceil((windowMs - (now - entry.startedAt)) / 1000))));
