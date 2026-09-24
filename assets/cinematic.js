@@ -812,8 +812,8 @@ function initCinematicJourney() {
     button.textContent = station.target.label;
     button.dataset.station = String(index);
     button.addEventListener('click', () => {
-      const availableHeight = Math.max(1, journey.offsetHeight - window.innerHeight);
-      window.scrollTo({ top: journey.offsetTop + availableHeight * station.at, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+      refreshJourneyMetrics();
+      window.scrollTo({ top: journeyTop + journeyTravel * station.at, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
     });
     return button;
   }));
@@ -911,7 +911,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = '30';
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v4-trimmed-animation';
+  stage.dataset.compressionProfile = 'safe-webgl-v5-scroll-hold-batched-particles';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -921,6 +921,7 @@ function initCinematicJourney() {
   renderer.setPixelRatio(renderPixelRatioTarget);
 
   const scene = new THREE.Scene();
+  const clearColorScratch = new THREE.Color();
   scene.fog = new THREE.FogExp2(0x052b4a, .018);
 
   const camera = new THREE.PerspectiveCamera(48, 1, .1, 130);
@@ -1503,10 +1504,16 @@ function initCinematicJourney() {
   let stageRect = null;
   let journeyTop = 0;
   let journeyTravel = 1;
+  let journeyEnd = 1;
+  let journeyExitHold = 1;
 
   const refreshJourneyMetrics = () => {
     journeyTop = journey.offsetTop;
-    journeyTravel = Math.max(1, journey.offsetHeight - window.innerHeight);
+    const totalTravel = Math.max(1, journey.offsetHeight - window.innerHeight);
+    journeyExitHold = Math.min(window.innerHeight * 1.10, totalTravel * .22);
+    journeyTravel = Math.max(1, totalTravel - journeyExitHold);
+    journeyEnd = journeyTop + totalTravel;
+    stage.dataset.exitHoldPx = String(Math.round(journeyExitHold));
   };
 
   const resize = () => {
@@ -1544,10 +1551,12 @@ function initCinematicJourney() {
   const calculateScroll = () => {
     if (journeyTravel < 2) refreshJourneyMetrics();
     const raw = (window.scrollY - journeyTop) / journeyTravel;
+    const insideJourney = window.scrollY >= journeyTop && window.scrollY <= journeyEnd;
     scrollProgress = clamp(raw);
     if (raw > .012 && portalIntroThemePlaying()) stopPortalIntroTheme();
-    journey.classList.toggle('is-active', raw >= 0 && raw <= 1);
-    journey.classList.toggle('is-after', raw > 1);
+    journey.classList.toggle('is-active', insideJourney);
+    journey.classList.toggle('is-after', window.scrollY > journeyEnd);
+    stage.dataset.exitHoldActive = String(raw >= 1 && insideJourney);
     updateProgressUI(scrollProgress);
   };
 
@@ -1591,20 +1600,17 @@ function initCinematicJourney() {
   };
 
   const animateBubbleField = (points, time, speedMultiplier = 1) => {
-    const attr = points.geometry.attributes.position;
-    const seeds = points.geometry.attributes.seed;
-    const base = points.userData.basePositions;
-    const depth = Math.max(.1, points.userData.depth || 1);
+    // Keep the full particle count and appearance, but stop rewriting every
+    // particle's XYZ buffer on the CPU. The point cloud drifts as a layer.
+    if (!points.userData.driftBase) points.userData.driftBase = points.position.clone();
+    const base = points.userData.driftBase;
     const rise = points.userData.riseSpeed * speedMultiplier;
-    for (let index = 0; index < attr.count; index += 1) {
-      const offset = index * 3;
-      const seed = seeds.array[index];
-      const cycle = (seed + time * rise * .035) % 1;
-      attr.array[offset] = base[offset] + Math.sin(time * .55 + seed * 12) * .035;
-      attr.array[offset + 1] = -cycle * depth;
-      attr.array[offset + 2] = base[offset + 2] + Math.cos(time * .47 + seed * 10) * .035;
-    }
-    attr.needsUpdate = true;
+    const phase = points.userData.depth * .071 + speedMultiplier * 1.31;
+    points.position.x = base.x + Math.sin(time * (.11 + rise * .05) + phase) * .12;
+    points.position.y = base.y + Math.sin(time * (.08 + rise * .03) + phase * .7) * .09;
+    points.position.z = base.z + Math.cos(time * (.09 + rise * .04) + phase) * .10;
+    points.rotation.y = Math.sin(time * .045 + phase) * .045;
+    points.rotation.z = Math.cos(time * .052 + phase) * .018;
   };
 
   const animateMascot = (progress, time, dt) => {
@@ -2187,18 +2193,17 @@ function initCinematicJourney() {
       lerp(.18, .035, deepening),
       lerp(.30, .10, deepening)
     );
-    renderer.setClearColor(new THREE.Color().setRGB(
+    clearColorScratch.setRGB(
       lerp(.21, .005, submerged),
       lerp(.72, .075, submerged),
       lerp(.93, .15, submerged)
-    ), 1);
+    );
+    renderer.setClearColor(clearColorScratch, 1);
 
     if (bubbleBudget >= bubbleInterval) {
       animateBubbleField(bubbles, time, 1);
       animateBubbleField(dust, time, .34);
       animateBubbleField(mascotTrail, time, 1.8);
-      bubbles.rotation.y = time * .018;
-      dust.rotation.y = -time * .012;
       bubbleBudget %= bubbleInterval;
     }
     bubbles.material.opacity = lerp(.34, .54, submerged);
