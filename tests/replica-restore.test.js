@@ -84,6 +84,16 @@ const authed = async (route, cookie) => {
     assert.equal(initial.response.status, 200);
     assert.deepEqual(initial.data.map(a => a.username), ['alpha-admin']);
 
+    const blockedMutation = await request('/api/term', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ term: 'This must never be acknowledged on standby' })
+    });
+    assert.equal(blockedMutation.response.status, 503);
+    assert.match(blockedMutation.data.message, /read-only/i);
+    assert.match(blockedMutation.data.message, /not saved/i);
+    assert.equal(blockedMutation.response.headers.get('retry-after'), '30');
+
     fs.writeFileSync(replicaFile, '{corrupt json');
     await wait(2300);
     const afterCorrupt = await authed('/api/accounts', cookie);
