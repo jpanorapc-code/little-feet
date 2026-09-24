@@ -82,6 +82,20 @@
   pointer-events: none;
   background: #03162c;
 }
+.cinematic-depth-picture::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(104deg, transparent 0 18%, rgba(140,244,255,.11) 30%, transparent 42%),
+    linear-gradient(76deg, transparent 0 58%, rgba(116,207,255,.08) 69%, transparent 80%);
+  opacity: .72;
+}
+.cinematic-journey.is-active:not(.is-user-paused) .cinematic-depth-image {
+  will-change: transform;
+}
+
 .cinematic-depth-image {
   position: absolute;
   left: 50%;
@@ -93,8 +107,7 @@
   object-position: 50% 0%;
   transform: translate3d(-50%, 0, 0) scale(1.035);
   transform-origin: 50% 0%;
-  will-change: transform;
-  filter: saturate(1.12) contrast(1.04) brightness(.92);
+  will-change: auto;
 }
 @media (min-aspect-ratio: 16/10) {
   .cinematic-depth-image {
@@ -105,66 +118,6 @@
 @media (max-width: 900px) {
   .cinematic-depth-image {
     height: 158%;
-    filter: saturate(1.08) contrast(1.03) brightness(.94);
-  }
-}
-.cinematic-journey.is-user-paused .cinematic-depth-image {
-  filter: saturate(1.03) contrast(1.02) brightness(.88);
-}
-
-
-.cinematic-parallax-image {
-  position: absolute;
-  inset: -6%;
-  z-index: 0;
-  pointer-events: none;
-  background-image: url('/assets/images/little-feet-ocean-depth-1080.webp');
-  background-repeat: no-repeat;
-  background-size: cover;
-  will-change: transform;
-}
-.cinematic-parallax-far {
-  opacity: .16;
-  background-position: 48% 44%;
-  filter: saturate(1.14) brightness(.82) blur(.6px);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 34%, #000 58%, #000 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, transparent 34%, #000 58%, #000 100%);
-}
-.cinematic-parallax-near {
-  opacity: .10;
-  background-position: 54% 72%;
-  filter: saturate(1.22) contrast(1.06) brightness(.72);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 56%, #000 78%, #000 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, transparent 56%, #000 78%, #000 100%);
-}
-@media (max-width: 900px) {
-  .cinematic-parallax-near { display: none; }
-  .cinematic-parallax-far { opacity: .12; }
-}
-
-.cinematic-seabed-2d {
-  position: absolute;
-  left: -5%;
-  right: -5%;
-  bottom: -10%;
-  height: 54%;
-  z-index: 0;
-  pointer-events: none;
-  background-image: url('/assets/images/little-feet-ocean-depth-1080.webp');
-  background-repeat: no-repeat;
-  background-size: 118% auto;
-  background-position: 50% 100%;
-  opacity: 0;
-  filter: saturate(1.16) contrast(1.08) brightness(.70);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.42) 26%, #000 64%, #000 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.42) 26%, #000 64%, #000 100%);
-  will-change: transform, opacity;
-}
-@media (max-width: 900px) {
-  .cinematic-seabed-2d {
-    height: 46%;
-    background-size: 145% auto;
-    filter: saturate(1.10) contrast(1.05) brightness(.74);
   }
 }
 
@@ -177,25 +130,28 @@
   background-size: contain;
   background-position: center;
   opacity: .58;
-  will-change: transform;
+  will-change: auto;
   transform: translate3d(0,0,0);
+  animation-play-state: paused !important;
+}
+.cinematic-journey.is-active:not(.is-user-paused) .cinematic-life-2d {
+  animation-play-state: running !important;
+  will-change: transform;
 }
 .cinematic-fish-2d {
   width: min(46vw, 720px);
   aspect-ratio: 3 / 1;
   background-image: url('/assets/images/cinematic-fish-school.svg');
-  filter: saturate(.82) brightness(.80);
 }
-.cinematic-fish-2d-a { left: 6%; top: 30%; }
-.cinematic-fish-2d-b { right: 4%; top: 59%; opacity: .42; transform: scaleX(-1); }
+.cinematic-fish-2d-a { left: 6%; top: 30%; animation: cinematicFishDriftA 25s ease-in-out infinite alternate; }
+.cinematic-fish-2d-b { right: 4%; top: 59%; opacity: .42; animation: cinematicFishDriftB 31s ease-in-out infinite alternate; }
 .cinematic-jelly-2d {
   width: min(18vw, 250px);
   aspect-ratio: 13 / 18;
   background-image: url('/assets/images/cinematic-jellyfish.svg');
-  filter: saturate(.92) brightness(.84);
 }
-.cinematic-jelly-2d-a { right: 12%; top: 37%; }
-.cinematic-jelly-2d-b { left: 9%; top: 69%; opacity: .44; }
+.cinematic-jelly-2d-a { right: 12%; top: 37%; animation: cinematicJellyDriftA 23s ease-in-out infinite alternate; }
+.cinematic-jelly-2d-b { left: 9%; top: 69%; opacity: .44; animation: cinematicJellyDriftB 29s ease-in-out infinite alternate; }
 .cinematic-manta-2d {
   width: min(35vw, 520px);
   aspect-ratio: 19 / 9;
@@ -203,12 +159,33 @@
   top: 76%;
   background-image: url('/assets/images/cinematic-manta.svg');
   opacity: .34;
-  filter: saturate(.78) brightness(.72);
+  animation: cinematicMantaDrift 35s ease-in-out infinite alternate;
 }
 .cinematic-journey:not(.is-active) .cinematic-life-2d,
 .cinematic-journey.is-user-paused .cinematic-life-2d {
   will-change: auto;
 }
+@keyframes cinematicFishDriftA {
+  from { transform: translate3d(-2vw, -4px, 0) scale(.86); }
+  to   { transform: translate3d(7vw, 10px, 0) scale(.86); }
+}
+@keyframes cinematicFishDriftB {
+  from { transform: translate3d(5vw, 8px, 0) scale(.68); }
+  to   { transform: translate3d(-7vw, -7px, 0) scale(.68); }
+}
+@keyframes cinematicJellyDriftA {
+  from { transform: translate3d(-8px, 16px, 0) scale(.72); }
+  to   { transform: translate3d(10px, -26px, 0) scale(.72); }
+}
+@keyframes cinematicJellyDriftB {
+  from { transform: translate3d(12px, 14px, 0) scale(.56); }
+  to   { transform: translate3d(-12px, -32px, 0) scale(.56); }
+}
+@keyframes cinematicMantaDrift {
+  from { transform: translate3d(-7vw, 8px, 0) scale(.76); }
+  to   { transform: translate3d(8vw, -10px, 0) scale(.76); }
+}
+
 @media (max-width: 900px) {
   .cinematic-fish-2d { width: 60vw; opacity: .42; }
   .cinematic-jelly-2d { width: 24vw; }
@@ -221,11 +198,6 @@
   .cinematic-fish-2d { width: 68vw; opacity: .34; }
   .cinematic-jelly-2d { width: 30vw; opacity: .32; }
 }
-
-#littleFeetCinematicCanvas {
-  filter: saturate(.92) brightness(.96);
-}
-
 #littleFeetCinematicCanvas {
   position: absolute;
   inset: 0;
