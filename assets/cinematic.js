@@ -654,6 +654,7 @@ function initCinematicJourney() {
   // Do not load or evaluate it in the browser: the procedural mascot rig below
   // provides the swim motion without per-frame imported-bone sampling.
   stage.dataset.swimSource = 'little-feet-mascot-v2';
+  stage.dataset.mascotModel = 'video-reference-v2';
 
   // Microbubble wake for strong underwater strokes. It is hidden on the
   // surface and fades in only when the mascot is actually propelling.
