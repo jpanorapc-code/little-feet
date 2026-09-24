@@ -1694,10 +1694,28 @@ function initCinematicJourney() {
 
   let firstFrameRendered = false;
   let renderFailed = false;
+  let cinematicLoopRunning = false;
+  let cinematicTimerId = 0;
+  let cinematicRafId = 0;
+  let lastInteractionMs = performance.now();
+
+  const cancelCinematicSchedule = () => {
+    if (cinematicTimerId) {
+      window.clearTimeout(cinematicTimerId);
+      cinematicTimerId = 0;
+    }
+    if (cinematicRafId) {
+      window.cancelAnimationFrame(cinematicRafId);
+      cinematicRafId = 0;
+    }
+  };
+
   const failToFallback = (message) => {
     if (renderFailed) return;
     renderFailed = true;
-    renderer.setAnimationLoop(null);
+    cinematicLoopRunning = false;
+    cancelCinematicSchedule();
+    stopCinematicAudio();
     journey.classList.add('cinematic-fallback');
     stage.classList.remove('is-ready');
     const loading = stage.querySelector('.cinematic-loading');
@@ -1709,34 +1727,23 @@ function initCinematicJourney() {
     failToFallback('3D paused by the browser · cinematic controls remain available');
   }, { once: true });
 
-  let lastRenderMs = 0;
-  let lastInteractionMs = performance.now();
   const markCinematicActivity = () => {
     lastInteractionMs = performance.now();
     stage.dataset.cinematicIdle = 'active';
     if (cinematicShouldRun()) startCinematicLoop();
   };
 
-  const render = frameTime => {
-    if (renderFailed) return;
-    const nowMs = Number.isFinite(frameTime) ? frameTime : performance.now();
-    const activityAgeMs = nowMs - lastInteractionMs;
-    if (activityAgeMs > 3500) {
-      stopCinematicLoop();
-      stage.dataset.cinematicIdle = 'frozen';
-      return;
-    }
-    const effectiveFpsCap = activityAgeMs > 900 ? 12 : renderFpsCap;
-    const minFrameMs = 1000 / effectiveFpsCap;
-    if (lastRenderMs && nowMs - lastRenderMs < minFrameMs - .5) return;
-    lastRenderMs = nowMs;
+  const scheduledFps = () => {
+    const activityAgeMs = performance.now() - lastInteractionMs;
+    if (activityAgeMs > 3500) return 0;
+    return activityAgeMs > 900 ? Math.min(12, renderFpsCap) : renderFpsCap;
+  };
 
+  const render = frameTime => {
+    if (renderFailed || !cinematicShouldRun()) return;
     const dt = Math.min(clock.getDelta(), .05);
     const time = clock.elapsedTime;
-    if (!cinematicShouldRun()) return;
     try {
-      // Resize again immediately before the first visible frame. This covers
-      // login transitions even on browsers that delay ResizeObserver delivery.
       if (!firstFrameRendered && !resize()) return;
       const workStart = performance.now();
       updateScene(dt, time);
@@ -1752,10 +1759,33 @@ function initCinematicJourney() {
     }
   };
 
+  const scheduleCinematicFrame = (immediate = false) => {
+    if (!cinematicLoopRunning || renderFailed) return;
+    const fps = scheduledFps();
+    if (fps <= 0) {
+      cinematicLoopRunning = false;
+      stage.dataset.cinematicIdle = 'frozen';
+      stage.dataset.cinematicRuntime = 'paused';
+      stopCinematicAudio();
+      return;
+    }
+
+    const delayMs = immediate ? 0 : Math.max(0, (1000 / fps) - 1);
+    cinematicTimerId = window.setTimeout(() => {
+      cinematicTimerId = 0;
+      if (!cinematicLoopRunning || renderFailed) return;
+      cinematicRafId = window.requestAnimationFrame(frameTime => {
+        cinematicRafId = 0;
+        if (!cinematicLoopRunning || renderFailed) return;
+        render(frameTime);
+        if (cinematicLoopRunning) scheduleCinematicFrame(false);
+      });
+    }, delayMs);
+  };
+
   // Hard runtime gate: when the cinematic is not actually being viewed or the
   // client pauses it, stop every cinematic update completely.
   let journeyInViewport = false;
-  let cinematicLoopRunning = false;
   let cinematicUserPaused = false;
   try {
     cinematicUserPaused = localStorage.getItem('lf_cinematic_paused') === 'true';
@@ -1781,11 +1811,10 @@ function initCinematicJourney() {
   };
 
   const stopCinematicLoop = () => {
-    if (!cinematicLoopRunning) return;
     cinematicLoopRunning = false;
-    renderer.setAnimationLoop(null);
+    cancelCinematicSchedule();
     stage.dataset.cinematicRuntime = 'paused';
-    setCinematicAudioMix(smoothProgress > .225 ? 1 : 0, false);
+    stopCinematicAudio();
     if (activePenguinCallSource) {
       try { activePenguinCallSource.stop(); } catch { /* Already ended. */ }
       activePenguinCallSource = null;
@@ -1796,10 +1825,9 @@ function initCinematicJourney() {
   const startCinematicLoop = () => {
     if (cinematicLoopRunning || !cinematicShouldRun()) return;
     cinematicLoopRunning = true;
-    lastRenderMs = 0;
     clock.getDelta();
     stage.dataset.cinematicRuntime = 'running';
-    renderer.setAnimationLoop(render);
+    scheduleCinematicFrame(true);
   };
 
   const syncCinematicRuntime = () => {
