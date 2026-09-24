@@ -126,7 +126,7 @@ function createMascot() {
 function createIceShelf() {
   const group = new THREE.Group();
   const top = new THREE.Mesh(
-    new THREE.CylinderGeometry(6.5, 5.2, .75, 42, 2),
+    new THREE.CylinderGeometry(3.45, 3.05, .62, 42, 2),
     new THREE.MeshPhysicalMaterial({
       color: 0xdffcff,
       roughness: .18,
@@ -137,16 +137,16 @@ function createIceShelf() {
       thickness: .7
     })
   );
-  top.position.y = -.1;
+  top.position.y = .02;
   top.receiveShadow = true;
   top.castShadow = true;
   group.add(top);
 
   const underside = new THREE.Mesh(
-    new THREE.CylinderGeometry(5.1, 3.7, 1.7, 34, 2),
+    new THREE.CylinderGeometry(3.0, 2.15, 1.35, 34, 2),
     new THREE.MeshPhysicalMaterial({ color: 0x79c9e9, roughness: .3, clearcoat: .5 })
   );
-  underside.position.y = -.95;
+  underside.position.y = -.88;
   underside.castShadow = true;
   group.add(underside);
   return group;
@@ -355,7 +355,9 @@ function initCinematicJourney() {
   scene.fog = new THREE.FogExp2(0x052b4a, .018);
 
   const camera = new THREE.PerspectiveCamera(48, 1, .1, 130);
-  camera.position.set(0, 3.1, 9.7);
+  // Keep the opening frame wide enough to show the mascot and the ice edge together.
+  camera.position.set(.8, 3.8, 11.8);
+  camera.lookAt(-1.35, 1.55, 0);
 
   const ambient = new THREE.HemisphereLight(0xc8fbff, 0x031226, 2.2);
   scene.add(ambient);
@@ -380,14 +382,14 @@ function initCinematicJourney() {
   scene.add(violetLight);
 
   const ice = createIceShelf();
-  ice.position.set(-2.6, .3, 0);
+  ice.position.set(-2.2, .18, -.25);
   scene.add(ice);
 
   const water = createWater();
   scene.add(water);
 
   const mascot = createMascot();
-  mascot.position.set(-2.4, 2.05, 0);
+  mascot.position.set(-2.15, 2.0, .35);
   mascot.rotation.y = -.24;
   scene.add(mascot);
 
@@ -486,8 +488,8 @@ function initCinematicJourney() {
     const dive = smoothstep(.12, .31, progress);
     const underwater = smoothstep(.24, .98, progress);
     const swimWave = Math.sin(time * 3.5);
-    const xPath = -2.4 + dive * 3.6 + Math.sin(progress * Math.PI * 5) * 1.7 * underwater;
-    const ySurface = 2.05 + Math.sin(time * 1.7) * .035;
+    const xPath = -2.15 + dive * 3.6 + Math.sin(progress * Math.PI * 5) * 1.7 * underwater;
+    const ySurface = 2.0 + Math.sin(time * 1.7) * .035;
     const jumpArc = Math.sin(dive * Math.PI) * 2.7;
     const yPath = lerp(ySurface + jumpArc, 1.05 - progress * 35.5, underwater);
     mascot.position.set(xPath, yPath, Math.sin(progress * Math.PI * 4) * .5);
@@ -516,14 +518,14 @@ function initCinematicJourney() {
     updateWater(time);
 
     const submerged = smoothstep(.19, .34, smoothProgress);
-    const targetY = lerp(3.15, 2.4 - smoothProgress * 34.6, submerged);
-    const targetZ = lerp(9.7, 8.1, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .45;
-    const targetX = Math.sin(smoothProgress * Math.PI * 4) * 1.35 * submerged;
+    const targetY = lerp(3.8, 2.4 - smoothProgress * 34.6, submerged);
+    const targetZ = lerp(11.8, 8.1, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .45;
+    const targetX = lerp(.8, Math.sin(smoothProgress * Math.PI * 4) * 1.35, submerged);
     camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * 1.05, 5.2, dt);
     camera.position.y = damp(camera.position.y, targetY + pointer.smoothY * .5, 5.2, dt);
     camera.position.z = damp(camera.position.z, targetZ, 5.2, dt);
     camera.lookAt(
-      mascot.position.x * .34 + pointer.smoothX * .55,
+      mascot.position.x * .62 + pointer.smoothX * .55,
       mascot.position.y - .2 + pointer.smoothY * .34,
       mascot.position.z
     );
@@ -556,14 +558,40 @@ function initCinematicJourney() {
     sun.intensity = lerp(5, 1.7, submerged);
   };
 
+  let firstFrameRendered = false;
+  let renderFailed = false;
+  const failToFallback = (message) => {
+    if (renderFailed) return;
+    renderFailed = true;
+    renderer.setAnimationLoop(null);
+    journey.classList.add('cinematic-fallback');
+    stage.classList.remove('is-ready');
+    const loading = stage.querySelector('.cinematic-loading');
+    if (loading) loading.textContent = message;
+  };
+
+  canvas.addEventListener('webglcontextlost', event => {
+    event.preventDefault();
+    failToFallback('3D paused by the browser · cinematic controls remain available');
+  }, { once: true });
+
   const render = () => {
+    if (renderFailed) return;
     const dt = Math.min(clock.getDelta(), .05);
     const time = clock.elapsedTime;
     const home = document.getElementById('homeTab');
     const visible = home?.classList.contains('active') && !document.hidden;
-    if (visible) {
+    if (!visible) return;
+    try {
       updateScene(dt, time);
       renderer.render(scene, camera);
+      if (!firstFrameRendered) {
+        firstFrameRendered = true;
+        stage.classList.add('is-ready');
+      }
+    } catch (error) {
+      console.error('Little Feet cinematic render failed:', error);
+      failToFallback('3D could not render · cinematic controls remain available');
     }
   };
 
@@ -572,7 +600,6 @@ function initCinematicJourney() {
   resize();
   calculateScroll();
   updateCopy(0);
-  stage.classList.add('is-ready');
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCinematicJourney, { once: true });
