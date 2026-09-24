@@ -43,15 +43,7 @@ function createMascot() {
   const blueDark = new THREE.MeshPhysicalMaterial({ color: 0x083f74, roughness: .28, clearcoat: .72 });
   const white = new THREE.MeshPhysicalMaterial({ color: 0xf1fbff, roughness: .28, clearcoat: .55 });
   const orange = new THREE.MeshStandardMaterial({ color: 0xffa61b, roughness: .45, metalness: .02 });
-  const glass = new THREE.MeshStandardMaterial({
-    color: 0x87f5ff,
-    roughness: .12,
-    metalness: .24,
-    transparent: true,
-    opacity: .72,
-    emissive: 0x0b5d79,
-    emissiveIntensity: .48
-  });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x87f5ff, roughness: .08, metalness: .18, transmission: .55, transparent: true, opacity: .78, emissive: 0x0b5d79, emissiveIntensity: .35 });
   const black = new THREE.MeshStandardMaterial({ color: 0x06121d, roughness: .22 });
 
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 32), blue);
@@ -186,12 +178,14 @@ function createIceShelf() {
   const group = new THREE.Group();
   const top = new THREE.Mesh(
     new THREE.CylinderGeometry(3.45, 3.05, .62, 42, 2),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshPhysicalMaterial({
       color: 0xdffcff,
-      roughness: .16,
-      metalness: .08,
-      emissive: 0x0b4965,
-      emissiveIntensity: .12
+      roughness: .18,
+      metalness: .03,
+      clearcoat: 1,
+      clearcoatRoughness: .08,
+      transmission: .12,
+      thickness: .7
     })
   );
   top.position.y = .02;
@@ -201,13 +195,7 @@ function createIceShelf() {
 
   const underside = new THREE.Mesh(
     new THREE.CylinderGeometry(3.0, 2.15, 1.35, 34, 2),
-    new THREE.MeshStandardMaterial({
-      color: 0x79c9e9,
-      roughness: .28,
-      metalness: .05,
-      emissive: 0x073e5a,
-      emissiveIntensity: .16
-    })
+    new THREE.MeshPhysicalMaterial({ color: 0x79c9e9, roughness: .3, clearcoat: .5 })
   );
   underside.position.y = -.88;
   underside.castShadow = true;
@@ -217,14 +205,17 @@ function createIceShelf() {
 
 function createWater() {
   const geometry = new THREE.PlaneGeometry(44, 44, 42, 42);
-  const material = new THREE.MeshPhongMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color: 0x19aee7,
     transparent: true,
-    opacity: .50,
-    specular: 0xb9f7ff,
-    shininess: 105,
-    side: THREE.DoubleSide,
-    depthWrite: false
+    opacity: .58,
+    roughness: .12,
+    metalness: .04,
+    transmission: .38,
+    thickness: .35,
+    clearcoat: 1,
+    clearcoatRoughness: .05,
+    side: THREE.DoubleSide
   });
   const water = new THREE.Mesh(geometry, material);
   water.rotation.x = -Math.PI / 2;
@@ -267,33 +258,24 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
   const group = new THREE.Group();
   const bell = new THREE.Mesh(
     new THREE.SphereGeometry(.88, 30, 20, 0, Math.PI * 2, 0, Math.PI * .56),
-    new THREE.MeshPhongMaterial({
+    new THREE.MeshPhysicalMaterial({
       color,
       emissive: accent,
-      emissiveIntensity: .82,
+      emissiveIntensity: .7,
       transparent: true,
-      opacity: .52,
-      specular: 0xeaffff,
-      shininess: 88,
-      side: THREE.DoubleSide,
-      depthWrite: false
+      opacity: .56,
+      roughness: .08,
+      transmission: .7,
+      thickness: .8,
+      clearcoat: 1,
+      side: THREE.DoubleSide
     })
   );
   bell.scale.y = .72;
   group.add(bell);
 
-  const core = new THREE.Mesh(
-    new THREE.SphereGeometry(.24, 10, 8),
-    new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: .72,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    })
-  );
-  core.scale.set(1.6, .72, 1.6);
-  core.position.y = .02;
+  const core = new THREE.PointLight(color, 4.2, 8, 2);
+  core.position.y = .05;
   group.add(core);
 
   for (let i = 0; i < 8; i += 1) {
@@ -373,14 +355,14 @@ function createFishSchool(count, color, accent = 0xffffff) {
 
 function createMantaRay(color = 0x77d9ff) {
   const group = new THREE.Group();
-  const material = new THREE.MeshPhongMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color,
     emissive: color,
-    emissiveIntensity: .62,
+    emissiveIntensity: .7,
+    roughness: .28,
     transparent: true,
     opacity: .78,
-    specular: 0x8ff4ff,
-    shininess: 52,
+    clearcoat: .7,
     side: THREE.DoubleSide
   });
   const body = new THREE.Mesh(new THREE.SphereGeometry(.48, 18, 12), material);
@@ -770,7 +752,6 @@ function initCinematicJourney() {
   }
   stage.dataset.cinematicFallback = '';
   stage.dataset.cinematicQuality = quality;
-  stage.dataset.cinematicGpuProfile = 'compressed-materials-v1';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
