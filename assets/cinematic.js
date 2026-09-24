@@ -253,7 +253,7 @@ function createIceShelf() {
 }
 
 function createWater() {
-  const geometry = new THREE.PlaneGeometry(44, 44, 42, 42);
+  const geometry = new THREE.PlaneGeometry(44, 44, 18, 18);
   const material = new THREE.MeshPhysicalMaterial({
     color: 0x19aee7,
     transparent: true,
@@ -323,7 +323,17 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
   bell.scale.y = .72;
   group.add(bell);
 
-  const core = new THREE.PointLight(color, 4.2, 8, 2);
+  const core = new THREE.Mesh(
+    getSharedGeometry('jellyCore', () => new THREE.SphereGeometry(.22, 10, 8)),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: .78,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  core.scale.set(1.55, .72, 1.55);
   core.position.y = .05;
   group.add(core);
 
@@ -532,10 +542,25 @@ function createGlowReef(color = 0x42f5e9, accent = 0x9768ff) {
   }
   group.add(rocks, corals);
 
-  const light = new THREE.PointLight(color, 5.5, 9, 2);
-  light.position.set(0, 1.2, 0);
-  group.add(light);
-  group.userData = { light, baseIntensity: light.intensity };
+  const glowCore = new THREE.Mesh(
+    getSharedGeometry('reefGlowCore', () => new THREE.SphereGeometry(.32, 10, 8)),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: .34,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  glowCore.position.set(0, 1.2, 0);
+  glowCore.scale.set(1.8, .72, 1.8);
+  group.add(glowCore);
+  group.userData = {
+    glowMaterial,
+    glowCore,
+    baseEmissiveIntensity: glowMaterial.emissiveIntensity,
+    baseGlowOpacity: glowCore.material.opacity
+  };
   return group;
 }
 
@@ -760,12 +785,8 @@ function initCinematicJourney() {
 
   let activeStation = -1;
   const updateCopy = (index) => {
+    if (index === activeStation) return;
     refreshStationTargets();
-    if (index === activeStation) {
-      const current = stations[index];
-      if (openButton && current) openButton.textContent = 'Open ' + current.target.label;
-      return;
-    }
     activeStation = index;
     stage.dataset.station = String(index);
     const station = stations[index];
@@ -802,6 +823,8 @@ function initCinematicJourney() {
 
   const quality = SCENE_DETAIL;
   let performanceTier = 'balanced';
+  let renderPixelRatioTarget = .78;
+  const MAX_RENDER_PIXELS = 1280 * 720;
   let renderer;
   let rendererError = null;
   const rendererOptions = {
@@ -840,14 +863,15 @@ function initCinematicJourney() {
   stage.dataset.cinematicBatching = 'instanced-v1';
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = '30';
-  stage.dataset.backgroundPause = 'offscreen-hard-stop-v1';
+  stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
+  stage.dataset.compressionProfile = 'safe-webgl-v1';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   renderer.shadowMap.enabled = false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(1);
+  renderer.setPixelRatio(renderPixelRatioTarget);
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x052b4a, .018);
@@ -1424,22 +1448,50 @@ function initCinematicJourney() {
     };
   };
 
+  let stageRect = null;
+  let journeyTop = 0;
+  let journeyTravel = 1;
+
+  const refreshJourneyMetrics = () => {
+    journeyTop = journey.offsetTop;
+    journeyTravel = Math.max(1, journey.offsetHeight - window.innerHeight);
+  };
+
   const resize = () => {
     const rect = stage.getBoundingClientRect();
     // The dashboard starts display:none before login. Never lock the WebGL buffer
     // to 1x1 while its parent is hidden; wait until the real portal size exists.
     if (rect.width < 2 || rect.height < 2) return false;
+
+    stageRect = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height
+    };
+    refreshJourneyMetrics();
+
+    // Three.js recommends limiting drawing-buffer pixel count for heavy scenes.
+    // Keep the CSS canvas full-size while rendering internally at a bounded
+    // resolution, then let the browser upscale it.
+    const cssPixels = Math.max(1, rect.width * rect.height);
+    const pixelBudgetRatio = Math.sqrt(MAX_RENDER_PIXELS / cssPixels);
+    const safePixelRatio = Math.min(
+      window.devicePixelRatio || 1,
+      renderPixelRatioTarget,
+      pixelBudgetRatio
+    );
+    renderer.setPixelRatio(Math.max(.5, safePixelRatio));
     renderer.setSize(Math.round(rect.width), Math.round(rect.height), false);
     camera.aspect = rect.width / rect.height;
     camera.updateProjectionMatrix();
+    stage.dataset.renderPixelRatio = renderer.getPixelRatio().toFixed(2);
     return true;
   };
 
   const calculateScroll = () => {
-    if (journey.offsetHeight < 2) return;
-    const top = journey.offsetTop;
-    const travel = Math.max(1, journey.offsetHeight - window.innerHeight);
-    const raw = (window.scrollY - top) / travel;
+    if (journeyTravel < 2) refreshJourneyMetrics();
+    const raw = (window.scrollY - journeyTop) / journeyTravel;
     scrollProgress = clamp(raw);
     if (raw > .012 && portalIntroThemePlaying()) stopPortalIntroTheme();
     journey.classList.toggle('is-active', raw >= 0 && raw <= 1);
@@ -1469,8 +1521,9 @@ function initCinematicJourney() {
   dashboardObserver?.observe(dashboard, { attributes: true, attributeFilter: ['class'] });
   window.addEventListener('pointermove', event => {
     if (event.pointerType === 'touch') return;
-    const rect = stage.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return;
+    markCinematicActivity();
+    const rect = stageRect;
+    if (!rect || rect.width < 2 || rect.height < 2) return;
     const nextX = clamp(((event.clientX - rect.left) / rect.width) * 2 - 1, -1, 1);
     const nextY = clamp(-(((event.clientY - rect.top) / rect.height) * 2 - 1), -1, 1);
     const movement = Math.hypot(nextX - pointer.lastX, nextY - pointer.lastY);
@@ -1959,7 +2012,9 @@ function initCinematicJourney() {
     });
 
     [reefA, reefB].forEach((reef, index) => {
-      reef.userData.light.intensity = reef.userData.baseIntensity * (1 + Math.sin(time * 1.15 + index * 1.9) * .24);
+      const pulse = 1 + Math.sin(time * 1.15 + index * 1.9) * .24;
+      reef.userData.glowMaterial.emissiveIntensity = reef.userData.baseEmissiveIntensity * pulse;
+      reef.userData.glowCore.material.opacity = reef.userData.baseGlowOpacity * (.86 + pulse * .14);
       reef.scale.y = 1 + Math.sin(time * .72 + index) * .018;
     });
 
@@ -2025,27 +2080,24 @@ function initCinematicJourney() {
     performanceTier = tier;
 
     if (tier === 'reduced') {
-      waterInterval = 1 / 10;
+      waterInterval = 1 / 8;
+      worldInterval = 1 / 10;
+      bubbleInterval = 1 / 8;
+      renderPixelRatioTarget = .62;
+    } else if (tier === 'enhanced') {
+      waterInterval = 1 / 15;
+      worldInterval = 1 / 20;
+      bubbleInterval = 1 / 16;
+      renderPixelRatioTarget = .88;
+    } else {
+      waterInterval = 1 / 12;
       worldInterval = 1 / 15;
       bubbleInterval = 1 / 12;
-      renderer.shadowMap.enabled = false;
-      sun.castShadow = false;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, .85));
-    } else if (tier === 'enhanced') {
-      waterInterval = 1 / 18;
-      worldInterval = 1 / 30;
-      bubbleInterval = 1 / 24;
-      renderer.shadowMap.enabled = true;
-      sun.castShadow = true;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.2));
-    } else {
-      waterInterval = 1 / 15;
-      worldInterval = 1 / 24;
-      bubbleInterval = 1 / 20;
-      renderer.shadowMap.enabled = false;
-      sun.castShadow = false;
-      renderer.setPixelRatio(1);
+      renderPixelRatioTarget = .76;
     }
+
+    renderer.shadowMap.enabled = false;
+    sun.castShadow = false;
 
     stage.dataset.performanceTier = tier;
     resize();
@@ -2207,24 +2259,21 @@ function initCinematicJourney() {
   }, { once: true });
 
   let lastRenderMs = 0;
+  let lastInteractionMs = performance.now();
+  const markCinematicActivity = () => { lastInteractionMs = performance.now(); };
+
   const render = frameTime => {
     if (renderFailed) return;
     const nowMs = Number.isFinite(frameTime) ? frameTime : performance.now();
-    const minFrameMs = 1000 / renderFpsCap;
+    const idle = nowMs - lastInteractionMs > 900;
+    const effectiveFpsCap = idle ? 6 : renderFpsCap;
+    const minFrameMs = 1000 / effectiveFpsCap;
     if (lastRenderMs && nowMs - lastRenderMs < minFrameMs - .5) return;
     lastRenderMs = nowMs;
 
     const dt = Math.min(clock.getDelta(), .05);
     const time = clock.elapsedTime;
-    const home = document.getElementById('homeTab');
-    const rect = stage.getBoundingClientRect();
-    const dashboardVisible = !dashboard || !dashboard.classList.contains('hidden');
-    const visible = dashboardVisible &&
-      home?.classList.contains('active') &&
-      !document.hidden &&
-      rect.width >= 2 &&
-      rect.height >= 2;
-    if (!visible) return;
+    if (!cinematicShouldRun()) return;
     try {
       // Resize again immediately before the first visible frame. This covers
       // login transitions even on browsers that delay ResizeObserver delivery.
@@ -2322,8 +2371,14 @@ function initCinematicJourney() {
     syncCinematicRuntime();
   });
 
-  window.addEventListener('scroll', syncCinematicRuntime, { passive: true });
-  window.addEventListener('resize', syncCinematicRuntime, { passive: true });
+  window.addEventListener('scroll', () => {
+    markCinematicActivity();
+    syncCinematicRuntime();
+  }, { passive: true });
+  window.addEventListener('resize', () => {
+    markCinematicActivity();
+    syncCinematicRuntime();
+  }, { passive: true });
 
   syncVisibleStage();
   if (!journeyObserver) syncCinematicRuntime();
