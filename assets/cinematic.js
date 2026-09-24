@@ -852,6 +852,9 @@ function initCinematicJourney() {
   floorGlow.position.y = -38;
   scene.add(floorGlow);
 
+  const depthBackdrop = createDepthBackdrop(quality);
+  scene.add(depthBackdrop);
+
   // Layered autonomous sea life. These live entirely inside the cinematic
   // scene and never touch portal data/navigation state.
   const fishPerSchool = quality === 'high' ? 15 : quality === 'medium' ? 10 : 6;
@@ -1179,11 +1182,11 @@ function initCinematicJourney() {
     { at: 0.00, x: -2.20, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
     { at: 0.10, x: -2.20, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
     { at: 0.14, x: -2.05, y:  1.82, z:  0.34, pitch: 0.08, roll:  0.00 },
-    { at: 0.17, x: -1.25, y:  2.55, z:  0.28, pitch: 0.16, roll: -0.08 },
-    { at: 0.20, x:  0.65, y:  2.28, z:  0.18, pitch: 0.34, roll: -0.13 },
-    { at: 0.225,x:  2.20, y:  0.82, z:  0.08, pitch: 0.58, roll: -0.18 },
-    { at: 0.24, x:  2.72, y: -0.90, z: -0.04, pitch: 0.76, roll: -0.12 },
-    { at: 0.29, x:  3.05, y: -2.45, z: -0.18, pitch: 0.92, roll: -0.06 },
+    { at: 0.17, x: -1.25, y:  2.55, z:  0.28, pitch: 0.20, roll: -0.10 },
+    { at: 0.20, x:  0.65, y:  2.28, z:  0.18, pitch: 0.56, roll: -0.18 },
+    { at: 0.225,x:  2.20, y:  0.82, z:  0.08, pitch: 0.96, roll: -0.24 },
+    { at: 0.24, x:  2.72, y: -0.90, z: -0.04, pitch: 1.18, roll: -0.18 },
+    { at: 0.29, x:  3.05, y: -2.45, z: -0.18, pitch: 0.96, roll: -0.08 },
     { at: 0.43, x: -5.10, y: -7.45, z: -0.55, pitch: 0.88, roll:  0.18 },
     { at: 0.62, x:  5.35, y: -15.25, z: 0.20, pitch: 0.82, roll: -0.16 },
     { at: 0.79, x: -5.45, y: -23.35, z: -0.42, pitch: 0.86, roll:  0.16 },
@@ -1336,14 +1339,22 @@ function initCinematicJourney() {
     const swim = smoothstep(.255, .34, progress);
     const surface = 1 - smoothstep(.115, .235, progress);
     const anticipation = smoothstep(.105, .14, progress) * (1 - smoothstep(.145, .175, progress));
+    const launch = smoothstep(.14, .17, progress) * (1 - smoothstep(.19, .215, progress));
+    const airborne = smoothstep(.165, .205, progress) * (1 - smoothstep(.222, .246, progress));
     const waterEntry = smoothstep(.215, .242, progress) * (1 - smoothstep(.255, .31, progress));
-    const movementDrive = clamp(scrollMotion * 1.18 + waterEntry * .46, 0, 1);
+    const streamline = smoothstep(.222, .248, progress) * (1 - smoothstep(.29, .34, progress));
+    const firstStrokeBurst = smoothstep(.255, .285, progress) * (1 - smoothstep(.34, .39, progress));
+    const movementDrive = clamp(scrollMotion * 1.18 + waterEntry * .46 + firstStrokeBurst * .35, 0, 1);
     const propulsion = swim * (1 - stationHold * .94);
     const effort = clamp(.28 + movementDrive * .95, .22, 1) * propulsion;
-    const swimPhase = time * (3.05 + effort * 4.8) + progress * 11.0;
-    const stroke = Math.sin(swimPhase);
-    const recovery = Math.cos(swimPhase);
-    const glideWave = Math.sin(swimPhase * .5);
+    const swimPhase = time * (2.55 + effort * 3.9) + progress * 10.5;
+    const strokeCycle = ((swimPhase / (Math.PI * 2)) % 1 + 1) % 1;
+    const powerStroke = smoothstep(0, .10, strokeCycle) * (1 - smoothstep(.28, .38, strokeCycle));
+    const recoveryStroke = smoothstep(.38, .50, strokeCycle) * (1 - smoothstep(.60, .72, strokeCycle));
+    const glide = 1 - clamp(powerStroke + recoveryStroke, 0, 1);
+    const stroke = powerStroke - recoveryStroke * .62;
+    const recovery = recoveryStroke - powerStroke * .28;
+    const glideWave = Math.sin(swimPhase * .42);
     const idleBreath = Math.sin(time * 2.05);
     const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .045;
     const idleBob = surface * Math.sin(time * 1.55) * .035;
@@ -1358,18 +1369,37 @@ function initCinematicJourney() {
     // Directional body steering. While travelling the torso points into the
     // actual path; when the user settles on a tab station the penguin brakes,
     // rotates upright and presents itself to the viewer.
-    const swimPitch = lerp(path.pitch, motion.pitch, .64) + glideWave * effort * .045;
-    const swimYaw = motion.yaw + Math.sin(progress * Math.PI * 4) * propulsion * .08;
-    const swimRoll = path.roll + motion.bank + glideWave * effort * .07;
+    const travelHeading = Math.atan2(-motion.dx, motion.dy);
+    const entryHeading = lerp(-.55, -2.12, smoothstep(.16, .245, progress));
+    const headingBlend = clamp(airborne + waterEntry + propulsion * .85, 0, 1);
+    const swimPitch = lerp(path.pitch, motion.pitch, .56) + glideWave * effort * .025;
+    const swimYaw = motion.yaw * .72 + Math.sin(progress * Math.PI * 4) * propulsion * .055;
+    const swimRoll = lerp(path.roll, travelHeading, headingBlend) + motion.bank * .26 + glideWave * effort * .035;
+    const entryRoll = entryHeading * clamp(airborne + waterEntry, 0, 1);
     const uprightPitch = stationPose.index === 0 ? 0 : .06;
     const uprightYaw = stationPose.index === 0 ? 0 : pointer.smoothX * .045;
     const uprightRoll = 0;
     const surfaceFront = 1 - smoothstep(.11, .22, progress);
     const uprightBlend = Math.max(stationHold, surfaceFront);
 
-    mascot.rotation.x = damp(mascot.rotation.x, lerp(swimPitch, uprightPitch, uprightBlend), surfaceFront > .7 ? 12 : 8.4, dt);
-    mascot.rotation.y = damp(mascot.rotation.y, lerp(swimYaw, uprightYaw, uprightBlend), surfaceFront > .7 ? 12 : 7.8, dt);
-    mascot.rotation.z = damp(mascot.rotation.z, lerp(swimRoll, uprightRoll, uprightBlend), surfaceFront > .7 ? 13 : 8.2, dt);
+    mascot.rotation.x = damp(
+      mascot.rotation.x,
+      lerp(swimPitch, uprightPitch, uprightBlend) + streamline * .08,
+      surfaceFront > .7 ? 12 : 8.8,
+      dt
+    );
+    mascot.rotation.y = damp(
+      mascot.rotation.y,
+      lerp(swimYaw, uprightYaw, uprightBlend),
+      surfaceFront > .7 ? 12 : 8.2,
+      dt
+    );
+    mascot.rotation.z = damp(
+      mascot.rotation.z,
+      lerp(swimRoll + entryRoll, uprightRoll, uprightBlend),
+      surfaceFront > .7 ? 13 : 9.2,
+      dt
+    );
 
     if (surfaceFront > .82) {
       mascot.position.x = damp(mascot.position.x, -2.20, 10, dt);
@@ -1382,7 +1412,7 @@ function initCinematicJourney() {
     const chestCounterRoll = -mascot.rotation.z * .32;
     data.chestRig.rotation.x = damp(
       data.chestRig.rotation.x,
-      anticipation * .20 - effort * stroke * .055 - stationHold * .03,
+      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03,
       9,
       dt
     );
@@ -1406,9 +1436,9 @@ function initCinematicJourney() {
     const preen = calmSurface * smoothstep(8.2, 9.0, preenClock) * (1 - smoothstep(11.2, 12.2, preenClock));
     const bodyBreath = 1 + surface * idleBreath * .014;
     data.body.scale.set(
-      data.bodyBaseScale.x * (bodyBreath + anticipation * .04),
-      data.bodyBaseScale.y * (bodyBreath - anticipation * .075),
-      data.bodyBaseScale.z * bodyBreath
+      data.bodyBaseScale.x * (bodyBreath + anticipation * .045 - launch * .018),
+      data.bodyBaseScale.y * (bodyBreath - anticipation * .085 + launch * .055 + streamline * .035),
+      data.bodyBaseScale.z * (bodyBreath - streamline * .018)
     );
     data.belly.scale.set(
       data.bellyBaseScale.x * (1 + surface * idleBreath * .011),
@@ -1418,34 +1448,38 @@ function initCinematicJourney() {
 
     // Rigid shoulder-driven flippers emulate underwater "flight": strong
     // symmetrical power strokes, controlled recovery, then a glide.
-    const flapAmplitude = .34 + effort * .48;
+    const flapAmplitude = .26 + effort * .56 + firstStrokeBurst * .18;
     const neutralL = -.48;
     const neutralR = .48;
-    const leftSwimZ = -.72 - stroke * flapAmplitude;
-    const rightSwimZ = .72 + stroke * flapAmplitude;
-    const shoulderSweep = .30 + recovery * (.12 + effort * .30);
+    const leftSwimZ = -.66 - stroke * flapAmplitude;
+    const rightSwimZ = .66 + stroke * flapAmplitude;
+    const shoulderSweep = .22 + powerStroke * (.18 + effort * .34) - recoveryStroke * .12;
+    const entryTuckL = -.16;
+    const entryTuckR = .16;
+    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline);
+    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline);
     data.leftFlipper.rotation.z = damp(
       data.leftFlipper.rotation.z,
-      lerp(neutralL - anticipation * .24, leftSwimZ, propulsion) - preen * .72,
-      11,
+      leftTargetZ - preen * .72,
+      12.5,
       dt
     );
     data.rightFlipper.rotation.z = damp(
       data.rightFlipper.rotation.z,
-      lerp(neutralR + anticipation * .24, rightSwimZ, propulsion),
-      11,
+      rightTargetZ,
+      12.5,
       dt
     );
     data.leftFlipper.rotation.x = damp(
       data.leftFlipper.rotation.x,
-      lerp(-.10 + anticipation * .30, shoulderSweep, propulsion) + preen * .92,
-      10,
+      lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion) + streamline * .42 + preen * .92,
+      11.5,
       dt
     );
     data.rightFlipper.rotation.x = damp(
       data.rightFlipper.rotation.x,
-      lerp(-.10 + anticipation * .30, shoulderSweep, propulsion),
-      10,
+      lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion) + streamline * .42,
+      11.5,
       dt
     );
     data.leftFlipper.rotation.y = damp(
@@ -1463,10 +1497,11 @@ function initCinematicJourney() {
 
     // Feet tuck against the body at speed and act as rudders during a turn,
     // matching real penguin steering behaviour rather than kicking constantly.
-    const feetTuck = propulsion * (.36 + effort * .18);
+    const feetTuck = propulsion * (.40 + effort * .16) + streamline * .46;
+    const launchKick = launch * -.28;
     const rudder = motion.yaw * propulsion;
-    data.footL.rotation.x = damp(data.footL.rotation.x, feetTuck + effort * Math.max(0, -stroke) * .18, 8, dt);
-    data.footR.rotation.x = damp(data.footR.rotation.x, feetTuck + effort * Math.max(0, -stroke) * .18, 8, dt);
+    data.footL.rotation.x = damp(data.footL.rotation.x, launchKick + feetTuck + powerStroke * effort * .10, 9.5, dt);
+    data.footR.rotation.x = damp(data.footR.rotation.x, launchKick + feetTuck + powerStroke * effort * .10, 9.5, dt);
     data.footL.rotation.y = damp(data.footL.rotation.y, rudder * .48, 8, dt);
     data.footR.rotation.y = damp(data.footR.rotation.y, rudder * .48, 8, dt);
     data.footL.rotation.z = damp(data.footL.rotation.z, surface * Math.sin(time * 1.2) * .035, 7, dt);
@@ -1479,9 +1514,10 @@ function initCinematicJourney() {
     // Cursor obsession: eyes lead, head follows, chest follows last. The head
     // also counter-rotates against the swimming body so the gaze stays visually
     // locked on the cursor even during banks and turns.
+    const diveFocus = clamp(airborne + waterEntry + streamline * .85, 0, 1);
     const gazeBoost = .92 + stationHold * .20 + surface * .12;
-    const requestedYaw = pointer.smoothX * 1.02 * gazeBoost - mascot.rotation.y * .38;
-    const requestedPitch = -pointer.smoothY * .68 * gazeBoost - mascot.rotation.x * .10;
+    const requestedYaw = lerp(pointer.smoothX * 1.02 * gazeBoost - mascot.rotation.y * .38, 0, diveFocus);
+    const requestedPitch = lerp(-pointer.smoothY * .68 * gazeBoost - mascot.rotation.x * .10, -.10, diveFocus);
     const headYaw = clamp(requestedYaw, -.72, .72);
     const headPitch = clamp(requestedPitch + preen * .14, -.46, .40);
     data.headRig.rotation.y = damp(data.headRig.rotation.y, headYaw, 14.5, dt);
@@ -1542,7 +1578,11 @@ function initCinematicJourney() {
       stage.dataset.mascotBehavior = propulsion > .2 ? 'swimming' : 'diving';
     }
 
-    mascotTrail.material.opacity = clamp(effort * .5 + (movementDrive > .86 ? .16 : 0), 0, .62);
+    mascotTrail.material.opacity = clamp(
+      underwater * (powerStroke * .42 + firstStrokeBurst * .32 + effort * .18),
+      0,
+      .68
+    );
     mascotTrail.rotation.y += dt * (1.2 + effort * 2.3);
     mascotTrail.rotation.z = Math.sin(time * 2.4) * .08;
   };
@@ -1625,6 +1665,30 @@ function initCinematicJourney() {
       beam.material.opacity = .032 + index * .006 + Math.sin(time * .65 + index) * .008;
     });
 
+    // Depth is reinforced by three independent parallax planes. Near particles
+    // respond most to camera/pointer motion, while the far reef barely moves.
+    const depthData = depthBackdrop.userData;
+    depthData.far.position.x = pointer.smoothX * .22;
+    depthData.far.position.y = pointer.smoothY * .10;
+    depthData.mid.position.x = pointer.smoothX * .52;
+    depthData.mid.position.y = pointer.smoothY * .20;
+    depthData.near.position.x = pointer.smoothX * .92;
+    depthData.near.position.y = pointer.smoothY * .34;
+
+    [depthData.farMist, depthData.midMist, depthData.nearMist].forEach((mist, layerIndex) => {
+      const positions = mist.geometry.attributes.position;
+      const phases = mist.geometry.attributes.phase;
+      const base = mist.userData.basePositions;
+      const drift = [.035, .065, .11][layerIndex];
+      for (let pointIndex = 0; pointIndex < positions.count; pointIndex += 1) {
+        const offset = pointIndex * 3;
+        const phase = phases.array[pointIndex];
+        positions.array[offset] = base[offset] + Math.sin(time * drift + phase) * (.18 + layerIndex * .12);
+        positions.array[offset + 1] = base[offset + 1] + Math.cos(time * drift * .72 + phase) * (.10 + layerIndex * .08);
+      }
+      positions.needsUpdate = true;
+    });
+
     rings.forEach((ring, index) => {
       const distance = Math.abs(progress - stations[Math.min(index + 2, stations.length - 1)].at);
       const proximity = 1 - smoothstep(.03, .15, distance);
@@ -1652,11 +1716,11 @@ function initCinematicJourney() {
     const stationPose = nearestStationPose(smoothProgress);
     const cameraSettle = stationPose.settle;
     const followHeight = lerp(3.8, mascot.position.y + 4.35, submerged);
-    const targetZ = lerp(11.8, 9.2, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .22;
+    const targetZ = lerp(11.8, 8.6, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .18;
     const targetX = lerp(.8, mascot.position.x * .08, submerged);
-    camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * .55, 4.0, dt);
-    camera.position.y = damp(camera.position.y, followHeight + pointer.smoothY * .36 + cameraSettle * .14, 3.2, dt);
-    camera.position.z = damp(camera.position.z, targetZ + cameraSettle * .35, 4.6, dt);
+    camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * .72, 4.0, dt);
+    camera.position.y = damp(camera.position.y, followHeight + pointer.smoothY * .42 + cameraSettle * .14, 3.2, dt);
+    camera.position.z = damp(camera.position.z, targetZ + cameraSettle * .35 + pointer.smoothY * .10, 4.6, dt);
     camera.lookAt(
       mascot.position.x * .18 + pointer.smoothX * .33,
       mascot.position.y - lerp(.18, .58, submerged) + pointer.smoothY * .25,
@@ -1684,7 +1748,13 @@ function initCinematicJourney() {
 
     setCinematicAudioMix(submerged, journey.classList.contains('is-active'));
 
-    scene.fog.density = lerp(.008, .027, submerged);
+    const deepening = smoothstep(.32, .95, smoothProgress);
+    scene.fog.density = lerp(.008, .034, submerged) + deepening * .006;
+    scene.fog.color.setRGB(
+      lerp(.02, .004, deepening),
+      lerp(.18, .035, deepening),
+      lerp(.30, .10, deepening)
+    );
     renderer.setClearColor(new THREE.Color().setRGB(
       lerp(.21, .005, submerged),
       lerp(.72, .075, submerged),
