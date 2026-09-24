@@ -992,12 +992,15 @@ app.get('/api/health', (req, res) => {
   // Do not count the health probe itself, and do not report normal concurrent
   // dashboard startup requests as server overload.
   const reportedActiveRequests = Math.max(0, activeRequestCount - 1);
+  const status = reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
+  const actor = getSessionAccount(req);
   res.set('Cache-Control', 'no-store');
-  res.json({
-    status: reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK',
+  if (!actor) return res.json({ status, timestamp: new Date().toISOString() });
+  return res.json({
+    status,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
     activeRequests: reportedActiveRequests,
-    timestamp: new Date()
+    timestamp: new Date().toISOString()
   });
 });
 
