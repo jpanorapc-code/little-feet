@@ -236,7 +236,13 @@ function createBubbles(count, spread, depth, size) {
     depthWrite: false,
     blending: THREE.AdditiveBlending
   });
-  return new THREE.Points(geometry, material);
+  const points = new THREE.Points(geometry, material);
+  points.userData = {
+    basePositions: Float32Array.from(positions),
+    depth,
+    riseSpeed: .55 + Math.random() * .45
+  };
+  return points;
 }
 
 function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
@@ -965,6 +971,23 @@ function initCinematicJourney() {
     water.geometry.computeVertexNormals();
   };
 
+  const animateBubbleField = (points, time, speedMultiplier = 1) => {
+    const attr = points.geometry.attributes.position;
+    const seeds = points.geometry.attributes.seed;
+    const base = points.userData.basePositions;
+    const depth = Math.max(.1, points.userData.depth || 1);
+    const rise = points.userData.riseSpeed * speedMultiplier;
+    for (let index = 0; index < attr.count; index += 1) {
+      const offset = index * 3;
+      const seed = seeds.array[index];
+      const cycle = (seed + time * rise * .035) % 1;
+      attr.array[offset] = base[offset] + Math.sin(time * .55 + seed * 12) * .035;
+      attr.array[offset + 1] = -cycle * depth;
+      attr.array[offset + 2] = base[offset + 2] + Math.cos(time * .47 + seed * 10) * .035;
+    }
+    attr.needsUpdate = true;
+  };
+
   const animateMascot = (progress, time, dt) => {
     const data = mascot.userData;
     const path = sampleDivePath(progress);
@@ -1177,15 +1200,30 @@ function initCinematicJourney() {
       school.position.x = data.base.x + Math.sin(wave) * data.span * .55;
       school.position.y = data.base.y + Math.sin(wave * .43 + schoolIndex) * .52;
       school.position.z = data.base.z + Math.cos(wave * .62) * 1.15;
-      school.rotation.y = damp(school.rotation.y, direction > 0 ? 0 : Math.PI, 3.4, dt);
+
+      // Schools react to the mascot instead of behaving like looping wallpaper.
+      const avoidX = school.position.x - mascot.position.x;
+      const avoidY = school.position.y - mascot.position.y;
+      const avoidZ = school.position.z - mascot.position.z;
+      const avoidDistance = Math.max(.001, Math.hypot(avoidX, avoidY, avoidZ));
+      const panicTarget = 1 - smoothstep(3.0, 7.0, avoidDistance);
+      data.panic = damp(data.panic || 0, panicTarget, 5.5, dt);
+      if (data.panic > .001) {
+        const force = data.panic * 1.25;
+        school.position.x += (avoidX / avoidDistance) * force;
+        school.position.y += (avoidY / avoidDistance) * force * .42;
+        school.position.z += (avoidZ / avoidDistance) * force * .55;
+      }
+
+      school.rotation.y = damp(school.rotation.y, direction > 0 ? 0 : Math.PI, 3.4 + data.panic * 5, dt);
       school.userData.fish.forEach((fish, fishIndex) => {
         const fishData = fish.userData;
-        const flutter = time * (5.2 * fishData.speed) + fishData.phase;
-        fish.position.x = fishData.base.x + Math.sin(flutter * .31) * .10;
-        fish.position.y = fishData.base.y + Math.sin(flutter) * .06;
-        fish.position.z = fishData.base.z + Math.cos(flutter * .67) * .08;
-        fish.rotation.z = Math.sin(flutter) * .08;
-        fish.rotation.y = Math.sin(flutter * .52) * .05;
+        const flutter = time * ((5.2 + data.panic * 5.8) * fishData.speed) + fishData.phase;
+        fish.position.x = fishData.base.x + Math.sin(flutter * .31) * (.10 + data.panic * .14);
+        fish.position.y = fishData.base.y + Math.sin(flutter) * (.06 + data.panic * .11);
+        fish.position.z = fishData.base.z + Math.cos(flutter * .67) * (.08 + data.panic * .12);
+        fish.rotation.z = Math.sin(flutter) * (.08 + data.panic * .12);
+        fish.rotation.y = Math.sin(flutter * .52) * (.05 + data.panic * .08);
       });
     });
 
@@ -1291,8 +1329,13 @@ function initCinematicJourney() {
       lerp(.93, .15, submerged)
     ), 1);
 
+    animateBubbleField(bubbles, time, 1);
+    animateBubbleField(dust, time, .34);
+    animateBubbleField(mascotTrail, time, 1.8);
     bubbles.rotation.y = time * .018;
     dust.rotation.y = -time * .012;
+    bubbles.material.opacity = lerp(.34, .54, submerged);
+    dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
     ice.visible = smoothProgress < .42;
     water.material.opacity = lerp(.58, .23, submerged);
