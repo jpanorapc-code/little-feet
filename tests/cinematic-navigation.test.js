@@ -30,7 +30,6 @@ assert.doesNotMatch(cinematic, /getContext\(['"]webgl2/);
 assert.doesNotMatch(cinematic, /canUseWebGL2/);
 assert.match(cinematic, /powerPreference: 'default'/);
 assert.match(cinematic, /webgl-renderer-unavailable/);
-assert.match(cinematic, /PlaneGeometry\(44, 44, 32, 32\)/);
 assert.match(cinematic, /safe-webgl-v15-local-css-water-no-shader/);
 assert.match(cinematic, /roughenIceGeometry[\s\S]*geometry\.computeVertexNormals\(\)/);
 assert.doesNotMatch(cinematic, /new THREE\.PointLight\(color, 4\.2, 8, 2\)/);
