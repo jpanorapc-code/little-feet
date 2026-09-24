@@ -238,75 +238,6 @@ function createIceShelf() {
   return group;
 }
 
-function createWater() {
-  // Lightweight GPU water: preserve animated waves, depth colour, glossy
-  // highlights and edge shine without MeshPhysicalMaterial transmission.
-  // Transmission on a full-screen surface is disproportionately expensive.
-  const geometry = new THREE.PlaneGeometry(44, 44, 32, 32);
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uOpacity: { value: .40 },
-      uShallow: { value: new THREE.Color(0x19bfed) },
-      uDeep: { value: new THREE.Color(0x025fa4) },
-      uHighlight: { value: new THREE.Color(0xb8f7ff) }
-    },
-    vertexShader: `
-      uniform float uTime;
-      varying vec3 vNormal;
-      varying vec3 vWorldPosition;
-      varying float vWave;
-
-      void main() {
-        vec3 p = position;
-        float waveA = sin(p.x * 0.72 + uTime * 1.25) * 0.055;
-        float waveB = cos(p.y * 0.56 + uTime * 0.90) * 0.042;
-        p.z += waveA + waveB;
-        vWave = waveA + waveB;
-
-        float dzdx = cos(p.x * 0.72 + uTime * 1.25) * 0.0396;
-        float dzdy = -sin(p.y * 0.56 + uTime * 0.90) * 0.02352;
-        vec3 localNormal = normalize(vec3(-dzdx, -dzdy, 1.0));
-        vNormal = normalize(normalMatrix * localNormal);
-
-        vec4 world = modelMatrix * vec4(p, 1.0);
-        vWorldPosition = world.xyz;
-        gl_Position = projectionMatrix * viewMatrix * world;
-      }
-    `,
-    fragmentShader: `
-      uniform float uOpacity;
-      uniform vec3 uShallow;
-      uniform vec3 uDeep;
-      uniform vec3 uHighlight;
-      varying vec3 vNormal;
-      varying vec3 vWorldPosition;
-      varying float vWave;
-
-      void main() {
-        vec3 n = normalize(vNormal);
-        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-        float fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 2.2);
-        vec3 lightDir = normalize(vec3(-0.35, 0.88, 0.28));
-        vec3 halfDir = normalize(lightDir + viewDir);
-        float specular = pow(max(dot(n, halfDir), 0.0), 52.0);
-        float waveTint = clamp(vWave * 4.0 + 0.5, 0.0, 1.0);
-
-        vec3 base = mix(uDeep, uShallow, 0.48 + waveTint * 0.20);
-        base += uHighlight * (fresnel * 0.36 + specular * 0.58);
-        gl_FragColor = vec4(base, uOpacity);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide
-  });
-  const water = new THREE.Mesh(geometry, material);
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = -.72;
-  return water;
-}
-
 function createBubbles(count, spread, depth, size) {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
@@ -578,7 +509,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'true-capped-scheduler-v3';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v14-true-cap-single-backdrop';
+  stage.dataset.compressionProfile = 'safe-webgl-v15-local-css-water-no-shader';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -621,9 +552,6 @@ function initCinematicJourney() {
   const ice = createIceShelf();
   ice.position.set(-2.2, .30, -.25);
   scene.add(ice);
-
-  const water = createWater();
-  scene.add(water);
 
   const mascot = createMascot();
   mascot.position.set(-2.15, 2.0, .35);
@@ -1152,10 +1080,6 @@ function initCinematicJourney() {
     pointer.y = nextY;
   }, { passive: true });
 
-  const updateWater = time => {
-    water.material.uniforms.uTime.value = time;
-  };
-
   const animateBubbleField = (points, time, speedMultiplier = 1) => {
     // Keep the full particle count and appearance, but stop rewriting every
     // particle's XYZ buffer on the CPU. The point cloud drifts as a layer.
@@ -1506,10 +1430,8 @@ function initCinematicJourney() {
     });
   };
 
-  let waterBudget = 0;
   let worldBudget = 0;
   let bubbleBudget = 0;
-  let waterInterval = 1 / 15;
   let worldInterval = 1 / 24;
   let bubbleInterval = 1 / 20;
   let perfFrameCount = 0;
@@ -1521,17 +1443,14 @@ function initCinematicJourney() {
     performanceTier = tier;
 
     if (tier === 'reduced') {
-      waterInterval = 1 / 8;
       worldInterval = 1 / 10;
       bubbleInterval = 1 / 8;
       renderPixelRatioTarget = .62;
     } else if (tier === 'enhanced') {
-      waterInterval = 1 / 15;
       worldInterval = 1 / 20;
       bubbleInterval = 1 / 16;
       renderPixelRatioTarget = .88;
     } else {
-      waterInterval = 1 / 12;
       worldInterval = 1 / 15;
       bubbleInterval = 1 / 12;
       renderPixelRatioTarget = .76;
@@ -1576,7 +1495,6 @@ function initCinematicJourney() {
   applyPerformanceTier('balanced');
 
   const updateScene = (dt, time) => {
-    waterBudget += dt;
     worldBudget += dt;
     bubbleBudget += dt;
     const progressDelta = scrollProgress - previousRawProgress;
@@ -1597,10 +1515,6 @@ function initCinematicJourney() {
     // Decouple expensive environment animation from the mascot/camera render.
     // The hero motion can stay responsive while background simulation runs at a
     // lower, fixed cadence that is much kinder to integrated GPUs and work PCs.
-    if (waterBudget >= waterInterval) {
-      updateWater(time);
-      waterBudget %= waterInterval;
-    }
     if (worldBudget >= worldInterval) {
       animateWorld(time, worldBudget, smoothProgress);
       worldBudget %= worldInterval;
@@ -1686,7 +1600,6 @@ function initCinematicJourney() {
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
     ice.visible = smoothProgress < .42;
-    water.material.uniforms.uOpacity.value = lerp(.40, .16, submerged);
     cyanLight.intensity = lerp(6, 14, submerged) + splash * 3.5;
     violetLight.intensity = lerp(2, 11, smoothstep(.45, .85, smoothProgress));
     sun.intensity = lerp(5, 1.7, submerged);
