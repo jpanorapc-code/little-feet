@@ -142,6 +142,32 @@
   .cinematic-parallax-far { opacity: .12; }
 }
 
+.cinematic-seabed-2d {
+  position: absolute;
+  left: -5%;
+  right: -5%;
+  bottom: -10%;
+  height: 54%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/assets/images/little-feet-ocean-depth-1080.webp');
+  background-repeat: no-repeat;
+  background-size: 118% auto;
+  background-position: 50% 100%;
+  opacity: 0;
+  filter: saturate(1.16) contrast(1.08) brightness(.70);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.42) 26%, #000 64%, #000 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.42) 26%, #000 64%, #000 100%);
+  will-change: transform, opacity;
+}
+@media (max-width: 900px) {
+  .cinematic-seabed-2d {
+    height: 46%;
+    background-size: 145% auto;
+    filter: saturate(1.10) contrast(1.05) brightness(.74);
+  }
+}
+
 #littleFeetCinematicCanvas {
   filter: saturate(.92) brightness(.96);
 }
