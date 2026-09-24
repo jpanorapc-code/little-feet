@@ -2015,8 +2015,7 @@ function initCinematicJourney() {
       nowMs >= nextMascotChirpAt &&
       calmEnoughToChirp &&
       journey.classList.contains('is-active') &&
-      !portalSoundMuted() &&
-      !portalIntroThemePlaying()
+      !portalSoundMuted()
     ) {
       const depthVariant = smoothProgress < .22
         ? Math.floor(nowMs / 1000) % 3
