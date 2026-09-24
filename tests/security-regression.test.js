@@ -28,6 +28,10 @@ assert.match(page, /id="accountDeleteButton"/);
 assert.match(page, /Delete this user\/account/);
 assert.match(client, /Are you sure you want to delete this user\/account\? This cannot be undone\./);
 assert.match(client, /function deleteSelectedAccount\(/);
+assert.match(page, /Request account deletion/);
+assert.match(client, /function requestOwnAccountDeletion\(/);
+assert.match(server, /app\.post\('\/api\/account-deletion-request'/);
+assert.match(server, /Account deletion request/);
 
 const forbiddenClientPatterns = [
   /\$\{p\.caption\}/,
