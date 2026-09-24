@@ -353,32 +353,6 @@ function createStationRing(color) {
 }
 
 
-function createCausticBeams(count = 4) {
-  const group = new THREE.Group();
-  const beams = [];
-  for (let index = 0; index < count; index += 1) {
-    const beam = new THREE.Mesh(
-      new THREE.ConeGeometry(2.4 + index * .55, 16 + index * 1.7, 22, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: index % 2 ? 0x6cf7ff : 0xc4fbff,
-        transparent: true,
-        opacity: .035 + index * .008,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      })
-    );
-    beam.position.set(-7 + index * 4.5, -6 - index * 2.1, -8 - index * 1.3);
-    beam.rotation.z = -.16 + index * .08;
-    beam.userData.phase = index * 1.4;
-    group.add(beam);
-    beams.push(beam);
-  }
-  group.userData.beams = beams;
-  return group;
-}
-
-
 // Background depth is image-based. The former 3D mist/terrace/haze helpers were
 // removed to avoid blob silhouettes and unnecessary rendering work.
 
@@ -394,14 +368,6 @@ function initCinematicJourney() {
   const stopContainer = document.getElementById('cinematicDepthMeter');
   const pauseButton = document.getElementById('cinematicPause');
   const depthBackdropImage = document.getElementById('cinematicDepthBackdrop');
-  const parallaxFar = document.getElementById('cinematicParallaxFar');
-  const parallaxNear = document.getElementById('cinematicParallaxNear');
-  const seabed2d = document.getElementById('cinematicSeabed2d');
-  const fish2dA = document.getElementById('cinematicFish2dA');
-  const fish2dB = document.getElementById('cinematicFish2dB');
-  const jelly2dA = document.getElementById('cinematicJelly2dA');
-  const jelly2dB = document.getElementById('cinematicJelly2dB');
-  const manta2d = document.getElementById('cinematicManta2d');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
@@ -608,11 +574,11 @@ function initCinematicJourney() {
   }
   stage.dataset.cinematicFallback = '';
   stage.dataset.cinematicQuality = quality;
-  stage.dataset.cinematicBatching = 'instanced-v1';
-  stage.dataset.performanceMode = 'adaptive-frame-time-v2';
+  stage.dataset.cinematicBatching = 'hero-only-v2';
+  stage.dataset.performanceMode = 'true-capped-scheduler-v3';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v13-2d-sealife-no-fake-textures';
+  stage.dataset.compressionProfile = 'safe-webgl-v14-true-cap-single-backdrop';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -716,9 +682,6 @@ function initCinematicJourney() {
 
   // Depth is now supplied by the portrait background and lightweight 2D parallax.
   // The old 3D mist/terrace/haze backdrop created the blob silhouettes, so it is not added.
-
-  const causticBeams = createCausticBeams(quality === 'high' ? 5 : quality === 'medium' ? 4 : 3);
-  scene.add(causticBeams);
 
   const clock = new THREE.Clock();
   const pointer = { x: 0, y: 0, smoothX: 0, smoothY: 0, activity: 0, lastX: 0, lastY: 0 };
@@ -1082,6 +1045,7 @@ function initCinematicJourney() {
   let journeyTravel = 1;
   let journeyEnd = 1;
   let journeyExitHold = 1;
+  let depthImageTravel = 0;
 
   const refreshJourneyMetrics = () => {
     journeyTop = journey.offsetTop;
@@ -1122,6 +1086,7 @@ function initCinematicJourney() {
     renderer.setSize(Math.round(rect.width), Math.round(rect.height), false);
     camera.aspect = rect.width / rect.height;
     camera.updateProjectionMatrix();
+    depthImageTravel = Math.max(0, (depthBackdropImage?.offsetHeight || 0) - rect.height);
     stage.dataset.renderPixelRatio = renderer.getPixelRatio().toFixed(2);
     return true;
   };
@@ -1518,25 +1483,6 @@ function initCinematicJourney() {
   };
 
   const animateWorld = (time, dt, progress) => {
-    // Background sea life is strictly 2D. Five compositor transforms replace
-    // dozens of live meshes, instanced-matrix rewrites and physical materials.
-    const drift = progress * 100;
-    if (fish2dA) fish2dA.style.transform =
-      `translate3d(${(Math.sin(time * .16) * 7 - drift * .10).toFixed(1)}vw,${(Math.sin(time * .23) * 12).toFixed(1)}px,0) scale(.86)`;
-    if (fish2dB) fish2dB.style.transform =
-      `translate3d(${(Math.cos(time * .12) * -8 + drift * .08).toFixed(1)}vw,${(Math.cos(time * .19) * 10).toFixed(1)}px,0) scale(.68)`;
-    if (jelly2dA) jelly2dA.style.transform =
-      `translate3d(${(Math.sin(time * .11) * 14).toFixed(1)}px,${(-progress * 70 + Math.sin(time * .34) * 11).toFixed(1)}px,0) scale(.72)`;
-    if (jelly2dB) jelly2dB.style.transform =
-      `translate3d(${(Math.cos(time * .09) * 18).toFixed(1)}px,${(-progress * 105 + Math.cos(time * .28) * 13).toFixed(1)}px,0) scale(.56)`;
-    if (manta2d) manta2d.style.transform =
-      `translate3d(${(Math.sin(time * .075) * 11).toFixed(1)}vw,${(-progress * 48 + Math.sin(time * .15) * 8).toFixed(1)}px,0) scale(.76)`;
-
-    causticBeams.userData.beams.forEach((beam, index) => {
-      beam.rotation.z = -.16 + index * .08 + Math.sin(time * .23 + beam.userData.phase) * .055;
-      beam.material.opacity = .032 + index * .006 + Math.sin(time * .65 + index) * .008;
-    });
-
     rings.forEach((ring, index) => {
       const distance = Math.abs(progress - stations[Math.min(index + 2, stations.length - 1)].at);
       const proximity = 1 - smoothstep(.03, .15, distance);
@@ -1697,25 +1643,9 @@ function initCinematicJourney() {
 
     const deepening = smoothstep(.32, .95, smoothProgress);
     if (depthBackdropImage) {
-      const depthTravel = Math.max(0, depthBackdropImage.offsetHeight - stage.clientHeight);
-      const depthShift = -depthTravel * smoothProgress;
+      const depthShift = -depthImageTravel * smoothProgress;
       depthBackdropImage.style.transform =
         `translate3d(-50%,${depthShift.toFixed(1)}px,0) scale(1.035)`;
-
-      // Two lightweight 2D image layers add realistic parallax without more 3D scenery.
-      if (parallaxFar) {
-        parallaxFar.style.transform =
-          `translate3d(${(pointer.smoothX * -10).toFixed(1)}px,${(-smoothProgress * 42).toFixed(1)}px,0) scale(1.08)`;
-      }
-      if (parallaxNear) {
-        parallaxNear.style.transform =
-          `translate3d(${(pointer.smoothX * 14).toFixed(1)}px,${(-smoothProgress * 86).toFixed(1)}px,0) scale(1.16)`;
-      }
-      if (seabed2d) {
-        seabed2d.style.transform =
-          `translate3d(${(pointer.smoothX * 8).toFixed(1)}px,${(-smoothProgress * 58).toFixed(1)}px,0) scale(1.10)`;
-        seabed2d.style.opacity = String(clamp((smoothProgress - .46) * 1.7, 0, .72));
-      }
     }
     scene.fog.density = lerp(.008, .034, submerged) + deepening * .006;
     scene.fog.color.setRGB(
