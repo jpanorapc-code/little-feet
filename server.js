@@ -2472,9 +2472,11 @@ app.get('/api/chat/groups', (req, res) => {
 app.post('/api/chat/groups', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create groups.' });
-  const { groupName } = req.body;
+  const groupName = String(req.body?.groupName || '').trim();
+  if (!groupName) return res.status(400).json({ message: 'A group name is required.' });
+  if (groupName.length > 120) return res.status(413).json({ message: 'Group names are limited to 120 characters.' });
   const id = crypto.randomUUID();
-  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName: String(groupName || '').trim().slice(0, 120) }));
+  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName }));
   db.groupMessages[id] = [];
   res.json({ success: true, id });
 });
