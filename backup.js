@@ -13,8 +13,6 @@ let knownTicketIds = new Set();
 let ticketsLoaded = false;
 let ticketAssigneeAccounts = [];
 let portalAudioContext = null;
-let startupChimePending = false;
-let startupChimePrompt = null;
 let schoolStatusTimer = null;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
@@ -25,24 +23,16 @@ let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
 let latestServerErrors = [];
-let startupChimePlayed = false;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
-let welcomeThemeAudio = null;
-let welcomeThemeStopTimer = null;
-let startupChimeStarting = false;
-let loginChimeAudio = null;
-let loginChimeStopTimer = null;
-let loginChimeFadeTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
 let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
-const WELCOME_THEME_MAX_MS = 10000;
 const DEFAULT_WALLPAPER_URL = 'assets/4k/little-feet-wallpaper-no-moon-4k.jpg';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
@@ -78,28 +68,6 @@ function getPortalAudioContext() {
 window.getPortalAudioContext = getPortalAudioContext;
 window.isPortalAudioMuted = () => portalAudioMuted;
 
-function isPortalIntroThemePlaying() {
-  return Boolean(
-    (loginChimeAudio && !loginChimeAudio.paused && !loginChimeAudio.ended) ||
-    (welcomeThemeAudio && !welcomeThemeAudio.paused && !welcomeThemeAudio.ended)
-  );
-}
-
-function announcePortalThemeState() {
-  try {
-    window.dispatchEvent(new CustomEvent('littlefeet:introthemechange', {
-      detail: { active: isPortalIntroThemePlaying() }
-    }));
-  } catch { /* Theme-state broadcast is optional. */ }
-}
-
-window.isPortalIntroThemePlaying = isPortalIntroThemePlaying;
-window.stopPortalIntroTheme = () => {
-  stopWelcomeTheme();
-  stopLoginChime();
-  announcePortalThemeState();
-};
-
 function announcePortalAudioState() {
   try {
     window.dispatchEvent(new CustomEvent('littlefeet:audiochange', { detail: { muted: portalAudioMuted } }));
@@ -109,35 +77,9 @@ function announcePortalAudioState() {
 function unlockPortalAudio() {
   try {
     if (portalAudioMuted) return;
-    if (startupChimePending) playStartupChime();
     const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(() => { if (startupChimePending) playStartupChime(); }).catch(showStartupChimePrompt);
-    } else if (startupChimePending) {
-      playStartupChime();
-    }
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   } catch { /* Sound remains optional when unavailable on a device. */ }
-}
-
-// Some mobile browsers only permit sound after an explicit second tap.  This
-// small, visible fallback is shown only when the browser blocks the first one.
-function showStartupChimePrompt() {
-  if (portalAudioMuted || startupChimePlayed || startupChimePrompt) return;
-  const prompt = document.createElement('button');
-  prompt.type = 'button';
-  prompt.className = 'action-btn btn-green';
-  prompt.textContent = '🔊 Play welcome theme';
-  prompt.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:10020;box-shadow:0 12px 30px rgba(0,0,0,.35);';
-  prompt.addEventListener('click', () => {
-    prompt.remove();
-    startupChimePrompt = null;
-    playStartupChime();
-  });
-  document.body.append(prompt);
-  startupChimePrompt = prompt;
-  window.setTimeout(() => {
-    if (startupChimePrompt === prompt) { prompt.remove(); startupChimePrompt = null; }
-  }, 12000);
 }
 
 function southAfricaNow(date = new Date()) {
@@ -245,8 +187,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!event.target.checked) clearRememberedLogin();
   });
   restoreCustomWallpaper().catch(() => {});
-  startupChimePending = true;
-  playStartupChime();
   const dateEl = document.getElementById('todayDateStr');
   if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
 
@@ -418,7 +358,6 @@ function handleMascotLegacyTap(event) {
 function openWindtLegacy() {
   if (!currentUser) return;
   openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p><details style="border-top:1px solid rgba(45,212,191,.35);padding-top:12px;"><summary style="cursor:pointer;color:#99f6e4;font-weight:800;">’n Brief van Pa</summary><div style="display:grid;gap:12px;margin-top:12px;color:var(--text-dark);"><p style="margin:0;">My seun ek is so trots op jou so ver as wat jy gekom het, as ek nie daar meer is nie ek is jammer jy is die beste ding wat in my lewe gebeur het en ek weet jy gan n success wees in lewe pa glo vas jy sal kan beter doen as wat ek sou kon, asseblief kyk mooi na jou ma as ek nie meer daar is nie.</p><p style="margin:0;">Btw jou middle naam is based op my child hood game hero Marcus Fenix jou ma wou nie hê ek moes jou dit noem nie maar pa het inageval want jy deserve die beste.</p><p style="margin:0;">Die Windt Legacy gan nie oor wat gedoen was nie en aan gaan met dit nie dit gaan oor wat jy voor sit vir jou familie sodat die volgende generation kan streef en nog beter doen as die laaste.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Christiaan Windt in and out, love you my Potato.</p></div></details></article>`);
-  stopWelcomeTheme();
   playWindtLegacyNote();
 }
 
@@ -429,18 +368,6 @@ function showPortalTourSlide(index) {
   portalTourIndex = (index + slides.length) % slides.length;
   slides.forEach((slide, slideIndex) => slide.classList.toggle('is-active', slideIndex === portalTourIndex));
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
-}
-
-function stopWelcomeTheme() {
-  if (welcomeThemeStopTimer) window.clearTimeout(welcomeThemeStopTimer);
-  welcomeThemeStopTimer = null;
-  startupChimeStarting = false;
-  if (welcomeThemeAudio) {
-    welcomeThemeAudio.pause();
-    welcomeThemeAudio.currentTime = 0;
-    welcomeThemeAudio = null;
-  }
-  announcePortalThemeState();
 }
 
 function portalAudioPreferenceKey() {
@@ -458,22 +385,7 @@ function updatePortalAudioControls() {
   });
 }
 
-function stopLoginChime() {
-  if (loginChimeStopTimer) window.clearTimeout(loginChimeStopTimer);
-  if (loginChimeFadeTimer) window.clearInterval(loginChimeFadeTimer);
-  loginChimeStopTimer = null;
-  loginChimeFadeTimer = null;
-  if (loginChimeAudio) {
-    loginChimeAudio.pause();
-    loginChimeAudio.currentTime = 0;
-    loginChimeAudio = null;
-  }
-  announcePortalThemeState();
-}
-
 function stopAllPortalAudio() {
-  stopWelcomeTheme();
-  stopLoginChime();
   stopWindtLegacyNote();
   stopWallpaperTheme();
 }
@@ -503,45 +415,12 @@ function togglePortalAudioMute() {
     if (accountKey) localStorage.setItem(accountKey, String(portalAudioMuted));
   } catch {}
   if (portalAudioMuted) {
-    startupChimePending = false;
-    startupChimePrompt?.remove();
-    startupChimePrompt = null;
     stopAllPortalAudio();
   } else if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) {
     startWallpaperTheme();
-  } else if (!currentUser && !startupChimePlayed) {
-    startupChimePending = true;
-    playStartupChime();
   }
   updatePortalAudioControls();
   announcePortalAudioState();
-}
-
-// The signed-in intro gets a full ten-second musical window unless the user
-// actively enters the scroll-driven penguin experience, which can stop it early.
-function playLoginChime() {
-  stopWelcomeTheme();
-  stopLoginChime();
-  if (portalAudioMuted) return;
-  try {
-    loginChimeAudio = new Audio('assets/audio/little-feet-theme.mp3');
-    loginChimeAudio.preload = 'auto';
-    loginChimeAudio.volume = 0.5;
-    loginChimeAudio.currentTime = 0;
-    loginChimeAudio.addEventListener('ended', stopLoginChime, { once: true });
-    loginChimeAudio.play().then(() => {
-      announcePortalThemeState();
-      loginChimeStopTimer = window.setTimeout(() => {
-        let step = 0;
-        loginChimeFadeTimer = window.setInterval(() => {
-          if (!loginChimeAudio) return stopLoginChime();
-          step += 1;
-          loginChimeAudio.volume = Math.max(0.01, 0.5 * (1 - step / 10));
-          if (step >= 10) stopLoginChime();
-        }, 80);
-      }, 10000);
-    }).catch(() => stopLoginChime());
-  } catch { stopLoginChime(); }
 }
 
 function playWindtLegacyNote() {
@@ -558,42 +437,6 @@ function stopWindtLegacyNote() {
   windtLegacyAudio.pause();
   windtLegacyAudio.currentTime = 0;
   windtLegacyAudio = null;
-}
-
-// The supplied Little Feet theme plays once after the first permitted interaction.
-function playStartupChime() {
-  if (startupChimePlayed || startupChimeStarting) return;
-  if (portalAudioMuted) {
-    startupChimePending = false;
-    return;
-  }
-  try {
-    startupChimePending = false;
-    if (!welcomeThemeAudio) {
-      welcomeThemeAudio = new Audio('assets/audio/little-feet-theme.mp3');
-      welcomeThemeAudio.preload = 'auto';
-      welcomeThemeAudio.volume = 0.58;
-    }
-    welcomeThemeAudio.loop = false;
-    welcomeThemeAudio.currentTime = 0;
-    startupChimeStarting = true;
-    welcomeThemeAudio.play().then(() => {
-      startupChimeStarting = false;
-      startupChimePlayed = true;
-      startupChimePrompt?.remove();
-      startupChimePrompt = null;
-      announcePortalThemeState();
-      welcomeThemeStopTimer = window.setTimeout(stopWelcomeTheme, WELCOME_THEME_MAX_MS);
-    }).catch(() => {
-      startupChimeStarting = false;
-      startupChimePending = true;
-      showStartupChimePrompt();
-    });
-  } catch {
-    startupChimeStarting = false;
-    startupChimePending = true;
-    showStartupChimePrompt();
-  }
 }
 
 function movePortalTour(direction) {
@@ -1156,7 +999,6 @@ function setupSession() {
   renderRoleHomePanel();
   configureDebugMode();
   applyUserPreferences();
-  playLoginChime();
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
@@ -1226,12 +1068,7 @@ function logout() {
   releaseNotesRefreshTimer = null;
   currentUser = null;
   exitWallpaperMode();
-  stopWelcomeTheme();
   stopWindtLegacyNote();
-  startupChimePlayed = false;
-  startupChimePending = false;
-  startupChimePrompt?.remove();
-  startupChimePrompt = null;
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
   if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
   knownTicketIds = new Set();
@@ -1320,7 +1157,6 @@ function startWallpaperMode() {
   const overlay = document.getElementById('wallpaperOverlay');
   if (!currentUser || !overlay) return;
   clearTimeout(wallpaperIdleTimer);
-  stopWelcomeTheme();
   overlay.classList.add('is-visible');
   overlay.setAttribute('aria-hidden', 'false');
   startWallpaperTheme();
