@@ -3871,6 +3871,8 @@ function resetAccountForm() {
   form.reset();
   document.getElementById('accountOriginalUsername').value = '';
   document.getElementById('accountSaveButton').textContent = 'Create account';
+  const deleteButton = document.getElementById('accountDeleteButton');
+  if (deleteButton) deleteButton.style.display = 'none';
   document.getElementById('accountPinHint').textContent = '*';
   document.getElementById('accountPin').placeholder = 'Required for a new account';
 }
@@ -3888,6 +3890,8 @@ function editAccount(account) {
   document.getElementById('accountPinHint').textContent = '(leave empty to keep password)';
   document.getElementById('accountPin').placeholder = 'Enter only to reset password';
   document.getElementById('accountSaveButton').textContent = 'Save account changes';
+  const deleteButton = document.getElementById('accountDeleteButton');
+  if (deleteButton) deleteButton.style.display = 'inline-flex';
   document.getElementById('accountsTab').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -3925,11 +3929,18 @@ function saveLearnerLinks() {
 }
 
 async function deleteAccount(encodedUsername) {
-  if (!confirm('Delete this account? This cannot be undone.')) return;
+  if (!confirm('Are you sure you want to delete this user/account? This cannot be undone.')) return;
   const response = await fetch(`/api/accounts/${encodedUsername}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser?.username }) });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to delete account.');
   loadAccounts();
+}
+
+async function deleteSelectedAccount() {
+  const originalUsername = document.getElementById('accountOriginalUsername')?.value;
+  if (!originalUsername) return alert('Choose an account to edit before deleting it.');
+  await deleteAccount(encodeURIComponent(originalUsername));
+  resetAccountForm();
 }
 
 async function approveAccount(encodedUsername) {
