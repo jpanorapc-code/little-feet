@@ -624,6 +624,27 @@ function initCinematicJourney() {
   mascot.rotation.y = 0;
   scene.add(mascot);
 
+  // Microbubble wake for strong underwater strokes. It is hidden on the
+  // surface and fades in only when the mascot is actually propelling.
+  const mascotTrail = createBubbles(quality === 'high' ? 56 : quality === 'medium' ? 34 : 18, 1.05, 2.7, .055);
+  mascotTrail.position.set(0, .15, -.65);
+  mascotTrail.material.opacity = 0;
+  mascot.add(mascotTrail);
+
+  const splashRing = new THREE.Mesh(
+    new THREE.TorusGeometry(.72, .045, 8, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0xe4ffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  splashRing.rotation.x = Math.PI / 2;
+  splashRing.position.set(-.65, -.12, .05);
+  scene.add(splashRing);
+
   const bubbleCount = quality === 'high' ? 800 : quality === 'medium' ? 480 : 240;
   const bubbles = createBubbles(bubbleCount, 26, 42, quality === 'high' ? .075 : .09);
   bubbles.position.y = -.7;
@@ -699,6 +720,7 @@ function initCinematicJourney() {
   mantaA.scale.setScalar(.75);
   mantaA.userData.phase = .4;
   mantaA.userData.speed = .17;
+  mantaA.userData.base = mantaA.position.clone();
   scene.add(mantaA);
 
   const mantaB = createMantaRay(0xa16dff);
@@ -706,6 +728,7 @@ function initCinematicJourney() {
   mantaB.scale.setScalar(.54);
   mantaB.userData.phase = 3.3;
   mantaB.userData.speed = -.13;
+  mantaB.userData.base = mantaB.position.clone();
   if (quality !== 'low') scene.add(mantaB);
 
   const kelpA = createKelpPatch(quality === 'high' ? 16 : quality === 'medium' ? 10 : 6, 0x38ffc4);
