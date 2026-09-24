@@ -2334,7 +2334,9 @@ function initCinematicJourney() {
       lerp(.72, .075, submerged),
       lerp(.93, .15, submerged)
     );
-    renderer.setClearColor(clearColorScratch, 1);
+    // Keep the WebGL canvas transparent so the portrait ocean backdrop remains visible.
+    // Scene fog/materials still tint the 3D objects; the background image supplies the depth.
+    renderer.setClearColor(clearColorScratch, 0);
 
     if (bubbleBudget >= bubbleInterval) {
       animateBubbleField(bubbles, time, 1);
