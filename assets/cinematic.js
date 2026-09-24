@@ -267,10 +267,18 @@ function initCinematicJourney() {
   const progressBar = document.getElementById('cinematicProgressBar');
   const depthLabel = document.getElementById('cinematicDepthLabel');
   const stopContainer = document.getElementById('cinematicDepthMeter');
+  const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const stations = stationBlueprints.map(station => ({ ...station, target: accessibleNavTarget(station.candidates) }));
+  const refreshStationTargets = () => {
+    stations.forEach((station, index) => {
+      station.target = accessibleNavTarget(station.candidates);
+      const button = stopContainer.children[index];
+      if (button) button.textContent = station.target.label;
+    });
+  };
 
   stopContainer.replaceChildren(...stations.map((station, index) => {
     const button = document.createElement('button');
@@ -287,6 +295,7 @@ function initCinematicJourney() {
 
   const openButton = document.getElementById('cinematicOpenCurrent');
   openButton?.addEventListener('click', () => {
+    refreshStationTargets();
     const current = stations[Number(stage.dataset.station || 0)] || stations[0];
     if (current?.target?.tabId && typeof window.openWorkspace === 'function') window.openWorkspace(current.target.tabId);
   });
@@ -298,7 +307,12 @@ function initCinematicJourney() {
 
   let activeStation = -1;
   const updateCopy = (index) => {
-    if (index === activeStation) return;
+    refreshStationTargets();
+    if (index === activeStation) {
+      const current = stations[index];
+      if (openButton && current) openButton.textContent = 'Open ' + current.target.label;
+      return;
+    }
     activeStation = index;
     stage.dataset.station = String(index);
     const station = stations[index];
@@ -445,22 +459,43 @@ function initCinematicJourney() {
 
   const resize = () => {
     const rect = stage.getBoundingClientRect();
-    const width = Math.max(1, rect.width);
-    const height = Math.max(1, rect.height);
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
+    // The dashboard starts display:none before login. Never lock the WebGL buffer
+    // to 1x1 while its parent is hidden; wait until the real portal size exists.
+    if (rect.width < 2 || rect.height < 2) return false;
+    renderer.setSize(Math.round(rect.width), Math.round(rect.height), false);
+    camera.aspect = rect.width / rect.height;
     camera.updateProjectionMatrix();
+    return true;
   };
 
   const calculateScroll = () => {
+    if (journey.offsetHeight < 2) return;
     const top = journey.offsetTop;
     const travel = Math.max(1, journey.offsetHeight - window.innerHeight);
     scrollProgress = clamp((window.scrollY - top) / travel);
     updateProgressUI(scrollProgress);
   };
 
+  const syncVisibleStage = () => {
+    if (!resize()) return;
+    refreshStationTargets();
+    calculateScroll();
+  };
+
   window.addEventListener('scroll', calculateScroll, { passive: true });
-  window.addEventListener('resize', () => { resize(); calculateScroll(); }, { passive: true });
+  window.addEventListener('resize', syncVisibleStage, { passive: true });
+
+  const resizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => syncVisibleStage())
+    : null;
+  resizeObserver?.observe(stage);
+
+  const dashboardObserver = dashboard && typeof MutationObserver === 'function'
+    ? new MutationObserver(() => {
+        if (!dashboard.classList.contains('hidden')) requestAnimationFrame(syncVisibleStage);
+      })
+    : null;
+  dashboardObserver?.observe(dashboard, { attributes: true, attributeFilter: ['class'] });
   stage.addEventListener('pointermove', event => {
     if (event.pointerType === 'touch') return;
     const rect = stage.getBoundingClientRect();
@@ -580,9 +615,18 @@ function initCinematicJourney() {
     const dt = Math.min(clock.getDelta(), .05);
     const time = clock.elapsedTime;
     const home = document.getElementById('homeTab');
-    const visible = home?.classList.contains('active') && !document.hidden;
+    const rect = stage.getBoundingClientRect();
+    const dashboardVisible = !dashboard || !dashboard.classList.contains('hidden');
+    const visible = dashboardVisible &&
+      home?.classList.contains('active') &&
+      !document.hidden &&
+      rect.width >= 2 &&
+      rect.height >= 2;
     if (!visible) return;
     try {
+      // Resize again immediately before the first visible frame. This covers
+      // login transitions even on browsers that delay ResizeObserver delivery.
+      if (!firstFrameRendered && !resize()) return;
       updateScene(dt, time);
       renderer.render(scene, camera);
       if (!firstFrameRendered) {
@@ -596,9 +640,13 @@ function initCinematicJourney() {
   };
 
   renderer.setAnimationLoop(render);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) clock.getDelta(); });
-  resize();
-  calculateScroll();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      clock.getDelta();
+      syncVisibleStage();
+    }
+  });
+  syncVisibleStage();
   updateCopy(0);
 }
 
