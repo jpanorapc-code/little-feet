@@ -11,6 +11,7 @@ const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const isProduction = process.env.NODE_ENV === 'production';
+const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
@@ -25,7 +26,7 @@ let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
 const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
 const productionConfigurationErrors = [];
-if (isProduction && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
+if (isProduction && !replicaMode && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
 if (isProduction && !fieldEncryptionConfigured) productionConfigurationErrors.push('LF_FIELD_ENCRYPTION_KEY');
 if (isProduction && !sessionSecretConfigured) productionConfigurationErrors.push('SESSION_SECRET');
 if (productionConfigurationErrors.length) {
@@ -316,6 +317,18 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use((req, res, next) => {
+  if (!replicaMode || !req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  // Standby replicas are deliberately read-only. Authentication is allowed so
+  // users can inspect the latest snapshot during failover, but business-data
+  // writes must never return success when there is no durable write path.
+  if (req.method === 'POST' && ['/api/login', '/api/auth/logout'].includes(req.path)) return next();
+  res.setHeader('Retry-After', '30');
+  return res.status(503).json({
+    message: 'Backup server is read-only. Your change was not saved; reconnect to the primary service and retry.',
+    requestId: req.requestId
+  });
+});
+app.use((req, res, next) => {
   persistenceReady.then(async () => {
     activeRequestCount += 1;
     let requestReleased = false;
@@ -481,7 +494,6 @@ const db = {
 // PostgreSQL is used whenever DATABASE_URL is configured (the production path).
 // SQLite remains a local-development fallback; the JSON replica is a portable
 // standby snapshot for the backup service.
-const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const databaseFile = path.join(__dirname, 'littlefeet.db');
 const replicaFile = path.join(__dirname, 'littlefeet-replica.json');
 let replicaTimer = null;
@@ -923,7 +935,7 @@ app.post('/api/login', (req, res) => {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
-    if (pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
+    if (!replicaMode && pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     establishAuthenticatedSession(req, user, (error, safeUser) => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
       res.json({ user: safeUser });
@@ -955,7 +967,8 @@ app.get('/api/keepalive', async (_req, res) => {
   try {
     if (postgresPool) await postgresPool.query('SELECT 1');
     else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
-    res.json({ status: 'OK', database: postgresPool ? 'postgresql' : stateDatabase ? 'sqlite' : 'replica', timestamp: new Date().toISOString() });
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
   } catch (error) {
     console.error('Keepalive database probe failed:', error.message);
     res.status(503).json({ status: 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
@@ -978,7 +991,14 @@ const runtimeReadiness = () => {
 // a missing production secret as a healthy, launch-ready configuration.
 app.get('/api/ready', (req, res) => {
   const readiness = runtimeReadiness();
-  res.status(readiness.ready ? 200 : 503).json({ ...readiness, environment: isProduction ? 'production' : 'development' });
+  res.set('Cache-Control', 'no-store');
+  // Public monitors need only the readiness result. Detailed infrastructure
+  // checks remain available to authenticated administrators.
+  res.status(readiness.ready ? 200 : 503).json({
+    ready: readiness.ready,
+    status: readiness.ready ? 'READY' : 'NOT_READY',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get('/api/production-readiness', (req, res) => {
