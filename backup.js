@@ -1922,7 +1922,7 @@ async function loadPosts() {
                 <span class="badge-tag info">Audience: ${escapeWorkspaceText(p.audience || 'All')}</span>
                 <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${escapeWorkspaceText(p.caption)}</p>
               </div>
-              <button type="button" onclick="deletePost('${p.id}')" class="action-btn btn-red">🗑️ Delete</button>
+              <button type="button" onclick="deletePost('${encodeURIComponent(p.id)}')" class="action-btn btn-red">🗑️ Delete</button>
             </div>
             ${p.mediaUrl ? `<img src="${p.mediaUrl}" class="post-item" onclick="openModal('Media File Preview', '<img src=\\'${p.mediaUrl}\\' style=\\'max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;\\'>')">` : ''}
             <div class="meta"><span>Posted by Staff (${escapeWorkspaceText(p.createdAt || 'Recent')})</span></div>
@@ -1977,7 +1977,7 @@ async function loadSchedules() {
               <strong>${escapeWorkspaceText(s.studentName)}</strong> - <span style="color:#0d9488; font-weight:600;">${escapeWorkspaceText(s.timeSlot)}</span>
               <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${escapeWorkspaceText(s.activity)}</p>
             </div>
-            <button type="button" onclick="deleteSchedule('${s.id}')" class="action-btn btn-red">🗑️ Delete</button>
+            <button type="button" onclick="deleteSchedule('${encodeURIComponent(s.id)}')" class="action-btn btn-red">🗑️ Delete</button>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active schedule records found.</p>';
   } catch (err) {
@@ -2085,8 +2085,8 @@ async function loadWorksheets() {
                 <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${escapeWorkspaceText(w.grade)}%</span>
               </div>
               <div>
-                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${w.id}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
-                <button type="button" onclick="deleteWorksheet('${w.id}')" class="action-btn btn-red">🗑️ Delete</button>
+                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${encodeURIComponent(w.id)}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
+                <button type="button" onclick="deleteWorksheet('${encodeURIComponent(w.id)}')" class="action-btn btn-red">🗑️ Delete</button>
               </div>
             </div>
             
@@ -2550,7 +2550,7 @@ async function loadTickets(checkForNew = false) {
                 <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
@@ -2575,7 +2575,7 @@ async function loadTickets(checkForNew = false) {
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
             <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
-            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
           <p style="font-size:0.85rem; margin-top:4px;">${escapeWorkspaceText(t.message)}</p>
           ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${escapeWorkspaceText(t.feedback)}</p>` : ''}
@@ -2682,10 +2682,10 @@ async function loadBroadcasts() {
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
               <span class="badge-tag urgent">${escapeWorkspaceText(b.bcPriority || 'Urgent Notice')}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${b.id}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${encodeURIComponent(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
             </div>
             <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${escapeWorkspaceText(b.bcMessage)}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${b.id}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeURIComponent(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
           </div>
         `).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
