@@ -5,6 +5,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const client = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 const requiredServerPatterns = [
   /req\.session\.destroy\(/,
@@ -17,6 +18,12 @@ const requiredServerPatterns = [
   /message:\s*['"]An unexpected server error occurred\./
 ];
 for (const pattern of requiredServerPatterns) assert.match(server, pattern);
+assert.doesNotMatch(server, /script-src[^\n]*unsafe-eval/);
+assert.match(server, /safeHttpsUrl/);
+assert.match(server, /account\s*!==\s*target/);
+assert.match(server, /\^\[0-9a-f\]\{64\}\$/);
+assert.doesNotMatch(page, /autocomplete="section-managed-account url"/);
+assert.match(page, /id="accountStoreUrl"[^>]*autocomplete="off"/);
 
 const forbiddenClientPatterns = [
   /\$\{p\.caption\}/,
