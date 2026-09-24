@@ -65,9 +65,15 @@ function createMascot() {
   belly.castShadow = true;
   group.add(belly);
 
+  // Articulated mascot rig. The meshes stay procedural, but the hierarchy
+  // behaves like a compact skeleton: chest -> head/shoulders, hips -> feet, tail.
+  const chestRig = new THREE.Group();
+  chestRig.position.set(0, .26, 0);
+  group.add(chestRig);
+
   const headRig = new THREE.Group();
-  headRig.position.set(0, 1.12, .03);
-  group.add(headRig);
+  headRig.position.set(0, .86, .03);
+  chestRig.add(headRig);
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(.79, 40, 30), blueDark);
   head.scale.set(1, .94, .94);
@@ -85,16 +91,24 @@ function createMascot() {
   beak.position.set(0, -.16, .99);
   headRig.add(beak);
 
-  const leftFlipper = new THREE.Mesh(new THREE.CapsuleGeometry(.18, 1.05, 7, 16), blueDark);
-  leftFlipper.scale.set(.72, 1, .38);
-  leftFlipper.position.set(-.94, -.02, .02);
-  leftFlipper.rotation.z = -.48;
-  leftFlipper.rotation.x = -.14;
-  leftFlipper.castShadow = true;
-  const rightFlipper = leftFlipper.clone();
-  rightFlipper.position.x = .94;
-  rightFlipper.rotation.z = .48;
-  group.add(leftFlipper, rightFlipper);
+  const leftShoulder = new THREE.Group();
+  leftShoulder.position.set(-.78, .22, .02);
+  const rightShoulder = new THREE.Group();
+  rightShoulder.position.set(.78, .22, .02);
+  chestRig.add(leftShoulder, rightShoulder);
+
+  const flipperGeometry = new THREE.CapsuleGeometry(.18, 1.05, 7, 16);
+  const leftFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
+  leftFlipperMesh.scale.set(.72, 1, .38);
+  leftFlipperMesh.position.set(-.16, -.50, 0);
+  leftFlipperMesh.castShadow = true;
+  leftShoulder.add(leftFlipperMesh);
+
+  const rightFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
+  rightFlipperMesh.scale.set(.72, 1, .38);
+  rightFlipperMesh.position.set(.16, -.50, 0);
+  rightFlipperMesh.castShadow = true;
+  rightShoulder.add(rightFlipperMesh);
 
   const eyeGeo = new THREE.SphereGeometry(.105, 18, 14);
   const eyeL = new THREE.Mesh(eyeGeo, black);
@@ -113,16 +127,36 @@ function createMascot() {
   headRig.add(ringL, ringR, bridge);
 
   const footGeo = new THREE.SphereGeometry(.32, 20, 14);
-  const footL = new THREE.Mesh(footGeo, orange);
-  const footR = new THREE.Mesh(footGeo, orange);
-  footL.scale.set(1.2,.24,.72);
-  footR.scale.copy(footL.scale);
-  footL.position.set(-.38,-1.32,.18);
-  footR.position.set(.38,-1.32,.18);
-  group.add(footL, footR);
+  const leftHip = new THREE.Group();
+  const rightHip = new THREE.Group();
+  leftHip.position.set(-.38, -1.05, .18);
+  rightHip.position.set(.38, -1.05, .18);
+  group.add(leftHip, rightHip);
+
+  const footLMesh = new THREE.Mesh(footGeo, orange);
+  const footRMesh = new THREE.Mesh(footGeo, orange);
+  footLMesh.scale.set(1.2,.24,.72);
+  footRMesh.scale.copy(footLMesh.scale);
+  footLMesh.position.set(0,-.27,0);
+  footRMesh.position.set(0,-.27,0);
+  leftHip.add(footLMesh);
+  rightHip.add(footRMesh);
+
+  const tailRig = new THREE.Group();
+  tailRig.position.set(0, -.82, -.54);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(.25, .62, 5), blueDark);
+  tail.rotation.x = Math.PI / 2;
+  tail.scale.set(1.05, 1, .35);
+  tail.position.z = -.18;
+  tailRig.add(tail);
+  group.add(tailRig);
 
   group.userData = {
-    body, belly, head, headRig, beak, leftFlipper, rightFlipper, eyeL, eyeR, footL, footR,
+    body, belly, chestRig, head, headRig, beak,
+    leftFlipper: leftShoulder, rightFlipper: rightShoulder,
+    leftFlipperMesh, rightFlipperMesh,
+    eyeL, eyeR, footL: leftHip, footR: rightHip, footLMesh, footRMesh,
+    tailRig, tail,
     eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone(),
     bodyBaseScale: body.scale.clone(), bellyBaseScale: belly.scale.clone(),
     beakBaseScale: beak.scale.clone()
@@ -587,7 +621,7 @@ function initCinematicJourney() {
 
   const mascot = createMascot();
   mascot.position.set(-2.15, 2.0, .35);
-  mascot.rotation.y = -.24;
+  mascot.rotation.y = 0;
   scene.add(mascot);
 
   const bubbleCount = quality === 'high' ? 800 : quality === 'medium' ? 480 : 240;
