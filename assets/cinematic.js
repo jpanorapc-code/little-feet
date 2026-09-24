@@ -260,10 +260,10 @@ function createWater() {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
-      uOpacity: { value: .58 },
-      uShallow: { value: new THREE.Color(0x35ddff) },
-      uDeep: { value: new THREE.Color(0x075aa8) },
-      uHighlight: { value: new THREE.Color(0xe4ffff) }
+      uOpacity: { value: .40 },
+      uShallow: { value: new THREE.Color(0x19bfed) },
+      uDeep: { value: new THREE.Color(0x025fa4) },
+      uHighlight: { value: new THREE.Color(0xb8f7ff) }
     },
     vertexShader: `
       uniform float uTime;
@@ -317,7 +317,7 @@ function createWater() {
   });
   const water = new THREE.Mesh(geometry, material);
   water.rotation.x = -Math.PI / 2;
-  water.position.y = -.25;
+  water.position.y = -.72;
   return water;
 }
 
@@ -794,6 +794,8 @@ function initCinematicJourney() {
   const stopContainer = document.getElementById('cinematicDepthMeter');
   const pauseButton = document.getElementById('cinematicPause');
   const depthBackdropImage = document.getElementById('cinematicDepthBackdrop');
+  const parallaxFar = document.getElementById('cinematicParallaxFar');
+  const parallaxNear = document.getElementById('cinematicParallaxNear');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
@@ -1045,7 +1047,7 @@ function initCinematicJourney() {
   scene.add(violetLight);
 
   const ice = createIceShelf();
-  ice.position.set(-2.2, .18, -.25);
+  ice.position.set(-2.2, .30, -.25);
   scene.add(ice);
 
   const water = createWater();
@@ -1127,8 +1129,8 @@ function initCinematicJourney() {
   floorGlow.position.y = -38;
   scene.add(floorGlow);
 
-  const depthBackdrop = createDepthBackdrop(quality);
-  scene.add(depthBackdrop);
+  // Depth is now supplied by the portrait background and lightweight 2D parallax.
+  // The old 3D mist/terrace/haze backdrop created the blob silhouettes, so it is not added.
 
   // Layered autonomous sea life. These live entirely inside the cinematic
   // scene and never touch portal data/navigation state.
@@ -2136,27 +2138,6 @@ function initCinematicJourney() {
       beam.material.opacity = .032 + index * .006 + Math.sin(time * .65 + index) * .008;
     });
 
-    // Depth is reinforced by three independent parallax planes. Near particles
-    // respond most to camera/pointer motion, while the far reef barely moves.
-    const depthData = depthBackdrop.userData;
-    depthData.far.position.x = pointer.smoothX * .22;
-    depthData.far.position.y = pointer.smoothY * .10;
-    depthData.mid.position.x = pointer.smoothX * .52;
-    depthData.mid.position.y = pointer.smoothY * .20;
-    depthData.near.position.x = pointer.smoothX * .92;
-    depthData.near.position.y = pointer.smoothY * .34;
-
-    // Keep the depth mist alive without rewriting hundreds of particle vertices
-    // every update. Moving each particle layer as a whole preserves parallax and
-    // drift while leaving the static GPU buffers untouched.
-    [depthData.farMist, depthData.midMist, depthData.nearMist].forEach((mist, layerIndex) => {
-      const drift = [.035, .065, .11][layerIndex];
-      const phase = layerIndex * 1.73;
-      mist.position.x = Math.sin(time * drift + phase) * (.18 + layerIndex * .12);
-      mist.position.y = Math.cos(time * drift * .72 + phase) * (.10 + layerIndex * .08);
-      mist.rotation.z = Math.sin(time * drift * .42 + phase) * (.0015 + layerIndex * .0012);
-    });
-
     rings.forEach((ring, index) => {
       const distance = Math.abs(progress - stations[Math.min(index + 2, stations.length - 1)].at);
       const proximity = 1 - smoothstep(.03, .15, distance);
@@ -2322,6 +2303,16 @@ function initCinematicJourney() {
       const depthShift = -depthTravel * smoothProgress;
       depthBackdropImage.style.transform =
         `translate3d(-50%,${depthShift.toFixed(1)}px,0) scale(1.035)`;
+
+      // Two lightweight 2D image layers add realistic parallax without more 3D scenery.
+      if (parallaxFar) {
+        parallaxFar.style.transform =
+          `translate3d(${(pointer.smoothX * -10).toFixed(1)}px,${(-smoothProgress * 42).toFixed(1)}px,0) scale(1.08)`;
+      }
+      if (parallaxNear) {
+        parallaxNear.style.transform =
+          `translate3d(${(pointer.smoothX * 14).toFixed(1)}px,${(-smoothProgress * 86).toFixed(1)}px,0) scale(1.16)`;
+      }
     }
     scene.fog.density = lerp(.008, .034, submerged) + deepening * .006;
     scene.fog.color.setRGB(
@@ -2348,7 +2339,7 @@ function initCinematicJourney() {
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
     ice.visible = smoothProgress < .42;
-    water.material.uniforms.uOpacity.value = lerp(.58, .23, submerged);
+    water.material.uniforms.uOpacity.value = lerp(.40, .16, submerged);
     cyanLight.intensity = lerp(6, 14, submerged) + splash * 3.5;
     violetLight.intensity = lerp(2, 11, smoothstep(.45, .85, smoothProgress));
     sun.intensity = lerp(5, 1.7, submerged);
