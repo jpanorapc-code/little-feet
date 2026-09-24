@@ -1549,11 +1549,12 @@
         <aside id="runtimeErrorBanner" class="wellbeing-banner runtime-error-banner hidden" aria-live="assertive"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><p><strong>We detected a technical issue.</strong> Your Support Desk ticket is prepared; add any useful notes before you send it.</p><button type="button" class="action-btn btn-red" onclick="openRuntimeErrorSupport()">Open Support Desk</button><button type="button" onclick="dismissRuntimeErrorBanner()" aria-label="Dismiss technical issue notice" title="Dismiss">×</button></aside>
         <section id="littleFeetCinematicJourney" class="cinematic-journey" aria-label="Cinematic Little Feet navigation">
           <div id="littleFeetCinematicStage" class="cinematic-stage">
-            <div class="cinematic-portrait-backdrop" aria-hidden="true">
-              <div class="cinematic-portrait-light cinematic-portrait-light-a"></div>
-              <div class="cinematic-portrait-light cinematic-portrait-light-b"></div>
-              <div class="cinematic-portrait-depth-lines"></div>
-            </div>
+            <picture class="cinematic-depth-picture" aria-hidden="true">
+              <source media="(max-width: 900px)" srcset="/assets/images/little-feet-ocean-depth-1080.webp">
+              <img id="cinematicDepthBackdrop" class="cinematic-depth-image"
+                src="/assets/images/little-feet-ocean-depth-4k.webp"
+                alt="" decoding="async" fetchpriority="high">
+            </picture>
             <canvas id="littleFeetCinematicCanvas" aria-hidden="true"></canvas>
             <div class="cinematic-loading" aria-live="polite">Preparing the Little Feet ocean…</div>
             <div class="cinematic-ui">
@@ -2471,7 +2472,7 @@
   </section>
 
   <script src="backup.js?v=20260914-support-banner" defer></script>
-  <script src="/assets/cinematic-loader.js?v=20260924-cinematic-v31" defer></script>
+  <script src="/assets/cinematic-loader.js?v=20260924-cinematic-v32" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
