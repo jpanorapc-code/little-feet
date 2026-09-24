@@ -840,6 +840,7 @@ function initCinematicJourney() {
   stage.dataset.cinematicBatching = 'instanced-v1';
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = '30';
+  stage.dataset.backgroundPause = 'offscreen-hard-stop-v1';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2242,14 +2243,90 @@ function initCinematicJourney() {
     }
   };
 
-  renderer.setAnimationLoop(render);
+  // Hard runtime gate: when the cinematic is not actually being viewed,
+  // stop the WebGL animation loop completely. This freezes water, fish, kelp,
+  // jellyfish, bubbles, mascot idle motion and every other background update.
+  let journeyInViewport = false;
+  let cinematicLoopRunning = false;
+
+  const cinematicShouldRun = () => {
+    const home = document.getElementById('homeTab');
+    const dashboardVisible = !dashboard || !dashboard.classList.contains('hidden');
+    return !renderFailed &&
+      !document.hidden &&
+      dashboardVisible &&
+      Boolean(home?.classList.contains('active')) &&
+      journeyInViewport &&
+      journey.classList.contains('is-active');
+  };
+
+  const stopCinematicLoop = () => {
+    if (!cinematicLoopRunning) return;
+    cinematicLoopRunning = false;
+    renderer.setAnimationLoop(null);
+    stage.dataset.cinematicRuntime = 'paused';
+    setCinematicAudioMix(smoothProgress > .225 ? 1 : 0, false);
+  };
+
+  const startCinematicLoop = () => {
+    if (cinematicLoopRunning || !cinematicShouldRun()) return;
+    cinematicLoopRunning = true;
+    lastRenderMs = 0;
+    clock.getDelta();
+    stage.dataset.cinematicRuntime = 'running';
+    renderer.setAnimationLoop(render);
+  };
+
+  const syncCinematicRuntime = () => {
+    if (cinematicShouldRun()) startCinematicLoop();
+    else stopCinematicLoop();
+  };
+
+  const journeyObserver = typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver(entries => {
+        journeyInViewport = entries.some(entry => entry.isIntersecting && entry.intersectionRatio > 0);
+        syncCinematicRuntime();
+      }, { threshold: [0, .01] })
+    : null;
+
+  if (journeyObserver) {
+    journeyObserver.observe(journey);
+  } else {
+    // Older browsers still get a safe geometry-based fallback.
+    const updateJourneyViewportFallback = () => {
+      const rect = journey.getBoundingClientRect();
+      journeyInViewport = rect.bottom > 0 && rect.top < window.innerHeight;
+      syncCinematicRuntime();
+    };
+    window.addEventListener('scroll', updateJourneyViewportFallback, { passive: true });
+    window.addEventListener('resize', updateJourneyViewportFallback, { passive: true });
+    updateJourneyViewportFallback();
+  }
+
+  const homeTab = document.getElementById('homeTab');
+  const homeObserver = homeTab && typeof MutationObserver === 'function'
+    ? new MutationObserver(syncCinematicRuntime)
+    : null;
+  homeObserver?.observe(homeTab, { attributes: true, attributeFilter: ['class'] });
+
+  const runtimeDashboardObserver = dashboard && typeof MutationObserver === 'function'
+    ? new MutationObserver(syncCinematicRuntime)
+    : null;
+  runtimeDashboardObserver?.observe(dashboard, { attributes: true, attributeFilter: ['class'] });
+
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       clock.getDelta();
       syncVisibleStage();
     }
+    syncCinematicRuntime();
   });
+
+  window.addEventListener('scroll', syncCinematicRuntime, { passive: true });
+  window.addEventListener('resize', syncCinematicRuntime, { passive: true });
+
   syncVisibleStage();
+  if (!journeyObserver) syncCinematicRuntime();
   updateCopy(0);
 }
 
