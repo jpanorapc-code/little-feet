@@ -292,6 +292,20 @@ const rawRequest = async (route) => {
     assert.match(deletionTicket.message, /Requested at:/);
     const adminDeletionRequest = await request('/api/account-deletion-request', { method: 'POST', cookie: bravoLogin.cookie, body: {} });
     assert.equal(adminDeletionRequest.response.status, 400);
+    const teacherSchoolDeletionRequest = await request('/api/school-deletion-request', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: {} });
+    assert.equal(teacherSchoolDeletionRequest.response.status, 403);
+    const principalSchoolDeletionRequest = await request('/api/school-deletion-request', { method: 'POST', cookie: alphaPrincipalLogin.cookie, body: {} });
+    assert.equal(principalSchoolDeletionRequest.response.status, 201);
+    const duplicateSchoolDeletionRequest = await request('/api/school-deletion-request', { method: 'POST', cookie: alphaPrincipalLogin.cookie, body: {} });
+    assert.equal(duplicateSchoolDeletionRequest.response.status, 409);
+    const alphaAdminTicketsForDeletion = await request('/api/tickets', { cookie: alphaLogin.cookie });
+    const schoolDeletionTicket = alphaAdminTicketsForDeletion.data.find(ticket => ticket.category === 'School deletion request');
+    assert.ok(schoolDeletionTicket);
+    assert.equal(schoolDeletionTicket.assignedTo, 'alpha-admin');
+    assert.match(schoolDeletionTicket.message, /SCHOOL DELETION REQUEST/);
+    assert.match(schoolDeletionTicket.message, /School: Alpha School/);
+    assert.match(schoolDeletionTicket.message, /Role: principal/);
+
 
     const logout = await request('/api/auth/logout', { method: 'POST', cookie: bravoParentCookie });
     assert.equal(logout.response.status, 200);
