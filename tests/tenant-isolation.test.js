@@ -81,6 +81,8 @@ const rawRequest = async (route) => {
     const health = await request('/api/health');
     assert.equal(health.response.status, 200);
     assert.equal(health.response.headers.get('cache-control'), 'no-store');
+    assert.equal(Object.prototype.hasOwnProperty.call(health.data, 'instance'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(health.data, 'activeRequests'), false);
     const readiness = await request('/api/ready');
     assert.equal(readiness.response.status, 503);
     assert.equal(readiness.data.ready, false);
@@ -116,6 +118,10 @@ const rawRequest = async (route) => {
     assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
     assert.equal(bravoParentLogin.response.status, 200);
+    const authenticatedHealth = await request('/api/health', { cookie: alphaLogin.cookie });
+    assert.equal(authenticatedHealth.response.status, 200);
+    assert.equal(authenticatedHealth.data.instance, 'STANDBY');
+    assert.equal(Number.isInteger(authenticatedHealth.data.activeRequests), true);
     const originalAlphaCookie = alphaLogin.cookie;
     const migratedAlphaLogin = await request('/api/login', { method: 'POST', cookie: originalAlphaCookie, body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     assert.equal(migratedAlphaLogin.response.status, 200);
