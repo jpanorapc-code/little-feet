@@ -2656,6 +2656,20 @@ function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
   });
 }
 
+async function requestOwnAccountDeletion() {
+  if (!currentUser || currentUser.role === 'admin') return alert('Administrators can manage accounts directly from Account Management.');
+  if (!confirm('Are you sure you want to request deletion of your account? Your account will stay active until an administrator reviews the request.')) return;
+  try {
+    const response = await fetch('/api/account-deletion-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to submit the account deletion request.');
+    alert('Account deletion request sent to your administrator as a support ticket.');
+    if (typeof loadTickets === 'function') loadTickets();
+  } catch {
+    alert('Unable to reach the account deletion service. Please try again.');
+  }
+}
+
 // Emergency Broadcasts
 async function loadBroadcasts() {
   try {
