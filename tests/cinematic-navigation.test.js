@@ -7,12 +7,14 @@ const root = path.resolve(__dirname, '..');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cinematic = fs.readFileSync(path.join(root, 'assets', 'cinematic.js'), 'utf8');
+const cinematicLoader = fs.readFileSync(path.join(root, 'assets', 'cinematic-loader.js'), 'utf8');
 const styles = fs.readFileSync(path.join(root, 'assets', 'cinematic.css'), 'utf8');
 
 assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
 assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
 assert.match(page, /\/assets\/cinematic\.css\?v=20260924-cinematic-v1/);
-assert.match(page, /type="module" src="\/assets\/cinematic\.js\?v=20260924-cinematic-v1"/);
+assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260924-cinematic-v2" defer/);
+assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
 assert.match(page, /id="littleFeetCinematicJourney"/);
 assert.match(page, /id="littleFeetCinematicCanvas"/);
 
@@ -36,6 +38,14 @@ assert.match(cinematic, /dashboard\.classList\.contains\('hidden'\)/);
 assert.match(cinematic, /refreshStationTargets/);
 assert.doesNotMatch(cinematic, /fetch\(/);
 assert.doesNotMatch(cinematic, /innerHTML\s*=/);
+
+assert.match(cinematicLoader, /dashboardSection/);
+assert.match(cinematicLoader, /dashboard\.classList\.contains\('hidden'\)/);
+assert.match(cinematicLoader, /MutationObserver/);
+assert.match(cinematicLoader, /import\('\/assets\/cinematic\.js\?v=20260924-cinematic-v2'\)/);
+assert.match(cinematicLoader, /cinematic-fallback/);
+assert.doesNotMatch(cinematicLoader, /fetch\(/);
+assert.doesNotMatch(cinematicLoader, /innerHTML\s*=/);
 
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(styles, /\.cinematic-fallback/);
