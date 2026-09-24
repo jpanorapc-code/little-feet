@@ -37,134 +37,225 @@ function accessibleNavTarget(candidates) {
   return { tabId: 'homeTab', label: 'Home' };
 }
 
+function shapePenguinGeometry(radius = 1, segments = 32, rings = 24, profile = 'body') {
+  const geometry = new THREE.SphereGeometry(radius, segments, rings);
+  const attr = geometry.attributes.position;
+
+  for (let index = 0; index < attr.count; index += 1) {
+    let x = attr.getX(index);
+    let y = attr.getY(index);
+    let z = attr.getZ(index);
+    const ny = y / radius;
+    const front = Math.max(0, z / radius);
+
+    if (profile === 'body') {
+      // Pear-shaped penguin torso: narrower chest, fuller lower body, subtly
+      // projected breast. This keeps the silhouette readable from every angle.
+      const lowerFullness = 1 + (1 - Math.abs(ny + .18)) * .12;
+      const shoulderTaper = 1 - Math.max(0, ny) * .18;
+      x *= lowerFullness * shoulderTaper;
+      z *= 1 + (1 - Math.abs(ny)) * .035;
+      z += front * (1 - Math.abs(ny)) * .045;
+      y *= 1.02;
+    } else if (profile === 'head') {
+      // Slightly broader crown and flatter face instead of a perfect sphere.
+      x *= 1 + Math.max(0, ny) * .04;
+      z *= 1 - front * .035;
+      y *= .98;
+    } else if (profile === 'belly') {
+      x *= .98;
+      z *= .72;
+      y *= 1.06;
+    } else if (profile === 'flipper') {
+      x *= 1 - Math.max(0, ny) * .14;
+      z *= .62;
+      y *= 1.08;
+    }
+
+    attr.setXYZ(index, x, y, z);
+  }
+
+  attr.needsUpdate = true;
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function createMascot() {
   const group = new THREE.Group();
+  group.name = 'LittleFeetMascotV2';
+
+  // Match the video/reference mascot without using expensive transmission or
+  // procedural texture maps. The surface reads soft and slightly velvety under
+  // the existing scene lights while keeping the material path cheap.
   const blue = new THREE.MeshStandardMaterial({
-    color: 0x1267a5, roughness: .58, metalness: 0
+    color: 0x1979b9,
+    roughness: .70,
+    metalness: 0
   });
   const blueDark = new THREE.MeshStandardMaterial({
-    color: 0x07375f, roughness: .62, metalness: 0
+    color: 0x083d6c,
+    roughness: .74,
+    metalness: 0
   });
   const white = new THREE.MeshStandardMaterial({
-    color: 0xf4fbfc, roughness: .72, metalness: 0
+    color: 0xf5fbfd,
+    roughness: .82,
+    metalness: 0
   });
-  const orange = new THREE.MeshStandardMaterial({ color: 0xffa61b, roughness: .45, metalness: .02 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0x87f5ff, roughness: .08, metalness: .18, transmission: .55, transparent: true, opacity: .78, emissive: 0x0b5d79, emissiveIntensity: .35 });
-  const black = new THREE.MeshStandardMaterial({ color: 0x06121d, roughness: .22 });
+  const orange = new THREE.MeshStandardMaterial({
+    color: 0xf4a31d,
+    roughness: .62,
+    metalness: 0
+  });
+  const orangeDark = new THREE.MeshStandardMaterial({
+    color: 0xc96e12,
+    roughness: .68,
+    metalness: 0
+  });
+  const frame = new THREE.MeshStandardMaterial({
+    color: 0x16364f,
+    roughness: .38,
+    metalness: .12
+  });
+  const lens = new THREE.MeshBasicMaterial({
+    color: 0xaeefff,
+    transparent: true,
+    opacity: .16,
+    depthWrite: false
+  });
+  const black = new THREE.MeshStandardMaterial({
+    color: 0x02080d,
+    roughness: .26,
+    metalness: 0
+  });
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 32), blue);
-  body.scale.set(.86, 1.36, .68);
-  body.castShadow = true;
-  body.receiveShadow = true;
+  const body = new THREE.Mesh(shapePenguinGeometry(1, 34, 26, 'body'), blue);
+  body.scale.set(.88, 1.38, .70);
+  body.position.y = -.02;
   group.add(body);
 
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(.72, 36, 28), white);
-  belly.scale.set(.72, 1.04, .34);
-  belly.position.set(0, -.18, .54);
-  belly.castShadow = true;
+  // White chest patch follows the body instead of looking like a separate ball.
+  const belly = new THREE.Mesh(shapePenguinGeometry(.76, 30, 22, 'belly'), white);
+  belly.scale.set(.74, 1.12, .30);
+  belly.position.set(0, -.20, .60);
   group.add(belly);
 
-  // Articulated mascot rig. The meshes stay procedural, but the hierarchy
-  // behaves like a compact skeleton: chest -> head/shoulders, hips -> feet, tail.
   const chestRig = new THREE.Group();
-  chestRig.position.set(0, .26, 0);
+  chestRig.position.set(0, .24, 0);
   group.add(chestRig);
 
   const headRig = new THREE.Group();
-  // Keep a real neck gap above the torso. The previous lower pivot let strong
-  // cursor pitch drive the skull through the chest mesh.
-  headRig.position.set(0, 1.18, .05);
+  headRig.position.set(0, 1.16, .03);
   chestRig.add(headRig);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(.79, 40, 30), blueDark);
-  head.scale.set(.96, .90, .91);
-  head.castShadow = true;
+  const head = new THREE.Mesh(shapePenguinGeometry(.82, 34, 26, 'head'), blueDark);
+  head.scale.set(.99, .94, .92);
+  head.position.y = .01;
   headRig.add(head);
 
-  const facePatch = new THREE.Mesh(new THREE.SphereGeometry(.58, 32, 24), white);
-  facePatch.scale.set(.82, .78, .25);
-  facePatch.position.set(0, -.05, .60);
+  // Reference has a soft white mask wrapping the cheeks and lower face.
+  const facePatch = new THREE.Mesh(shapePenguinGeometry(.61, 28, 20, 'belly'), white);
+  facePatch.scale.set(.86, .78, .26);
+  facePatch.position.set(0, -.08, .63);
   headRig.add(facePatch);
 
-  // Two-piece beak: wide at the face, short in profile, with a darker lower
-  // mandible. This avoids the old diamond/cone mouth that looked detached.
-  const beak = new THREE.Mesh(
-    new THREE.ConeGeometry(.18, .42, 4, 1, false),
-    orange
-  );
+  const cheekL = new THREE.Mesh(new THREE.SphereGeometry(.16, 16, 12), white);
+  const cheekR = cheekL.clone();
+  cheekL.scale.set(1.12, .72, .35);
+  cheekR.scale.copy(cheekL.scale);
+  cheekL.position.set(-.26, -.02, .69);
+  cheekR.position.set(.26, -.02, .69);
+  headRig.add(cheekL, cheekR);
+
+  // Short rounded beak, broad from the front and compact in profile.
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(.19, .38, 4, 1, false), orange);
   beak.rotation.x = Math.PI / 2;
-  beak.scale.set(1.38, .64, .92);
-  beak.position.set(0, -.16, .96);
+  beak.rotation.z = Math.PI / 4;
+  beak.scale.set(1.42, .64, .88);
+  beak.position.set(0, -.16, .97);
   headRig.add(beak);
 
-  const lowerBeak = new THREE.Mesh(
-    new THREE.SphereGeometry(.16, 18, 10),
-    new THREE.MeshStandardMaterial({ color: 0xd97a12, roughness: .52, metalness: .01 })
-  );
-  lowerBeak.scale.set(1.15, .34, .58);
-  lowerBeak.position.set(0, -.225, .92);
+  const lowerBeak = new THREE.Mesh(new THREE.SphereGeometry(.17, 18, 10), orangeDark);
+  lowerBeak.scale.set(1.12, .30, .54);
+  lowerBeak.position.set(0, -.225, .93);
   headRig.add(lowerBeak);
 
-  const leftShoulder = new THREE.Group();
-  leftShoulder.position.set(-.72, .18, -.01);
-  const rightShoulder = new THREE.Group();
-  rightShoulder.position.set(.72, .18, -.01);
-  chestRig.add(leftShoulder, rightShoulder);
-
-  const flipperGeometry = new THREE.CapsuleGeometry(.18, 1.05, 7, 16);
-  const leftFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
-  leftFlipperMesh.scale.set(.60, 1.08, .29);
-  leftFlipperMesh.position.set(-.16, -.50, 0);
-  leftFlipperMesh.castShadow = true;
-  leftShoulder.add(leftFlipperMesh);
-
-  const rightFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
-  rightFlipperMesh.scale.set(.60, 1.08, .29);
-  rightFlipperMesh.position.set(.16, -.50, 0);
-  rightFlipperMesh.castShadow = true;
-  rightShoulder.add(rightFlipperMesh);
-
-  const eyeGeo = new THREE.SphereGeometry(.105, 18, 14);
+  const eyeGeo = new THREE.SphereGeometry(.102, 18, 14);
   const eyeL = new THREE.Mesh(eyeGeo, black);
   const eyeR = new THREE.Mesh(eyeGeo, black);
-  eyeL.position.set(-.24, .10, .83);
-  eyeR.position.set(.24, .10, .83);
+  eyeL.position.set(-.235, .105, .84);
+  eyeR.position.set(.235, .105, .84);
   headRig.add(eyeL, eyeR);
 
-  const ringGeo = new THREE.TorusGeometry(.22, .045, 10, 26);
-  const ringL = new THREE.Mesh(ringGeo, glass);
-  const ringR = new THREE.Mesh(ringGeo, glass);
-  ringL.position.set(-.25, .10, .92);
-  ringR.position.set(.25, .10, .92);
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(.18,.055,.055), glass);
-  bridge.position.set(0,.10,.92);
-  headRig.add(ringL, ringR, bridge);
+  // Chunkier dark frames with very cheap translucent lenses.
+  const ringGeo = new THREE.TorusGeometry(.235, .048, 10, 28);
+  const ringL = new THREE.Mesh(ringGeo, frame);
+  const ringR = new THREE.Mesh(ringGeo, frame);
+  ringL.position.set(-.25, .105, .945);
+  ringR.position.set(.25, .105, .945);
+  const lensGeo = new THREE.CircleGeometry(.205, 24);
+  const lensL = new THREE.Mesh(lensGeo, lens);
+  const lensR = new THREE.Mesh(lensGeo, lens);
+  lensL.position.set(-.25, .105, .950);
+  lensR.position.set(.25, .105, .950);
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(.17, .05, .05), frame);
+  bridge.position.set(0, .105, .945);
+  const templeL = new THREE.Mesh(new THREE.BoxGeometry(.34, .035, .035), frame);
+  const templeR = templeL.clone();
+  templeL.position.set(-.46, .11, .86);
+  templeR.position.set(.46, .11, .86);
+  templeL.rotation.y = -.22;
+  templeR.rotation.y = .22;
+  headRig.add(lensL, lensR, ringL, ringR, bridge, templeL, templeR);
 
-  const footGeo = new THREE.SphereGeometry(.32, 20, 14);
+  const leftShoulder = new THREE.Group();
+  const rightShoulder = new THREE.Group();
+  leftShoulder.position.set(-.72, .18, -.02);
+  rightShoulder.position.set(.72, .18, -.02);
+  chestRig.add(leftShoulder, rightShoulder);
+
+  const flipperGeometry = shapePenguinGeometry(.52, 24, 16, 'flipper');
+  const leftFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
+  const rightFlipperMesh = new THREE.Mesh(flipperGeometry, blueDark);
+  leftFlipperMesh.scale.set(.42, 1.42, .31);
+  rightFlipperMesh.scale.copy(leftFlipperMesh.scale);
+  leftFlipperMesh.position.set(-.12, -.49, -.02);
+  rightFlipperMesh.position.set(.12, -.49, -.02);
+  leftFlipperMesh.rotation.z = .10;
+  rightFlipperMesh.rotation.z = -.10;
+  leftShoulder.add(leftFlipperMesh);
+  rightShoulder.add(rightFlipperMesh);
+
   const leftHip = new THREE.Group();
   const rightHip = new THREE.Group();
-  leftHip.position.set(-.38, -1.05, .18);
-  rightHip.position.set(.38, -1.05, .18);
+  leftHip.position.set(-.35, -1.06, .18);
+  rightHip.position.set(.35, -1.06, .18);
   group.add(leftHip, rightHip);
 
+  const footGeo = shapePenguinGeometry(.34, 20, 14, 'belly');
   const footLMesh = new THREE.Mesh(footGeo, orange);
   const footRMesh = new THREE.Mesh(footGeo, orange);
-  footLMesh.scale.set(1.0,.18,.62);
+  footLMesh.scale.set(1.12, .24, .72);
   footRMesh.scale.copy(footLMesh.scale);
-  footLMesh.position.set(0,-.27,0);
-  footRMesh.position.set(0,-.27,0);
+  footLMesh.position.set(-.03, -.27, .04);
+  footRMesh.position.set(.03, -.27, .04);
+  footLMesh.rotation.z = -.06;
+  footRMesh.rotation.z = .06;
   leftHip.add(footLMesh);
   rightHip.add(footRMesh);
 
   const tailRig = new THREE.Group();
-  tailRig.position.set(0, -.82, -.54);
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(.25, .62, 5), blueDark);
+  tailRig.position.set(0, -.83, -.55);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(.27, .64, 5), blueDark);
   tail.rotation.x = Math.PI / 2;
-  tail.scale.set(1.05, 1, .35);
-  tail.position.z = -.18;
+  tail.scale.set(1.06, 1, .40);
+  tail.position.z = -.19;
   tailRig.add(tail);
   group.add(tailRig);
 
+  // Keep the established animation contract intact so the existing swim,
+  // return-swim, idle, gaze, feet and tail logic continue working unchanged.
   group.userData = {
     body, belly, chestRig, head, headRig, beak, lowerBeak,
     leftFlipper: leftShoulder, rightFlipper: rightShoulder,
@@ -176,6 +267,7 @@ function createMascot() {
     bodyBaseScale: body.scale.clone(), bellyBaseScale: belly.scale.clone(),
     beakBaseScale: beak.scale.clone(), lowerBeakBaseScale: lowerBeak.scale.clone()
   };
+
   group.scale.setScalar(.92);
   return group;
 }
@@ -561,7 +653,7 @@ function initCinematicJourney() {
   // The downloaded Riley action is kept only as an archived/reference asset.
   // Do not load or evaluate it in the browser: the procedural mascot rig below
   // provides the swim motion without per-frame imported-bone sampling.
-  stage.dataset.swimSource = 'procedural-optimized';
+  stage.dataset.swimSource = 'little-feet-mascot-v2';
 
   // Microbubble wake for strong underwater strokes. It is hidden on the
   // surface and fades in only when the mascot is actually propelling.
