@@ -8,7 +8,6 @@ const smoothstep = (a, b, value) => {
   return x * x * (3 - 2 * x);
 };
 const damp = (current, target, lambda, dt) => THREE.MathUtils.lerp(current, target, 1 - Math.exp(-lambda * dt));
-const ZERO_BONE = Object.freeze([0, 0, 0]);
 
 // Merge static meshes that share a material into one GPU buffer. This keeps
 // all authored geometry while reducing draw calls on weaker machines.
@@ -262,9 +261,9 @@ function createWater() {
     uniforms: {
       uTime: { value: 0 },
       uOpacity: { value: .58 },
-      uShallow: { value: new THREE.Color(0x2fc9ef) },
-      uDeep: { value: new THREE.Color(0x0876b7) },
-      uHighlight: { value: new THREE.Color(0xc8fbff) }
+      uShallow: { value: new THREE.Color(0x35ddff) },
+      uDeep: { value: new THREE.Color(0x075aa8) },
+      uHighlight: { value: new THREE.Color(0xe4ffff) }
     },
     vertexShader: `
       uniform float uTime;
@@ -308,7 +307,7 @@ function createWater() {
         float waveTint = clamp(vWave * 4.0 + 0.5, 0.0, 1.0);
 
         vec3 base = mix(uDeep, uShallow, 0.48 + waveTint * 0.20);
-        base += uHighlight * (fresnel * 0.28 + specular * 0.48);
+        base += uHighlight * (fresnel * 0.36 + specular * 0.58);
         gl_FragColor = vec4(base, uOpacity);
       }
     `,
@@ -912,11 +911,11 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = '30';
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v3-procedural-mascot';
+  stage.dataset.compressionProfile = 'safe-webgl-v4-trimmed-animation';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.32;
   renderer.shadowMap.enabled = false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(renderPixelRatioTarget);
@@ -966,7 +965,6 @@ function initCinematicJourney() {
   // The downloaded Riley action is kept only as an archived/reference asset.
   // Do not load or evaluate it in the browser: the procedural mascot rig below
   // provides the swim motion without per-frame imported-bone sampling.
-  const sourceSwimAction = null;
   stage.dataset.swimSource = 'procedural-optimized';
 
   // Microbubble wake for strong underwater strokes. It is hidden on the
@@ -1614,16 +1612,6 @@ function initCinematicJourney() {
     const recovery = recoveryStroke - powerStroke * .28;
     const glideWave = Math.sin(swimPhase * .42);
 
-    const sourceBlend = 0;
-    const sourceBodyLower = ZERO_BONE;
-    const sourceBodyUpper = ZERO_BONE;
-    const sourceChest = ZERO_BONE;
-    const sourceRightRoot = ZERO_BONE;
-    const sourceRightTip = ZERO_BONE;
-    const sourceLeftRoot = ZERO_BONE;
-    const sourceLeftTip = ZERO_BONE;
-    const sourceUpperRight = ZERO_BONE;
-    const sourceUpperLeft = ZERO_BONE;
     const idleBreath = Math.sin(time * 2.05);
     const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .045;
     const idleBob = surface * Math.sin(time * 1.55) * .035;
@@ -1681,8 +1669,7 @@ function initCinematicJourney() {
     const chestCounterRoll = -mascot.rotation.z * .32;
     data.chestRig.rotation.x = damp(
       data.chestRig.rotation.x,
-      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03
-        + sourceBlend * (sourceBodyUpper[0] * .42 + sourceChest[0] * .22),
+      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03,
       9,
       dt
     );
@@ -1716,19 +1703,6 @@ function initCinematicJourney() {
       data.bellyBaseScale.z
     );
 
-    // Preserve the Little Feet mascot mesh, but let the uploaded Riley action
-    // drive the torso with its authored body wave instead of only influencing
-    // the shoulders. When the source action is unavailable these damp to zero.
-    const authoredBodyPitch = sourceBlend * (sourceBodyLower[0] * .26 + sourceBodyUpper[0] * .34);
-    const authoredBodyYaw = sourceBlend * (sourceBodyLower[1] * .24 + sourceChest[1] * .20);
-    const authoredBodyRoll = sourceBlend * (sourceBodyLower[2] * .34 + sourceChest[2] * .26);
-    data.body.rotation.x = damp(data.body.rotation.x, authoredBodyPitch, 9.5, dt);
-    data.body.rotation.y = damp(data.body.rotation.y, authoredBodyYaw, 9.5, dt);
-    data.body.rotation.z = damp(data.body.rotation.z, authoredBodyRoll, 9.5, dt);
-    data.belly.rotation.x = damp(data.belly.rotation.x, authoredBodyPitch * .72, 9, dt);
-    data.belly.rotation.y = damp(data.belly.rotation.y, authoredBodyYaw * .62, 9, dt);
-    data.belly.rotation.z = damp(data.belly.rotation.z, authoredBodyRoll * .72, 9, dt);
-
     // Rigid shoulder-driven flippers emulate underwater "flight": strong
     // symmetrical power strokes, controlled recovery, then a glide.
     const flapAmplitude = .26 + effort * .56 + firstStrokeBurst * .18;
@@ -1739,12 +1713,8 @@ function initCinematicJourney() {
     const shoulderSweep = .22 + powerStroke * (.18 + effort * .34) - recoveryStroke * .12;
     const entryTuckL = -.16;
     const entryTuckR = .16;
-    const authoredLeftZ = sourceBlend * (sourceLeftRoot[0] * .52 + sourceLeftTip[2] * .16);
-    const authoredRightZ = sourceBlend * (-sourceRightRoot[0] * .52 + sourceRightTip[2] * .16);
-    const authoredLeftSweep = sourceBlend * (-sourceLeftRoot[0] * .50 + Math.abs(sourceLeftTip[0]) * .10);
-    const authoredRightSweep = sourceBlend * (-sourceRightRoot[0] * .50 + Math.abs(sourceRightTip[0]) * .10);
-    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline) + authoredLeftZ;
-    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline) + authoredRightZ;
+    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline);
+    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline);
     data.leftFlipper.rotation.z = damp(
       data.leftFlipper.rotation.z,
       leftTargetZ - preen * .72,
@@ -1760,39 +1730,29 @@ function initCinematicJourney() {
     data.leftFlipper.rotation.x = damp(
       data.leftFlipper.rotation.x,
       lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion)
-        + streamline * .42 + preen * .92 + authoredLeftSweep,
+        + streamline * .42 + preen * .92,
       11.5,
       dt
     );
     data.rightFlipper.rotation.x = damp(
       data.rightFlipper.rotation.x,
       lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion)
-        + streamline * .42 + authoredRightSweep,
+        + streamline * .42,
       11.5,
       dt
     );
     data.leftFlipper.rotation.y = damp(
       data.leftFlipper.rotation.y,
-      propulsion * (.16 + motion.yaw * .24) + sourceBlend * sourceLeftRoot[1] * .24,
+      propulsion * (.16 + motion.yaw * .24),
       9,
       dt
     );
     data.rightFlipper.rotation.y = damp(
       data.rightFlipper.rotation.y,
-      propulsion * (-.16 + motion.yaw * .24) + sourceBlend * sourceRightRoot[1] * .24,
+      propulsion * (-.16 + motion.yaw * .24),
       9,
       dt
     );
-
-    // The uploaded rig has a second animated flipper segment on each side.
-    // Map those authored tip rotations onto the visible capsule children so the
-    // stroke bends through the whole flipper instead of pivoting at one joint.
-    data.leftFlipperMesh.rotation.x = damp(data.leftFlipperMesh.rotation.x, sourceBlend * sourceLeftTip[0] * .88, 12.5, dt);
-    data.leftFlipperMesh.rotation.y = damp(data.leftFlipperMesh.rotation.y, sourceBlend * sourceLeftTip[1] * .78, 12.5, dt);
-    data.leftFlipperMesh.rotation.z = damp(data.leftFlipperMesh.rotation.z, sourceBlend * sourceLeftTip[2] * .90, 12.5, dt);
-    data.rightFlipperMesh.rotation.x = damp(data.rightFlipperMesh.rotation.x, sourceBlend * sourceRightTip[0] * .88, 12.5, dt);
-    data.rightFlipperMesh.rotation.y = damp(data.rightFlipperMesh.rotation.y, sourceBlend * sourceRightTip[1] * .78, 12.5, dt);
-    data.rightFlipperMesh.rotation.z = damp(data.rightFlipperMesh.rotation.z, sourceBlend * sourceRightTip[2] * .90, 12.5, dt);
 
     // Feet tuck against the body at speed and act as rudders during a turn,
     // matching real penguin steering behaviour rather than kicking constantly.
@@ -1801,27 +1761,27 @@ function initCinematicJourney() {
     const rudder = motion.yaw * propulsion;
     data.footL.rotation.x = damp(
       data.footL.rotation.x,
-      launchKick + feetTuck + powerStroke * effort * .10 + sourceBlend * sourceUpperLeft[0] * .34,
+      launchKick + feetTuck + powerStroke * effort * .10,
       9.5,
       dt
     );
     data.footR.rotation.x = damp(
       data.footR.rotation.x,
-      launchKick + feetTuck + powerStroke * effort * .10 + sourceBlend * sourceUpperRight[0] * .34,
+      launchKick + feetTuck + powerStroke * effort * .10,
       9.5,
       dt
     );
-    data.footL.rotation.y = damp(data.footL.rotation.y, rudder * .48 + sourceBlend * sourceUpperLeft[1] * .24, 8, dt);
-    data.footR.rotation.y = damp(data.footR.rotation.y, rudder * .48 + sourceBlend * sourceUpperRight[1] * .24, 8, dt);
+    data.footL.rotation.y = damp(data.footL.rotation.y, rudder * .48, 8, dt);
+    data.footR.rotation.y = damp(data.footR.rotation.y, rudder * .48, 8, dt);
     data.footL.rotation.z = damp(
       data.footL.rotation.z,
-      surface * Math.sin(time * 1.2) * .035 + sourceBlend * sourceUpperLeft[2] * .28,
+      surface * Math.sin(time * 1.2) * .035,
       7,
       dt
     );
     data.footR.rotation.z = damp(
       data.footR.rotation.z,
-      -surface * Math.sin(time * 1.2) * .035 + sourceBlend * sourceUpperRight[2] * .28,
+      -surface * Math.sin(time * 1.2) * .035,
       7,
       dt
     );
@@ -1829,7 +1789,7 @@ function initCinematicJourney() {
     data.tailRig.rotation.y = damp(data.tailRig.rotation.y, -rudder * .62, 8.5, dt);
     data.tailRig.rotation.x = damp(
       data.tailRig.rotation.x,
-      propulsion * recovery * .10 + sourceBlend * sourceBodyLower[0] * .34,
+      propulsion * recovery * .10,
       7.5,
       dt
     );
@@ -2248,13 +2208,22 @@ function initCinematicJourney() {
 
   let lastRenderMs = 0;
   let lastInteractionMs = performance.now();
-  const markCinematicActivity = () => { lastInteractionMs = performance.now(); };
+  const markCinematicActivity = () => {
+    lastInteractionMs = performance.now();
+    stage.dataset.cinematicIdle = 'active';
+    if (cinematicShouldRun()) startCinematicLoop();
+  };
 
   const render = frameTime => {
     if (renderFailed) return;
     const nowMs = Number.isFinite(frameTime) ? frameTime : performance.now();
-    const idle = nowMs - lastInteractionMs > 900;
-    const effectiveFpsCap = idle ? 6 : renderFpsCap;
+    const activityAgeMs = nowMs - lastInteractionMs;
+    if (activityAgeMs > 3500) {
+      stopCinematicLoop();
+      stage.dataset.cinematicIdle = 'frozen';
+      return;
+    }
+    const effectiveFpsCap = activityAgeMs > 900 ? 12 : renderFpsCap;
     const minFrameMs = 1000 / effectiveFpsCap;
     if (lastRenderMs && nowMs - lastRenderMs < minFrameMs - .5) return;
     lastRenderMs = nowMs;
