@@ -64,7 +64,7 @@ assert.doesNotMatch(cinematic, /mist\.position\.x = Math\.sin/);
 assert.doesNotMatch(cinematic, /positions\.needsUpdate = true;/);
 assert.match(cinematic, /stage\.dataset\.cinematicQuality = quality/);
 assert.match(cinematic, /SCENE_DETAIL = 'high'/);
-assert.match(cinematic, /performanceMode = 'adaptive-frame-time-v2'/);
+assert.match(cinematic, /performanceMode = 'true-capped-scheduler-v3'/);
 assert.match(cinematic, /let renderFpsCap = 30/);
 assert.match(cinematic, /stage\.dataset\.renderFpsCap = String\(renderFpsCap\)/);
 assert.match(cinematic, /backgroundPause = 'offscreen-hard-stop-v2'/);
@@ -100,7 +100,7 @@ assert.match(cinematic, /effectiveFpsCap = activityAgeMs > 900 \? 12 : renderFps
 assert.match(cinematic, /cinematicIdle = 'frozen'/);
 assert.match(cinematic, /cinematicIdle = 'active'/);
 assert.match(cinematic, /minFrameMs = 1000 \/ effectiveFpsCap/);
-assert.match(cinematic, /cinematicBatching = 'instanced-v1'/);
+assert.match(cinematic, /cinematicBatching = 'hero-only-v2'/);
 assert.match(cinematic, /getSharedGeometry\('stationRingOuter'/);
 assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
 assert.match(cinematic, /accessibleNavTarget/);
