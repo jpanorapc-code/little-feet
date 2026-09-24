@@ -16,6 +16,8 @@ const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
+const SCHOOL_SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
+const SCHOOL_SEARCH_CACHE_MAX_ENTRIES = 250;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
@@ -264,6 +266,37 @@ const activeLoginAttempt = (key) => {
   return entry;
 };
 
+const pruneLoginAttempts = (now = Date.now()) => {
+  for (const [key, entry] of loginAttempts) {
+    if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginAttempts.delete(key);
+  }
+  // Stale entries should normally keep this tiny. The hard ceiling prevents a
+  // distributed username spray from turning the limiter itself into a memory sink.
+  while (loginAttempts.size > 10000) loginAttempts.delete(loginAttempts.keys().next().value);
+};
+const loginAttemptCleanupTimer = setInterval(pruneLoginAttempts, 5 * 60 * 1000);
+loginAttemptCleanupTimer.unref?.();
+
+const readSchoolSearchCache = (key, now = Date.now()) => {
+  const cached = schoolSearchCache.get(key);
+  if (!cached) return null;
+  if (now - cached.createdAt >= SCHOOL_SEARCH_CACHE_TTL_MS) {
+    schoolSearchCache.delete(key);
+    return null;
+  }
+  return cached;
+};
+const writeSchoolSearchCache = (key, data, now = Date.now()) => {
+  for (const [candidate, entry] of schoolSearchCache) {
+    if (!entry || now - entry.createdAt >= SCHOOL_SEARCH_CACHE_TTL_MS) schoolSearchCache.delete(candidate);
+  }
+  if (schoolSearchCache.has(key)) schoolSearchCache.delete(key);
+  while (schoolSearchCache.size >= SCHOOL_SEARCH_CACHE_MAX_ENTRIES) {
+    schoolSearchCache.delete(schoolSearchCache.keys().next().value);
+  }
+  schoolSearchCache.set(key, { createdAt: now, data });
+};
+
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
 app.use(compression({ threshold: 1024 }));
@@ -303,6 +336,7 @@ app.use('/api', (req, res, next) => {
 });
 app.use((req, res, next) => {
   if (req.method === 'POST' && req.path === '/api/signup' && !enforcePublicRateLimit(req, res, 'signup', 20, 60 * 60 * 1000)) return;
+  if (req.method === 'GET' && req.path === '/api/nearby-schools' && !enforcePublicRateLimit(req, res, 'nearby-schools', 60, 10 * 60 * 1000)) return;
   if (req.method === 'POST' && req.path === '/api/schools/enrich' && !enforcePublicRateLimit(req, res, 'school-enrich', 60, 10 * 60 * 1000)) return;
   if (req.method === 'POST' && req.path === '/api/donations/intents' && !enforcePublicRateLimit(req, res, 'donation-intent', 30, 60 * 60 * 1000)) return;
   next();
@@ -942,6 +976,7 @@ app.post('/api/login', (req, res) => {
     });
   } else {
     loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
+    if (loginAttempts.size > 10000) pruneLoginAttempts();
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
 });
@@ -1839,10 +1874,8 @@ app.get('/api/nearby-schools', async (req, res) => {
   }
 
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${radius}`;
-  const cached = schoolSearchCache.get(cacheKey);
-  if (cached && Date.now() - cached.createdAt < 30 * 60 * 1000) {
-    return res.json({ ...cached.data, cached: true });
-  }
+  const cached = readSchoolSearchCache(cacheKey);
+  if (cached) return res.json({ ...cached.data, cached: true });
 
   // A bounding-box lookup is significantly faster than searching every school building by radius.
   // The browser applies the exact circular 20 km check before rendering markers.
@@ -1877,7 +1910,7 @@ app.get('/api/nearby-schools', async (req, res) => {
     }));
 
     const data = { elements: Array.isArray(payload.elements) ? payload.elements : [], source: 'OpenStreetMap' };
-    schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
+    writeSchoolSearchCache(cacheKey, data);
     res.json(data);
   } catch (error) {
     // If the shared Overpass network is busy, use Nominatim's independent
@@ -1917,7 +1950,7 @@ app.get('/api/nearby-schools', async (req, res) => {
         source: 'OpenStreetMap fallback'
       };
       if (!data.elements.length) throw new Error('No nearby schools were returned by the fallback');
-      schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
+      writeSchoolSearchCache(cacheKey, data);
       res.json(data);
     } catch (fallbackError) {
       console.error('Nearby school search failed:', error.message, '| fallback failed:', fallbackError.message);
