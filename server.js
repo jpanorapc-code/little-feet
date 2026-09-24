@@ -3223,7 +3223,8 @@ const microsoftCallbackUrl = 'https://littlefeet.co.za/auth/microsoft/callback';
 if (googleSignInConfigured) passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "https://littlefeet.co.za/auth/google/callback"
+    callbackURL: "https://littlefeet.co.za/auth/google/callback",
+    state: true
   },
   (accessToken, refreshToken, profile, done) => {
     const user = {
