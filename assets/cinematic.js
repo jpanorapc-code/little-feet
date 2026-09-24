@@ -44,6 +44,31 @@ const mergeStaticGeometries = geometries => {
 // CPU cores, a high-DPI display, or a high-refresh monitor.
 const SCENE_DETAIL = 'high';
 
+const sharedGeometry = {};
+const getSharedGeometry = (key, factory) => {
+  if (!sharedGeometry[key]) sharedGeometry[key] = factory();
+  return sharedGeometry[key];
+};
+
+const getSharedJellyTentacleGeometry = () => getSharedGeometry('jellyTentacles', () => {
+  const geometries = [];
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (i / 8) * Math.PI * 2;
+    const x = Math.cos(angle) * .47;
+    const z = Math.sin(angle) * .47;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(x, -.18, z),
+      new THREE.Vector3(x * .72 + Math.sin(i) * .16, -.95, z * .72),
+      new THREE.Vector3(x * .45 - Math.cos(i) * .14, -1.85, z * .44),
+      new THREE.Vector3(x * .25, -2.65 - (i % 3) * .22, z * .2)
+    ]);
+    geometries.push(new THREE.TubeGeometry(curve, 22, .025 + (i % 2) * .011, 7, false));
+  }
+  const merged = mergeStaticGeometries(geometries);
+  geometries.forEach(geometry => geometry.dispose());
+  return merged;
+});
+
 const stationBlueprints = [
   { at: 0.05, title: 'Surface', kicker: 'Little Feet · cinematic home', text: 'Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.', candidates: [['feedTab','School Feed']] },
   { at: 0.24, title: 'Take the plunge', kicker: 'Scroll to dive', text: 'Keep scrolling. The mascot leaves the ice, crosses the waterline, and the portal opens beneath the surface.', candidates: [['scheduleTab','Timetable'],['feedTab','School Feed']] },
@@ -281,7 +306,7 @@ function createBubbles(count, spread, depth, size) {
 function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
   const group = new THREE.Group();
   const bell = new THREE.Mesh(
-    new THREE.SphereGeometry(.88, 30, 20, 0, Math.PI * 2, 0, Math.PI * .56),
+    getSharedGeometry('jellyBell', () => new THREE.SphereGeometry(.88, 30, 20, 0, Math.PI * 2, 0, Math.PI * .56)),
     new THREE.MeshPhysicalMaterial({
       color,
       emissive: accent,
@@ -302,22 +327,8 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
   core.position.y = .05;
   group.add(core);
 
-  const tentacleGeometries = [];
-  for (let i = 0; i < 8; i += 1) {
-    const angle = (i / 8) * Math.PI * 2;
-    const x = Math.cos(angle) * .47;
-    const z = Math.sin(angle) * .47;
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x, -.18, z),
-      new THREE.Vector3(x * .72 + Math.sin(i) * .16, -.95, z * .72),
-      new THREE.Vector3(x * .45 - Math.cos(i) * .14, -1.85, z * .44),
-      new THREE.Vector3(x * .25, -2.65 - (i % 3) * .22, z * .2)
-    ]);
-    tentacleGeometries.push(new THREE.TubeGeometry(curve, 22, .025 + (i % 2) * .011, 7, false));
-  }
-
   const tentacles = new THREE.Mesh(
-    mergeStaticGeometries(tentacleGeometries),
+    getSharedJellyTentacleGeometry(),
     new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -325,7 +336,6 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
       blending: THREE.AdditiveBlending
     })
   );
-  tentacleGeometries.forEach(geometry => geometry.dispose());
   group.add(tentacles);
 
   group.userData.bell = bell;
@@ -336,12 +346,12 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
 function createStationRing(color) {
   const group = new THREE.Group();
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(2.15, .055, 12, 80),
+    getSharedGeometry('stationRingOuter', () => new THREE.TorusGeometry(2.15, .055, 12, 80)),
     new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 4.2, roughness: .16, metalness: .3 })
   );
   ring.rotation.y = Math.PI / 2.25;
   const inner = new THREE.Mesh(
-    new THREE.TorusGeometry(1.52, .024, 10, 72),
+    getSharedGeometry('stationRingInner', () => new THREE.TorusGeometry(1.52, .024, 10, 72)),
     new THREE.MeshBasicMaterial({ color: 0xd7ffff, transparent: true, opacity: .62, blending: THREE.AdditiveBlending })
   );
   inner.rotation.copy(ring.rotation);
@@ -354,8 +364,8 @@ function createFishSchool(count, color, accent = 0xffffff) {
   const school = new THREE.Group();
   const bodyMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9 });
   const accentMaterial = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: .72 });
-  const bodyGeometry = new THREE.SphereGeometry(.16, 10, 7);
-  const tailGeometry = new THREE.ConeGeometry(.13, .28, 3);
+  const bodyGeometry = getSharedGeometry('fishBody', () => new THREE.SphereGeometry(.16, 10, 7));
+  const tailGeometry = getSharedGeometry('fishTail', () => new THREE.ConeGeometry(.13, .28, 3));
 
   // Fish are visually identical geometry repeated many times. Instancing keeps
   // every fish while collapsing the school to two draw calls: bodies + tails.
