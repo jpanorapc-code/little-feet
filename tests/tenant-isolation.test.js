@@ -273,6 +273,20 @@ const rawRequest = async (route) => {
     assert.equal(bravoLedger.data.length, 0);
 
     const bravoParentCookie = bravoParentLogin.cookie;
+    const deletionRequest = await request('/api/account-deletion-request', { method: 'POST', cookie: bravoParentCookie, body: {} });
+    assert.equal(deletionRequest.response.status, 201);
+    assert.equal(deletionRequest.data.success, true);
+    assert.equal(deletionRequest.data.ticket.status, 'Open');
+    const duplicateDeletionRequest = await request('/api/account-deletion-request', { method: 'POST', cookie: bravoParentCookie, body: {} });
+    assert.equal(duplicateDeletionRequest.response.status, 409);
+    const bravoAdminTickets = await request('/api/tickets', { cookie: bravoLogin.cookie });
+    assert.equal(bravoAdminTickets.response.status, 200);
+    const deletionTicket = bravoAdminTickets.data.find(ticket => ticket.category === 'Account deletion request' && ticket.createdBy === 'bravo-parent');
+    assert.ok(deletionTicket);
+    assert.equal(deletionTicket.assignedTo, 'bravo-admin');
+    const adminDeletionRequest = await request('/api/account-deletion-request', { method: 'POST', cookie: bravoLogin.cookie, body: {} });
+    assert.equal(adminDeletionRequest.response.status, 400);
+
     const logout = await request('/api/auth/logout', { method: 'POST', cookie: bravoParentCookie });
     assert.equal(logout.response.status, 200);
     assert.equal(logout.data.success, true);
