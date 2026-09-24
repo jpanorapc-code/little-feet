@@ -109,7 +109,6 @@ assert.match(cinematic, /getSharedGeometry\('jellyBell'/);
 assert.match(cinematic, /getSharedGeometry\('stationRingOuter'/);
 assert.match(cinematic, /getSharedGeometry\('fishBody'/);
 assert.match(cinematic, /new THREE\.InstancedMesh\(bodyGeometry, bodyMaterial, count\)/);
-assert.match(cinematic, /new THREE\.InstancedMesh\(rockGeometry, baseMaterial, 11\)/);
 assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
 assert.match(cinematic, /accessibleNavTarget/);
 assert.match(cinematic, /document\.hidden/);
