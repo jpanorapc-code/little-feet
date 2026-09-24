@@ -18,15 +18,6 @@ const qualityForDevice = () => {
   return 'high';
 };
 
-const canUseWebGL2 = () => {
-  try {
-    const canvas = document.createElement('canvas');
-    return Boolean(canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true }));
-  } catch {
-    return false;
-  }
-};
-
 const stationBlueprints = [
   { at: 0.05, title: 'Surface', kicker: 'Little Feet · cinematic home', text: 'Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.', candidates: [['feedTab','School Feed']] },
   { at: 0.24, title: 'Take the plunge', kicker: 'Scroll to dive', text: 'Keep scrolling. The mascot leaves the ice, crosses the waterline, and the portal opens beneath the surface.', candidates: [['scheduleTab','Timetable'],['feedTab','School Feed']] },
@@ -715,27 +706,49 @@ function initCinematicJourney() {
     updateCopy(reached);
   };
 
-  if (reduceMotion.matches || !canUseWebGL2()) {
+  if (reduceMotion.matches) {
     journey.classList.add('cinematic-fallback');
-    stage.querySelector('.cinematic-loading').textContent = reduceMotion.matches ? 'Reduced motion mode · cinematic controls remain available' : '3D unavailable · cinematic controls remain available';
+    stage.dataset.cinematicFallback = 'reduced-motion';
+    stage.querySelector('.cinematic-loading').textContent = 'Reduced motion mode · cinematic controls remain available';
     updateProgressUI(0);
     return;
   }
 
   const quality = qualityForDevice();
   let renderer;
+  let rendererError = null;
+  const rendererOptions = {
+    canvas,
+    alpha: true,
+    antialias: quality !== 'low',
+    powerPreference: quality === 'low' ? 'low-power' : 'high-performance'
+  };
+
   try {
-    renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: quality !== 'low',
-      powerPreference: quality === 'low' ? 'low-power' : 'high-performance'
-    });
-  } catch {
+    // Let Three.js perform the real capability test. The old preflight used
+    // failIfMajorPerformanceCaveat:true, which can reject otherwise-working
+    // WebGL2 contexts on laptops, remote sessions and software-fallback GPUs.
+    renderer = new THREE.WebGLRenderer(rendererOptions);
+  } catch (error) {
+    rendererError = error;
+    try {
+      // A second attempt with the browser default GPU preference avoids false
+      // negatives when "high-performance" is unavailable but WebGL2 still works.
+      renderer = new THREE.WebGLRenderer({ ...rendererOptions, powerPreference: 'default' });
+      rendererError = null;
+    } catch (fallbackError) {
+      rendererError = fallbackError;
+    }
+  }
+
+  if (!renderer) {
     journey.classList.add('cinematic-fallback');
+    stage.dataset.cinematicFallback = 'webgl-renderer-unavailable';
     stage.querySelector('.cinematic-loading').textContent = '3D unavailable · cinematic controls remain available';
+    console.error('Little Feet cinematic WebGL renderer unavailable:', rendererError);
     return;
   }
+  stage.dataset.cinematicFallback = '';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
