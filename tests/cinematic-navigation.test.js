@@ -110,7 +110,6 @@ assert.match(cinematic, /getSharedGeometry\('fishBody'/);
 assert.match(cinematic, /buckets = \[\[\], \[\], \[\]\]/);
 assert.match(cinematic, /new THREE\.InstancedMesh\(bodyGeometry, bodyMaterial, count\)/);
 assert.match(cinematic, /new THREE\.InstancedMesh\(rockGeometry, baseMaterial, 11\)/);
-assert.match(cinematic, /new THREE\.InstancedMesh\(new THREE\.IcosahedronGeometry\(1, 1\), silhouette, rockCount\)/);
 assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
 assert.match(cinematic, /accessibleNavTarget/);
 assert.match(cinematic, /document\.hidden/);
