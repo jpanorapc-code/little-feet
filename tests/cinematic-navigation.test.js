@@ -28,6 +28,12 @@ assert.match(cinematic, /camera\.position\.set\(\.8, 3\.8, 11\.8\)/);
 assert.match(cinematic, /firstFrameRendered/);
 assert.match(cinematic, /webglcontextlost/);
 assert.match(cinematic, /cinematic render failed/);
+assert.match(cinematic, /dashboardSection/);
+assert.match(cinematic, /rect\.width < 2 \|\| rect\.height < 2/);
+assert.match(cinematic, /ResizeObserver/);
+assert.match(cinematic, /MutationObserver/);
+assert.match(cinematic, /dashboard\.classList\.contains\('hidden'\)/);
+assert.match(cinematic, /refreshStationTargets/);
 assert.doesNotMatch(cinematic, /fetch\(/);
 assert.doesNotMatch(cinematic, /innerHTML\s*=/);
 
