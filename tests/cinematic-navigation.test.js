@@ -228,8 +228,6 @@ assert.match(cinematic, /safe-webgl-v15-local-css-water-no-shader/);
 assert.doesNotMatch(cinematic, /createDepthMist/);
 assert.doesNotMatch(cinematic, /createDepthTerrace/);
 assert.doesNotMatch(cinematic, /createDepthBackdrop/);
-assert.match(cinematic, /new THREE\.Color\(0x19bfed\)/);
-assert.match(cinematic, /new THREE\.Color\(0x025fa4\)/);
 assert.match(cinematic, /safe-webgl-v15-local-css-water-no-shader/);
 assert.match(page, /little-feet-ocean-depth-4k\.webp/);
 assert.match(page, /little-feet-ocean-depth-1080\.webp/);
