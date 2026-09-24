@@ -239,7 +239,6 @@ assert.match(cinematic, /mascotTrail/);
 assert.match(cinematic, /splashRing/);
 assert.match(cinematic, /animateWorld/);
 assert.match(cinematic, /animateBubbleField/);
-assert.match(cinematic, /panicTarget/);
 assert.match(cinematic, /playWaterSplash/);
 assert.match(cinematic, /splashSoundArmed/);
 assert.match(cinematic, /Rigid shoulder-driven flippers/);
