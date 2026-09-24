@@ -635,6 +635,87 @@ function initCinematicJourney() {
   floorGlow.position.y = -38;
   scene.add(floorGlow);
 
+  // Layered autonomous sea life. These live entirely inside the cinematic
+  // scene and never touch portal data/navigation state.
+  const fishPerSchool = quality === 'high' ? 15 : quality === 'medium' ? 10 : 6;
+  const fishSchools = [
+    createFishSchool(fishPerSchool, 0x62fff4, 0xe8ffff),
+    createFishSchool(Math.max(5, fishPerSchool - 2), 0xff76dd, 0xffd7f6),
+    createFishSchool(Math.max(5, fishPerSchool - 3), 0xbaff57, 0xf4ffd3),
+    createFishSchool(Math.max(4, fishPerSchool - 5), 0x55b9ff, 0xbde9ff)
+  ];
+  const schoolSpecs = [
+    { x: -7.4, y: -6.4, z: -5.8, speed: .72, phase: .2, span: 15 },
+    { x:  6.8, y: -13.7, z: -7.2, speed: .54, phase: 2.1, span: 18 },
+    { x: -6.2, y: -23.2, z: -6.5, speed: .62, phase: 4.0, span: 17 },
+    { x:  5.8, y: -31.0, z: -8.0, speed: .48, phase: 5.4, span: 16 }
+  ];
+  fishSchools.forEach((school, index) => {
+    const spec = schoolSpecs[index];
+    school.position.set(spec.x, spec.y, spec.z);
+    school.userData.base.copy(school.position);
+    school.userData.speed = spec.speed;
+    school.userData.phase = spec.phase;
+    school.userData.span = spec.span;
+    scene.add(school);
+  });
+
+  const mantaA = createMantaRay(0x69dcff);
+  mantaA.position.set(-10, -11.7, -10);
+  mantaA.scale.setScalar(.75);
+  mantaA.userData.phase = .4;
+  mantaA.userData.speed = .17;
+  scene.add(mantaA);
+
+  const mantaB = createMantaRay(0xa16dff);
+  mantaB.position.set(9.5, -27.2, -11.5);
+  mantaB.scale.setScalar(.54);
+  mantaB.userData.phase = 3.3;
+  mantaB.userData.speed = -.13;
+  if (quality !== 'low') scene.add(mantaB);
+
+  const kelpA = createKelpPatch(quality === 'high' ? 16 : quality === 'medium' ? 10 : 6, 0x38ffc4);
+  kelpA.position.set(-5.5, -37.7, -5.8);
+  scene.add(kelpA);
+  const kelpB = createKelpPatch(quality === 'high' ? 13 : quality === 'medium' ? 8 : 5, 0x6ad8ff);
+  kelpB.position.set(5.6, -37.6, -7.4);
+  kelpB.scale.setScalar(.86);
+  scene.add(kelpB);
+
+  const reefA = createGlowReef(0x55fff2, 0x1768ff);
+  reefA.position.set(-5.4, -37.8, -5.8);
+  scene.add(reefA);
+  const reefB = createGlowReef(0xff75df, 0x684cff);
+  reefB.position.set(5.7, -37.85, -7.7);
+  reefB.scale.setScalar(.82);
+  scene.add(reefB);
+
+  const extraJellies = [];
+  if (quality !== 'low') {
+    const jellyD = createJellyfish(0x62d9ff, 0x3477ff);
+    jellyD.position.set(-7.4, -12.4, -7.5);
+    jellyD.scale.setScalar(.48);
+    scene.add(jellyD);
+    extraJellies.push(jellyD);
+
+    const jellyE = createJellyfish(0xffa7ed, 0x993cff);
+    jellyE.position.set(7.2, -25.7, -6.8);
+    jellyE.scale.setScalar(.58);
+    scene.add(jellyE);
+    extraJellies.push(jellyE);
+
+    if (quality === 'high') {
+      const jellyF = createJellyfish(0xbfff79, 0x2cfcc0);
+      jellyF.position.set(-1.8, -33.1, -9.2);
+      jellyF.scale.setScalar(.43);
+      scene.add(jellyF);
+      extraJellies.push(jellyF);
+    }
+  }
+
+  const causticBeams = createCausticBeams(quality === 'high' ? 5 : quality === 'medium' ? 4 : 3);
+  scene.add(causticBeams);
+
   const clock = new THREE.Clock();
   const pointer = { x: 0, y: 0, smoothX: 0, smoothY: 0, activity: 0, lastX: 0, lastY: 0 };
   let scrollProgress = 0;
