@@ -18,7 +18,7 @@ const thirdPartyAssets = fs.readFileSync(path.join(root, 'THIRD_PARTY_ASSETS.md'
 
 assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
 assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
-assert.match(page, /href="\/assets\/cinematic\.css\?v=20260924-cinematic-v3"/);
+assert.match(page, /href="\/assets\/cinematic\.css\?v=20260924-cinematic-v4"/);
 assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260924-cinematic-v38" defer/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
 assert.match(page, /id="littleFeetCinematicJourney"/);
