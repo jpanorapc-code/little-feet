@@ -2169,6 +2169,45 @@ app.post('/api/school-applications', (req, res) => {
   res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: principal.name || principal.username, status: ticket.status } });
 });
 
+app.post('/api/account-deletion-request', (req, res) => {
+  const requester = getSessionAccount(req);
+  if (!requester) return res.status(401).json({ message: 'Sign in before requesting account deletion.' });
+  if (requester.role === 'admin') return res.status(400).json({ message: 'Administrators can manage accounts directly from Account Management.' });
+
+  const schoolId = accountSchoolId(requester);
+  const existing = db.tickets.find(ticket =>
+    recordInSchool(ticket, requester) &&
+    ticket.category === 'Account deletion request' &&
+    normalizeUsername(ticket.createdBy) === normalizeUsername(requester.username) &&
+    ticket.status !== 'Completed'
+  );
+  if (existing) return res.status(409).json({ message: 'An account deletion request is already waiting for administrator review.', ticketId: existing.id });
+
+  const administrator = db.users.find(account =>
+    account.role === 'admin' &&
+    accountSchoolId(account) === schoolId &&
+    !String(account.verificationStatus || '').toLowerCase().includes('pending')
+  );
+  if (!administrator) return res.status(409).json({ message: 'No active administrator is available for this school yet.' });
+
+  const ticket = tagSchoolRecord(requester, {
+    id: crypto.randomUUID(),
+    department: 'Admin',
+    category: 'Account deletion request',
+    priority: 'High',
+    subject: `Account deletion request · ${requester.name || requester.username}`,
+    message: 'The signed-in user has requested deletion of their Little Feet account. Verify the request and complete the approved account-deletion process.',
+    createdBy: requester.username,
+    createdByName: requester.name || requester.username,
+    assignedTo: administrator.username,
+    status: 'Open',
+    monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }),
+    createdAt: new Date().toISOString()
+  });
+  db.tickets.unshift(ticket);
+  res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: administrator.name || administrator.username, status: ticket.status } });
+});
+
 app.get('/api/tickets', (req, res) => {
   const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'Sign in to view your support tickets.' });
