@@ -284,6 +284,12 @@ const rawRequest = async (route) => {
     const deletionTicket = bravoAdminTickets.data.find(ticket => ticket.category === 'Account deletion request' && ticket.createdBy === 'bravo-parent');
     assert.ok(deletionTicket);
     assert.equal(deletionTicket.assignedTo, 'bravo-admin');
+    assert.match(deletionTicket.message, /ACCOUNT DELETION REQUEST/);
+    assert.match(deletionTicket.message, /Name: Bravo Parent/);
+    assert.match(deletionTicket.message, /Username \/ email: bravo-parent/);
+    assert.match(deletionTicket.message, /Role: parent/);
+    assert.match(deletionTicket.message, /School: Bravo School/);
+    assert.match(deletionTicket.message, /Requested at:/);
     const adminDeletionRequest = await request('/api/account-deletion-request', { method: 'POST', cookie: bravoLogin.cookie, body: {} });
     assert.equal(adminDeletionRequest.response.status, 400);
 
