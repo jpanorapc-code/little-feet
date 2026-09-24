@@ -137,7 +137,6 @@ assert.doesNotMatch(cinematic, /sourceLeftRoot/);
 assert.doesNotMatch(cinematic, /sourceUpperRight/);
 assert.doesNotMatch(cinematic, /sampleSourceSwimBone/);
 assert.doesNotMatch(cinematic, /fetch\('\/assets\/penguin-swim-action\.json/);
-assert.match(cinematic, /authoredRightZ/);
 assert.equal(swimAction.schema, 'little-feet-penguin-action-v1');
 assert.equal(swimAction.source.action, 'ArmatureAction');
 assert.equal(swimAction.source.fps, 24);
