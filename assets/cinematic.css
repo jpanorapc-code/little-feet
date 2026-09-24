@@ -1,5 +1,13 @@
 
 /* Little Feet cinematic navigation — isolated from the working portal UI. */
+/* The portal's global tab reveal keeps a transform on active tabs because
+   animation-fill-mode is "both". A transformed ancestor interferes with the
+   long sticky cinematic section, so the home tab must stay untransformed. */
+#homeTab.tab-content.active {
+  animation: none !important;
+  transform: none !important;
+}
+
 .cinematic-journey {
   --cinematic-accent: #58fff2;
   --cinematic-blue: #28b8ff;
