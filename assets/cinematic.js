@@ -838,7 +838,8 @@ function initCinematicJourney() {
   stage.dataset.cinematicFallback = '';
   stage.dataset.cinematicQuality = quality;
   stage.dataset.cinematicBatching = 'instanced-v1';
-  stage.dataset.performanceMode = 'adaptive-frame-time-v1';
+  stage.dataset.performanceMode = 'adaptive-frame-time-v2';
+  stage.dataset.renderFpsCap = '30';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2013,7 +2014,7 @@ function initCinematicJourney() {
   let waterInterval = 1 / 15;
   let worldInterval = 1 / 24;
   let bubbleInterval = 1 / 20;
-  let renderFpsCap = 60;
+  const renderFpsCap = 30;
   let perfFrameCount = 0;
   let perfFrameTotalMs = 0;
   let perfGoodWindows = 0;
@@ -2023,7 +2024,6 @@ function initCinematicJourney() {
     performanceTier = tier;
 
     if (tier === 'reduced') {
-      renderFpsCap = 45;
       waterInterval = 1 / 10;
       worldInterval = 1 / 15;
       bubbleInterval = 1 / 12;
@@ -2031,7 +2031,6 @@ function initCinematicJourney() {
       sun.castShadow = false;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, .85));
     } else if (tier === 'enhanced') {
-      renderFpsCap = 60;
       waterInterval = 1 / 18;
       worldInterval = 1 / 30;
       bubbleInterval = 1 / 24;
@@ -2039,7 +2038,6 @@ function initCinematicJourney() {
       sun.castShadow = true;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.2));
     } else {
-      renderFpsCap = 60;
       waterInterval = 1 / 15;
       worldInterval = 1 / 24;
       bubbleInterval = 1 / 20;
@@ -2052,31 +2050,32 @@ function initCinematicJourney() {
     resize();
   };
 
-  const recordFramePerformance = dt => {
-    const frameMs = dt * 1000;
-    // Ignore tab restores / debugger pauses / first-frame stalls.
-    if (frameMs <= 0 || frameMs > 80) return;
-    perfFrameTotalMs += frameMs;
+  const recordFramePerformance = workMs => {
+    // Measure the actual CPU/render work of a drawn frame, not the interval
+    // between frames. The cinematic is intentionally capped at 30 FPS, so frame
+    // spacing is ~33 ms even when the machine is healthy.
+    if (workMs <= 0 || workMs > 80) return;
+    perfFrameTotalMs += workMs;
     perfFrameCount += 1;
-    if (perfFrameCount < 90) return;
+    if (perfFrameCount < 60) return;
 
     const averageMs = perfFrameTotalMs / perfFrameCount;
     perfFrameCount = 0;
     perfFrameTotalMs = 0;
 
-    if (averageMs > 23) {
+    if (averageMs > 24) {
       perfGoodWindows = 0;
       applyPerformanceTier('reduced');
       return;
     }
-    if (averageMs > 18.5) {
+    if (averageMs > 16) {
       perfGoodWindows = 0;
       applyPerformanceTier('balanced');
       return;
     }
 
     perfGoodWindows += 1;
-    if (perfGoodWindows >= 2 && averageMs < 16.2) applyPerformanceTier('enhanced');
+    if (perfGoodWindows >= 2 && averageMs < 11) applyPerformanceTier('enhanced');
   };
 
   applyPerformanceTier('balanced');
@@ -2229,9 +2228,10 @@ function initCinematicJourney() {
       // Resize again immediately before the first visible frame. This covers
       // login transitions even on browsers that delay ResizeObserver delivery.
       if (!firstFrameRendered && !resize()) return;
+      const workStart = performance.now();
       updateScene(dt, time);
       renderer.render(scene, camera);
-      recordFramePerformance(dt);
+      recordFramePerformance(performance.now() - workStart);
       if (!firstFrameRendered) {
         firstFrameRendered = true;
         stage.classList.add('is-ready');
