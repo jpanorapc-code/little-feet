@@ -43,6 +43,12 @@ assert.match(server, /Backup server is read-only/);
 assert.match(server, /!replicaMode && !process\.env\.DATABASE_URL/);
 assert.match(server, /status: readiness\.ready \? 'READY' : 'NOT_READY'/);
 assert.doesNotMatch(server, /res\.json\(\{ status: 'OK', database:/);
+assert.match(server, /MODERATION_EXEMPT_FIELDS/);
+assert.match(server, /'pin', 'password', 'passcode', 'verificationcode'/);
+assert.match(server, /id: crypto\.randomUUID\(\),\n    studentName,/);
+assert.match(server, /Ticket status must be Open or Completed/);
+assert.match(client, /escapeWorkspaceText\(b\.category\)/);
+assert.match(client, /escapeWorkspaceText\(currentFeedback/);
 
 const forbiddenClientPatterns = [
   /\$\{p\.caption\}/,
@@ -55,7 +61,10 @@ const forbiddenClientPatterns = [
   /\$\{t\.message\}/,
   /\$\{t\.feedback\}/,
   /\$\{b\.bcMessage\}/,
-  /\$\{b\.bcPriority\s*\|\|/
+  /\$\{b\.bcPriority\s*\|\|/,
+  /\$\{b\.category\}/,
+  /\$\{b\.studentName\}/,
+  /\$\{b\.note\}/
 ];
 for (const pattern of forbiddenClientPatterns) {
   assert.doesNotMatch(client, pattern, `Unsafe raw interpolation still present: ${pattern}`);
