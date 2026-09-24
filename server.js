@@ -93,7 +93,8 @@ const containsBlockedLanguage = (value) => {
 };
 const MODERATION_EXEMPT_FIELDS = new Set([
   'pin', 'password', 'passcode', 'verificationcode', 'accesscode',
-  'signature', 'accountnumber', 'reference', 'transactionid', 'bankreference'
+  'signature', 'signaturedata', 'mediaurl', 'photourl',
+  'accountnumber', 'reference', 'transactionid', 'bankreference'
 ]);
 const requestContainsBlockedLanguage = (value, fieldName = '') => {
   if (MODERATION_EXEMPT_FIELDS.has(String(fieldName || '').toLocaleLowerCase('en-US'))) return false;
