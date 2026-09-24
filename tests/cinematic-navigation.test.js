@@ -60,7 +60,7 @@ assert.match(cinematic, /performanceMode = 'adaptive-frame-time-v2'/);
 assert.match(cinematic, /const renderFpsCap = 30/);
 assert.match(cinematic, /renderFpsCap = '30'/);
 assert.match(cinematic, /backgroundPause = 'offscreen-hard-stop-v2'/);
-assert.match(cinematic, /compressionProfile = 'safe-webgl-v1'/);
+assert.match(cinematic, /compressionProfile = 'safe-webgl-v2-gpu-water'/);
 assert.match(cinematic, /IntersectionObserver/);
 assert.match(cinematic, /renderer\.setAnimationLoop\(null\)/);
 assert.match(cinematic, /renderer\.setAnimationLoop\(render\)/);
