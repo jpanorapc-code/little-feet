@@ -59,30 +59,19 @@
   overflow: hidden;
   border: 1px solid rgba(118, 240, 255, .34);
   border-radius: 24px;
-  background:
-    radial-gradient(circle at 70% 18%, rgba(116, 255, 246, .18), transparent 28%),
-    linear-gradient(180deg, #9defff 0%, #2daeea 19%, #075287 43%, #052f59 68%, #03192f 100%);
+  background: #03162c;
   box-shadow:
     0 30px 90px rgba(0, 8, 25, .52),
     inset 0 1px 0 rgba(255,255,255,.28),
     inset 0 0 90px rgba(41, 214, 255, .08);
 }
-.cinematic-stage::before,
 .cinematic-stage::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 2;
-}
-.cinematic-stage::before {
-  background:
-    radial-gradient(circle at 18% 74%, rgba(69, 251, 255, .14), transparent 24%),
-    radial-gradient(circle at 86% 68%, rgba(141, 96, 255, .14), transparent 27%);
-  mix-blend-mode: screen;
-}
-.cinematic-stage::after {
-  background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 18%, transparent 78%, rgba(0,0,0,.28));
+  background: linear-gradient(180deg, rgba(3,20,44,.03), transparent 22%, transparent 76%, rgba(0,0,0,.24));
 }
 
 .cinematic-depth-picture {
