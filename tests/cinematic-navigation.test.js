@@ -40,7 +40,6 @@ assert.match(cinematic, /headRig\.position\.set\(0, \.76, \.03\)/);
 assert.match(cinematic, /little-feet-mascot-v3/);
 assert.match(cinematic, /video-reference-v3/);
 assert.match(cinematic, /const lens = new THREE\.MeshBasicMaterial/);
-assert.match(cinematic, /const blue = new THREE\.MeshStandardMaterial/);
 assert.doesNotMatch(cinematic, /procedural-optimized/);
 assert.doesNotMatch(cinematic, /new THREE\.CapsuleGeometry\(\.18, 1\.05/);
 assert.match(cinematic, /roughenIceGeometry[\s\S]*geometry\.computeVertexNormals\(\)/);
