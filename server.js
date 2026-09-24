@@ -2038,7 +2038,7 @@ app.post('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
   if (req.body?.mediaUrl !== undefined && req.body.mediaUrl !== null && !validPostMediaData(req.body.mediaUrl)) return res.status(400).json({ message: 'Attached media must be a supported PNG, JPEG, or WebP image under 5 MB.' });
-  const post = tagSchoolRecord(actor, req.body || {});
+  const post = tagSchoolRecord(actor, { ...(req.body || {}), id: crypto.randomUUID() });
   post.createdAt = post.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   db.posts.unshift(post);
   res.json({ success: true, post });
@@ -2061,7 +2061,7 @@ app.get('/api/schedules', (req, res) => {
 app.post('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create schedules.' });
-  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body });
+  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID() });
   db.schedules.push(item);
   res.json({ success: true, item });
 });
@@ -2070,7 +2070,7 @@ app.post('/api/schedules/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import schedules.' });
   const { schedules } = req.body;
   if (Array.isArray(schedules)) {
-    db.schedules.push(...schedules.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    db.schedules.push(...schedules.slice(0, 2000).map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID() })));
   }
   res.json({ success: true });
 });
@@ -2092,7 +2092,7 @@ app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
   if (req.body?.photoUrl !== undefined && req.body.photoUrl !== null && !validWorksheetMediaData(req.body.photoUrl)) return res.status(400).json({ message: 'Attached evidence must be a supported PNG, JPEG, GIF, or WebP image under 5 MB.' });
-  const item = tagSchoolRecord(actor, { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
+  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
 });
@@ -2182,7 +2182,7 @@ app.get('/api/attendance', (req, res) => {
 app.post('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record attendance.' });
-  const item = tagSchoolRecord(actor, { ...req.body, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
   db.attendance.unshift(item);
   res.json({ success: true, item });
 });
@@ -2191,7 +2191,7 @@ app.post('/api/attendance/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import attendance.' });
   const { attendance } = req.body;
   if (Array.isArray(attendance)) {
-    db.attendance.unshift(...attendance.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    db.attendance.unshift(...attendance.slice(0, 2000).map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID() })));
   }
   res.json({ success: true });
 });
@@ -2599,8 +2599,8 @@ app.post('/api/broadcasts', (req, res) => {
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
   if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
   const item = tagSchoolRecord(actor, {
-    id: Date.now().toString(),
     ...req.body,
+    id: crypto.randomUUID(),
     issuedBy: actor.username,
     issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -2798,7 +2798,7 @@ app.post('/api/modules/:module', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save workspace records.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
+  const record = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() });
   records.unshift(record);
   res.json({ success: true, record });
 });
