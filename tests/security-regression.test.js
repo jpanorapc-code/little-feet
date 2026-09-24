@@ -49,6 +49,11 @@ assert.match(server, /id: crypto\.randomUUID\(\),\n    studentName,/);
 assert.match(server, /Ticket status must be Open or Completed/);
 assert.match(client, /escapeWorkspaceText\(b\.category\)/);
 assert.match(client, /escapeWorkspaceText\(currentFeedback/);
+assert.match(server, /Messages are limited to 4,000 characters/);
+assert.match(server, /Emergency alerts are limited to 2,000 characters/);
+assert.match(server, /Alert radius must be between 0\.1 km and 100 km/);
+assert.doesNotMatch(server, /\{ id: crypto\.randomUUID\(\), \.\.\.req\.body/);
+assert.doesNotMatch(server, /\{ id: crypto\.randomUUID\(\), \.\.\.item/);
 
 const forbiddenClientPatterns = [
   /\$\{p\.caption\}/,
