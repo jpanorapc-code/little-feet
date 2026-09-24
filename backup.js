@@ -42,7 +42,7 @@ let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
-const WELCOME_THEME_MAX_MS = 8000;
+const WELCOME_THEME_MAX_MS = 10000;
 const DEFAULT_WALLPAPER_URL = 'assets/4k/little-feet-wallpaper-no-moon-4k.jpg';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
@@ -77,6 +77,28 @@ function getPortalAudioContext() {
 
 window.getPortalAudioContext = getPortalAudioContext;
 window.isPortalAudioMuted = () => portalAudioMuted;
+
+function isPortalIntroThemePlaying() {
+  return Boolean(
+    (loginChimeAudio && !loginChimeAudio.paused && !loginChimeAudio.ended) ||
+    (welcomeThemeAudio && !welcomeThemeAudio.paused && !welcomeThemeAudio.ended)
+  );
+}
+
+function announcePortalThemeState() {
+  try {
+    window.dispatchEvent(new CustomEvent('littlefeet:introthemechange', {
+      detail: { active: isPortalIntroThemePlaying() }
+    }));
+  } catch { /* Theme-state broadcast is optional. */ }
+}
+
+window.isPortalIntroThemePlaying = isPortalIntroThemePlaying;
+window.stopPortalIntroTheme = () => {
+  stopWelcomeTheme();
+  stopLoginChime();
+  announcePortalThemeState();
+};
 
 function announcePortalAudioState() {
   try {
@@ -413,10 +435,12 @@ function stopWelcomeTheme() {
   if (welcomeThemeStopTimer) window.clearTimeout(welcomeThemeStopTimer);
   welcomeThemeStopTimer = null;
   startupChimeStarting = false;
-  if (!welcomeThemeAudio) return;
-  welcomeThemeAudio.pause();
-  welcomeThemeAudio.currentTime = 0;
-  welcomeThemeAudio = null;
+  if (welcomeThemeAudio) {
+    welcomeThemeAudio.pause();
+    welcomeThemeAudio.currentTime = 0;
+    welcomeThemeAudio = null;
+  }
+  announcePortalThemeState();
 }
 
 function portalAudioPreferenceKey() {
@@ -439,10 +463,12 @@ function stopLoginChime() {
   if (loginChimeFadeTimer) window.clearInterval(loginChimeFadeTimer);
   loginChimeStopTimer = null;
   loginChimeFadeTimer = null;
-  if (!loginChimeAudio) return;
-  loginChimeAudio.pause();
-  loginChimeAudio.currentTime = 0;
-  loginChimeAudio = null;
+  if (loginChimeAudio) {
+    loginChimeAudio.pause();
+    loginChimeAudio.currentTime = 0;
+    loginChimeAudio = null;
+  }
+  announcePortalThemeState();
 }
 
 function stopAllPortalAudio() {
@@ -491,7 +517,8 @@ function togglePortalAudioMute() {
   announcePortalAudioState();
 }
 
-// A five-second login cue taken from the supplied main theme keeps the same musical identity.
+// The signed-in intro gets a full ten-second musical window unless the user
+// actively enters the scroll-driven penguin experience, which can stop it early.
 function playLoginChime() {
   stopWelcomeTheme();
   stopLoginChime();
@@ -501,16 +528,19 @@ function playLoginChime() {
     loginChimeAudio.preload = 'auto';
     loginChimeAudio.volume = 0.5;
     loginChimeAudio.currentTime = 0;
-    loginChimeAudio.play().catch(() => {});
-    loginChimeStopTimer = window.setTimeout(() => {
-      let step = 0;
-      loginChimeFadeTimer = window.setInterval(() => {
-        if (!loginChimeAudio) return stopLoginChime();
-        step += 1;
-        loginChimeAudio.volume = Math.max(0.01, 0.5 * (1 - step / 8));
-        if (step >= 8) stopLoginChime();
-      }, 75);
-    }, 4400);
+    loginChimeAudio.addEventListener('ended', stopLoginChime, { once: true });
+    loginChimeAudio.play().then(() => {
+      announcePortalThemeState();
+      loginChimeStopTimer = window.setTimeout(() => {
+        let step = 0;
+        loginChimeFadeTimer = window.setInterval(() => {
+          if (!loginChimeAudio) return stopLoginChime();
+          step += 1;
+          loginChimeAudio.volume = Math.max(0.01, 0.5 * (1 - step / 10));
+          if (step >= 10) stopLoginChime();
+        }, 80);
+      }, 10000);
+    }).catch(() => stopLoginChime());
   } catch { stopLoginChime(); }
 }
 
@@ -552,6 +582,7 @@ function playStartupChime() {
       startupChimePlayed = true;
       startupChimePrompt?.remove();
       startupChimePrompt = null;
+      announcePortalThemeState();
       welcomeThemeStopTimer = window.setTimeout(stopWelcomeTheme, WELCOME_THEME_MAX_MS);
     }).catch(() => {
       startupChimeStarting = false;
