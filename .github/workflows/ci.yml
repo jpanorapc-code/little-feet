@@ -45,5 +45,8 @@ jobs:
       - name: High severity dependency audit
         run: npm audit --audit-level=high
 
+      - name: Git history secret-pattern scan
+        run: node tests/history-secrets.test.js
+
       - name: Diff hygiene
         run: git diff --check HEAD^ HEAD || git diff --check
