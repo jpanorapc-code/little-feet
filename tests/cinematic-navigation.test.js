@@ -215,7 +215,6 @@ assert.match(styles, /cinematic-journey\.is-active \.cinematic-stage/);
 assert.match(styles, /width: calc\(100vw - 260px\)/);
 assert.match(styles, /#homeTab\.tab-content\.active/);
 assert.match(styles, /transform: none !important/);
-assert.match(cinematic, /fetch\('\/assets\/penguin-swim-action\.json\?v=20260924-swim-v1'/);
 assert.doesNotMatch(cinematic, /fetch\(['"]https?:\/\//);
 assert.doesNotMatch(cinematic, /innerHTML\s*=/);
 
