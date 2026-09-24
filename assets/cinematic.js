@@ -8,6 +8,7 @@ const smoothstep = (a, b, value) => {
   return x * x * (3 - 2 * x);
 };
 const damp = (current, target, lambda, dt) => THREE.MathUtils.lerp(current, target, 1 - Math.exp(-lambda * dt));
+const ZERO_BONE = Object.freeze([0, 0, 0]);
 
 // Merge static meshes that share a material into one GPU buffer. This keeps
 // all authored geometry while reducing draw calls on weaker machines.
@@ -911,7 +912,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = '30';
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v2-gpu-water';
+  stage.dataset.compressionProfile = 'safe-webgl-v3-procedural-mascot';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -962,27 +963,11 @@ function initCinematicJourney() {
   mascot.rotation.y = 0;
   scene.add(mascot);
 
-  // The uploaded Riley Penguin.blend contains one real 40-frame swim action.
-  // We extracted only its authored bone-motion deltas into a tiny same-origin
-  // JSON file so the browser can use the real motion now without shipping a
-  // .blend file or waiting for the final GLB/FBX pipeline.
-  let sourceSwimAction = null;
-  fetch('/assets/penguin-swim-action.json?v=20260924-swim-v1', { cache: 'force-cache' })
-    .then(response => {
-      if (!response.ok) throw new Error(`swim action HTTP ${response.status}`);
-      return response.json();
-    })
-    .then(data => {
-      if (data?.schema !== 'little-feet-penguin-action-v1' || !data?.bones || !data?.mapping) {
-        throw new Error('swim action schema mismatch');
-      }
-      sourceSwimAction = data;
-      stage.dataset.swimSource = 'uploaded-riley-action';
-    })
-    .catch(error => {
-      console.warn('Little Feet source swim action unavailable; keeping procedural fallback.', error);
-      stage.dataset.swimSource = 'procedural-fallback';
-    });
+  // The downloaded Riley action is kept only as an archived/reference asset.
+  // Do not load or evaluate it in the browser: the procedural mascot rig below
+  // provides the swim motion without per-frame imported-bone sampling.
+  const sourceSwimAction = null;
+  stage.dataset.swimSource = 'procedural-optimized';
 
   // Microbubble wake for strong underwater strokes. It is hidden on the
   // surface and fades in only when the mascot is actually propelling.
@@ -1585,31 +1570,6 @@ function initCinematicJourney() {
     water.material.uniforms.uTime.value = time;
   };
 
-  const sampleSourceSwimBone = (boneName, cycle) => {
-    const action = sourceSwimAction;
-    const keys = action?.bones?.[boneName]?.rotationDeltaEulerXYZ;
-    if (!Array.isArray(keys) || keys.length < 2) return [0, 0, 0];
-
-    const frameStart = Number(action.source?.frameStart ?? 0);
-    const frameEnd = Number(action.source?.frameEnd ?? 40);
-    const span = Math.max(1, frameEnd - frameStart);
-    const wrapped = ((cycle % 1) + 1) % 1;
-    const frame = frameStart + wrapped * span;
-
-    for (let index = 0; index < keys.length - 1; index += 1) {
-      const from = keys[index];
-      const to = keys[index + 1];
-      if (frame > to.frame) continue;
-      const local = smoothstep(from.frame, to.frame, frame);
-      return [
-        lerp(from.euler[0], to.euler[0], local),
-        lerp(from.euler[1], to.euler[1], local),
-        lerp(from.euler[2], to.euler[2], local)
-      ];
-    }
-    return keys[keys.length - 1].euler.slice(0, 3);
-  };
-
   const animateBubbleField = (points, time, speedMultiplier = 1) => {
     const attr = points.geometry.attributes.position;
     const seeds = points.geometry.attributes.seed;
@@ -1654,19 +1614,16 @@ function initCinematicJourney() {
     const recovery = recoveryStroke - powerStroke * .28;
     const glideWave = Math.sin(swimPhase * .42);
 
-    const sourceMap = sourceSwimAction?.mapping;
-    const sourceBlend = sourceSwimAction
-      ? clamp(propulsion * (1 - streamline) * (1 - stationHold * .92) * 1.12, 0, 1)
-      : 0;
-    const sourceBodyLower = sourceMap ? sampleSourceSwimBone(sourceMap.bodyLower, strokeCycle) : [0, 0, 0];
-    const sourceBodyUpper = sourceMap ? sampleSourceSwimBone(sourceMap.bodyUpper, strokeCycle) : [0, 0, 0];
-    const sourceChest = sourceMap ? sampleSourceSwimBone(sourceMap.chestHead, strokeCycle) : [0, 0, 0];
-    const sourceRightRoot = sourceMap ? sampleSourceSwimBone(sourceMap.rightFlipperRoot, strokeCycle) : [0, 0, 0];
-    const sourceRightTip = sourceMap ? sampleSourceSwimBone(sourceMap.rightFlipperTip, strokeCycle) : [0, 0, 0];
-    const sourceLeftRoot = sourceMap ? sampleSourceSwimBone(sourceMap.leftFlipperRoot, strokeCycle) : [0, 0, 0];
-    const sourceLeftTip = sourceMap ? sampleSourceSwimBone(sourceMap.leftFlipperTip, strokeCycle) : [0, 0, 0];
-    const sourceUpperRight = sourceMap ? sampleSourceSwimBone(sourceMap.upperRight, strokeCycle) : [0, 0, 0];
-    const sourceUpperLeft = sourceMap ? sampleSourceSwimBone(sourceMap.upperLeft, strokeCycle) : [0, 0, 0];
+    const sourceBlend = 0;
+    const sourceBodyLower = ZERO_BONE;
+    const sourceBodyUpper = ZERO_BONE;
+    const sourceChest = ZERO_BONE;
+    const sourceRightRoot = ZERO_BONE;
+    const sourceRightTip = ZERO_BONE;
+    const sourceLeftRoot = ZERO_BONE;
+    const sourceLeftTip = ZERO_BONE;
+    const sourceUpperRight = ZERO_BONE;
+    const sourceUpperLeft = ZERO_BONE;
     const idleBreath = Math.sin(time * 2.05);
     const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .045;
     const idleBob = surface * Math.sin(time * 1.55) * .035;
