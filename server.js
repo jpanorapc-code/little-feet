@@ -242,6 +242,20 @@ const ensureAllLearnersHaveAccessCodes = () => {
     });
   });
 };
+const redactSensitiveLogText = value => String(value || '')
+  .replace(/\b(authorization|password|passwd|pin|token|secret|api[_ -]?key)\b\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+  .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
+  .slice(0, 500);
+const safeHttpsUrl = value => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : '';
+  } catch {
+    return '';
+  }
+};
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
 const activeLoginAttempt = (key) => {
   const entry = loginAttempts.get(key);
@@ -1063,7 +1077,7 @@ const recordSystemError = (error, req = null, extra = {}) => {
     id: crypto.randomUUID(), requestId: req?.requestId || '', schoolId: actor ? accountSchoolId(actor) : '',
     method: String(req?.method || extra.method || 'SYSTEM').slice(0, 12),
     route: String(req?.originalUrl || extra.route || '').split('?')[0].slice(0, 240),
-    name: String(error?.name || 'Error').slice(0, 80), message: String(error?.message || 'Unknown server error').slice(0, 500),
+    name: String(error?.name || 'Error').slice(0, 80), message: redactSensitiveLogText(error?.message || 'Unknown server error'),
     severity: extra.severity || 'error', status: 'open', createdAt: new Date().toISOString()
   };
   db.systemErrors.unshift(entry);
@@ -1670,6 +1684,7 @@ app.post('/api/payments/webhook', (req, res) => {
   const secret = String(process.env.LF_PAYMENT_WEBHOOK_SECRET || '');
   if (!secret) return res.status(503).json({ message: 'Payment webhook processing is not configured.' });
   const supplied = String(req.get('x-little-feet-signature') || '').trim().toLowerCase().replace(/^sha256=/, '');
+  if (!/^[0-9a-f]{64}$/.test(supplied)) return res.status(401).json({ message: 'Invalid payment webhook signature.' });
   const expected = crypto.createHmac('sha256', secret).update(req.rawBody || Buffer.from('')).digest('hex');
   const suppliedBuffer = Buffer.from(supplied, 'hex');
   const expectedBuffer = Buffer.from(expected, 'hex');
@@ -1725,7 +1740,9 @@ app.post('/api/accounts', (req, res) => {
   if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: String(schoolStoreUrl || '').trim(), linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
+  const normalisedStoreUrl = safeHttpsUrl(schoolStoreUrl);
+  if (String(schoolStoreUrl || '').trim() && !normalisedStoreUrl) return res.status(400).json({ message: 'School web-store links must use a valid HTTPS URL.' });
+  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: normalisedStoreUrl, linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
   db.users.push(account);
   res.status(201).json({ success: true, account: safeAccount(account) });
 });
@@ -1744,7 +1761,9 @@ app.put('/api/accounts/:username', (req, res) => {
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
   account.schoolName = actor.schoolName;
   account.schoolId = accountSchoolId(actor);
-  account.schoolStoreUrl = String(schoolStoreUrl || '').trim();
+  const normalisedStoreUrl = safeHttpsUrl(schoolStoreUrl);
+  if (String(schoolStoreUrl || '').trim() && !normalisedStoreUrl) return res.status(400).json({ message: 'School web-store links must use a valid HTTPS URL.' });
+  account.schoolStoreUrl = normalisedStoreUrl;
   const linkValidation = account.role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   account.linkedLearners = linkValidation.links;
@@ -1762,7 +1781,7 @@ app.delete('/api/accounts/:username', (req, res) => {
   if (!target || !isSameSchool(actor, target)) return res.status(404).json({ message: 'Account not found.' });
   if (target.role === 'admin' && db.users.filter(account => account.role === 'admin' && isSameSchool(actor, account)).length <= 1) return res.status(400).json({ message: 'Create another administrator before removing the final administrator account.' });
   const previousLength = db.users.length;
-  db.users = db.users.filter(account => account.username !== req.params.username);
+  db.users = db.users.filter(account => account !== target);
   if (db.users.length === previousLength) return res.status(404).json({ message: 'Account not found.' });
   res.json({ success: true });
 });
