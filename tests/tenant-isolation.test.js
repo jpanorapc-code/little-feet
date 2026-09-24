@@ -337,6 +337,21 @@ const rawRequest = async (route) => {
     assert.equal(invalidWorksheet.response.status, 400);
     const bravoPosts = await request('/api/posts', { cookie: bravoLogin.cookie });
     assert.equal(bravoPosts.data.length, 0);
+
+    const rejectedSchoolRemoval = await request('/api/school-deletion/execute', { method: 'POST', cookie: alphaLogin.cookie, body: { ticketId: schoolDeletionTicket.id, confirmation: 'not confirmed' } });
+    assert.equal(rejectedSchoolRemoval.response.status, 400);
+    const approvedSchoolRemoval = await request('/api/school-deletion/execute', { method: 'POST', cookie: alphaLogin.cookie, body: { ticketId: schoolDeletionTicket.id, confirmation: 'DELETE SCHOOL' } });
+    assert.equal(approvedSchoolRemoval.response.status, 200);
+    assert.equal(approvedSchoolRemoval.data.deletedSchoolId, 'school-alpha');
+
+    const deletedAlphaSession = await request('/api/auth/session', { cookie: alphaLogin.cookie });
+    assert.equal(deletedAlphaSession.data.authenticated, false);
+    const survivingBravoSession = await request('/api/auth/session', { cookie: bravoLogin.cookie });
+    assert.equal(survivingBravoSession.data.authenticated, true);
+    const survivingBravoAccounts = await request('/api/accounts', { cookie: bravoLogin.cookie });
+    assert.ok(survivingBravoAccounts.data.some(account => account.username === 'bravo-admin'));
+    assert.ok(survivingBravoAccounts.data.some(account => account.username === 'bravo-parent'));
+
     console.log('Tenant isolation test passed.');
   } catch (error) {
     console.error(error);
