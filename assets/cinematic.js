@@ -9,6 +9,36 @@ const smoothstep = (a, b, value) => {
 };
 const damp = (current, target, lambda, dt) => THREE.MathUtils.lerp(current, target, 1 - Math.exp(-lambda * dt));
 
+// Merge static meshes that share a material into one GPU buffer. This keeps
+// all authored geometry while reducing draw calls on weaker machines.
+const mergeStaticGeometries = geometries => {
+  const prepared = geometries.map(geometry => {
+    const copy = geometry.index ? geometry.toNonIndexed() : geometry.clone();
+    return copy;
+  });
+  const attributes = ['position', 'normal', 'uv'];
+  const merged = new THREE.BufferGeometry();
+
+  attributes.forEach(name => {
+    const present = prepared.map(geometry => geometry.getAttribute(name));
+    if (present.some(attribute => !attribute)) return;
+    const itemSize = present[0].itemSize;
+    const ArrayType = present[0].array.constructor;
+    const totalLength = present.reduce((sum, attribute) => sum + attribute.array.length, 0);
+    const values = new ArrayType(totalLength);
+    let offset = 0;
+    present.forEach(attribute => {
+      values.set(attribute.array, offset);
+      offset += attribute.array.length;
+    });
+    merged.setAttribute(name, new THREE.BufferAttribute(values, itemSize, present[0].normalized));
+  });
+
+  prepared.forEach(geometry => geometry.dispose());
+  merged.computeBoundingSphere();
+  return merged;
+};
+
 // Keep the authored scene at full detail. Runtime performance is managed
 // separately so a machine is never punished just because it reports more RAM,
 // CPU cores, a high-DPI display, or a high-refresh monitor.
@@ -272,6 +302,7 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
   core.position.y = .05;
   group.add(core);
 
+  const tentacleGeometries = [];
   for (let i = 0; i < 8; i += 1) {
     const angle = (i / 8) * Math.PI * 2;
     const x = Math.cos(angle) * .47;
@@ -282,13 +313,23 @@ function createJellyfish(color = 0x83f8ff, accent = 0x725dff) {
       new THREE.Vector3(x * .45 - Math.cos(i) * .14, -1.85, z * .44),
       new THREE.Vector3(x * .25, -2.65 - (i % 3) * .22, z * .2)
     ]);
-    const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 22, .025 + (i % 2) * .011, 7, false),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .45, blending: THREE.AdditiveBlending })
-    );
-    group.add(tube);
+    tentacleGeometries.push(new THREE.TubeGeometry(curve, 22, .025 + (i % 2) * .011, 7, false));
   }
+
+  const tentacles = new THREE.Mesh(
+    mergeStaticGeometries(tentacleGeometries),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: .45,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  tentacleGeometries.forEach(geometry => geometry.dispose());
+  group.add(tentacles);
+
   group.userData.bell = bell;
+  group.userData.tentacles = tentacles;
   return group;
 }
 
@@ -397,33 +438,41 @@ function createMantaRay(color = 0x77d9ff) {
 
 function createKelpPatch(count, color = 0x2cffb5) {
   const patch = new THREE.Group();
-  const fronds = [];
+  const buckets = [[], [], []];
+
   for (let index = 0; index < count; index += 1) {
     const height = 2.7 + (index % 5) * .6;
     const x = (index - (count - 1) / 2) * .62;
     const z = Math.sin(index * 1.9) * 1.5;
     const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(.12 * Math.sin(index), height * .34, 0),
-      new THREE.Vector3(-.15 * Math.cos(index * 1.3), height * .69, .03),
-      new THREE.Vector3(.12 * Math.sin(index * .7), height, 0)
+      new THREE.Vector3(x, 0, z),
+      new THREE.Vector3(x + .12 * Math.sin(index), height * .34, z),
+      new THREE.Vector3(x - .15 * Math.cos(index * 1.3), height * .69, z + .03),
+      new THREE.Vector3(x + .12 * Math.sin(index * .7), height, z)
     ]);
-    const frond = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 18, .035 + (index % 3) * .008, 6, false),
-      new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: .8,
-        roughness: .45,
-        transparent: true,
-        opacity: .72
-      })
+    buckets[index % 3].push(
+      new THREE.TubeGeometry(curve, 18, .035 + (index % 3) * .008, 6, false)
     );
-    frond.position.set(x, 0, z);
-    frond.userData.phase = index * .83;
-    patch.add(frond);
-    fronds.push(frond);
   }
+
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: .8,
+    roughness: .45,
+    transparent: true,
+    opacity: .72
+  });
+
+  const fronds = buckets.filter(bucket => bucket.length).map((bucket, bucketIndex) => {
+    const geometry = mergeStaticGeometries(bucket);
+    bucket.forEach(item => item.dispose());
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.phase = bucketIndex * 1.31;
+    patch.add(mesh);
+    return mesh;
+  });
+
   patch.userData.fronds = fronds;
   return patch;
 }
