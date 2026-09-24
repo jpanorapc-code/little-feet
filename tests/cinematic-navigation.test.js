@@ -23,6 +23,11 @@ assert.match(cinematic, /qualityForDevice/);
 assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
 assert.match(cinematic, /accessibleNavTarget/);
 assert.match(cinematic, /document\.hidden/);
+assert.match(cinematic, /CylinderGeometry\(3\.45, 3\.05, \.62/);
+assert.match(cinematic, /camera\.position\.set\(\.8, 3\.8, 11\.8\)/);
+assert.match(cinematic, /firstFrameRendered/);
+assert.match(cinematic, /webglcontextlost/);
+assert.match(cinematic, /cinematic render failed/);
 assert.doesNotMatch(cinematic, /fetch\(/);
 assert.doesNotMatch(cinematic, /innerHTML\s*=/);
 
