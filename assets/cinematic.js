@@ -265,6 +265,181 @@ function createStationRing(color) {
   return group;
 }
 
+
+function createFishSchool(count, color, accent = 0xffffff) {
+  const school = new THREE.Group();
+  const bodyMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9 });
+  const accentMaterial = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: .72 });
+  const bodyGeometry = new THREE.SphereGeometry(.16, 10, 7);
+  const tailGeometry = new THREE.ConeGeometry(.13, .28, 3);
+
+  const fish = [];
+  for (let index = 0; index < count; index += 1) {
+    const swimmer = new THREE.Group();
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.scale.set(1.85, .66, .62);
+    const tail = new THREE.Mesh(tailGeometry, accentMaterial);
+    tail.position.x = -.34;
+    tail.rotation.z = Math.PI / 2;
+    tail.scale.set(.95, 1, .7);
+    swimmer.add(body, tail);
+    const lane = (index % 4) - 1.5;
+    const row = Math.floor(index / 4);
+    swimmer.position.set(
+      -row * .62 - (index % 2) * .22,
+      lane * .34 + Math.sin(index * 1.7) * .11,
+      Math.sin(index * 2.1) * .65
+    );
+    const size = .72 + (index % 5) * .055;
+    swimmer.scale.setScalar(size);
+    swimmer.userData = {
+      phase: index * 1.37,
+      base: swimmer.position.clone(),
+      speed: .85 + (index % 3) * .11
+    };
+    school.add(swimmer);
+    fish.push(swimmer);
+  }
+  school.userData = { fish, base: new THREE.Vector3(), speed: 1, phase: 0, span: 12 };
+  return school;
+}
+
+function createMantaRay(color = 0x77d9ff) {
+  const group = new THREE.Group();
+  const material = new THREE.MeshPhysicalMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: .7,
+    roughness: .28,
+    transparent: true,
+    opacity: .78,
+    clearcoat: .7,
+    side: THREE.DoubleSide
+  });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.48, 18, 12), material);
+  body.scale.set(1.35, .32, 1.7);
+  group.add(body);
+
+  const makeWing = side => {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.quadraticCurveTo(side * 1.35, .34, side * 2.15, -.05);
+    shape.quadraticCurveTo(side * 1.15, -.62, 0, -.18);
+    shape.lineTo(0, 0);
+    const wing = new THREE.Mesh(new THREE.ShapeGeometry(shape, 10), material);
+    wing.rotation.x = -Math.PI / 2;
+    return wing;
+  };
+  const wingL = makeWing(-1);
+  const wingR = makeWing(1);
+  group.add(wingL, wingR);
+
+  const tailCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, -.65),
+    new THREE.Vector3(.03, -.02, -1.55),
+    new THREE.Vector3(-.05, .01, -2.65)
+  ]);
+  const tail = new THREE.Mesh(
+    new THREE.TubeGeometry(tailCurve, 18, .025, 6, false),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .5 })
+  );
+  group.add(tail);
+  group.userData = { wingL, wingR, baseScale: group.scale.clone(), phase: 0, speed: .18 };
+  return group;
+}
+
+function createKelpPatch(count, color = 0x2cffb5) {
+  const patch = new THREE.Group();
+  const fronds = [];
+  for (let index = 0; index < count; index += 1) {
+    const height = 2.7 + (index % 5) * .6;
+    const x = (index - (count - 1) / 2) * .62;
+    const z = Math.sin(index * 1.9) * 1.5;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(.12 * Math.sin(index), height * .34, 0),
+      new THREE.Vector3(-.15 * Math.cos(index * 1.3), height * .69, .03),
+      new THREE.Vector3(.12 * Math.sin(index * .7), height, 0)
+    ]);
+    const frond = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 18, .035 + (index % 3) * .008, 6, false),
+      new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: .8,
+        roughness: .45,
+        transparent: true,
+        opacity: .72
+      })
+    );
+    frond.position.set(x, 0, z);
+    frond.userData.phase = index * .83;
+    patch.add(frond);
+    fronds.push(frond);
+  }
+  patch.userData.fronds = fronds;
+  return patch;
+}
+
+function createGlowReef(color = 0x42f5e9, accent = 0x9768ff) {
+  const group = new THREE.Group();
+  const baseMaterial = new THREE.MeshStandardMaterial({
+    color: 0x063a54,
+    roughness: .78,
+    metalness: .08
+  });
+  const glowMaterial = new THREE.MeshStandardMaterial({
+    color,
+    emissive: accent,
+    emissiveIntensity: 2.2,
+    roughness: .32
+  });
+
+  for (let index = 0; index < 11; index += 1) {
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(.55 + (index % 4) * .18, 1), baseMaterial);
+    rock.scale.y = .45 + (index % 3) * .16;
+    rock.position.set((index - 5) * .72, Math.sin(index * 2.2) * .18, Math.cos(index * 1.7) * 1.25);
+    group.add(rock);
+
+    if (index % 2 === 0) {
+      const coral = new THREE.Mesh(new THREE.CylinderGeometry(.05, .11, .8 + (index % 3) * .28, 8), glowMaterial);
+      coral.position.set(rock.position.x, .5 + (index % 3) * .16, rock.position.z);
+      coral.rotation.z = (index - 5) * .035;
+      group.add(coral);
+    }
+  }
+  const light = new THREE.PointLight(color, 5.5, 9, 2);
+  light.position.set(0, 1.2, 0);
+  group.add(light);
+  group.userData = { light, baseIntensity: light.intensity };
+  return group;
+}
+
+function createCausticBeams(count = 4) {
+  const group = new THREE.Group();
+  const beams = [];
+  for (let index = 0; index < count; index += 1) {
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(2.4 + index * .55, 16 + index * 1.7, 22, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: index % 2 ? 0x6cf7ff : 0xc4fbff,
+        transparent: true,
+        opacity: .035 + index * .008,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+    beam.position.set(-7 + index * 4.5, -6 - index * 2.1, -8 - index * 1.3);
+    beam.rotation.z = -.16 + index * .08;
+    beam.userData.phase = index * 1.4;
+    group.add(beam);
+    beams.push(beam);
+  }
+  group.userData.beams = beams;
+  return group;
+}
+
 function initCinematicJourney() {
   const journey = document.getElementById('littleFeetCinematicJourney');
   const stage = document.getElementById('littleFeetCinematicStage');
