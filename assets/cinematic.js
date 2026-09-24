@@ -65,22 +65,25 @@ function createMascot() {
   belly.castShadow = true;
   group.add(belly);
 
+  const headRig = new THREE.Group();
+  headRig.position.set(0, 1.12, .03);
+  group.add(headRig);
+
   const head = new THREE.Mesh(new THREE.SphereGeometry(.79, 40, 30), blueDark);
-  head.position.set(0, 1.12, .03);
   head.scale.set(1, .94, .94);
   head.castShadow = true;
-  group.add(head);
+  headRig.add(head);
 
   const facePatch = new THREE.Mesh(new THREE.SphereGeometry(.58, 32, 24), white);
   facePatch.scale.set(.88, .82, .28);
-  facePatch.position.set(0, 1.07, .63);
-  group.add(facePatch);
+  facePatch.position.set(0, -.05, .60);
+  headRig.add(facePatch);
 
   const beak = new THREE.Mesh(new THREE.ConeGeometry(.23, .48, 4), orange);
   beak.rotation.x = Math.PI / 2;
   beak.rotation.z = Math.PI / 4;
-  beak.position.set(0, .96, 1.02);
-  group.add(beak);
+  beak.position.set(0, -.16, .99);
+  headRig.add(beak);
 
   const leftFlipper = new THREE.Mesh(new THREE.CapsuleGeometry(.18, 1.05, 7, 16), blueDark);
   leftFlipper.scale.set(.72, 1, .38);
@@ -96,18 +99,18 @@ function createMascot() {
   const eyeGeo = new THREE.SphereGeometry(.105, 18, 14);
   const eyeL = new THREE.Mesh(eyeGeo, black);
   const eyeR = new THREE.Mesh(eyeGeo, black);
-  eyeL.position.set(-.24, 1.22, .86);
-  eyeR.position.set(.24, 1.22, .86);
-  group.add(eyeL, eyeR);
+  eyeL.position.set(-.24, .10, .83);
+  eyeR.position.set(.24, .10, .83);
+  headRig.add(eyeL, eyeR);
 
   const ringGeo = new THREE.TorusGeometry(.22, .045, 10, 26);
   const ringL = new THREE.Mesh(ringGeo, glass);
   const ringR = new THREE.Mesh(ringGeo, glass);
-  ringL.position.set(-.25, 1.22, .95);
-  ringR.position.set(.25, 1.22, .95);
+  ringL.position.set(-.25, .10, .92);
+  ringR.position.set(.25, .10, .92);
   const bridge = new THREE.Mesh(new THREE.BoxGeometry(.18,.055,.055), glass);
-  bridge.position.set(0,1.22,.95);
-  group.add(ringL, ringR, bridge);
+  bridge.position.set(0,.10,.92);
+  headRig.add(ringL, ringR, bridge);
 
   const footGeo = new THREE.SphereGeometry(.32, 20, 14);
   const footL = new THREE.Mesh(footGeo, orange);
@@ -118,7 +121,10 @@ function createMascot() {
   footR.position.set(.38,-1.32,.18);
   group.add(footL, footR);
 
-  group.userData = { body, head, leftFlipper, rightFlipper, eyeL, eyeR, footL, footR };
+  group.userData = {
+    body, head, headRig, leftFlipper, rightFlipper, eyeL, eyeR, footL, footR,
+    eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone()
+  };
   group.scale.setScalar(.92);
   return group;
 }
@@ -456,6 +462,54 @@ function initCinematicJourney() {
   const pointer = { x: 0, y: 0, smoothX: 0, smoothY: 0 };
   let scrollProgress = 0;
   let smoothProgress = 0;
+  let mascotSoundUnlocked = false;
+  let lastMascotChirpAt = 0;
+  let lastMascotSoundBand = -1;
+
+  const portalSoundMuted = () => {
+    try { return localStorage.getItem('lf_portal_audio_muted_last') === 'true'; }
+    catch { return false; }
+  };
+
+  const playMascotChirp = (variant = 0) => {
+    if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
+    const nowMs = performance.now();
+    if (nowMs - lastMascotChirpAt < 1100) return;
+    lastMascotChirpAt = nowMs;
+    try {
+      const getContext = typeof window.getPortalAudioContext === 'function' ? window.getPortalAudioContext : null;
+      const ctx = getContext ? getContext() : null;
+      if (!ctx || ctx.state === 'suspended') return;
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, ctx.currentTime);
+      master.gain.exponentialRampToValueAtTime(0.055, ctx.currentTime + .012);
+      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + .32);
+      master.connect(ctx.destination);
+      const patterns = [[920,1180],[760,1040,1320],[1080,860]];
+      const tones = patterns[variant % patterns.length];
+      tones.forEach((frequency, index) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = ctx.currentTime + index * .075;
+        osc.type = index % 2 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(frequency, start);
+        osc.frequency.exponentialRampToValueAtTime(frequency * 1.04, start + .06);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(.7, start + .008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + .09);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(start);
+        osc.stop(start + .11);
+      });
+    } catch { /* Mascot sound remains optional if a browser blocks Web Audio. */ }
+  };
+
+  const unlockMascotSound = () => {
+    mascotSoundUnlocked = true;
+  };
+  stage.addEventListener('pointerdown', unlockMascotSound, { once: true, passive: true });
+  stage.addEventListener('keydown', unlockMascotSound, { once: true });
 
   // A deterministic dive path keeps the mascot tied to the same scroll
   // milestones as the underwater stations instead of letting camera math
@@ -466,10 +520,10 @@ function initCinematicJourney() {
     { at: 0.16, x: -1.70, y:  2.55, z:  0.20, pitch: 0.18, roll: -0.18 },
     { at: 0.22, x: -0.65, y:  0.55, z:  0.05, pitch: 0.82, roll: -0.38 },
     { at: 0.27, x:  0.35, y: -1.10, z: -0.10, pitch: 1.02, roll: -0.20 },
-    { at: 0.43, x: -2.85, y: -7.45, z: -0.55, pitch: 0.88, roll:  0.12 },
-    { at: 0.62, x:  2.70, y: -15.25, z: 0.20, pitch: 0.82, roll: -0.10 },
-    { at: 0.79, x: -2.90, y: -23.35, z: -0.42, pitch: 0.86, roll:  0.10 },
-    { at: 0.94, x:  2.55, y: -31.35, z: 0.05, pitch: 0.78, roll: -0.08 },
+    { at: 0.43, x: -5.10, y: -7.45, z: -0.55, pitch: 0.88, roll:  0.18 },
+    { at: 0.62, x:  5.35, y: -15.25, z: 0.20, pitch: 0.82, roll: -0.16 },
+    { at: 0.79, x: -5.45, y: -23.35, z: -0.42, pitch: 0.86, roll:  0.16 },
+    { at: 0.94, x:  5.00, y: -31.35, z: 0.05, pitch: 0.78, roll: -0.14 },
     { at: 1.00, x:  0.00, y: -35.80, z: 0.00, pitch: 0.66, roll:  0.00 }
   ];
 
@@ -506,7 +560,10 @@ function initCinematicJourney() {
     if (journey.offsetHeight < 2) return;
     const top = journey.offsetTop;
     const travel = Math.max(1, journey.offsetHeight - window.innerHeight);
-    scrollProgress = clamp((window.scrollY - top) / travel);
+    const raw = (window.scrollY - top) / travel;
+    scrollProgress = clamp(raw);
+    journey.classList.toggle('is-active', raw >= 0 && raw <= 1);
+    journey.classList.toggle('is-after', raw > 1);
     updateProgressUI(scrollProgress);
   };
 
@@ -552,27 +609,43 @@ function initCinematicJourney() {
     water.geometry.computeVertexNormals();
   };
 
-  const animateMascot = (progress, time) => {
+  const animateMascot = (progress, time, dt) => {
     const data = mascot.userData;
     const path = sampleDivePath(progress);
     const underwater = smoothstep(.22, .31, progress);
     const swim = smoothstep(.27, .38, progress);
-    const swimWave = Math.sin(time * 3.5);
+    const swimPhase = time * 4.7 + progress * 8.0;
+    const swimWave = Math.sin(swimPhase);
+    const glideWave = Math.sin(swimPhase * .5);
     const idleBob = (1 - underwater) * Math.sin(time * 1.7) * .035;
 
-    mascot.position.set(path.x, path.y + idleBob, path.z);
-    mascot.rotation.z = path.roll + swim * Math.sin(time * 1.15) * .10;
-    mascot.rotation.x = path.pitch + swim * Math.sin(time * 1.7) * .055;
-    mascot.rotation.y = -.24 + swim * Math.sin(progress * Math.PI * 4) * .22;
+    mascot.position.set(path.x, path.y + idleBob + swim * Math.sin(swimPhase * .55) * .12, path.z);
+    mascot.rotation.z = path.roll + swim * glideWave * .13;
+    mascot.rotation.x = path.pitch + swim * Math.sin(swimPhase * .7) * .07;
+    mascot.rotation.y = -.24 + swim * Math.sin(progress * Math.PI * 4) * .28;
 
-    const flipperSpeed = swim > .05 ? 5.2 : 1.9;
-    const flipperRange = swim > .05 ? .72 : .09;
-    data.leftFlipper.rotation.z = -.48 + Math.sin(time * flipperSpeed) * flipperRange;
-    data.rightFlipper.rotation.z = .48 - Math.sin(time * flipperSpeed) * flipperRange;
-    data.leftFlipper.rotation.x = -.14 + swim * .9;
-    data.rightFlipper.rotation.x = -.14 + swim * .9;
-    data.footL.rotation.x = swim * (swimWave * .5);
-    data.footR.rotation.x = swim * (-swimWave * .5);
+    // Penguin propulsion: powerful mirrored flipper strokes with a smaller foot kick.
+    const stroke = Math.sin(swimPhase);
+    const recovery = Math.sin(swimPhase + Math.PI * .5);
+    data.leftFlipper.rotation.z = lerp(-.48, -1.05 + stroke * .46, swim);
+    data.rightFlipper.rotation.z = lerp(.48, 1.05 - stroke * .46, swim);
+    data.leftFlipper.rotation.x = lerp(-.14, .72 + recovery * .34, swim);
+    data.rightFlipper.rotation.x = lerp(-.14, .72 - recovery * .34, swim);
+    data.leftFlipper.rotation.y = swim * (.18 + stroke * .20);
+    data.rightFlipper.rotation.y = swim * (-.18 - stroke * .20);
+    data.footL.rotation.x = swim * (.22 + swimWave * .54);
+    data.footR.rotation.x = swim * (.22 - swimWave * .54);
+
+    // The head and pupils track the pointer independently from the camera.
+    data.headRig.rotation.y = damp(data.headRig.rotation.y, pointer.smoothX * .34, 7.5, dt);
+    data.headRig.rotation.x = damp(data.headRig.rotation.x, -pointer.smoothY * .22 + swim * .03, 7.5, dt);
+    data.headRig.rotation.z = damp(data.headRig.rotation.z, pointer.smoothX * -.055, 7.5, dt);
+    const eyeX = pointer.smoothX * .055;
+    const eyeY = pointer.smoothY * .038;
+    data.eyeL.position.x = damp(data.eyeL.position.x, data.eyeLBase.x + eyeX, 10, dt);
+    data.eyeR.position.x = damp(data.eyeR.position.x, data.eyeRBase.x + eyeX, 10, dt);
+    data.eyeL.position.y = damp(data.eyeL.position.y, data.eyeLBase.y + eyeY, 10, dt);
+    data.eyeR.position.y = damp(data.eyeR.position.y, data.eyeRBase.y + eyeY, 10, dt);
 
     const blink = (time % 4.8) > 4.68 ? .08 : 1;
     data.eyeL.scale.y = blink;
@@ -584,23 +657,29 @@ function initCinematicJourney() {
     pointer.smoothX = damp(pointer.smoothX, pointer.x, 4.4, dt);
     pointer.smoothY = damp(pointer.smoothY, pointer.y, 4.4, dt);
 
-    animateMascot(smoothProgress, time);
+    animateMascot(smoothProgress, time, dt);
     updateWater(time);
 
     const submerged = smoothstep(.20, .30, smoothProgress);
     const followHeight = lerp(3.8, mascot.position.y + 4.25, submerged);
     const targetZ = lerp(11.8, 8.9, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .28;
-    const targetX = lerp(.8, mascot.position.x * .34, submerged);
-    camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * 1.05, 4.5, dt);
+    const targetX = lerp(.8, mascot.position.x * .10, submerged);
+    camera.position.x = damp(camera.position.x, targetX + pointer.smoothX * .72, 4.2, dt);
     // Follow more slowly on Y than the mascot moves. The small lag makes the
     // entry visibly read as a downward dive instead of the camera outrunning it.
     camera.position.y = damp(camera.position.y, followHeight + pointer.smoothY * .5, 3.1, dt);
     camera.position.z = damp(camera.position.z, targetZ, 4.8, dt);
     camera.lookAt(
-      mascot.position.x * .58 + pointer.smoothX * .55,
+      mascot.position.x * .20 + pointer.smoothX * .42,
       mascot.position.y - lerp(.2, .65, submerged) + pointer.smoothY * .34,
       mascot.position.z
     );
+
+    const soundBand = smoothProgress < .18 ? 0 : smoothProgress < .30 ? 1 : smoothProgress < .60 ? 2 : 3;
+    if (soundBand !== lastMascotSoundBand) {
+      lastMascotSoundBand = soundBand;
+      if (soundBand > 0) playMascotChirp(soundBand - 1);
+    }
 
     scene.fog.density = lerp(.008, .027, submerged);
     renderer.setClearColor(new THREE.Color().setRGB(
