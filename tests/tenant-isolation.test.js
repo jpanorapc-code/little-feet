@@ -37,7 +37,7 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
 
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
-  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
+  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', LF_TEST_ALLOW_REPLICA_WRITES: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
   stdio: ['ignore', 'ignore', 'pipe']
 });
 let childErrorOutput = '';
