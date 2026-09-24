@@ -1135,6 +1135,17 @@ function initCinematicJourney() {
   let splashSoundArmed = true;
   let cinematicAudio = null;
   let cinematicAudioStarting = false;
+  let penguinCallBuffer = null;
+  let penguinCallLoading = null;
+  let activePenguinCallSource = null;
+  let activePenguinCallUntil = 0;
+  const penguinCallSegments = [
+    { offset: .08, duration: .72 },
+    { offset: .83, duration: .43 },
+    { offset: 1.30, duration: .225 },
+    { offset: 1.59, duration: .405 },
+    { offset: 2.04, duration: .18 }
+  ];
 
   const portalSoundMuted = () => {
     if (typeof window.isPortalAudioMuted === 'function') return window.isPortalAudioMuted();
@@ -1266,81 +1277,90 @@ function initCinematicJourney() {
   };
 
   const scheduleNextMascotChirp = (nowMs = performance.now(), progress = smoothProgress) => {
+    // Real penguin calls should feel occasional and unpredictable, not looped.
+    // Use a shorter gap while the user is actively travelling through the scene.
     const underwater = progress > .28;
-    const minGap = underwater ? 7600 : 4800;
-    const variation = underwater ? 7600 : 6200;
+    const minGap = underwater ? 3200 : 2600;
+    const variation = underwater ? 5200 : 4200;
     nextMascotChirpAt = nowMs + minGap + Math.random() * variation;
+  };
+
+  const ensurePenguinCallBuffer = () => {
+    if (penguinCallBuffer) return Promise.resolve(penguinCallBuffer);
+    if (penguinCallLoading) return penguinCallLoading;
+    const ctx = portalContext();
+    if (!ctx) return Promise.resolve(null);
+
+    penguinCallLoading = fetch('/assets/audio/penguin-calls-sprite.mp3?v=20260924-call-v1', { cache: 'force-cache' })
+      .then(response => {
+        if (!response.ok) throw new Error(`penguin call HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(bytes => ctx.decodeAudioData(bytes))
+      .then(buffer => {
+        penguinCallBuffer = buffer;
+        stage.dataset.penguinCallAudio = 'ready';
+        return buffer;
+      })
+      .catch(error => {
+        console.warn('Little Feet penguin call audio unavailable.', error);
+        stage.dataset.penguinCallAudio = 'unavailable';
+        return null;
+      })
+      .finally(() => { penguinCallLoading = null; });
+
+    return penguinCallLoading;
   };
 
   const playMascotChirp = (variant = 0) => {
     if (!mascotSoundUnlocked || portalSoundMuted() || portalIntroThemePlaying() || document.hidden) return false;
+    if (!journey.classList.contains('is-active')) return false;
+
     const nowMs = performance.now();
-    if (nowMs - lastMascotChirpAt < 900) return false;
+    if (nowMs < activePenguinCallUntil || nowMs - lastMascotChirpAt < 1200) return false;
 
     const ctx = portalContext();
-    if (!ctx || ctx.state !== 'running') return false;
+    if (!ctx || ctx.state !== 'running' || !penguinCallBuffer) {
+      ensurePenguinCallBuffer();
+      return false;
+    }
 
-    const patterns = [
-      [760, 1040, 880],
-      [690, 930, 1180, 980],
-      [860, 720, 970],
-      [820, 1080],
-      [710, 860, 760, 1020, 890]
-    ];
-    const tones = patterns[variant % patterns.length];
-    const beatTimeline = [];
-    let finalEnd = 0;
+    const randomIndex = Math.floor(Math.random() * penguinCallSegments.length);
+    const segment = penguinCallSegments[(randomIndex + variant) % penguinCallSegments.length];
+    const duration = Math.min(segment.duration, Math.max(.05, penguinCallBuffer.duration - segment.offset));
+    if (duration <= .05) return false;
 
     try {
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0.0001, ctx.currentTime);
-      master.gain.exponentialRampToValueAtTime(0.105, ctx.currentTime + .012);
-      master.connect(ctx.destination);
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      source.buffer = penguinCallBuffer;
+      gain.gain.setValueAtTime(.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.22, ctx.currentTime + .012);
+      gain.gain.setValueAtTime(.22, ctx.currentTime + Math.max(.02, duration - .045));
+      gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + duration);
+      source.connect(gain);
+      gain.connect(ctx.destination);
 
-      tones.forEach((frequency, index) => {
-        const osc = ctx.createOscillator();
-        const harmonic = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const harmonicGain = ctx.createGain();
-        const offset = index * .092;
-        const start = ctx.currentTime + offset;
-        const length = .105 + (index % 2) * .028;
-        const end = offset + length;
-        finalEnd = Math.max(finalEnd, end);
-        beatTimeline.push({
-          startMs: nowMs + offset * 1000,
-          peakMs: nowMs + (offset + .025) * 1000,
-          endMs: nowMs + end * 1000
-        });
+      source.start(ctx.currentTime, segment.offset, duration);
+      activePenguinCallSource = source;
+      activePenguinCallUntil = nowMs + duration * 1000 + 80;
+      source.onended = () => {
+        if (activePenguinCallSource === source) activePenguinCallSource = null;
+      };
 
-        osc.type = 'triangle';
-        harmonic.type = 'sine';
-        osc.frequency.setValueAtTime(frequency * .94, start);
-        osc.frequency.exponentialRampToValueAtTime(frequency * 1.07, start + length);
-        harmonic.frequency.setValueAtTime(frequency * 2.02, start);
-
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(.82, start + .01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-        harmonicGain.gain.setValueAtTime(0.0001, start);
-        harmonicGain.gain.exponentialRampToValueAtTime(.14, start + .012);
-        harmonicGain.gain.exponentialRampToValueAtTime(0.0001, start + length * .9);
-
-        osc.connect(gain); gain.connect(master);
-        harmonic.connect(harmonicGain); harmonicGain.connect(master);
-        osc.start(start); harmonic.start(start);
-        osc.stop(start + length + .02); harmonic.stop(start + length + .02);
-      });
-
-      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + finalEnd + .07);
       lastMascotChirpAt = nowMs;
-      mascotChirpTimeline = beatTimeline;
-      mascotChirpUntil = nowMs + (finalEnd + .08) * 1000;
+      mascotChirpTimeline = [{
+        startMs: nowMs,
+        peakMs: nowMs + Math.min(90, duration * 350),
+        endMs: nowMs + duration * 1000
+      }];
+      mascotChirpUntil = nowMs + duration * 1000;
       scheduleNextMascotChirp(nowMs, smoothProgress);
+      stage.dataset.lastPenguinCall = String((randomIndex + variant) % penguinCallSegments.length);
       return true;
     } catch {
-      mascotChirpTimeline = [];
-      mascotChirpUntil = 0;
+      activePenguinCallSource = null;
+      activePenguinCallUntil = 0;
       return false;
     }
   };
@@ -1382,9 +1402,11 @@ function initCinematicJourney() {
       ctx.resume().then(() => {
         mascotSoundUnlocked = true;
         ensureCinematicAudio();
+        ensurePenguinCallBuffer();
       }).catch(() => {});
     } else if (mascotSoundUnlocked) {
       ensureCinematicAudio();
+      ensurePenguinCallBuffer();
     }
   };
 
