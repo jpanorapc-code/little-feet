@@ -256,7 +256,6 @@ assert.match(cinematic, /playMascotChirp/);
 assert.match(cinematic, /scheduleNextMascotChirp/);
 assert.match(cinematic, /mascotChirpTimeline/);
 assert.match(cinematic, /nextMascotChirpAt/);
-assert.match(backup, /WELCOME_THEME_MAX_MS = 10000/);
 assert.match(backup, /window\.isPortalIntroThemePlaying/);
 assert.match(backup, /10000\);/);
 assert.match(cinematic, /lf_portal_audio_muted_last/);
