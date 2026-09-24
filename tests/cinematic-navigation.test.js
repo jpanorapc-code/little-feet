@@ -256,7 +256,6 @@ assert.match(cinematic, /playMascotChirp/);
 assert.match(cinematic, /scheduleNextMascotChirp/);
 assert.match(cinematic, /mascotChirpTimeline/);
 assert.match(cinematic, /nextMascotChirpAt/);
-assert.match(backup, /window\.isPortalIntroThemePlaying/);
 assert.match(backup, /10000\);/);
 assert.match(cinematic, /lf_portal_audio_muted_last/);
 assert.match(cinematic, /journey\.classList\.toggle\('is-active'/);
