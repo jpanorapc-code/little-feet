@@ -949,6 +949,8 @@ function initCinematicJourney() {
   let lastMascotChirpAt = 0;
   let lastMascotSoundBand = -1;
   let mascotChirpUntil = 0;
+  let mascotChirpTimeline = [];
+  let nextMascotChirpAt = performance.now() + 5200;
   let splashSoundArmed = true;
   let cinematicAudio = null;
   let cinematicAudioStarting = false;
@@ -957,6 +959,22 @@ function initCinematicJourney() {
     if (typeof window.isPortalAudioMuted === 'function') return window.isPortalAudioMuted();
     try { return localStorage.getItem('lf_portal_audio_muted_last') === 'true'; }
     catch { return false; }
+  };
+
+  const portalIntroThemePlaying = () => {
+    try {
+      return typeof window.isPortalIntroThemePlaying === 'function'
+        ? window.isPortalIntroThemePlaying()
+        : false;
+    } catch {
+      return false;
+    }
+  };
+
+  const stopPortalIntroTheme = () => {
+    try {
+      if (typeof window.stopPortalIntroTheme === 'function') window.stopPortalIntroTheme();
+    } catch { /* Intro handoff is optional. */ }
   };
 
   const portalContext = () => {
@@ -1054,7 +1072,7 @@ function initCinematicJourney() {
     const audio = ensureCinematicAudio();
     if (!audio) return;
     const now = audio.ctx.currentTime;
-    const muted = portalSoundMuted() || !audible || document.hidden;
+    const muted = portalSoundMuted() || portalIntroThemePlaying() || !audible || document.hidden;
     const masterTarget = muted ? 0.0001 : 0.12;
     const surfaceTarget = muted ? 0.0001 : Math.max(0.0001, (1 - submerged) * .72);
     const underwaterTarget = muted ? 0.0001 : Math.max(0.0001, submerged * .58);
@@ -1066,36 +1084,53 @@ function initCinematicJourney() {
     audio.underwaterGain.gain.setTargetAtTime(underwaterTarget, now, .22);
   };
 
+  const scheduleNextMascotChirp = (nowMs = performance.now(), progress = smoothProgress) => {
+    const underwater = progress > .28;
+    const minGap = underwater ? 7600 : 4800;
+    const variation = underwater ? 7600 : 6200;
+    nextMascotChirpAt = nowMs + minGap + Math.random() * variation;
+  };
+
   const playMascotChirp = (variant = 0) => {
-    if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
+    if (!mascotSoundUnlocked || portalSoundMuted() || portalIntroThemePlaying() || document.hidden) return false;
     const nowMs = performance.now();
-    if (nowMs - lastMascotChirpAt < 900) return;
-    lastMascotChirpAt = nowMs;
-    mascotChirpUntil = nowMs + 420;
+    if (nowMs - lastMascotChirpAt < 900) return false;
 
     const ctx = portalContext();
-    if (!ctx || ctx.state !== 'running') return;
+    if (!ctx || ctx.state !== 'running') return false;
+
+    const patterns = [
+      [760, 1040, 880],
+      [690, 930, 1180, 980],
+      [860, 720, 970],
+      [820, 1080],
+      [710, 860, 760, 1020, 890]
+    ];
+    const tones = patterns[variant % patterns.length];
+    const beatTimeline = [];
+    let finalEnd = 0;
 
     try {
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.0001, ctx.currentTime);
-      master.gain.exponentialRampToValueAtTime(0.11, ctx.currentTime + .012);
-      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + .46);
+      master.gain.exponentialRampToValueAtTime(0.105, ctx.currentTime + .012);
       master.connect(ctx.destination);
 
-      const patterns = [
-        [760, 1040, 880],
-        [690, 930, 1180, 980],
-        [860, 720, 970]
-      ];
-      const tones = patterns[variant % patterns.length];
       tones.forEach((frequency, index) => {
         const osc = ctx.createOscillator();
         const harmonic = ctx.createOscillator();
         const gain = ctx.createGain();
         const harmonicGain = ctx.createGain();
-        const start = ctx.currentTime + index * .085;
-        const length = .105 + (index % 2) * .025;
+        const offset = index * .092;
+        const start = ctx.currentTime + offset;
+        const length = .105 + (index % 2) * .028;
+        const end = offset + length;
+        finalEnd = Math.max(finalEnd, end);
+        beatTimeline.push({
+          startMs: nowMs + offset * 1000,
+          peakMs: nowMs + (offset + .025) * 1000,
+          endMs: nowMs + end * 1000
+        });
 
         osc.type = 'triangle';
         harmonic.type = 'sine';
@@ -1107,7 +1142,7 @@ function initCinematicJourney() {
         gain.gain.exponentialRampToValueAtTime(.82, start + .01);
         gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
         harmonicGain.gain.setValueAtTime(0.0001, start);
-        harmonicGain.gain.exponentialRampToValueAtTime(.16, start + .012);
+        harmonicGain.gain.exponentialRampToValueAtTime(.14, start + .012);
         harmonicGain.gain.exponentialRampToValueAtTime(0.0001, start + length * .9);
 
         osc.connect(gain); gain.connect(master);
@@ -1115,11 +1150,22 @@ function initCinematicJourney() {
         osc.start(start); harmonic.start(start);
         osc.stop(start + length + .02); harmonic.stop(start + length + .02);
       });
-    } catch { /* Mascot sound is non-critical. */ }
+
+      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + finalEnd + .07);
+      lastMascotChirpAt = nowMs;
+      mascotChirpTimeline = beatTimeline;
+      mascotChirpUntil = nowMs + (finalEnd + .08) * 1000;
+      scheduleNextMascotChirp(nowMs, smoothProgress);
+      return true;
+    } catch {
+      mascotChirpTimeline = [];
+      mascotChirpUntil = 0;
+      return false;
+    }
   };
 
   const playWaterSplash = () => {
-    if (!mascotSoundUnlocked || portalSoundMuted() || document.hidden) return;
+    if (!mascotSoundUnlocked || portalSoundMuted() || portalIntroThemePlaying() || document.hidden) return;
     const ctx = portalContext();
     if (!ctx || ctx.state !== 'running') return;
     try {
@@ -1173,6 +1219,15 @@ function initCinematicJourney() {
     const muted = Boolean(event.detail?.muted);
     if (!muted) unlockMascotSound();
     setCinematicAudioMix(smoothProgress > .225 ? 1 : 0, !muted && journey.classList.contains('is-active'));
+  });
+
+  window.addEventListener('littlefeet:introthemechange', event => {
+    const active = Boolean(event.detail?.active);
+    if (!active) unlockMascotSound();
+    setCinematicAudioMix(
+      smoothProgress > .225 ? 1 : 0,
+      !active && !portalSoundMuted() && journey.classList.contains('is-active')
+    );
   });
 
   // A deterministic dive path keeps the mascot tied to the same scroll
@@ -1259,6 +1314,7 @@ function initCinematicJourney() {
     const travel = Math.max(1, journey.offsetHeight - window.innerHeight);
     const raw = (window.scrollY - top) / travel;
     scrollProgress = clamp(raw);
+    if (raw > .012 && portalIntroThemePlaying()) stopPortalIntroTheme();
     journey.classList.toggle('is-active', raw >= 0 && raw <= 1);
     journey.classList.toggle('is-after', raw > 1);
     updateProgressUI(scrollProgress);
@@ -1547,8 +1603,19 @@ function initCinematicJourney() {
     mascot.scale.y = .92 * (1 + alert * .024 - effort * .008);
     mascot.scale.z = .92;
 
-    const chirping = performance.now() < mascotChirpUntil;
-    const chirpOpen = chirping ? (Math.sin(time * 38) * .5 + .5) : 0;
+    const mouthNow = performance.now();
+    const chirping = mouthNow < mascotChirpUntil;
+    let chirpOpen = 0;
+    if (chirping) {
+      mascotChirpTimeline.forEach(beat => {
+        if (mouthNow < beat.startMs || mouthNow > beat.endMs) return;
+        const opening = smoothstep(beat.startMs, beat.peakMs, mouthNow);
+        const closing = 1 - smoothstep(beat.peakMs, beat.endMs, mouthNow);
+        chirpOpen = Math.max(chirpOpen, Math.min(opening, closing));
+      });
+    } else if (mascotChirpTimeline.length) {
+      mascotChirpTimeline = [];
+    }
     data.beak.scale.set(
       data.beakBaseScale.x,
       data.beakBaseScale.y,
@@ -1715,6 +1782,20 @@ function initCinematicJourney() {
     const submerged = smoothstep(.20, .30, smoothProgress);
     const stationPose = nearestStationPose(smoothProgress);
     const cameraSettle = stationPose.settle;
+    const nowMs = performance.now();
+    const calmEnoughToChirp = scrollMotion < .24 || stationPose.settle > .62;
+    if (
+      nowMs >= nextMascotChirpAt &&
+      calmEnoughToChirp &&
+      journey.classList.contains('is-active') &&
+      !portalSoundMuted() &&
+      !portalIntroThemePlaying()
+    ) {
+      const depthVariant = smoothProgress < .22
+        ? Math.floor(nowMs / 1000) % 3
+        : (stationPose.index + Math.floor(nowMs / 3000)) % 5;
+      if (!playMascotChirp(depthVariant)) scheduleNextMascotChirp(nowMs, smoothProgress);
+    }
     const followHeight = lerp(3.8, mascot.position.y + 4.35, submerged);
     const targetZ = lerp(11.8, 8.6, submerged) + Math.sin(smoothProgress * Math.PI * 2) * .18;
     const targetX = lerp(.8, mascot.position.x * .08, submerged);
