@@ -307,6 +307,14 @@ app.use((req, res, next) => {
   next();
 });
 app.set('trust proxy', 1);
+app.use('/api', (req, res, next) => {
+  const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+  const limit = isMutation
+    ? Math.max(60, Math.min(600, Number(process.env.LF_API_MUTATION_RATE_LIMIT) || 240))
+    : Math.max(300, Math.min(3000, Number(process.env.LF_API_READ_RATE_LIMIT) || 1200));
+  if (!enforcePublicRateLimit(req, res, isMutation ? 'api-mutation' : 'api-read', limit, 60 * 1000)) return;
+  next();
+});
 app.use((req, res, next) => {
   persistenceReady.then(async () => {
     activeRequestCount += 1;
@@ -2217,6 +2225,55 @@ app.post('/api/account-deletion-request', (req, res) => {
   res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: administrator.name || administrator.username, status: ticket.status } });
 });
 
+app.post('/api/school-deletion-request', (req, res) => {
+  const requester = getSessionAccount(req);
+  if (!requester) return res.status(401).json({ message: 'Sign in before requesting school deletion.' });
+  if (requester.role !== 'principal') {
+    return res.status(403).json({ message: 'Only the school principal can request deletion of the entire school account and its linked data.' });
+  }
+
+  const existing = db.tickets.find(ticket =>
+    recordInSchool(ticket, requester) &&
+    ticket.category === 'School deletion request' &&
+    ticket.status !== 'Completed'
+  );
+  if (existing) return res.status(409).json({ message: 'A school deletion request is already waiting for administrator review.', ticketId: existing.id });
+
+  const administrator = db.users.find(account =>
+    account.role === 'admin' &&
+    isSameSchool(requester, account) &&
+    !String(account.verificationStatus || '').toLowerCase().includes('pending')
+  );
+  if (!administrator) return res.status(409).json({ message: 'No active administrator is available for this school yet.' });
+
+  const ticket = tagSchoolRecord(requester, {
+    id: crypto.randomUUID(),
+    department: 'Admin',
+    category: 'School deletion request',
+    priority: 'High',
+    subject: `SCHOOL DELETION REQUEST · ${requester.schoolName}`,
+    message: [
+      'SCHOOL DELETION REQUEST',
+      `School: ${requester.schoolName || 'Not recorded'}`,
+      `School ID: ${accountSchoolId(requester)}`,
+      `Requested by: ${requester.name || requester.username}`,
+      `Username / email: ${requester.username}`,
+      `Role: ${requester.role}`,
+      `Requested at: ${new Date().toISOString()}`,
+      '',
+      'WARNING: Approval permanently deletes every account and every school-scoped record linked to this school. The administrator must verify the request before approval.'
+    ].join('\n'),
+    createdBy: requester.username,
+    createdByName: requester.name || requester.username,
+    assignedTo: administrator.username,
+    status: 'Open',
+    monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }),
+    createdAt: new Date().toISOString()
+  });
+  db.tickets.unshift(ticket);
+  res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: administrator.name || administrator.username, status: ticket.status } });
+});
+
 app.get('/api/tickets', (req, res) => {
   const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'Sign in to view your support tickets.' });
@@ -2249,6 +2306,55 @@ app.post('/api/tickets', (req, res) => {
   db.tickets.unshift(item);
   res.json({ success: true, item });
 });
+const purgeSchoolData = schoolId => {
+  const chatGroupIds = new Set((db.chatGroups || []).filter(group => group.schoolId === schoolId).map(group => String(group.id)));
+  for (const [key, value] of Object.entries(db)) {
+    if (!Array.isArray(value)) continue;
+    if (key === 'schools') {
+      db.schools = value.filter(record => record.id !== schoolId);
+      continue;
+    }
+    if (key === 'releaseNotes') continue;
+    db[key] = value.filter(record => record?.schoolId !== schoolId);
+  }
+  for (const [moduleName, records] of Object.entries(db.moduleRecords || {})) {
+    db.moduleRecords[moduleName] = (records || []).filter(record => record?.schoolId !== schoolId);
+  }
+  for (const groupId of chatGroupIds) delete db.groupMessages[groupId];
+  if (db.schoolBilling && typeof db.schoolBilling === 'object') delete db.schoolBilling[schoolId];
+  if (db.schoolTerms && typeof db.schoolTerms === 'object') delete db.schoolTerms[schoolId];
+};
+
+app.post('/api/school-deletion/execute', async (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const ticketId = String(req.body?.ticketId || '');
+  const confirmation = String(req.body?.confirmation || '').trim();
+  if (confirmation !== 'DELETE SCHOOL') return res.status(400).json({ message: 'Type DELETE SCHOOL exactly to confirm the permanent deletion.' });
+
+  const ticket = db.tickets.find(entry =>
+    entry.id === ticketId &&
+    entry.category === 'School deletion request' &&
+    entry.status !== 'Completed' &&
+    recordInSchool(entry, actor)
+  );
+  if (!ticket) return res.status(404).json({ message: 'Open school deletion request not found.' });
+
+  const schoolId = accountSchoolId(actor);
+  const schoolName = actor.schoolName;
+  purgeSchoolData(schoolId);
+
+  if (postgresPool) {
+    await postgresPool.query(
+      `DELETE FROM little_feet_sessions
+       WHERE sess->'littleFeetUser'->>'schoolId' = $1`,
+      [schoolId]
+    );
+  }
+
+  res.json({ success: true, deletedSchoolId: schoolId, deletedSchoolName: schoolName });
+});
+
 app.post('/api/tickets/update', (req, res) => {
   const { id, status, feedback, updatedBy, assignedTo } = req.body;
   const actor = getSessionAccount(req);

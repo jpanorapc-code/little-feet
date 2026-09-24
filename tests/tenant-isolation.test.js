@@ -292,6 +292,20 @@ const rawRequest = async (route) => {
     assert.match(deletionTicket.message, /Requested at:/);
     const adminDeletionRequest = await request('/api/account-deletion-request', { method: 'POST', cookie: bravoLogin.cookie, body: {} });
     assert.equal(adminDeletionRequest.response.status, 400);
+    const teacherSchoolDeletionRequest = await request('/api/school-deletion-request', { method: 'POST', cookie: alphaTeacherLogin.cookie, body: {} });
+    assert.equal(teacherSchoolDeletionRequest.response.status, 403);
+    const principalSchoolDeletionRequest = await request('/api/school-deletion-request', { method: 'POST', cookie: alphaPrincipalLogin.cookie, body: {} });
+    assert.equal(principalSchoolDeletionRequest.response.status, 201);
+    const duplicateSchoolDeletionRequest = await request('/api/school-deletion-request', { method: 'POST', cookie: alphaPrincipalLogin.cookie, body: {} });
+    assert.equal(duplicateSchoolDeletionRequest.response.status, 409);
+    const alphaAdminTicketsForDeletion = await request('/api/tickets', { cookie: alphaLogin.cookie });
+    const schoolDeletionTicket = alphaAdminTicketsForDeletion.data.find(ticket => ticket.category === 'School deletion request');
+    assert.ok(schoolDeletionTicket);
+    assert.equal(schoolDeletionTicket.assignedTo, 'alpha-admin');
+    assert.match(schoolDeletionTicket.message, /SCHOOL DELETION REQUEST/);
+    assert.match(schoolDeletionTicket.message, /School: Alpha School/);
+    assert.match(schoolDeletionTicket.message, /Role: principal/);
+
 
     const logout = await request('/api/auth/logout', { method: 'POST', cookie: bravoParentCookie });
     assert.equal(logout.response.status, 200);
@@ -323,6 +337,21 @@ const rawRequest = async (route) => {
     assert.equal(invalidWorksheet.response.status, 400);
     const bravoPosts = await request('/api/posts', { cookie: bravoLogin.cookie });
     assert.equal(bravoPosts.data.length, 0);
+
+    const rejectedSchoolRemoval = await request('/api/school-deletion/execute', { method: 'POST', cookie: alphaLogin.cookie, body: { ticketId: schoolDeletionTicket.id, confirmation: 'not confirmed' } });
+    assert.equal(rejectedSchoolRemoval.response.status, 400);
+    const approvedSchoolRemoval = await request('/api/school-deletion/execute', { method: 'POST', cookie: alphaLogin.cookie, body: { ticketId: schoolDeletionTicket.id, confirmation: 'DELETE SCHOOL' } });
+    assert.equal(approvedSchoolRemoval.response.status, 200);
+    assert.equal(approvedSchoolRemoval.data.deletedSchoolId, 'school-alpha');
+
+    const deletedAlphaSession = await request('/api/auth/session', { cookie: alphaLogin.cookie });
+    assert.equal(deletedAlphaSession.data.authenticated, false);
+    const survivingBravoSession = await request('/api/auth/session', { cookie: bravoLogin.cookie });
+    assert.equal(survivingBravoSession.data.authenticated, true);
+    const survivingBravoAccounts = await request('/api/accounts', { cookie: bravoLogin.cookie });
+    assert.ok(survivingBravoAccounts.data.some(account => account.username === 'bravo-admin'));
+    assert.ok(survivingBravoAccounts.data.some(account => account.username === 'bravo-parent'));
+
     console.log('Tenant isolation test passed.');
   } catch (error) {
     console.error(error);
