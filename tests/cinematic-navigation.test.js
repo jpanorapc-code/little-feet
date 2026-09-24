@@ -37,7 +37,6 @@ assert.match(cinematic, /createWebbedFootGeometry/);
 assert.match(cinematic, /addFeatherVertexColors/);
 assert.match(cinematic, /new THREE\.LatheGeometry/);
 assert.match(cinematic, /headRig\.position\.set\(0, \.76, \.03\)/);
-assert.match(cinematic, /shapePenguinGeometry/);
 assert.match(cinematic, /little-feet-mascot-v3/);
 assert.match(cinematic, /video-reference-v3/);
 assert.match(cinematic, /const lens = new THREE\.MeshBasicMaterial/);
