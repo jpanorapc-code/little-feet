@@ -503,114 +503,6 @@ function createMantaRay(color = 0x77d9ff) {
   return group;
 }
 
-function createKelpPatch(count, color = 0x2cffb5) {
-  const patch = new THREE.Group();
-  const buckets = [[], [], []];
-
-  for (let index = 0; index < count; index += 1) {
-    const height = 2.7 + (index % 5) * .6;
-    const x = (index - (count - 1) / 2) * .62;
-    const z = Math.sin(index * 1.9) * 1.5;
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x, 0, z),
-      new THREE.Vector3(x + .12 * Math.sin(index), height * .34, z),
-      new THREE.Vector3(x - .15 * Math.cos(index * 1.3), height * .69, z + .03),
-      new THREE.Vector3(x + .12 * Math.sin(index * .7), height, z)
-    ]);
-    buckets[index % 3].push(
-      new THREE.TubeGeometry(curve, 18, .035 + (index % 3) * .008, 6, false)
-    );
-  }
-
-  const material = new THREE.MeshStandardMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: .8,
-    roughness: .45,
-    transparent: true,
-    opacity: .72
-  });
-
-  const fronds = buckets.filter(bucket => bucket.length).map((bucket, bucketIndex) => {
-    const geometry = mergeStaticGeometries(bucket);
-    bucket.forEach(item => item.dispose());
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.userData.phase = bucketIndex * 1.31;
-    patch.add(mesh);
-    return mesh;
-  });
-
-  patch.userData.fronds = fronds;
-  return patch;
-}
-
-function createGlowReef(color = 0x42f5e9, accent = 0x9768ff) {
-  const group = new THREE.Group();
-  const baseMaterial = new THREE.MeshStandardMaterial({
-    color: 0x063a54,
-    roughness: .78,
-    metalness: .08
-  });
-  const glowMaterial = new THREE.MeshStandardMaterial({
-    color,
-    emissive: accent,
-    emissiveIntensity: 2.2,
-    roughness: .32
-  });
-
-  const rockGeometry = new THREE.IcosahedronGeometry(1, 1);
-  const coralGeometry = new THREE.CylinderGeometry(.05, .11, 1, 8);
-  const rocks = new THREE.InstancedMesh(rockGeometry, baseMaterial, 11);
-  const coralCount = 6;
-  const corals = new THREE.InstancedMesh(coralGeometry, glowMaterial, coralCount);
-  const object = new THREE.Object3D();
-  let coralIndex = 0;
-
-  for (let index = 0; index < 11; index += 1) {
-    const radius = .55 + (index % 4) * .18;
-    const x = (index - 5) * .72;
-    const y = Math.sin(index * 2.2) * .18;
-    const z = Math.cos(index * 1.7) * 1.25;
-    object.position.set(x, y, z);
-    object.rotation.set(0, 0, 0);
-    object.scale.set(radius, radius * (.45 + (index % 3) * .16), radius);
-    object.updateMatrix();
-    rocks.setMatrixAt(index, object.matrix);
-
-    if (index % 2 === 0) {
-      const height = .8 + (index % 3) * .28;
-      object.position.set(x, .5 + (index % 3) * .16, z);
-      object.rotation.set(0, 0, (index - 5) * .035);
-      object.scale.set(1, height, 1);
-      object.updateMatrix();
-      corals.setMatrixAt(coralIndex, object.matrix);
-      coralIndex += 1;
-    }
-  }
-  group.add(rocks, corals);
-
-  const glowCore = new THREE.Mesh(
-    getSharedGeometry('reefGlowCore', () => new THREE.SphereGeometry(.32, 10, 8)),
-    new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: .34,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    })
-  );
-  glowCore.position.set(0, 1.2, 0);
-  glowCore.scale.set(1.8, .72, 1.8);
-  group.add(glowCore);
-  group.userData = {
-    glowMaterial,
-    glowCore,
-    baseEmissiveIntensity: glowMaterial.emissiveIntensity,
-    baseGlowOpacity: glowCore.material.opacity
-  };
-  return group;
-}
-
 function createCausticBeams(count = 4) {
   const group = new THREE.Group();
   const beams = [];
@@ -654,6 +546,7 @@ function initCinematicJourney() {
   const depthBackdropImage = document.getElementById('cinematicDepthBackdrop');
   const parallaxFar = document.getElementById('cinematicParallaxFar');
   const parallaxNear = document.getElementById('cinematicParallaxNear');
+  const seabed2d = document.getElementById('cinematicSeabed2d');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
 
@@ -864,7 +757,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v10-clean-2d-depth-waterline';
+  stage.dataset.compressionProfile = 'safe-webgl-v11-compact-2d-seabed';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -979,14 +872,6 @@ function initCinematicJourney() {
     return ring;
   });
 
-  const floorGlow = new THREE.Mesh(
-    new THREE.CircleGeometry(18, 64),
-    new THREE.MeshBasicMaterial({ color: 0x083d66, transparent: true, opacity: .34, blending: THREE.AdditiveBlending, depthWrite: false })
-  );
-  floorGlow.rotation.x = -Math.PI / 2;
-  floorGlow.position.y = -38;
-  scene.add(floorGlow);
-
   // Depth is now supplied by the portrait background and lightweight 2D parallax.
   // The old 3D mist/terrace/haze backdrop created the blob silhouettes, so it is not added.
 
@@ -1030,22 +915,6 @@ function initCinematicJourney() {
   mantaB.userData.speed = -.13;
   mantaB.userData.base = mantaB.position.clone();
   if (quality !== 'low') scene.add(mantaB);
-
-  const kelpA = createKelpPatch(quality === 'high' ? 16 : quality === 'medium' ? 10 : 6, 0x38ffc4);
-  kelpA.position.set(-5.5, -37.7, -5.8);
-  scene.add(kelpA);
-  const kelpB = createKelpPatch(quality === 'high' ? 13 : quality === 'medium' ? 8 : 5, 0x6ad8ff);
-  kelpB.position.set(5.6, -37.6, -7.4);
-  kelpB.scale.setScalar(.86);
-  scene.add(kelpB);
-
-  const reefA = createGlowReef(0x55fff2, 0x1768ff);
-  reefA.position.set(-5.4, -37.8, -5.8);
-  scene.add(reefA);
-  const reefB = createGlowReef(0xff75df, 0x684cff);
-  reefB.position.set(5.7, -37.85, -7.7);
-  reefB.scale.setScalar(.82);
-  scene.add(reefB);
 
   const extraJellies = [];
   if (quality !== 'low') {
@@ -1940,20 +1809,6 @@ function initCinematicJourney() {
       manta.rotation.z = Math.sin(phase * .55) * .06;
     });
 
-    [kelpA, kelpB].forEach((patch, patchIndex) => {
-      patch.userData.fronds.forEach((frond, index) => {
-        frond.rotation.z = Math.sin(time * .72 + frond.userData.phase + patchIndex) * (.045 + (index % 3) * .01);
-        frond.rotation.x = Math.cos(time * .54 + frond.userData.phase) * .018;
-      });
-    });
-
-    [reefA, reefB].forEach((reef, index) => {
-      const pulse = 1 + Math.sin(time * 1.15 + index * 1.9) * .24;
-      reef.userData.glowMaterial.emissiveIntensity = reef.userData.baseEmissiveIntensity * pulse;
-      reef.userData.glowCore.material.opacity = reef.userData.baseGlowOpacity * (.86 + pulse * .14);
-      reef.scale.y = 1 + Math.sin(time * .72 + index) * .018;
-    });
-
     const allJellies = [jellyA, jellyB, jellyC, ...extraJellies];
     allJellies.forEach((jelly, index) => {
       if (!jelly.userData.basePosition) jelly.userData.basePosition = jelly.position.clone();
@@ -2144,6 +1999,11 @@ function initCinematicJourney() {
       if (parallaxNear) {
         parallaxNear.style.transform =
           `translate3d(${(pointer.smoothX * 14).toFixed(1)}px,${(-smoothProgress * 86).toFixed(1)}px,0) scale(1.16)`;
+      }
+      if (seabed2d) {
+        seabed2d.style.transform =
+          `translate3d(${(pointer.smoothX * 8).toFixed(1)}px,${(-smoothProgress * 58).toFixed(1)}px,0) scale(1.10)`;
+        seabed2d.style.opacity = String(clamp((smoothProgress - .46) * 1.7, 0, .72));
       }
     }
     scene.fog.density = lerp(.008, .034, submerged) + deepening * .006;
