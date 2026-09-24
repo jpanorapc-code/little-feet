@@ -9,16 +9,10 @@ const smoothstep = (a, b, value) => {
 };
 const damp = (current, target, lambda, dt) => THREE.MathUtils.lerp(current, target, 1 - Math.exp(-lambda * dt));
 
-const qualityForDevice = () => {
-  const memory = Number(navigator.deviceMemory || 8);
-  const cores = Number(navigator.hardwareConcurrency || 8);
-  const narrow = window.matchMedia('(max-width: 760px)').matches;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const renderPixels = Math.max(1, window.innerWidth) * Math.max(1, window.innerHeight) * dpr * dpr;
-  if (narrow || memory <= 4 || cores <= 4 || renderPixels > 5_000_000) return 'low';
-  if (memory < 12 || cores < 10 || renderPixels > 2_600_000) return 'medium';
-  return 'high';
-};
+// Keep the authored scene at full detail. Runtime performance is managed
+// separately so a machine is never punished just because it reports more RAM,
+// CPU cores, a high-DPI display, or a high-refresh monitor.
+const SCENE_DETAIL = 'high';
 
 const stationBlueprints = [
   { at: 0.05, title: 'Surface', kicker: 'Little Feet · cinematic home', text: 'Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.', candidates: [['feedTab','School Feed']] },
@@ -747,14 +741,15 @@ function initCinematicJourney() {
     return;
   }
 
-  const quality = qualityForDevice();
+  const quality = SCENE_DETAIL;
+  let performanceTier = 'balanced';
   let renderer;
   let rendererError = null;
   const rendererOptions = {
     canvas,
     alpha: true,
-    antialias: quality !== 'low',
-    powerPreference: quality === 'low' ? 'low-power' : 'high-performance'
+    antialias: true,
+    powerPreference: 'high-performance'
   };
 
   try {
@@ -784,13 +779,14 @@ function initCinematicJourney() {
   stage.dataset.cinematicFallback = '';
   stage.dataset.cinematicQuality = quality;
   stage.dataset.cinematicBatching = 'instanced-v1';
+  stage.dataset.performanceMode = 'adaptive-frame-time-v1';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
-  renderer.shadowMap.enabled = quality === 'high';
+  renderer.shadowMap.enabled = false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 1.3 : 1));
+  renderer.setPixelRatio(1);
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x052b4a, .018);
@@ -805,7 +801,7 @@ function initCinematicJourney() {
 
   const sun = new THREE.DirectionalLight(0xffffff, 4.4);
   sun.position.set(-8, 12, 8);
-  sun.castShadow = quality === 'high';
+  sun.castShadow = false;
   if (sun.castShadow) {
     sun.shadow.mapSize.set(1536, 1536);
     sun.shadow.camera.left = -12;
@@ -1955,9 +1951,76 @@ function initCinematicJourney() {
   let waterBudget = 0;
   let worldBudget = 0;
   let bubbleBudget = 0;
-  const waterInterval = quality === 'high' ? 1 / 18 : quality === 'medium' ? 1 / 12 : 1 / 10;
-  const worldInterval = quality === 'high' ? 1 / 30 : quality === 'medium' ? 1 / 20 : 1 / 15;
-  const bubbleInterval = quality === 'high' ? 1 / 24 : quality === 'medium' ? 1 / 16 : 1 / 12;
+  let waterInterval = 1 / 15;
+  let worldInterval = 1 / 24;
+  let bubbleInterval = 1 / 20;
+  let renderFpsCap = 60;
+  let perfFrameCount = 0;
+  let perfFrameTotalMs = 0;
+  let perfGoodWindows = 0;
+
+  const applyPerformanceTier = tier => {
+    if (tier === performanceTier && stage.dataset.performanceTier) return;
+    performanceTier = tier;
+
+    if (tier === 'reduced') {
+      renderFpsCap = 45;
+      waterInterval = 1 / 10;
+      worldInterval = 1 / 15;
+      bubbleInterval = 1 / 12;
+      renderer.shadowMap.enabled = false;
+      sun.castShadow = false;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, .85));
+    } else if (tier === 'enhanced') {
+      renderFpsCap = 60;
+      waterInterval = 1 / 18;
+      worldInterval = 1 / 30;
+      bubbleInterval = 1 / 24;
+      renderer.shadowMap.enabled = true;
+      sun.castShadow = true;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.2));
+    } else {
+      renderFpsCap = 60;
+      waterInterval = 1 / 15;
+      worldInterval = 1 / 24;
+      bubbleInterval = 1 / 20;
+      renderer.shadowMap.enabled = false;
+      sun.castShadow = false;
+      renderer.setPixelRatio(1);
+    }
+
+    stage.dataset.performanceTier = tier;
+    resize();
+  };
+
+  const recordFramePerformance = dt => {
+    const frameMs = dt * 1000;
+    // Ignore tab restores / debugger pauses / first-frame stalls.
+    if (frameMs <= 0 || frameMs > 80) return;
+    perfFrameTotalMs += frameMs;
+    perfFrameCount += 1;
+    if (perfFrameCount < 90) return;
+
+    const averageMs = perfFrameTotalMs / perfFrameCount;
+    perfFrameCount = 0;
+    perfFrameTotalMs = 0;
+
+    if (averageMs > 23) {
+      perfGoodWindows = 0;
+      applyPerformanceTier('reduced');
+      return;
+    }
+    if (averageMs > 18.5) {
+      perfGoodWindows = 0;
+      applyPerformanceTier('balanced');
+      return;
+    }
+
+    perfGoodWindows += 1;
+    if (perfGoodWindows >= 2 && averageMs < 16.2) applyPerformanceTier('enhanced');
+  };
+
+  applyPerformanceTier('balanced');
 
   const updateScene = (dt, time) => {
     waterBudget += dt;
@@ -2084,8 +2147,14 @@ function initCinematicJourney() {
     failToFallback('3D paused by the browser · cinematic controls remain available');
   }, { once: true });
 
-  const render = () => {
+  let lastRenderMs = 0;
+  const render = frameTime => {
     if (renderFailed) return;
+    const nowMs = Number.isFinite(frameTime) ? frameTime : performance.now();
+    const minFrameMs = 1000 / renderFpsCap;
+    if (lastRenderMs && nowMs - lastRenderMs < minFrameMs - .5) return;
+    lastRenderMs = nowMs;
+
     const dt = Math.min(clock.getDelta(), .05);
     const time = clock.elapsedTime;
     const home = document.getElementById('homeTab');
@@ -2103,6 +2172,7 @@ function initCinematicJourney() {
       if (!firstFrameRendered && !resize()) return;
       updateScene(dt, time);
       renderer.render(scene, camera);
+      recordFramePerformance(dt);
       if (!firstFrameRendered) {
         firstFrameRendered = true;
         stage.classList.add('is-ready');
