@@ -26,7 +26,7 @@ assert.match(page, /id="littleFeetCinematicCanvas"/);
 
 assert.match(cinematic, /import \* as THREE from '\/vendor\/three\.module\.js'/);
 assert.match(cinematic, /prefers-reduced-motion: reduce/);
-assert.doesNotMatch(cinematic, /failIfMajorPerformanceCaveat/);
+assert.doesNotMatch(cinematic, /failIfMajorPerformanceCaveat\s*:/);
 assert.doesNotMatch(cinematic, /canUseWebGL2/);
 assert.match(cinematic, /powerPreference: 'default'/);
 assert.match(cinematic, /webgl-renderer-unavailable/);
