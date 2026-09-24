@@ -1,0 +1,32 @@
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const cinematic = fs.readFileSync(path.join(root, 'assets', 'cinematic.js'), 'utf8');
+const styles = fs.readFileSync(path.join(root, 'assets', 'cinematic.css'), 'utf8');
+
+assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
+assert.match(page, /\/assets\/cinematic\.css\?v=20260924-cinematic-v1/);
+assert.match(page, /type="module" src="\/assets\/cinematic\.js\?v=20260924-cinematic-v1"/);
+assert.match(page, /id="littleFeetCinematicJourney"/);
+assert.match(page, /id="littleFeetCinematicCanvas"/);
+
+assert.match(cinematic, /import \* as THREE from '\/vendor\/three\.module\.js'/);
+assert.match(cinematic, /prefers-reduced-motion: reduce/);
+assert.match(cinematic, /canUseWebGL2/);
+assert.match(cinematic, /qualityForDevice/);
+assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
+assert.match(cinematic, /accessibleNavTarget/);
+assert.match(cinematic, /document\.hidden/);
+assert.doesNotMatch(cinematic, /fetch\(/);
+assert.doesNotMatch(cinematic, /innerHTML\s*=/);
+
+assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
+assert.match(styles, /\.cinematic-fallback/);
+assert.match(styles, /backdrop-filter/);
+
+console.log('Cinematic navigation regression test passed.');
