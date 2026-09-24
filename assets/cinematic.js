@@ -13,8 +13,10 @@ const qualityForDevice = () => {
   const memory = Number(navigator.deviceMemory || 8);
   const cores = Number(navigator.hardwareConcurrency || 8);
   const narrow = window.matchMedia('(max-width: 760px)').matches;
-  if (narrow || memory <= 4 || cores <= 4) return 'low';
-  if (memory <= 8 || cores <= 8) return 'medium';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const renderPixels = Math.max(1, window.innerWidth) * Math.max(1, window.innerHeight) * dpr * dpr;
+  if (narrow || memory <= 4 || cores <= 4 || renderPixels > 5_000_000) return 'low';
+  if (memory < 12 || cores < 10 || renderPixels > 2_600_000) return 'medium';
   return 'high';
 };
 
@@ -577,15 +579,15 @@ function createDepthBackdrop(quality) {
   root.add(far, mid, near);
 
   const farMist = createDepthMist(
-    quality === 'high' ? 520 : quality === 'medium' ? 330 : 180,
+    quality === 'high' ? 460 : quality === 'medium' ? 240 : 140,
     24, 48, 0x6fd8ff, quality === 'high' ? .055 : .07, .18
   );
   const midMist = createDepthMist(
-    quality === 'high' ? 320 : quality === 'medium' ? 210 : 110,
+    quality === 'high' ? 280 : quality === 'medium' ? 150 : 90,
     11, 23, 0x72fff0, quality === 'high' ? .07 : .085, .22
   );
   const nearMist = createDepthMist(
-    quality === 'high' ? 130 : quality === 'medium' ? 85 : 45,
+    quality === 'high' ? 110 : quality === 'medium' ? 60 : 36,
     4, 10, 0xc8fbff, quality === 'high' ? .10 : .12, .16
   );
   far.add(farMist);
@@ -749,13 +751,14 @@ function initCinematicJourney() {
     return;
   }
   stage.dataset.cinematicFallback = '';
+  stage.dataset.cinematicQuality = quality;
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
-  renderer.shadowMap.enabled = quality !== 'low';
+  renderer.shadowMap.enabled = quality === 'high';
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 1.75 : quality === 'medium' ? 1.35 : 1));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 1.3 : 1));
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x052b4a, .018);
@@ -770,9 +773,9 @@ function initCinematicJourney() {
 
   const sun = new THREE.DirectionalLight(0xffffff, 4.4);
   sun.position.set(-8, 12, 8);
-  sun.castShadow = quality !== 'low';
+  sun.castShadow = quality === 'high';
   if (sun.castShadow) {
-    sun.shadow.mapSize.set(quality === 'high' ? 2048 : 1024, quality === 'high' ? 2048 : 1024);
+    sun.shadow.mapSize.set(1536, 1536);
     sun.shadow.camera.left = -12;
     sun.shadow.camera.right = 12;
     sun.shadow.camera.top = 12;
@@ -842,7 +845,7 @@ function initCinematicJourney() {
   splashRing.position.set(-.65, -.12, .05);
   scene.add(splashRing);
 
-  const bubbleCount = quality === 'high' ? 800 : quality === 'medium' ? 480 : 240;
+  const bubbleCount = quality === 'high' ? 620 : quality === 'medium' ? 320 : 180;
   const bubbles = createBubbles(bubbleCount, 26, 42, quality === 'high' ? .075 : .09);
   bubbles.position.y = -.7;
   scene.add(bubbles);
@@ -892,7 +895,7 @@ function initCinematicJourney() {
 
   // Layered autonomous sea life. These live entirely inside the cinematic
   // scene and never touch portal data/navigation state.
-  const fishPerSchool = quality === 'high' ? 15 : quality === 'medium' ? 10 : 6;
+  const fishPerSchool = quality === 'high' ? 13 : quality === 'medium' ? 8 : 5;
   const fishSchools = [
     createFishSchool(fishPerSchool, 0x62fff4, 0xe8ffff),
     createFishSchool(Math.max(5, fishPerSchool - 2), 0xff76dd, 0xffd7f6),
@@ -1389,7 +1392,8 @@ function initCinematicJourney() {
     pointer.y = nextY;
   }, { passive: true });
 
-  const updateWater = (time) => {
+  let waterUpdateCount = 0;
+  const updateWater = (time, refreshNormals = false) => {
     const attr = water.geometry.attributes.position;
     const base = water.userData.basePositions;
     const stride = attr.itemSize;
@@ -1400,7 +1404,8 @@ function initCinematicJourney() {
       attr.array[offset + 2] = Math.sin(x * .72 + time * 1.25) * .055 + Math.cos(y * .56 + time * .9) * .042;
     }
     attr.needsUpdate = true;
-    water.geometry.computeVertexNormals();
+    waterUpdateCount += 1;
+    if (refreshNormals || waterUpdateCount % 8 === 0) water.geometry.computeVertexNormals();
   };
 
   const sampleSourceSwimBone = (boneName, cycle) => {
@@ -1894,7 +1899,10 @@ function initCinematicJourney() {
     });
   };
 
+  let worldFrame = 0;
   const updateScene = (dt, time) => {
+    worldFrame += 1;
+    const updateHeavyWorld = quality === 'high' || worldFrame % 2 === 0;
     const rawMotion = Math.abs(scrollProgress - previousRawProgress) / Math.max(.001, dt);
     scrollMotion = damp(scrollMotion, clamp(rawMotion * .55, 0, 1), 7.5, dt);
     previousRawProgress = scrollProgress;
@@ -1905,8 +1913,10 @@ function initCinematicJourney() {
     pointer.activity = damp(pointer.activity, 0, 2.6, dt);
 
     animateMascot(smoothProgress, time, dt);
-    updateWater(time);
-    animateWorld(time, dt, smoothProgress);
+    if (updateHeavyWorld) {
+      updateWater(time);
+      animateWorld(time, dt * (quality === 'high' ? 1 : 2), smoothProgress);
+    }
 
     const submerged = smoothstep(.20, .30, smoothProgress);
     const stationPose = nearestStationPose(smoothProgress);
@@ -1971,11 +1981,13 @@ function initCinematicJourney() {
       lerp(.93, .15, submerged)
     ), 1);
 
-    animateBubbleField(bubbles, time, 1);
-    animateBubbleField(dust, time, .34);
-    animateBubbleField(mascotTrail, time, 1.8);
-    bubbles.rotation.y = time * .018;
-    dust.rotation.y = -time * .012;
+    if (updateHeavyWorld) {
+      animateBubbleField(bubbles, time, 1);
+      animateBubbleField(dust, time, .34);
+      animateBubbleField(mascotTrail, time, 1.8);
+      bubbles.rotation.y = time * .018;
+      dust.rotation.y = -time * .012;
+    }
     bubbles.material.opacity = lerp(.34, .54, submerged);
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
