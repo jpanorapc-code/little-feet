@@ -2305,12 +2305,12 @@ async function loadBadges() {
       ? list.map(b => `
           <div class="item-row" style="justify-content: space-between; align-items: flex-start;">
             <div>
-              <span class="badge-tag" style="background:#10b981;">${b.category}</span>
-              <strong style="font-size:1.05rem; color:#fff;">${b.title || b.awardName}</strong>
-              <span style="color:#a7f3d0;">— ${b.studentName}</span>
-              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${b.note}"</p>
+              <span class="badge-tag" style="background:#10b981;">${escapeWorkspaceText(b.category)}</span>
+              <strong style="font-size:1.05rem; color:#fff;">${escapeWorkspaceText(b.title || b.awardName)}</strong>
+              <span style="color:#a7f3d0;">— ${escapeWorkspaceText(b.studentName)}</span>
+              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${escapeWorkspaceText(b.note)}"</p>
             </div>
-            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${b.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${encodeURIComponent(String(b.id || ''))}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No milestone badges awarded yet.</p>';
   } catch (err) {
@@ -2355,10 +2355,11 @@ if (badgeForm) {
   });
 }
 
-async function deleteBadge(id) {
+async function deleteBadge(encodedId) {
   if (!canManageBadges()) return alert('Only authorised school staff can remove badges.');
   if (!confirm('Are you sure you want to delete this awarded badge?')) return;
-  const response = await fetch(`/api/badges/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
+  const id = decodeURIComponent(String(encodedId || ''));
+  const response = await fetch(`/api/badges/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   if (!response.ok) {
     const result = await response.json();
     return alert(result.message || 'Unable to remove this badge.');
@@ -2598,7 +2599,7 @@ async function loadTickets(checkForNew = false) {
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
-              <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
+              <button type="button" onclick="editTicketModal('${encodeURIComponent(String(t.id || ''))}', '${encodeURIComponent(String(t.status || 'Open'))}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
             </div>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
@@ -2662,14 +2663,16 @@ if (ticketForm) {
   });
 }
 
-function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
+function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssignee) {
+  const id = decodeURIComponent(encodedId || '');
+  const currentStatus = decodeURIComponent(encodedStatus || 'Open');
   const currentFeedback = decodeURIComponent(encodedFeedback || '');
   const currentAssignee = decodeURIComponent(encodedAssignee || '');
   const html = `
     <form id="editTicketForm">
       <div>
         <label for="editFeedback">Admin Feedback & Notes</label>
-        <textarea id="editFeedback" rows="3" required>${currentFeedback || ''}</textarea>
+        <textarea id="editFeedback" rows="3" required>${escapeWorkspaceText(currentFeedback || '')}</textarea>
       </div>
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
