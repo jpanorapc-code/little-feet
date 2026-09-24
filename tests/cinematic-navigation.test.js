@@ -47,7 +47,7 @@ assert.match(cinematic, /window\.addEventListener\('pointermove'/);
 assert.match(cinematic, /pointer\.activity/);
 assert.match(cinematic, /bodyBreath/);
 assert.match(cinematic, /anticipation/);
-assert.match(cinematic, /beakPulse/);
+assert.match(cinematic, /chirpOpen/);
 assert.match(cinematic, /createFishSchool/);
 assert.match(cinematic, /createMantaRay/);
 assert.match(cinematic, /createKelpPatch/);
