@@ -122,8 +122,10 @@ function createMascot() {
   group.add(footL, footR);
 
   group.userData = {
-    body, head, headRig, leftFlipper, rightFlipper, eyeL, eyeR, footL, footR,
-    eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone()
+    body, belly, head, headRig, beak, leftFlipper, rightFlipper, eyeL, eyeR, footL, footR,
+    eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone(),
+    bodyBaseScale: body.scale.clone(), bellyBaseScale: belly.scale.clone(),
+    beakBaseScale: beak.scale.clone()
   };
   group.scale.setScalar(.92);
   return group;
@@ -459,12 +461,13 @@ function initCinematicJourney() {
   scene.add(floorGlow);
 
   const clock = new THREE.Clock();
-  const pointer = { x: 0, y: 0, smoothX: 0, smoothY: 0 };
+  const pointer = { x: 0, y: 0, smoothX: 0, smoothY: 0, activity: 0, lastX: 0, lastY: 0 };
   let scrollProgress = 0;
   let smoothProgress = 0;
   let mascotSoundUnlocked = false;
   let lastMascotChirpAt = 0;
   let lastMascotSoundBand = -1;
+  let mascotChirpUntil = 0;
 
   const portalSoundMuted = () => {
     try { return localStorage.getItem('lf_portal_audio_muted_last') === 'true'; }
@@ -476,6 +479,7 @@ function initCinematicJourney() {
     const nowMs = performance.now();
     if (nowMs - lastMascotChirpAt < 1100) return;
     lastMascotChirpAt = nowMs;
+    mascotChirpUntil = nowMs + 360;
     try {
       const getContext = typeof window.getPortalAudioContext === 'function' ? window.getPortalAudioContext : null;
       const ctx = getContext ? getContext() : null;
@@ -587,13 +591,19 @@ function initCinematicJourney() {
       })
     : null;
   dashboardObserver?.observe(dashboard, { attributes: true, attributeFilter: ['class'] });
-  stage.addEventListener('pointermove', event => {
+  window.addEventListener('pointermove', event => {
     if (event.pointerType === 'touch') return;
     const rect = stage.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+    if (rect.width < 2 || rect.height < 2) return;
+    const nextX = clamp(((event.clientX - rect.left) / rect.width) * 2 - 1, -1, 1);
+    const nextY = clamp(-(((event.clientY - rect.top) / rect.height) * 2 - 1), -1, 1);
+    const movement = Math.hypot(nextX - pointer.lastX, nextY - pointer.lastY);
+    pointer.activity = clamp(pointer.activity + movement * 1.7, 0, 1);
+    pointer.lastX = nextX;
+    pointer.lastY = nextY;
+    pointer.x = nextX;
+    pointer.y = nextY;
   }, { passive: true });
-  stage.addEventListener('pointerleave', () => { pointer.x = 0; pointer.y = 0; }, { passive: true });
 
   const updateWater = (time) => {
     const attr = water.geometry.attributes.position;
@@ -614,48 +624,96 @@ function initCinematicJourney() {
     const path = sampleDivePath(progress);
     const underwater = smoothstep(.22, .31, progress);
     const swim = smoothstep(.27, .38, progress);
-    const swimPhase = time * 4.7 + progress * 8.0;
+    const surface = 1 - swim;
+    const anticipation = smoothstep(.10, .145, progress) * (1 - smoothstep(.15, .19, progress));
+    const entry = smoothstep(.15, .25, progress) * (1 - smoothstep(.26, .34, progress));
+    const swimPhase = time * 5.15 + progress * 9.5;
     const swimWave = Math.sin(swimPhase);
     const glideWave = Math.sin(swimPhase * .5);
-    const idleBob = (1 - underwater) * Math.sin(time * 1.7) * .035;
+    const idleBreath = Math.sin(time * 2.15);
+    const idleBob = surface * Math.sin(time * 1.7) * .04;
 
-    mascot.position.set(path.x, path.y + idleBob + swim * Math.sin(swimPhase * .55) * .12, path.z);
-    mascot.rotation.z = path.roll + swim * glideWave * .13;
-    mascot.rotation.x = path.pitch + swim * Math.sin(swimPhase * .7) * .07;
-    mascot.rotation.y = -.24 + swim * Math.sin(progress * Math.PI * 4) * .28;
+    mascot.position.set(
+      path.x,
+      path.y + idleBob + swim * Math.sin(swimPhase * .55) * .14 - anticipation * .16,
+      path.z
+    );
+    mascot.rotation.z = path.roll + swim * glideWave * .16 + entry * -.08;
+    mascot.rotation.x = path.pitch + swim * Math.sin(swimPhase * .7) * .08 + anticipation * .12;
+    mascot.rotation.y = -.24 + swim * Math.sin(progress * Math.PI * 4) * .32;
 
-    // Penguin propulsion: powerful mirrored flipper strokes with a smaller foot kick.
+    // Surface life: breathing, tiny weight shifts, foot wiggles and pre-dive crouch.
+    const bodyBreath = 1 + surface * idleBreath * .012;
+    data.body.scale.set(
+      data.bodyBaseScale.x * (bodyBreath + anticipation * .035),
+      data.bodyBaseScale.y * (bodyBreath - anticipation * .07),
+      data.bodyBaseScale.z * bodyBreath
+    );
+    data.belly.scale.set(
+      data.bellyBaseScale.x * (1 + surface * idleBreath * .010),
+      data.bellyBaseScale.y * (1 + surface * idleBreath * .014 - anticipation * .055),
+      data.bellyBaseScale.z
+    );
+
+    // Penguin propulsion: strong flipper strokes, recovery, body glide and alternating foot kicks.
     const stroke = Math.sin(swimPhase);
     const recovery = Math.sin(swimPhase + Math.PI * .5);
-    data.leftFlipper.rotation.z = lerp(-.48, -1.05 + stroke * .46, swim);
-    data.rightFlipper.rotation.z = lerp(.48, 1.05 - stroke * .46, swim);
-    data.leftFlipper.rotation.x = lerp(-.14, .72 + recovery * .34, swim);
-    data.rightFlipper.rotation.x = lerp(-.14, .72 - recovery * .34, swim);
-    data.leftFlipper.rotation.y = swim * (.18 + stroke * .20);
-    data.rightFlipper.rotation.y = swim * (-.18 - stroke * .20);
-    data.footL.rotation.x = swim * (.22 + swimWave * .54);
-    data.footR.rotation.x = swim * (.22 - swimWave * .54);
+    const idleFlap = Math.sin(time * 1.35) * .045;
+    data.leftFlipper.rotation.z = lerp(-.48 + idleFlap - anticipation * .20, -1.10 + stroke * .52, swim);
+    data.rightFlipper.rotation.z = lerp(.48 - idleFlap + anticipation * .20, 1.10 - stroke * .52, swim);
+    data.leftFlipper.rotation.x = lerp(-.14 + anticipation * .32, .74 + recovery * .38, swim);
+    data.rightFlipper.rotation.x = lerp(-.14 + anticipation * .32, .74 - recovery * .38, swim);
+    data.leftFlipper.rotation.y = swim * (.20 + stroke * .24);
+    data.rightFlipper.rotation.y = swim * (-.20 - stroke * .24);
+    data.footL.rotation.x = surface * Math.sin(time * 1.8) * .035 + swim * (.24 + swimWave * .60);
+    data.footR.rotation.x = surface * Math.sin(time * 1.8 + Math.PI) * .035 + swim * (.24 - swimWave * .60);
+    data.footL.rotation.z = surface * Math.sin(time * 1.15) * .035;
+    data.footR.rotation.z = -data.footL.rotation.z;
 
-    // The head and pupils track the pointer independently from the camera.
-    data.headRig.rotation.y = damp(data.headRig.rotation.y, pointer.smoothX * .34, 7.5, dt);
-    data.headRig.rotation.x = damp(data.headRig.rotation.x, -pointer.smoothY * .22 + swim * .03, 7.5, dt);
-    data.headRig.rotation.z = damp(data.headRig.rotation.z, pointer.smoothX * -.055, 7.5, dt);
-    const eyeX = pointer.smoothX * .055;
-    const eyeY = pointer.smoothY * .038;
-    data.eyeL.position.x = damp(data.eyeL.position.x, data.eyeLBase.x + eyeX, 10, dt);
-    data.eyeR.position.x = damp(data.eyeR.position.x, data.eyeRBase.x + eyeX, 10, dt);
-    data.eyeL.position.y = damp(data.eyeL.position.y, data.eyeLBase.y + eyeY, 10, dt);
-    data.eyeR.position.y = damp(data.eyeR.position.y, data.eyeRBase.y + eyeY, 10, dt);
+    // "You stole my food" tracking: the face turns hard toward the cursor and
+    // the pupils push even farther, so the stare is obvious instead of subtle.
+    const headYaw = pointer.smoothX * .72;
+    const headPitch = -pointer.smoothY * .48 + swim * .035;
+    data.headRig.rotation.y = damp(data.headRig.rotation.y, headYaw, 11.5, dt);
+    data.headRig.rotation.x = damp(data.headRig.rotation.x, headPitch, 11.5, dt);
+    data.headRig.rotation.z = damp(data.headRig.rotation.z, pointer.smoothX * -.11, 10.5, dt);
+    const eyeX = pointer.smoothX * .115;
+    const eyeY = pointer.smoothY * .078;
+    data.eyeL.position.x = damp(data.eyeL.position.x, data.eyeLBase.x + eyeX, 16, dt);
+    data.eyeR.position.x = damp(data.eyeR.position.x, data.eyeRBase.x + eyeX, 16, dt);
+    data.eyeL.position.y = damp(data.eyeL.position.y, data.eyeLBase.y + eyeY, 16, dt);
+    data.eyeR.position.y = damp(data.eyeR.position.y, data.eyeRBase.y + eyeY, 16, dt);
 
-    const blink = (time % 4.8) > 4.68 ? .08 : 1;
+    // Quick alert reaction when the cursor moves: eyes widen and the body gives
+    // a tiny "caught you" pop while still respecting the scroll-driven path.
+    const alert = pointer.activity;
+    const eyeWiden = 1 + alert * .22;
+    data.eyeL.scale.x = eyeWiden;
+    data.eyeR.scale.x = eyeWiden;
+    mascot.scale.x = .92 * (1 + alert * .012);
+    mascot.scale.y = .92 * (1 + alert * .022);
+    mascot.scale.z = .92;
+
+    const chirping = performance.now() < mascotChirpUntil;
+    const beakPulse = chirping ? 1 + Math.sin(time * 34) * .12 : 1;
+    data.beak.scale.set(
+      data.beakBaseScale.x,
+      data.beakBaseScale.y * beakPulse,
+      data.beakBaseScale.z * beakPulse
+    );
+
+    // Less robotic blinking: a normal blink plus an occasional fast double blink.
+    const blinkCycle = time % 6.6;
+    const blink = (blinkCycle > 6.43 || (blinkCycle > 5.98 && blinkCycle < 6.08)) ? .06 : 1;
     data.eyeL.scale.y = blink;
     data.eyeR.scale.y = blink;
   };
 
   const updateScene = (dt, time) => {
     smoothProgress = damp(smoothProgress, scrollProgress, 7.2, dt);
-    pointer.smoothX = damp(pointer.smoothX, pointer.x, 4.4, dt);
-    pointer.smoothY = damp(pointer.smoothY, pointer.y, 4.4, dt);
+    pointer.smoothX = damp(pointer.smoothX, pointer.x, 10.5, dt);
+    pointer.smoothY = damp(pointer.smoothY, pointer.y, 10.5, dt);
+    pointer.activity = damp(pointer.activity, 0, 2.8, dt);
 
     animateMascot(smoothProgress, time, dt);
     updateWater(time);
