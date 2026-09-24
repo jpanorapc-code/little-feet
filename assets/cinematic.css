@@ -109,11 +109,8 @@
   border-radius: 22px;
   background: linear-gradient(145deg, rgba(3, 24, 48, .78), rgba(6, 57, 86, .36));
   box-shadow: 0 18px 55px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.12);
-  /* Fake glass instead of live backdrop blur. Blurring an animated WebGL
-     canvas behind this panel forces expensive compositor work every frame. */
-  background:
-    linear-gradient(145deg, rgba(3, 24, 48, .88), rgba(6, 57, 86, .56)),
-    radial-gradient(circle at 18% 12%, rgba(146, 255, 249, .12), transparent 42%);
+  backdrop-filter: blur(16px) saturate(135%);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
   pointer-events: auto;
 }
 .cinematic-kicker {
@@ -169,8 +166,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  background:
-    linear-gradient(120deg, rgba(3,20,39,.76), rgba(8,48,72,.62));
+  backdrop-filter: blur(10px);
   transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
 }
 .cinematic-stop::before {
@@ -252,8 +248,7 @@
   font-size: .78rem;
   font-weight: 800;
   cursor: pointer;
-  background:
-    linear-gradient(120deg, rgba(2,17,33,.82), rgba(7,45,68,.62));
+  backdrop-filter: blur(10px);
 }
 .cinematic-skip:hover,
 .cinematic-skip:focus-visible {
