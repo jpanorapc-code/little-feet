@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 720">
+<defs>
+ <radialGradient id="bell" cx=".5" cy=".25" r=".75">
+  <stop offset="0" stop-color="#f0ffff" stop-opacity=".88"/>
+  <stop offset=".32" stop-color="#66e9ff" stop-opacity=".58"/>
+  <stop offset=".72" stop-color="#7460ff" stop-opacity=".24"/>
+  <stop offset="1" stop-color="#472685" stop-opacity=".06"/>
+ </radialGradient>
+ <filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+<path d="M102 238C102 98 184 44 260 44s158 54 158 194c0 22-8 41-22 58H124c-14-17-22-36-22-58Z" fill="url(#bell)" stroke="#c7fbff" stroke-opacity=".36"/>
+<ellipse cx="260" cy="285" rx="124" ry="18" fill="#a7f5ff" opacity=".12" filter="url(#glow)"/>
+<g fill="none" stroke-linecap="round">
+ <path d="M150 298C124 390 186 456 142 640" stroke="#96f3ff" stroke-opacity=".26" stroke-width="8"/>
+ <path d="M210 298C178 382 238 480 198 676" stroke="#bd9cff" stroke-opacity=".28" stroke-width="7"/>
+ <path d="M270 298C310 392 244 478 286 670" stroke="#8ff5ff" stroke-opacity=".30" stroke-width="8"/>
+ <path d="M330 298C364 390 310 476 356 628" stroke="#c5a6ff" stroke-opacity=".22" stroke-width="7"/>
+ <path d="M380 298C402 374 366 446 404 586" stroke="#7ceaff" stroke-opacity=".20" stroke-width="6"/>
+</g>
+</svg>
