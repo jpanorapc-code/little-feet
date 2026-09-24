@@ -83,10 +83,14 @@ const rawRequest = async (route) => {
     assert.equal(health.response.headers.get('cache-control'), 'no-store');
     const readiness = await request('/api/ready');
     assert.equal(readiness.response.status, 503);
-    assert.equal(readiness.data.checks.database, false);
+    assert.equal(readiness.data.ready, false);
+    assert.equal(readiness.data.status, 'NOT_READY');
+    assert.equal(Object.prototype.hasOwnProperty.call(readiness.data, 'checks'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(readiness.data, 'environment'), false);
     const keepalive = await request('/api/keepalive');
     assert.equal(keepalive.response.status, 200);
     assert.equal(keepalive.data.status, 'OK');
+    assert.equal(Object.prototype.hasOwnProperty.call(keepalive.data, 'database'), false);
     for (const privatePath of ['/server.js', '/auth-crypto.js', '/package.json', '/littlefeet-replica.json', '/littlefeet.db']) {
       const privateFile = await rawRequest(privatePath);
       assert.equal(privateFile.response.status, 404);
