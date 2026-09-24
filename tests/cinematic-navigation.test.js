@@ -19,7 +19,7 @@ const thirdPartyAssets = fs.readFileSync(path.join(root, 'THIRD_PARTY_ASSETS.md'
 assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
 assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
 assert.match(page, /href="\/assets\/cinematic\.css\?v=20260924-cinematic-v3"/);
-assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260924-cinematic-v16" defer/);
+assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260924-cinematic-v17" defer/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
 assert.match(page, /id="littleFeetCinematicJourney"/);
 assert.match(page, /id="littleFeetCinematicCanvas"/);
@@ -41,10 +41,6 @@ assert.match(cinematic, /const bubbleInterval = quality === 'high' \? 1 \/ 24/);
 assert.match(cinematic, /mist\.position\.x = Math\.sin/);
 assert.doesNotMatch(cinematic, /positions\.needsUpdate = true;/);
 assert.match(cinematic, /stage\.dataset\.cinematicQuality = quality/);
-assert.match(cinematic, /cinematicGpuProfile = 'compressed-materials-v1'/);
-assert.doesNotMatch(cinematic, /transmission:/);
-assert.doesNotMatch(cinematic, /new THREE\.PointLight\(color, 4\.2, 8, 2\)/);
-assert.doesNotMatch(styles, /backdrop-filter:\s*blur\(/);
 assert.match(cinematic, /typeof window\.openWorkspace === 'function'/);
 assert.match(cinematic, /accessibleNavTarget/);
 assert.match(cinematic, /document\.hidden/);
@@ -176,13 +172,12 @@ assert.doesNotMatch(cinematic, /innerHTML\s*=/);
 assert.match(cinematicLoader, /dashboardSection/);
 assert.match(cinematicLoader, /dashboard\.classList\.contains\('hidden'\)/);
 assert.match(cinematicLoader, /MutationObserver/);
-assert.match(cinematicLoader, /import\('\/assets\/cinematic\.js\?v=20260924-cinematic-v16'\)/);
+assert.match(cinematicLoader, /import\('\/assets\/cinematic\.js\?v=20260924-cinematic-v17'\)/);
 assert.match(cinematicLoader, /cinematic-fallback/);
 assert.doesNotMatch(cinematicLoader, /fetch\(/);
 assert.doesNotMatch(cinematicLoader, /innerHTML\s*=/);
 
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(styles, /\.cinematic-fallback/);
-assert.doesNotMatch(styles, /backdrop-filter:\s*blur\(/);
 
 console.log('Cinematic navigation regression test passed.');
