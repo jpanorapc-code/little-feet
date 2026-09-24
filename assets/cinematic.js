@@ -322,34 +322,38 @@ function createFishSchool(count, color, accent = 0xffffff) {
   const bodyGeometry = new THREE.SphereGeometry(.16, 10, 7);
   const tailGeometry = new THREE.ConeGeometry(.13, .28, 3);
 
+  // Fish are visually identical geometry repeated many times. Instancing keeps
+  // every fish while collapsing the school to two draw calls: bodies + tails.
+  const bodies = new THREE.InstancedMesh(bodyGeometry, bodyMaterial, count);
+  const tails = new THREE.InstancedMesh(tailGeometry, accentMaterial, count);
+  bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  tails.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  school.add(bodies, tails);
+
   const fish = [];
   for (let index = 0; index < count; index += 1) {
-    const swimmer = new THREE.Group();
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.scale.set(1.85, .66, .62);
-    const tail = new THREE.Mesh(tailGeometry, accentMaterial);
-    tail.position.x = -.34;
-    tail.rotation.z = Math.PI / 2;
-    tail.scale.set(.95, 1, .7);
-    swimmer.add(body, tail);
     const lane = (index % 4) - 1.5;
     const row = Math.floor(index / 4);
-    swimmer.position.set(
+    const base = new THREE.Vector3(
       -row * .62 - (index % 2) * .22,
       lane * .34 + Math.sin(index * 1.7) * .11,
       Math.sin(index * 2.1) * .65
     );
-    const size = .72 + (index % 5) * .055;
-    swimmer.scale.setScalar(size);
-    swimmer.userData = {
+    fish.push({
       phase: index * 1.37,
-      base: swimmer.position.clone(),
-      speed: .85 + (index % 3) * .11
-    };
-    school.add(swimmer);
-    fish.push(swimmer);
+      base,
+      speed: .85 + (index % 3) * .11,
+      size: .72 + (index % 5) * .055,
+      position: base.clone(),
+      rotationY: 0,
+      rotationZ: 0
+    });
   }
-  school.userData = { fish, base: new THREE.Vector3(), speed: 1, phase: 0, span: 12 };
+  school.userData = {
+    fish, bodies, tails,
+    base: new THREE.Vector3(), speed: 1, phase: 0, span: 12,
+    matrixObject: new THREE.Object3D()
+  };
   return school;
 }
 
@@ -444,19 +448,37 @@ function createGlowReef(color = 0x42f5e9, accent = 0x9768ff) {
     roughness: .32
   });
 
+  const rockGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const coralGeometry = new THREE.CylinderGeometry(.05, .11, 1, 8);
+  const rocks = new THREE.InstancedMesh(rockGeometry, baseMaterial, 11);
+  const coralCount = 6;
+  const corals = new THREE.InstancedMesh(coralGeometry, glowMaterial, coralCount);
+  const object = new THREE.Object3D();
+  let coralIndex = 0;
+
   for (let index = 0; index < 11; index += 1) {
-    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(.55 + (index % 4) * .18, 1), baseMaterial);
-    rock.scale.y = .45 + (index % 3) * .16;
-    rock.position.set((index - 5) * .72, Math.sin(index * 2.2) * .18, Math.cos(index * 1.7) * 1.25);
-    group.add(rock);
+    const radius = .55 + (index % 4) * .18;
+    const x = (index - 5) * .72;
+    const y = Math.sin(index * 2.2) * .18;
+    const z = Math.cos(index * 1.7) * 1.25;
+    object.position.set(x, y, z);
+    object.rotation.set(0, 0, 0);
+    object.scale.set(radius, radius * (.45 + (index % 3) * .16), radius);
+    object.updateMatrix();
+    rocks.setMatrixAt(index, object.matrix);
 
     if (index % 2 === 0) {
-      const coral = new THREE.Mesh(new THREE.CylinderGeometry(.05, .11, .8 + (index % 3) * .28, 8), glowMaterial);
-      coral.position.set(rock.position.x, .5 + (index % 3) * .16, rock.position.z);
-      coral.rotation.z = (index - 5) * .035;
-      group.add(coral);
+      const height = .8 + (index % 3) * .28;
+      object.position.set(x, .5 + (index % 3) * .16, z);
+      object.rotation.set(0, 0, (index - 5) * .035);
+      object.scale.set(1, height, 1);
+      object.updateMatrix();
+      corals.setMatrixAt(coralIndex, object.matrix);
+      coralIndex += 1;
     }
   }
+  group.add(rocks, corals);
+
   const light = new THREE.PointLight(color, 5.5, 9, 2);
   light.position.set(0, 1.2, 0);
   group.add(light);
@@ -539,31 +561,40 @@ function createDepthTerrace(y, z, width, color, accent, quality) {
   });
 
   const rockCount = quality === 'high' ? 15 : quality === 'medium' ? 11 : 7;
+  const beaconCount = Math.ceil(rockCount / 3);
+  const rocks = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), silhouette, rockCount);
+  const beacons = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), glow, beaconCount);
+  const object = new THREE.Object3D();
+  let beaconIndex = 0;
+
   for (let index = 0; index < rockCount; index += 1) {
     const normalized = rockCount <= 1 ? 0 : index / (rockCount - 1);
     const x = (normalized - .5) * width;
-    const rock = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(.8 + (index % 4) * .32, 1),
-      silhouette
+    const y = Math.sin(index * 1.9) * .34;
+    const z = Math.cos(index * 1.37) * 1.9;
+    const radius = .8 + (index % 4) * .32;
+
+    object.position.set(x, y, z);
+    object.rotation.set(index * .11, index * .27, index * .07);
+    object.scale.set(
+      radius * (1.2 + (index % 3) * .35),
+      radius * (.65 + (index % 5) * .24),
+      radius * (.9 + (index % 4) * .22)
     );
-    rock.position.set(x, Math.sin(index * 1.9) * .34, Math.cos(index * 1.37) * 1.9);
-    rock.scale.set(
-      1.2 + (index % 3) * .35,
-      .65 + (index % 5) * .24,
-      .9 + (index % 4) * .22
-    );
-    rock.rotation.set(index * .11, index * .27, index * .07);
-    group.add(rock);
+    object.updateMatrix();
+    rocks.setMatrixAt(index, object.matrix);
 
     if (index % 3 === 0) {
-      const beacon = new THREE.Mesh(
-        new THREE.SphereGeometry(.10 + (index % 2) * .04, 10, 8),
-        glow
-      );
-      beacon.position.set(x + Math.sin(index) * .35, .75 + (index % 4) * .3, rock.position.z + .15);
-      group.add(beacon);
+      const beaconRadius = .10 + (index % 2) * .04;
+      object.position.set(x + Math.sin(index) * .35, .75 + (index % 4) * .3, z + .15);
+      object.rotation.set(0, 0, 0);
+      object.scale.setScalar(beaconRadius);
+      object.updateMatrix();
+      beacons.setMatrixAt(beaconIndex, object.matrix);
+      beaconIndex += 1;
     }
   }
+  group.add(rocks, beacons);
 
   group.userData.baseX = group.position.x;
   group.userData.baseY = group.position.y;
@@ -752,6 +783,7 @@ function initCinematicJourney() {
   }
   stage.dataset.cinematicFallback = '';
   stage.dataset.cinematicQuality = quality;
+  stage.dataset.cinematicBatching = 'instanced-v1';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1816,15 +1848,35 @@ function initCinematicJourney() {
       }
 
       school.rotation.y = damp(school.rotation.y, direction > 0 ? 0 : Math.PI, 3.4 + data.panic * 5, dt);
-      school.userData.fish.forEach((fish, fishIndex) => {
-        const fishData = fish.userData;
+      const matrixObject = data.matrixObject;
+      data.fish.forEach((fishData, fishIndex) => {
         const flutter = time * ((5.2 + data.panic * 5.8) * fishData.speed) + fishData.phase;
-        fish.position.x = fishData.base.x + Math.sin(flutter * .31) * (.10 + data.panic * .14);
-        fish.position.y = fishData.base.y + Math.sin(flutter) * (.06 + data.panic * .11);
-        fish.position.z = fishData.base.z + Math.cos(flutter * .67) * (.08 + data.panic * .12);
-        fish.rotation.z = Math.sin(flutter) * (.08 + data.panic * .12);
-        fish.rotation.y = Math.sin(flutter * .52) * (.05 + data.panic * .08);
+        fishData.position.set(
+          fishData.base.x + Math.sin(flutter * .31) * (.10 + data.panic * .14),
+          fishData.base.y + Math.sin(flutter) * (.06 + data.panic * .11),
+          fishData.base.z + Math.cos(flutter * .67) * (.08 + data.panic * .12)
+        );
+        fishData.rotationZ = Math.sin(flutter) * (.08 + data.panic * .12);
+        fishData.rotationY = Math.sin(flutter * .52) * (.05 + data.panic * .08);
+
+        matrixObject.position.copy(fishData.position);
+        matrixObject.rotation.set(0, fishData.rotationY, fishData.rotationZ);
+        matrixObject.scale.set(1.85 * fishData.size, .66 * fishData.size, .62 * fishData.size);
+        matrixObject.updateMatrix();
+        data.bodies.setMatrixAt(fishIndex, matrixObject.matrix);
+
+        matrixObject.position.set(
+          fishData.position.x - .34 * Math.cos(fishData.rotationY) * fishData.size,
+          fishData.position.y,
+          fishData.position.z + .34 * Math.sin(fishData.rotationY) * fishData.size
+        );
+        matrixObject.rotation.set(0, fishData.rotationY, Math.PI / 2 + fishData.rotationZ);
+        matrixObject.scale.set(.95 * fishData.size, fishData.size, .7 * fishData.size);
+        matrixObject.updateMatrix();
+        data.tails.setMatrixAt(fishIndex, matrixObject.matrix);
       });
+      data.bodies.instanceMatrix.needsUpdate = true;
+      data.tails.instanceMatrix.needsUpdate = true;
     });
 
     [mantaA, mantaB].forEach((manta, index) => {
