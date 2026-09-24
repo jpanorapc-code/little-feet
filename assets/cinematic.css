@@ -13,7 +13,7 @@
   --cinematic-blue: #28b8ff;
   --cinematic-violet: #946cff;
   position: relative;
-  height: 520vh;
+  height: 680vh;
   margin: 0 0 28px;
   border-radius: 24px;
   isolation: isolate;
@@ -84,6 +84,91 @@
 .cinematic-stage::after {
   background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 18%, transparent 78%, rgba(0,0,0,.28));
 }
+
+.cinematic-portrait-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% -8%, rgba(220,255,255,.98) 0%, rgba(111,239,255,.76) 8%, rgba(29,171,234,.48) 20%, transparent 34%),
+    radial-gradient(ellipse at 18% 32%, rgba(34,244,255,.26), transparent 28%),
+    radial-gradient(ellipse at 82% 56%, rgba(174,72,255,.22), transparent 30%),
+    linear-gradient(180deg,
+      #8feeff 0%,
+      #2dbdeb 9%,
+      #0879c1 22%,
+      #07518f 38%,
+      #07376f 52%,
+      #10245c 67%,
+      #17133f 81%,
+      #070a1d 100%);
+  transform: translateZ(0);
+}
+.cinematic-portrait-backdrop::before,
+.cinematic-portrait-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: -8%;
+  pointer-events: none;
+}
+.cinematic-portrait-backdrop::before {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(125,241,255,.075) 0,
+      rgba(125,241,255,.075) 1px,
+      transparent 1px,
+      transparent 92px
+    );
+  mask-image: linear-gradient(180deg, transparent, #000 16%, #000 88%, transparent);
+  opacity: .48;
+}
+.cinematic-portrait-backdrop::after {
+  background:
+    radial-gradient(ellipse at center, transparent 34%, rgba(2,8,24,.12) 68%, rgba(1,4,16,.58) 100%);
+}
+.cinematic-portrait-light {
+  position: absolute;
+  width: 26%;
+  height: 120%;
+  top: -10%;
+  filter: blur(26px);
+  opacity: .30;
+  transform-origin: top center;
+}
+.cinematic-portrait-light-a {
+  left: 10%;
+  background: linear-gradient(180deg, rgba(184,255,255,.68), rgba(48,221,255,.12) 35%, transparent 72%);
+  transform: rotate(8deg);
+}
+.cinematic-portrait-light-b {
+  right: 8%;
+  background: linear-gradient(180deg, rgba(172,246,255,.48), rgba(141,89,255,.10) 42%, transparent 74%);
+  transform: rotate(-10deg);
+}
+.cinematic-portrait-depth-lines {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 49.8%, rgba(84,233,255,.10) 50%, transparent 50.2%),
+    repeating-linear-gradient(180deg, transparent 0, transparent 13%, rgba(116,243,255,.035) 13.2%, transparent 13.5%);
+  opacity: .52;
+}
+.cinematic-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.cinematic-journey.is-user-paused .cinematic-portrait-light {
+  opacity: .16;
+}
+.cinematic-journey.is-user-paused #littleFeetCinematicCanvas {
+  filter: saturate(.92) brightness(.96);
+}
+
 #littleFeetCinematicCanvas {
   position: absolute;
   inset: 0;
@@ -296,7 +381,7 @@
     linear-gradient(180deg,#a6f4ff 0%,#138fcb 24%,#07517f 48%,#032846 76%,#041522 100%);
 }
 @media (max-width: 860px) {
-  .cinematic-journey { height: 400vh; }
+  .cinematic-journey { height: 520vh; }
   .cinematic-stage { min-height: 340px; border-radius: 18px; }
   .cinematic-ui { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 16px; }
   .cinematic-copy { max-width: 100%; }
@@ -323,7 +408,7 @@
   .cinematic-progress-shell { width: min(100%, 420px); }
 }
 @media (max-width: 560px) {
-  .cinematic-journey { height: 330vh; margin-inline: -6px; }
+  .cinematic-journey { height: 430vh; margin-inline: -6px; }
   .cinematic-stage {
     top: 8px;
     height: calc(100vh - 16px);
@@ -334,6 +419,8 @@
   .cinematic-copy h2 { font-size: clamp(1.45rem, 9vw, 2.25rem); }
   .cinematic-copy p { font-size: .84rem; }
   .cinematic-footer { gap: 9px; }
+  .cinematic-footer-actions { gap: 6px; }
+  .cinematic-footer-actions .cinematic-skip { padding-inline: 9px; }
   .cinematic-skip { padding: 8px 10px; font-size: .7rem; }
   .cinematic-progress-label { font-size: .62rem; }
 }
