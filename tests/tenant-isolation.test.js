@@ -154,6 +154,13 @@ const rawRequest = async (route) => {
     });
     assert.equal(opaqueCredentialSignup.response.status, 201);
 
+    const oversizedBroadcast = await request('/api/broadcasts', {
+      method: 'POST',
+      cookie: alphaLogin.cookie,
+      body: { bcPriority: 'Campus Notice', bcMessage: 'x'.repeat(2001), radiusKm: 5, location: { lat: -25.7, lng: 28.2 } }
+    });
+    assert.equal(oversizedBroadcast.response.status, 413);
+
     const stickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaLogin.cookie, body: { type: 'Call family', details: 'Confirm the pickup time after 15:00.', colour: 'teal', recordedBy: 'Alpha Administrator' } });
     assert.equal(stickyNote.response.status, 200);
     const alphaStickyNotes = await request('/api/modules/stickyNotes', { cookie: alphaLogin.cookie });
@@ -184,7 +191,10 @@ const rawRequest = async (route) => {
 
     const secondLearner = await request('/api/students/import', { method: 'POST', cookie: alphaLogin.cookie, body: { students: [{ studentName: 'Alpha Other Learner', className: 'A2', parentName: 'Another Parent', contactEmail: 'another.parent@example.test' }] } });
     assert.equal(secondLearner.response.status, 201);
-    await request('/api/schedules', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-schedule-linked', studentName: 'Alpha Learner', activity: 'Reading' } });
+    const generatedSchedule = await request('/api/schedules', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-schedule-linked', studentName: 'Alpha Learner', activity: 'Reading' } });
+    assert.equal(generatedSchedule.response.status, 200);
+    assert.notEqual(generatedSchedule.data.item.id, 'alpha-schedule-linked');
+    assert.match(generatedSchedule.data.item.id, /^[0-9a-f-]{36}$/i);
     await request('/api/schedules', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-schedule-other', studentName: 'Alpha Other Learner', activity: 'Painting' } });
     await request('/api/worksheets', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-worksheet-linked', studentName: 'Alpha Learner', title: 'Letters' } });
     await request('/api/worksheets', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-worksheet-other', studentName: 'Alpha Other Learner', title: 'Numbers' } });
