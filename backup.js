@@ -889,7 +889,7 @@ function logAppError(code, reason) {
   if (errorBox && errorList) {
     errorBox.style.display = 'block';
     errorList.innerHTML = errorLog.map(err => 
-      `<li><strong>[${err.code}]</strong> ${err.reason} <em>(${err.timestamp})</em></li>`
+      `<li><strong>[${escapeWorkspaceText(err.code)}]</strong> ${escapeWorkspaceText(err.reason)} <em>(${escapeWorkspaceText(err.timestamp)})</em></li>`
     ).join('');
   }
 }
@@ -1919,13 +1919,13 @@ async function loadPosts() {
           <div class="item-row" style="flex-direction: column; align-items: flex-start;">
             <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
               <div>
-                <span class="badge-tag info">Audience: ${p.audience || 'All'}</span>
-                <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${p.caption}</p>
+                <span class="badge-tag info">Audience: ${escapeWorkspaceText(p.audience || 'All')}</span>
+                <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${escapeWorkspaceText(p.caption)}</p>
               </div>
-              <button type="button" onclick="deletePost('${p.id}')" class="action-btn btn-red">🗑️ Delete</button>
+              <button type="button" onclick="deletePost('${encodeURIComponent(p.id)}')" class="action-btn btn-red">🗑️ Delete</button>
             </div>
             ${p.mediaUrl ? `<img src="${p.mediaUrl}" class="post-item" onclick="openModal('Media File Preview', '<img src=\\'${p.mediaUrl}\\' style=\\'max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;\\'>')">` : ''}
-            <div class="meta"><span>Posted by Staff (${p.createdAt || 'Recent'})</span></div>
+            <div class="meta"><span>Posted by Staff (${escapeWorkspaceText(p.createdAt || 'Recent')})</span></div>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No updates published yet.</p>';
   } catch (err) {
@@ -1973,11 +1973,11 @@ async function loadSchedules() {
       ? list.map(s => `
           <div class="item-row">
             <div>
-              <span class="badge-tag">${s.dayOfWeek}</span>
-              <strong>${s.studentName}</strong> - <span style="color:#0d9488; font-weight:600;">${s.timeSlot}</span>
-              <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${s.activity}</p>
+              <span class="badge-tag">${escapeWorkspaceText(s.dayOfWeek)}</span>
+              <strong>${escapeWorkspaceText(s.studentName)}</strong> - <span style="color:#0d9488; font-weight:600;">${escapeWorkspaceText(s.timeSlot)}</span>
+              <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${escapeWorkspaceText(s.activity)}</p>
             </div>
-            <button type="button" onclick="deleteSchedule('${s.id}')" class="action-btn btn-red">🗑️ Delete</button>
+            <button type="button" onclick="deleteSchedule('${encodeURIComponent(s.id)}')" class="action-btn btn-red">🗑️ Delete</button>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active schedule records found.</p>';
   } catch (err) {
@@ -2081,18 +2081,18 @@ async function loadWorksheets() {
           <div class="item-row" style="flex-direction: column; align-items: flex-start;">
             <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
               <div>
-                <strong>${w.studentName}</strong> — ${w.title} 
-                <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${w.grade}%</span>
+                <strong>${escapeWorkspaceText(w.studentName)}</strong> — ${escapeWorkspaceText(w.title)} 
+                <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${escapeWorkspaceText(w.grade)}%</span>
               </div>
               <div>
-                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${w.id}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
-                <button type="button" onclick="deleteWorksheet('${w.id}')" class="action-btn btn-red">🗑️ Delete</button>
+                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${encodeURIComponent(w.id)}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
+                <button type="button" onclick="deleteWorksheet('${encodeURIComponent(w.id)}')" class="action-btn btn-red">🗑️ Delete</button>
               </div>
             </div>
             
             <div class="meta" style="margin-top:8px;">
-              <span>Submitted By: <strong style="color:var(--primary-color);">${w.submittedBy || 'Educator'}</strong></span>
-              <span>• Upload Date: ${w.uploadedAt || 'Recently'}</span>
+              <span>Submitted By: <strong style="color:var(--primary-color);">${escapeWorkspaceText(w.submittedBy || 'Educator')}</strong></span>
+              <span>• Upload Date: ${escapeWorkspaceText(w.uploadedAt || 'Recently')}</span>
             </div>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No graded worksheets uploaded.</p>';
@@ -2109,7 +2109,7 @@ async function viewWorksheetFile(id) {
     if (item && item.photoUrl) {
       openModal(`Submission File View: ${item.studentName}`, `
         <div style="text-align:center;">
-          <p style="font-size:0.85rem; margin-bottom:10px;">Submitted by: <strong>${item.submittedBy}</strong> | Title: ${item.title}</p>
+          <p style="font-size:0.85rem; margin-bottom:10px;">Submitted by: <strong>${escapeWorkspaceText(item.submittedBy)}</strong> | Title: ${escapeWorkspaceText(item.title)}</p>
           <img src="${item.photoUrl}" style="max-width:100%; max-height:75vh; border-radius:6px; border:1px solid var(--border-color); object-fit:contain;">
         </div>
       `);
@@ -2377,7 +2377,7 @@ async function loadAttendance() {
       ? list.map(a => `
           <div class="item-row">
             <div>
-              <strong>${a.studentName}</strong> <span class="meta" style="display:inline;">(${a.status} at ${a.timestamp || 'Today'})</span>
+              <strong>${escapeWorkspaceText(a.studentName)}</strong> <span class="meta" style="display:inline;">(${escapeWorkspaceText(a.status)} at ${escapeWorkspaceText(a.timestamp || 'Today')})</span>
             </div>
             <div>
               <button type="button" onclick="toggleAttendance('${a.id}', '${a.status === 'Checked In' ? 'Checked Out' : 'Checked In'}')" class="action-btn ${a.status === 'Checked In' ? 'btn-red' : 'btn-green'}">
@@ -2545,16 +2545,16 @@ async function loadTickets(checkForNew = false) {
           <div class="item-row" style="flex-direction: column; align-items: flex-start;">
             <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
               <div>
-                <span class="badge-tag">${t.department}</span> 
-                <span class="badge-tag urgent">${t.priority} Priority</span>
-                <strong>${t.subject}</strong>
+                <span class="badge-tag">${escapeWorkspaceText(t.department)}</span> 
+                <span class="badge-tag urgent">${escapeWorkspaceText(t.priority)} Priority</span>
+                <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
-            <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${t.message}</p>
+            <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
-            ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${t.updatedBy}:</strong> ${t.feedback}</div>` : ''}
+            ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
               <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
             </div>` : ''}
@@ -2570,15 +2570,15 @@ async function loadTickets(checkForNew = false) {
 
     let completedHtml = '';
     for (const [month, list] of Object.entries(grouped)) {
-      completedHtml += `<h3 style="font-size:0.95rem; color:var(--primary-color); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📅 Submitted Category: ${month}</h3>`;
+      completedHtml += `<h3 style="font-size:0.95rem; color:var(--primary-color); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📅 Submitted Category: ${escapeWorkspaceText(month)}</h3>`;
       completedHtml += list.map(t => `
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-            <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${t.subject}</strong></div>
-            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${t.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
+            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
-          <p style="font-size:0.85rem; margin-top:4px;">${t.message}</p>
-          ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${t.feedback}</p>` : ''}
+          <p style="font-size:0.85rem; margin-top:4px;">${escapeWorkspaceText(t.message)}</p>
+          ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${escapeWorkspaceText(t.feedback)}</p>` : ''}
         </div>
       `).join('');
     }
@@ -2681,11 +2681,11 @@ async function loadBroadcasts() {
       ? visibleBroadcasts.map(b => `
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-              <span class="badge-tag urgent">${b.bcPriority || 'Urgent Notice'}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${b.timestamp || 'Recent'}${b.radiusKm ? ` · ${b.radiusKm}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${b.id}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+              <span class="badge-tag urgent">${escapeWorkspaceText(b.bcPriority || 'Urgent Notice')}</span>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${encodeURIComponent(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
             </div>
-            <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${b.bcMessage}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${b.id}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
+            <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${escapeWorkspaceText(b.bcMessage)}</p>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeURIComponent(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
           </div>
         `).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
@@ -3209,11 +3209,11 @@ function setupFormListeners() {
         box.innerHTML = results.length
           ? results.map(s => `
               <div class="item-row" style="flex-direction: column; align-items: flex-start;">
-                <strong>${s.studentName}</strong> <span class="badge-tag info">${s.className}</span>
+                <strong>${escapeWorkspaceText(s.studentName)}</strong> <span class="badge-tag info">${s.className}</span>
                 <div style="font-size:0.85rem; margin-top:4px;">
-                  <p>Guardian: <strong>${s.parentName}</strong> (${s.contactEmail})</p>
-                  <p style="color:#ef4444; margin-top:2px;"><strong>⚕ Medical / allergy card:</strong> ${s.medicalNotes}</p>
-                  <p style="margin-top:2px;"><strong>Emergency:</strong> ${s.emergencyContact || 'Not recorded'}<br><strong>Authorised pickup:</strong> ${s.authorisedPickups || 'Not recorded'}</p>
+                  <p>Guardian: <strong>${escapeWorkspaceText(s.parentName)}</strong> (${escapeWorkspaceText(s.contactEmail)})</p>
+                  <p style="color:#ef4444; margin-top:2px;"><strong>⚕ Medical / allergy card:</strong> ${escapeWorkspaceText(s.medicalNotes)}</p>
+                  <p style="margin-top:2px;"><strong>Emergency:</strong> ${escapeWorkspaceText(s.emergencyContact || 'Not recorded')}<br><strong>Authorised pickup:</strong> ${escapeWorkspaceText(s.authorisedPickups || 'Not recorded')}</p>
                 </div>
               </div>
             `).join('')
