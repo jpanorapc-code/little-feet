@@ -1002,7 +1002,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'adaptive-frame-time-v2';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v6-display-adaptive';
+  stage.dataset.compressionProfile = 'safe-webgl-v7-directional-swim-idle';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1217,6 +1217,7 @@ function initCinematicJourney() {
   let smoothProgress = 0;
   let previousRawProgress = 0;
   let scrollMotion = 0;
+  let scrollDirection = 1;
   let lastSettledStation = -1;
   let mascotSoundUnlocked = false;
   let lastMascotChirpAt = 0;
@@ -1711,6 +1712,16 @@ function initCinematicJourney() {
     const data = mascot.userData;
     const path = sampleDivePath(progress);
     const motion = samplePathMotion(progress);
+    const travelSign = scrollDirection < -.12 ? -1 : 1;
+    const directedMotion = {
+      dx: motion.dx * travelSign,
+      dy: motion.dy * travelSign,
+      dz: motion.dz * travelSign,
+      yaw: motion.yaw * travelSign,
+      bank: motion.bank * travelSign
+    };
+    const directedHorizontal = Math.max(.0001, Math.hypot(directedMotion.dx, directedMotion.dz));
+    directedMotion.pitch = clamp(Math.atan2(-directedMotion.dy, directedHorizontal), -1.12, 1.12);
     const stationPose = nearestStationPose(progress);
     const stationHold = stationPose.settle;
     const underwater = smoothstep(.225, .29, progress);
@@ -1735,8 +1746,13 @@ function initCinematicJourney() {
     const glideWave = Math.sin(swimPhase * .42);
 
     const idleBreath = Math.sin(time * 2.05);
-    const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .045;
-    const idleBob = surface * Math.sin(time * 1.55) * .035;
+    const calmIdle = clamp((surface + stationHold * .82) * (1 - scrollMotion) * (1 - pointer.activity * .72), 0, 1);
+    const idleSway = Math.sin(time * .74 + .8) * calmIdle;
+    const idleNod = Math.sin(time * .49 + 2.1) * calmIdle;
+    const idleFlipperQuirk = Math.sin(time * .93 + 1.4) * calmIdle;
+    const idleTailTick = Math.sin(time * .61 + 2.7) * calmIdle;
+    const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .052;
+    const idleBob = surface * (Math.sin(time * 1.55) * .035 + Math.sin(time * .63 + 1.2) * .018);
     const pathBob = propulsion * Math.sin(swimPhase * .55) * (.05 + effort * .10);
 
     mascot.position.set(
@@ -1748,12 +1764,14 @@ function initCinematicJourney() {
     // Directional body steering. While travelling the torso points into the
     // actual path; when the user settles on a tab station the penguin brakes,
     // rotates upright and presents itself to the viewer.
-    const travelHeading = Math.atan2(-motion.dx, motion.dy);
+    const travelHeading = Math.atan2(-directedMotion.dx, directedMotion.dy);
     const entryHeading = lerp(-.55, -2.12, smoothstep(.16, .245, progress));
     const headingBlend = clamp(airborne + waterEntry + propulsion * .85, 0, 1);
-    const swimPitch = lerp(path.pitch, motion.pitch, .56) + glideWave * effort * .025;
-    const swimYaw = motion.yaw * .72 + Math.sin(progress * Math.PI * 4) * propulsion * .055;
-    const swimRoll = lerp(path.roll, travelHeading, headingBlend) + motion.bank * .26 + glideWave * effort * .035;
+    const directionBlend = smoothstep(.08, .30, scrollMotion);
+    const forwardPitch = lerp(path.pitch, motion.pitch, .56);
+    const swimPitch = lerp(forwardPitch, directedMotion.pitch, directionBlend) + glideWave * effort * .025;
+    const swimYaw = directedMotion.yaw * .72 + Math.sin(progress * Math.PI * 4) * propulsion * .055;
+    const swimRoll = lerp(path.roll * travelSign, travelHeading, headingBlend) + directedMotion.bank * .26 + glideWave * effort * .035;
     const entryRoll = entryHeading * clamp(airborne + waterEntry, 0, 1);
     const uprightPitch = stationPose.index === 0 ? 0 : .06;
     const uprightYaw = stationPose.index === 0 ? 0 : pointer.smoothX * .045;
@@ -1791,19 +1809,21 @@ function initCinematicJourney() {
     const chestCounterRoll = -mascot.rotation.z * .32;
     data.chestRig.rotation.x = damp(
       data.chestRig.rotation.x,
-      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03,
+      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03
+        + idleNod * .035,
       9,
       dt
     );
     data.chestRig.rotation.y = damp(
       data.chestRig.rotation.y,
-      pointer.smoothX * (.18 * surface + .11 * stationHold) + motion.yaw * propulsion * .12,
+      pointer.smoothX * (.18 * surface + .11 * stationHold) + directedMotion.yaw * propulsion * .12
+        + idleSway * .055,
       6.6,
       dt
     );
     data.chestRig.rotation.z = damp(
       data.chestRig.rotation.z,
-      chestCounterRoll + effort * recovery * .035,
+      chestCounterRoll + effort * recovery * .035 + idleSway * .028,
       8,
       dt
     );
@@ -1835,8 +1855,10 @@ function initCinematicJourney() {
     const shoulderSweep = .22 + powerStroke * (.18 + effort * .34) - recoveryStroke * .12;
     const entryTuckL = -.16;
     const entryTuckR = .16;
-    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline);
-    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline);
+    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline)
+      + idleFlipperQuirk * .045;
+    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline)
+      - idleFlipperQuirk * .032;
     data.leftFlipper.rotation.z = damp(
       data.leftFlipper.rotation.z,
       leftTargetZ - preen * .72,
@@ -1865,13 +1887,13 @@ function initCinematicJourney() {
     );
     data.leftFlipper.rotation.y = damp(
       data.leftFlipper.rotation.y,
-      propulsion * (.16 + motion.yaw * .24),
+      propulsion * (.16 + directedMotion.yaw * .24) + idleFlipperQuirk * .035,
       9,
       dt
     );
     data.rightFlipper.rotation.y = damp(
       data.rightFlipper.rotation.y,
-      propulsion * (-.16 + motion.yaw * .24),
+      propulsion * (-.16 + directedMotion.yaw * .24) - idleFlipperQuirk * .025,
       9,
       dt
     );
@@ -1880,7 +1902,7 @@ function initCinematicJourney() {
     // matching real penguin steering behaviour rather than kicking constantly.
     const feetTuck = propulsion * (.40 + effort * .16) + streamline * .46;
     const launchKick = launch * -.28;
-    const rudder = motion.yaw * propulsion;
+    const rudder = directedMotion.yaw * propulsion;
     data.footL.rotation.x = damp(
       data.footL.rotation.x,
       launchKick + feetTuck + powerStroke * effort * .10,
@@ -1897,13 +1919,13 @@ function initCinematicJourney() {
     data.footR.rotation.y = damp(data.footR.rotation.y, rudder * .48, 8, dt);
     data.footL.rotation.z = damp(
       data.footL.rotation.z,
-      surface * Math.sin(time * 1.2) * .035,
+      surface * Math.sin(time * 1.2) * .035 + idleTailTick * .018,
       7,
       dt
     );
     data.footR.rotation.z = damp(
       data.footR.rotation.z,
-      -surface * Math.sin(time * 1.2) * .035,
+      -surface * Math.sin(time * 1.2) * .035 - idleTailTick * .014,
       7,
       dt
     );
@@ -1915,15 +1937,23 @@ function initCinematicJourney() {
       7.5,
       dt
     );
-    data.tailRig.rotation.z = damp(data.tailRig.rotation.z, motion.bank * -.32 * propulsion, 7.5, dt);
+    data.tailRig.rotation.z = damp(data.tailRig.rotation.z, directedMotion.bank * -.32 * propulsion + idleTailTick * .045, 7.5, dt);
 
     // Cursor obsession: eyes lead, head follows, chest follows last. The head
     // also counter-rotates against the swimming body so the gaze stays visually
     // locked on the cursor even during banks and turns.
     const diveFocus = clamp(airborne + waterEntry + streamline * .85, 0, 1);
     const gazeBoost = .92 + stationHold * .20 + surface * .12;
-    const requestedYaw = lerp(pointer.smoothX * 1.02 * gazeBoost - mascot.rotation.y * .38, 0, diveFocus);
-    const requestedPitch = lerp(-pointer.smoothY * .68 * gazeBoost - mascot.rotation.x * .10, -.10, diveFocus);
+    const requestedYaw = lerp(
+      pointer.smoothX * 1.02 * gazeBoost - mascot.rotation.y * .38 + idleSway * .16,
+      0,
+      diveFocus
+    );
+    const requestedPitch = lerp(
+      -pointer.smoothY * .68 * gazeBoost - mascot.rotation.x * .10 + idleNod * .07,
+      travelSign < 0 && propulsion > .2 ? .08 : -.10,
+      diveFocus
+    );
     const headYaw = clamp(requestedYaw, -.72, .72);
     const headPitch = clamp(requestedPitch + preen * .14, -.46, .40);
     data.headRig.rotation.y = damp(data.headRig.rotation.y, headYaw, 14.5, dt);
@@ -2207,8 +2237,12 @@ function initCinematicJourney() {
     waterBudget += dt;
     worldBudget += dt;
     bubbleBudget += dt;
-    const rawMotion = Math.abs(scrollProgress - previousRawProgress) / Math.max(.001, dt);
+    const progressDelta = scrollProgress - previousRawProgress;
+    const rawMotion = Math.abs(progressDelta) / Math.max(.001, dt);
     scrollMotion = damp(scrollMotion, clamp(rawMotion * .55, 0, 1), 7.5, dt);
+    if (Math.abs(progressDelta) > .00015) {
+      scrollDirection = damp(scrollDirection, progressDelta > 0 ? 1 : -1, 13, dt);
+    }
     previousRawProgress = scrollProgress;
 
     smoothProgress = damp(smoothProgress, scrollProgress, 7.2, dt);
