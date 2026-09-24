@@ -786,6 +786,28 @@ function initCinematicJourney() {
   mascot.rotation.y = 0;
   scene.add(mascot);
 
+  // The uploaded Riley Penguin.blend contains one real 40-frame swim action.
+  // We extracted only its authored bone-motion deltas into a tiny same-origin
+  // JSON file so the browser can use the real motion now without shipping a
+  // .blend file or waiting for the final GLB/FBX pipeline.
+  let sourceSwimAction = null;
+  fetch('/assets/penguin-swim-action.json?v=20260924-swim-v1', { cache: 'force-cache' })
+    .then(response => {
+      if (!response.ok) throw new Error(`swim action HTTP ${response.status}`);
+      return response.json();
+    })
+    .then(data => {
+      if (data?.schema !== 'little-feet-penguin-action-v1' || !data?.bones || !data?.mapping) {
+        throw new Error('swim action schema mismatch');
+      }
+      sourceSwimAction = data;
+      stage.dataset.swimSource = 'uploaded-riley-action';
+    })
+    .catch(error => {
+      console.warn('Little Feet source swim action unavailable; keeping procedural fallback.', error);
+      stage.dataset.swimSource = 'procedural-fallback';
+    });
+
   // Microbubble wake for strong underwater strokes. It is hidden on the
   // surface and fades in only when the mascot is actually propelling.
   const mascotTrail = createBubbles(quality === 'high' ? 56 : quality === 'medium' ? 34 : 18, 1.05, 2.7, .055);
@@ -1368,6 +1390,31 @@ function initCinematicJourney() {
     water.geometry.computeVertexNormals();
   };
 
+  const sampleSourceSwimBone = (boneName, cycle) => {
+    const action = sourceSwimAction;
+    const keys = action?.bones?.[boneName]?.rotationDeltaEulerXYZ;
+    if (!Array.isArray(keys) || keys.length < 2) return [0, 0, 0];
+
+    const frameStart = Number(action.source?.frameStart ?? 0);
+    const frameEnd = Number(action.source?.frameEnd ?? 40);
+    const span = Math.max(1, frameEnd - frameStart);
+    const wrapped = ((cycle % 1) + 1) % 1;
+    const frame = frameStart + wrapped * span;
+
+    for (let index = 0; index < keys.length - 1; index += 1) {
+      const from = keys[index];
+      const to = keys[index + 1];
+      if (frame > to.frame) continue;
+      const local = smoothstep(from.frame, to.frame, frame);
+      return [
+        lerp(from.euler[0], to.euler[0], local),
+        lerp(from.euler[1], to.euler[1], local),
+        lerp(from.euler[2], to.euler[2], local)
+      ];
+    }
+    return keys[keys.length - 1].euler.slice(0, 3);
+  };
+
   const animateBubbleField = (points, time, speedMultiplier = 1) => {
     const attr = points.geometry.attributes.position;
     const seeds = points.geometry.attributes.seed;
@@ -1411,6 +1458,18 @@ function initCinematicJourney() {
     const stroke = powerStroke - recoveryStroke * .62;
     const recovery = recoveryStroke - powerStroke * .28;
     const glideWave = Math.sin(swimPhase * .42);
+
+    const sourceMap = sourceSwimAction?.mapping;
+    const sourceBlend = sourceSwimAction
+      ? propulsion * (1 - streamline) * (1 - stationHold * .92)
+      : 0;
+    const sourceBodyLower = sourceMap ? sampleSourceSwimBone(sourceMap.bodyLower, strokeCycle) : [0, 0, 0];
+    const sourceBodyUpper = sourceMap ? sampleSourceSwimBone(sourceMap.bodyUpper, strokeCycle) : [0, 0, 0];
+    const sourceChest = sourceMap ? sampleSourceSwimBone(sourceMap.chestHead, strokeCycle) : [0, 0, 0];
+    const sourceRightRoot = sourceMap ? sampleSourceSwimBone(sourceMap.rightFlipperRoot, strokeCycle) : [0, 0, 0];
+    const sourceRightTip = sourceMap ? sampleSourceSwimBone(sourceMap.rightFlipperTip, strokeCycle) : [0, 0, 0];
+    const sourceLeftRoot = sourceMap ? sampleSourceSwimBone(sourceMap.leftFlipperRoot, strokeCycle) : [0, 0, 0];
+    const sourceLeftTip = sourceMap ? sampleSourceSwimBone(sourceMap.leftFlipperTip, strokeCycle) : [0, 0, 0];
     const idleBreath = Math.sin(time * 2.05);
     const stationBob = stationHold * Math.sin(time * 1.38 + stationPose.index) * .045;
     const idleBob = surface * Math.sin(time * 1.55) * .035;
@@ -1468,7 +1527,8 @@ function initCinematicJourney() {
     const chestCounterRoll = -mascot.rotation.z * .32;
     data.chestRig.rotation.x = damp(
       data.chestRig.rotation.x,
-      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03,
+      anticipation * .24 - launch * .12 - streamline * .08 - effort * stroke * .032 - stationHold * .03
+        + sourceBlend * (sourceBodyUpper[0] * .42 + sourceChest[0] * .22),
       9,
       dt
     );
@@ -1512,8 +1572,12 @@ function initCinematicJourney() {
     const shoulderSweep = .22 + powerStroke * (.18 + effort * .34) - recoveryStroke * .12;
     const entryTuckL = -.16;
     const entryTuckR = .16;
-    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline);
-    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline);
+    const authoredLeftZ = sourceBlend * (sourceLeftRoot[0] * .52 + sourceLeftTip[2] * .16);
+    const authoredRightZ = sourceBlend * (-sourceRightRoot[0] * .52 + sourceRightTip[2] * .16);
+    const authoredLeftSweep = sourceBlend * (-sourceLeftRoot[0] * .50 + Math.abs(sourceLeftTip[0]) * .10);
+    const authoredRightSweep = sourceBlend * (-sourceRightRoot[0] * .50 + Math.abs(sourceRightTip[0]) * .10);
+    const leftTargetZ = lerp(lerp(neutralL - anticipation * .26, leftSwimZ, propulsion), entryTuckL, streamline) + authoredLeftZ;
+    const rightTargetZ = lerp(lerp(neutralR + anticipation * .26, rightSwimZ, propulsion), entryTuckR, streamline) + authoredRightZ;
     data.leftFlipper.rotation.z = damp(
       data.leftFlipper.rotation.z,
       leftTargetZ - preen * .72,
@@ -1528,25 +1592,27 @@ function initCinematicJourney() {
     );
     data.leftFlipper.rotation.x = damp(
       data.leftFlipper.rotation.x,
-      lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion) + streamline * .42 + preen * .92,
+      lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion)
+        + streamline * .42 + preen * .92 + authoredLeftSweep,
       11.5,
       dt
     );
     data.rightFlipper.rotation.x = damp(
       data.rightFlipper.rotation.x,
-      lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion) + streamline * .42,
+      lerp(-.10 + anticipation * .34 + launch * .16, shoulderSweep, propulsion)
+        + streamline * .42 + authoredRightSweep,
       11.5,
       dt
     );
     data.leftFlipper.rotation.y = damp(
       data.leftFlipper.rotation.y,
-      propulsion * (.16 + motion.yaw * .24),
+      propulsion * (.16 + motion.yaw * .24) + sourceBlend * sourceLeftRoot[1] * .24,
       9,
       dt
     );
     data.rightFlipper.rotation.y = damp(
       data.rightFlipper.rotation.y,
-      propulsion * (-.16 + motion.yaw * .24),
+      propulsion * (-.16 + motion.yaw * .24) + sourceBlend * sourceRightRoot[1] * .24,
       9,
       dt
     );
@@ -1564,7 +1630,12 @@ function initCinematicJourney() {
     data.footR.rotation.z = damp(data.footR.rotation.z, -surface * Math.sin(time * 1.2) * .035, 7, dt);
 
     data.tailRig.rotation.y = damp(data.tailRig.rotation.y, -rudder * .62, 8.5, dt);
-    data.tailRig.rotation.x = damp(data.tailRig.rotation.x, propulsion * recovery * .10, 7.5, dt);
+    data.tailRig.rotation.x = damp(
+      data.tailRig.rotation.x,
+      propulsion * recovery * .10 + sourceBlend * sourceBodyLower[0] * .34,
+      7.5,
+      dt
+    );
     data.tailRig.rotation.z = damp(data.tailRig.rotation.z, motion.bank * -.32 * propulsion, 7.5, dt);
 
     // Cursor obsession: eyes lead, head follows, chest follows last. The head
