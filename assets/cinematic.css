@@ -85,87 +85,45 @@
   background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 18%, transparent 78%, rgba(0,0,0,.28));
 }
 
-.cinematic-portrait-backdrop {
+.cinematic-depth-picture {
   position: absolute;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse at 50% -8%, rgba(220,255,255,.98) 0%, rgba(111,239,255,.76) 8%, rgba(29,171,234,.48) 20%, transparent 34%),
-    radial-gradient(ellipse at 18% 32%, rgba(34,244,255,.26), transparent 28%),
-    radial-gradient(ellipse at 82% 56%, rgba(174,72,255,.22), transparent 30%),
-    linear-gradient(180deg,
-      #8feeff 0%,
-      #2dbdeb 9%,
-      #0879c1 22%,
-      #07518f 38%,
-      #07376f 52%,
-      #10245c 67%,
-      #17133f 81%,
-      #070a1d 100%);
-  transform: translateZ(0);
+  background: #03162c;
 }
-.cinematic-portrait-backdrop::before,
-.cinematic-portrait-backdrop::after {
-  content: "";
+.cinematic-depth-image {
   position: absolute;
-  inset: -8%;
-  pointer-events: none;
+  left: 50%;
+  top: 0;
+  width: 100%;
+  height: 172%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 0%;
+  transform: translate3d(-50%, 0, 0) scale(1.035);
+  transform-origin: 50% 0%;
+  will-change: transform;
+  filter: saturate(1.12) contrast(1.04) brightness(.92);
 }
-.cinematic-portrait-backdrop::before {
-  background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(125,241,255,.075) 0,
-      rgba(125,241,255,.075) 1px,
-      transparent 1px,
-      transparent 92px
-    );
-  mask-image: linear-gradient(180deg, transparent, #000 16%, #000 88%, transparent);
-  opacity: .48;
+@media (min-aspect-ratio: 16/10) {
+  .cinematic-depth-image {
+    width: max(100%, 1200px);
+    height: 188%;
+  }
 }
-.cinematic-portrait-backdrop::after {
-  background:
-    radial-gradient(ellipse at center, transparent 34%, rgba(2,8,24,.12) 68%, rgba(1,4,16,.58) 100%);
+@media (max-width: 900px) {
+  .cinematic-depth-image {
+    height: 158%;
+    filter: saturate(1.08) contrast(1.03) brightness(.94);
+  }
 }
-.cinematic-portrait-light {
-  position: absolute;
-  width: 26%;
-  height: 120%;
-  top: -10%;
-  filter: blur(26px);
-  opacity: .30;
-  transform-origin: top center;
+.cinematic-journey.is-user-paused .cinematic-depth-image {
+  filter: saturate(1.03) contrast(1.02) brightness(.88);
 }
-.cinematic-portrait-light-a {
-  left: 10%;
-  background: linear-gradient(180deg, rgba(184,255,255,.68), rgba(48,221,255,.12) 35%, transparent 72%);
-  transform: rotate(8deg);
-}
-.cinematic-portrait-light-b {
-  right: 8%;
-  background: linear-gradient(180deg, rgba(172,246,255,.48), rgba(141,89,255,.10) 42%, transparent 74%);
-  transform: rotate(-10deg);
-}
-.cinematic-portrait-depth-lines {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, transparent 49.8%, rgba(84,233,255,.10) 50%, transparent 50.2%),
-    repeating-linear-gradient(180deg, transparent 0, transparent 13%, rgba(116,243,255,.035) 13.2%, transparent 13.5%);
-  opacity: .52;
-}
-.cinematic-footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: auto;
-}
-.cinematic-journey.is-user-paused .cinematic-portrait-light {
-  opacity: .16;
-}
-.cinematic-journey.is-user-paused #littleFeetCinematicCanvas {
+
+#littleFeetCinematicCanvas {
   filter: saturate(.92) brightness(.96);
 }
 
