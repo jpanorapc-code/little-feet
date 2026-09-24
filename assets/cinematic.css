@@ -1,0 +1,302 @@
+
+/* Little Feet cinematic navigation — isolated from the working portal UI. */
+.cinematic-journey {
+  --cinematic-accent: #58fff2;
+  --cinematic-blue: #28b8ff;
+  --cinematic-violet: #946cff;
+  position: relative;
+  height: 520vh;
+  margin: 0 0 28px;
+  border-radius: 24px;
+  isolation: isolate;
+}
+.cinematic-stage {
+  position: sticky;
+  top: 14px;
+  height: calc(100vh - 28px);
+  min-height: 620px;
+  overflow: hidden;
+  border: 1px solid rgba(118, 240, 255, .34);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 70% 18%, rgba(116, 255, 246, .18), transparent 28%),
+    linear-gradient(180deg, #9defff 0%, #2daeea 19%, #075287 43%, #052f59 68%, #03192f 100%);
+  box-shadow:
+    0 30px 90px rgba(0, 8, 25, .52),
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 0 0 90px rgba(41, 214, 255, .08);
+}
+.cinematic-stage::before,
+.cinematic-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.cinematic-stage::before {
+  background:
+    radial-gradient(circle at 18% 74%, rgba(69, 251, 255, .14), transparent 24%),
+    radial-gradient(circle at 86% 68%, rgba(141, 96, 255, .14), transparent 27%);
+  mix-blend-mode: screen;
+}
+.cinematic-stage::after {
+  background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 18%, transparent 78%, rgba(0,0,0,.28));
+}
+#littleFeetCinematicCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  display: block;
+}
+.cinematic-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  grid-template-rows: auto 1fr auto;
+  gap: 18px;
+  padding: clamp(18px, 3vw, 38px);
+}
+.cinematic-copy {
+  align-self: start;
+  max-width: min(670px, 70vw);
+  padding: clamp(18px, 2.8vw, 30px);
+  border: 1px solid rgba(151, 247, 255, .28);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(3, 24, 48, .78), rgba(6, 57, 86, .36));
+  box-shadow: 0 18px 55px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.12);
+  backdrop-filter: blur(16px) saturate(135%);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  pointer-events: auto;
+}
+.cinematic-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #a7fff8;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.cinematic-kicker::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #7dfff7;
+  box-shadow: 0 0 10px #7dfff7, 0 0 24px #28b8ff;
+}
+.cinematic-copy h2 {
+  margin: 0 0 8px;
+  color: #fff;
+  font-size: clamp(1.55rem, 3.2vw, 3.35rem);
+  line-height: .98;
+  letter-spacing: -.035em;
+  text-shadow: 0 4px 28px rgba(0,0,0,.34), 0 0 24px rgba(88,255,242,.14);
+}
+.cinematic-copy p {
+  margin: 0;
+  max-width: 590px;
+  color: #d8f8ff;
+  line-height: 1.55;
+  font-size: clamp(.88rem, 1.5vw, 1.02rem);
+}
+.cinematic-depth-meter {
+  justify-self: end;
+  align-self: center;
+  display: grid;
+  gap: 9px;
+  width: min(300px, 28vw);
+  pointer-events: auto;
+}
+.cinematic-stop {
+  position: relative;
+  width: 100%;
+  padding: 11px 13px 11px 38px;
+  border: 1px solid rgba(159,236,255,.18);
+  border-radius: 14px;
+  background: rgba(3,20,39,.58);
+  color: #d7f7ff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.cinematic-stop::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #65d8ff;
+  box-shadow: 0 0 9px rgba(101,216,255,.7);
+}
+.cinematic-stop:hover,
+.cinematic-stop:focus-visible {
+  transform: translateX(-5px);
+  border-color: rgba(126,255,245,.72);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(88,255,242,.12), 0 10px 32px rgba(0,0,0,.24);
+}
+.cinematic-stop.is-current {
+  border-color: rgba(126,255,245,.78);
+  color: #fff;
+  background: linear-gradient(110deg, rgba(0,174,188,.38), rgba(86,74,207,.28));
+  box-shadow: 0 0 24px rgba(38,221,255,.18), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.cinematic-stop.is-current::before {
+  background: #d6ff64;
+  box-shadow: 0 0 8px #d6ff64, 0 0 22px #58fff2;
+}
+.cinematic-footer {
+  grid-column: 1 / -1;
+  align-self: end;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cinematic-progress-shell {
+  width: min(520px, 62vw);
+  pointer-events: none;
+}
+.cinematic-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 7px;
+  color: rgba(226,251,255,.88);
+  font-size: .71rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+.cinematic-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.34);
+}
+.cinematic-progress-bar {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #56fff0, #23c6ff 42%, #a66cff);
+  box-shadow: 0 0 13px rgba(88,255,242,.88);
+  will-change: width;
+}
+.cinematic-skip {
+  pointer-events: auto;
+  width: auto;
+  padding: 10px 14px;
+  border: 1px solid rgba(174,246,255,.3);
+  border-radius: 999px;
+  background: rgba(2,17,33,.6);
+  color: #eaffff;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+.cinematic-skip:hover,
+.cinematic-skip:focus-visible {
+  border-color: rgba(126,255,245,.78);
+  outline: none;
+  box-shadow: 0 0 18px rgba(88,255,242,.16);
+}
+.cinematic-loading {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  z-index: 6;
+  transform: translate(-50%, 50%);
+  padding: 9px 13px;
+  border-radius: 999px;
+  background: rgba(2,15,28,.72);
+  color: #dffffc;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  transition: opacity .35s ease, visibility .35s ease;
+}
+.cinematic-stage.is-ready .cinematic-loading {
+  opacity: 0;
+  visibility: hidden;
+}
+.cinematic-fallback .cinematic-loading {
+  opacity: 1;
+  visibility: visible;
+  bottom: auto;
+  top: 50%;
+}
+.cinematic-fallback #littleFeetCinematicCanvas {
+  display: none;
+}
+.cinematic-fallback .cinematic-stage {
+  background:
+    radial-gradient(circle at 72% 26%, rgba(111,255,244,.24), transparent 25%),
+    radial-gradient(circle at 25% 70%, rgba(73,119,255,.24), transparent 29%),
+    linear-gradient(180deg,#a6f4ff 0%,#138fcb 24%,#07517f 48%,#032846 76%,#041522 100%);
+}
+@media (max-width: 860px) {
+  .cinematic-journey { height: 400vh; }
+  .cinematic-stage { min-height: 540px; border-radius: 18px; }
+  .cinematic-ui { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 16px; }
+  .cinematic-copy { max-width: 100%; }
+  .cinematic-depth-meter {
+    align-self: end;
+    justify-self: stretch;
+    width: 100%;
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .cinematic-depth-meter::-webkit-scrollbar { display: none; }
+  .cinematic-stop {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 132px;
+    padding: 9px 11px 9px 31px;
+    font-size: .76rem;
+  }
+  .cinematic-stop::before { left: 11px; }
+  .cinematic-footer { align-items: center; }
+  .cinematic-progress-shell { width: min(100%, 420px); }
+}
+@media (max-width: 560px) {
+  .cinematic-journey { height: 330vh; margin-inline: -6px; }
+  .cinematic-stage { top: 8px; height: calc(100vh - 16px); min-height: 520px; }
+  .cinematic-copy { padding: 15px; border-radius: 16px; }
+  .cinematic-copy h2 { font-size: clamp(1.45rem, 9vw, 2.25rem); }
+  .cinematic-copy p { font-size: .84rem; }
+  .cinematic-footer { gap: 9px; }
+  .cinematic-skip { padding: 8px 10px; font-size: .7rem; }
+  .cinematic-progress-label { font-size: .62rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-journey { height: auto; }
+  .cinematic-stage {
+    position: relative;
+    top: auto;
+    height: auto;
+    min-height: 640px;
+  }
+  .cinematic-depth-meter { align-self: end; }
+  .cinematic-progress-shell { display: none; }
+}
