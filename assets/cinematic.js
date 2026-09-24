@@ -825,6 +825,20 @@ function initCinematicJourney() {
     audio.underwaterGain.gain.setTargetAtTime(underwaterTarget, now, .22);
   };
 
+  const stopCinematicAudio = () => {
+    const audio = cinematicAudio;
+    cinematicAudio = null;
+    cinematicAudioStarting = false;
+    if (!audio) return;
+    audio.sources.forEach(source => {
+      try { source.stop(); } catch { /* Already stopped. */ }
+      try { source.disconnect(); } catch { /* Optional cleanup. */ }
+    });
+    try { audio.surfaceGain.disconnect(); } catch { /* Optional cleanup. */ }
+    try { audio.underwaterGain.disconnect(); } catch { /* Optional cleanup. */ }
+    try { audio.master.disconnect(); } catch { /* Optional cleanup. */ }
+  };
+
   const scheduleNextMascotChirp = (nowMs = performance.now(), progress = smoothProgress) => {
     // Real penguin calls should feel occasional and unpredictable, not looped.
     // Use a shorter gap while the user is actively travelling through the scene.
