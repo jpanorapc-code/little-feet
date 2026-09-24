@@ -2983,7 +2983,7 @@ async function loadGroupChatMessages() {
   }
 
   try {
-    const res = await fetch(`/api/chat/messages/${groupId}`);
+    const res = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}`);
     const msgs = await res.json();
     if (res.status === 404) {
       if (chatBox) chatBox.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">This channel is no longer available. Refreshing the channel list…</p>';
@@ -2996,7 +2996,7 @@ async function loadGroupChatMessages() {
       ? msgs.map(m => {
           const isMe = currentUser && m.sender === currentUser.username;
           const moderation = currentUser?.role === 'admin' && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${groupId}','${m.id}')">Delete</button>` : '';
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${encodeURIComponent(groupId)}','${encodeURIComponent(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
               <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
@@ -3011,8 +3011,10 @@ async function loadGroupChatMessages() {
   }
 }
 
-async function deleteGroupChatMessage(groupId, messageId) {
+async function deleteGroupChatMessage(encodedGroupId, encodedMessageId) {
   if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this chat message?')) return;
+  const groupId = decodeURIComponent(String(encodedGroupId || ''));
+  const messageId = decodeURIComponent(String(encodedMessageId || ''));
   const response = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to delete this message.');
@@ -3056,7 +3058,7 @@ async function deleteCurrentGroup() {
 
   if (!confirm('Are you sure you want to delete this group channel?')) return;
 
-  await fetch(`/api/chat/groups/${groupId}`, { method: 'DELETE' });
+  await fetch(`/api/chat/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
   await loadChatGroups();
   loadGroupChatMessages();
 }
@@ -3096,7 +3098,7 @@ async function loadDirectChatMessages() {
       ? msgs.map(m => {
           const isMe = m.sender === currentUser.username;
           const moderation = currentUser?.role === 'admin' && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${m.id}')">Delete</button>` : '';
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${encodeURIComponent(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
               <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
@@ -3111,8 +3113,9 @@ async function loadDirectChatMessages() {
   }
 }
 
-async function deleteDirectChatMessage(messageId) {
+async function deleteDirectChatMessage(encodedMessageId) {
   if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this private message?')) return;
+  const messageId = decodeURIComponent(String(encodedMessageId || ''));
   const response = await fetch(`/api/chat/direct/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to delete this message.');
