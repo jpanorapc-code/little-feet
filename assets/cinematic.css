@@ -122,6 +122,143 @@
 }
 
 
+
+.cinematic-water-surface,
+.cinematic-water-current {
+  position: absolute;
+  pointer-events: none;
+  z-index: .35;
+  overflow: hidden;
+}
+
+.cinematic-water-surface {
+  left: -12%;
+  width: 124%;
+  top: 39%;
+  height: 30%;
+  opacity: .50;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(2, 72, 132, 0) 0%,
+      rgba(18, 145, 205, .06) 14%,
+      rgba(40, 185, 232, .14) 34%,
+      rgba(31, 149, 211, .16) 52%,
+      rgba(10, 95, 163, .10) 72%,
+      rgba(4, 45, 88, 0) 100%
+    );
+}
+
+.cinematic-water-surface::before,
+.cinematic-water-surface::after {
+  content: "";
+  position: absolute;
+  inset: -10% -18%;
+  will-change: transform;
+}
+
+.cinematic-water-surface::before {
+  background:
+    repeating-linear-gradient(
+      176deg,
+      transparent 0 24px,
+      rgba(180, 246, 255, .12) 25px 27px,
+      transparent 28px 52px
+    ),
+    repeating-linear-gradient(
+      184deg,
+      transparent 0 34px,
+      rgba(70, 192, 234, .10) 35px 37px,
+      transparent 38px 68px
+    );
+  animation: cinematicSurfaceDrift 18s linear infinite alternate;
+}
+
+.cinematic-water-surface::after {
+  top: 9%;
+  bottom: auto;
+  height: 18%;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(218, 252, 255, 0) 0%,
+      rgba(193, 249, 255, .24) 44%,
+      rgba(126, 226, 250, .10) 66%,
+      rgba(218, 252, 255, 0) 100%
+    );
+  animation: cinematicSurfaceShimmer 11s ease-in-out infinite alternate;
+}
+
+.cinematic-water-current {
+  left: -10%;
+  width: 120%;
+  top: 54%;
+  height: 40%;
+  opacity: .20;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(5, 53, 105, 0) 0%,
+      rgba(18, 112, 177, .06) 18%,
+      rgba(46, 173, 220, .08) 48%,
+      rgba(17, 91, 153, .05) 76%,
+      rgba(3, 31, 71, 0) 100%
+    );
+}
+
+.cinematic-water-current::before {
+  content: "";
+  position: absolute;
+  inset: -12% -16%;
+  background:
+    repeating-linear-gradient(
+      168deg,
+      transparent 0 46px,
+      rgba(120, 222, 248, .08) 48px 50px,
+      transparent 52px 96px
+    );
+  animation: cinematicCurrentDrift 28s linear infinite alternate;
+  will-change: transform;
+}
+
+.cinematic-journey:not(.is-active) .cinematic-water-surface::before,
+.cinematic-journey:not(.is-active) .cinematic-water-surface::after,
+.cinematic-journey:not(.is-active) .cinematic-water-current::before,
+.cinematic-journey.is-user-paused .cinematic-water-surface::before,
+.cinematic-journey.is-user-paused .cinematic-water-surface::after,
+.cinematic-journey.is-user-paused .cinematic-water-current::before {
+  animation-play-state: paused;
+  will-change: auto;
+}
+
+@keyframes cinematicSurfaceDrift {
+  from { transform: translate3d(-5%, -1px, 0); }
+  to { transform: translate3d(5%, 2px, 0); }
+}
+
+@keyframes cinematicSurfaceShimmer {
+  from { transform: translate3d(-3%, 0, 0) scaleX(1.02); opacity: .72; }
+  to { transform: translate3d(4%, 1px, 0) scaleX(.98); opacity: 1; }
+}
+
+@keyframes cinematicCurrentDrift {
+  from { transform: translate3d(-4%, 0, 0); }
+  to { transform: translate3d(4%, -3px, 0); }
+}
+
+@media (max-width: 900px) {
+  .cinematic-water-surface {
+    top: 41%;
+    height: 26%;
+    opacity: .40;
+  }
+  .cinematic-water-current {
+    top: 57%;
+    height: 32%;
+    opacity: .14;
+  }
+}
+
 .cinematic-life-2d {
   position: absolute;
   z-index: .5;
