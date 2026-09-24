@@ -12,7 +12,6 @@ const styles = fs.readFileSync(path.join(root, 'assets', 'cinematic.css'), 'utf8
 
 assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
 assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
-assert.match(page, /\/assets\/cinematic\.css\?v=20260924-cinematic-v1/);
 assert.match(page, /href="\/assets\/cinematic\.css\?v=20260924-cinematic-v3"/);
 assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260924-cinematic-v3" defer/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
