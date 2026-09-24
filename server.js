@@ -91,11 +91,16 @@ const containsBlockedLanguage = (value) => {
   return blockedTerms.some(term => new RegExp(`(^|[^a-z])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z])`, 'i').test(normalised)
     || (term.length >= 4 && compact.includes(term)));
 };
-const requestContainsBlockedLanguage = (value) => {
+const MODERATION_EXEMPT_FIELDS = new Set([
+  'pin', 'password', 'passcode', 'verificationcode', 'accesscode',
+  'signature', 'accountnumber', 'reference', 'transactionid', 'bankreference'
+]);
+const requestContainsBlockedLanguage = (value, fieldName = '') => {
+  if (MODERATION_EXEMPT_FIELDS.has(String(fieldName || '').toLocaleLowerCase('en-US'))) return false;
   if (typeof value === 'string') return containsBlockedLanguage(value);
-  if (Array.isArray(value)) return value.some(requestContainsBlockedLanguage);
+  if (Array.isArray(value)) return value.some(item => requestContainsBlockedLanguage(item, fieldName));
   if (!value || typeof value !== 'object') return false;
-  return Object.values(value).some(requestContainsBlockedLanguage);
+  return Object.entries(value).some(([key, item]) => requestContainsBlockedLanguage(item, key));
 };
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
 const publicRateLimits = new Map();
