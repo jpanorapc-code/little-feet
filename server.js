@@ -2196,7 +2196,16 @@ app.post('/api/account-deletion-request', (req, res) => {
     category: 'Account deletion request',
     priority: 'High',
     subject: `Account deletion request · ${requester.name || requester.username}`,
-    message: 'The signed-in user has requested deletion of their Little Feet account. Verify the request and complete the approved account-deletion process.',
+    message: [
+      'ACCOUNT DELETION REQUEST',
+      `Name: ${requester.name || 'Not recorded'}`,
+      `Username / email: ${requester.username}`,
+      `Role: ${requester.role}`,
+      `School: ${requester.schoolName || 'Not recorded'}`,
+      `Requested at: ${new Date().toISOString()}`,
+      '',
+      'The signed-in user requested deletion of their Little Feet account. Verify the requester and complete the approved account-deletion process.'
+    ].join('\n'),
     createdBy: requester.username,
     createdByName: requester.name || requester.username,
     assignedTo: administrator.username,
