@@ -32,6 +32,13 @@ assert.match(page, /Request account deletion/);
 assert.match(client, /function requestOwnAccountDeletion\(/);
 assert.match(server, /app\.post\('\/api\/account-deletion-request'/);
 assert.match(server, /Account deletion request/);
+assert.match(page, /Request full school deletion/);
+assert.match(client, /function requestSchoolDeletion\(/);
+assert.match(client, /function executeSchoolDeletion\(/);
+assert.match(server, /school-deletion-request/);
+assert.match(server, /school-deletion\/execute/);
+assert.match(server, /LF_API_MUTATION_RATE_LIMIT/);
+assert.match(server, /LF_API_READ_RATE_LIMIT/);
 
 const forbiddenClientPatterns = [
   /\$\{p\.caption\}/,
