@@ -72,7 +72,9 @@ function createMascot() {
   group.add(chestRig);
 
   const headRig = new THREE.Group();
-  headRig.position.set(0, .86, .03);
+  // Keep a real neck gap above the torso. The previous lower pivot let strong
+  // cursor pitch drive the skull through the chest mesh.
+  headRig.position.set(0, 1.15, .07);
   chestRig.add(headRig);
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(.79, 40, 30), blueDark);
@@ -158,6 +160,7 @@ function createMascot() {
     eyeL, eyeR, footL: leftHip, footR: rightHip, footLMesh, footRMesh,
     tailRig, tail,
     eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone(),
+    headRigBase: headRig.position.clone(),
     bodyBaseScale: body.scale.clone(), bellyBaseScale: belly.scale.clone(),
     beakBaseScale: beak.scale.clone()
   };
@@ -548,15 +551,18 @@ function initCinematicJourney() {
 
   const updateProgressUI = (progress) => {
     progressBar.style.width = (progress * 100).toFixed(2) + '%';
-    const depth = progress < .22 ? 'Surface' : Math.round((progress - .18) * 42) + ' m below';
+    const depth = progress < .235 ? 'Surface' : Math.max(1, Math.round((progress - .215) * 44)) + ' m below';
     depthLabel.textContent = depth;
-    let nearest = 0;
-    let distance = Infinity;
+
+    // A station becomes active when its scroll milestone is actually reached.
+    // This keeps the text/tab destination synchronized with what the mascot is
+    // physically doing instead of switching early because another stop is
+    // mathematically "nearest".
+    let reached = 0;
     stations.forEach((station, index) => {
-      const candidate = Math.abs(progress - station.at);
-      if (candidate < distance) { distance = candidate; nearest = index; }
+      if (progress >= station.at - .003) reached = index;
     });
-    updateCopy(nearest);
+    updateCopy(reached);
   };
 
   if (reduceMotion.matches || !canUseWebGL2()) {
@@ -876,10 +882,13 @@ function initCinematicJourney() {
   // accidentally make it appear to float upward.
   const diveKeyframes = [
     { at: 0.00, x: -2.15, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
-    { at: 0.11, x: -2.10, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
-    { at: 0.16, x: -1.70, y:  2.55, z:  0.20, pitch: 0.18, roll: -0.18 },
-    { at: 0.22, x: -0.65, y:  0.55, z:  0.05, pitch: 0.82, roll: -0.38 },
-    { at: 0.27, x:  0.35, y: -1.10, z: -0.10, pitch: 1.02, roll: -0.20 },
+    { at: 0.10, x: -2.15, y:  2.00, z:  0.35, pitch: 0.00, roll:  0.00 },
+    { at: 0.14, x: -2.05, y:  1.82, z:  0.34, pitch: 0.08, roll:  0.00 },
+    { at: 0.17, x: -1.25, y:  2.55, z:  0.28, pitch: 0.16, roll: -0.08 },
+    { at: 0.20, x:  0.65, y:  2.28, z:  0.18, pitch: 0.34, roll: -0.13 },
+    { at: 0.225,x:  2.20, y:  0.82, z:  0.08, pitch: 0.58, roll: -0.18 },
+    { at: 0.24, x:  2.72, y: -0.90, z: -0.04, pitch: 0.76, roll: -0.12 },
+    { at: 0.29, x:  3.05, y: -2.45, z: -0.18, pitch: 0.92, roll: -0.06 },
     { at: 0.43, x: -5.10, y: -7.45, z: -0.55, pitch: 0.88, roll:  0.18 },
     { at: 0.62, x:  5.35, y: -15.25, z: 0.20, pitch: 0.82, roll: -0.16 },
     { at: 0.79, x: -5.45, y: -23.35, z: -0.42, pitch: 0.86, roll:  0.16 },
@@ -1028,11 +1037,11 @@ function initCinematicJourney() {
     const motion = samplePathMotion(progress);
     const stationPose = nearestStationPose(progress);
     const stationHold = stationPose.settle;
-    const underwater = smoothstep(.20, .29, progress);
-    const swim = smoothstep(.245, .34, progress);
-    const surface = 1 - smoothstep(.105, .22, progress);
-    const anticipation = smoothstep(.105, .145, progress) * (1 - smoothstep(.155, .195, progress));
-    const waterEntry = smoothstep(.165, .215, progress) * (1 - smoothstep(.24, .30, progress));
+    const underwater = smoothstep(.225, .29, progress);
+    const swim = smoothstep(.255, .34, progress);
+    const surface = 1 - smoothstep(.115, .235, progress);
+    const anticipation = smoothstep(.105, .14, progress) * (1 - smoothstep(.145, .175, progress));
+    const waterEntry = smoothstep(.215, .242, progress) * (1 - smoothstep(.255, .31, progress));
     const movementDrive = clamp(scrollMotion * 1.18 + waterEntry * .46, 0, 1);
     const propulsion = swim * (1 - stationHold * .94);
     const effort = clamp(.28 + movementDrive * .95, .22, 1) * propulsion;
@@ -1169,20 +1178,25 @@ function initCinematicJourney() {
     // Cursor obsession: eyes lead, head follows, chest follows last. The head
     // also counter-rotates against the swimming body so the gaze stays visually
     // locked on the cursor even during banks and turns.
-    const gazeBoost = .88 + stationHold * .17 + surface * .10;
-    const headYaw = pointer.smoothX * .94 * gazeBoost - mascot.rotation.y * .44;
-    const headPitch = -pointer.smoothY * .62 * gazeBoost - mascot.rotation.x * .16;
-    data.headRig.rotation.y = damp(data.headRig.rotation.y, headYaw, 13.5, dt);
-    data.headRig.rotation.x = damp(data.headRig.rotation.x, headPitch + preen * .18, 13.5, dt);
+    const gazeBoost = .92 + stationHold * .20 + surface * .12;
+    const requestedYaw = pointer.smoothX * 1.02 * gazeBoost - mascot.rotation.y * .38;
+    const requestedPitch = -pointer.smoothY * .68 * gazeBoost - mascot.rotation.x * .10;
+    const headYaw = clamp(requestedYaw, -.72, .72);
+    const headPitch = clamp(requestedPitch + preen * .14, -.46, .40);
+    data.headRig.rotation.y = damp(data.headRig.rotation.y, headYaw, 14.5, dt);
+    data.headRig.rotation.x = damp(data.headRig.rotation.x, headPitch, 14.5, dt);
     data.headRig.rotation.z = damp(
       data.headRig.rotation.z,
-      pointer.smoothX * -.14 - mascot.rotation.z * .46 + preen * -.12,
+      clamp(pointer.smoothX * -.12 - mascot.rotation.z * .32 + preen * -.09, -.16, .16),
       12,
       dt
     );
+    const neckClearance = Math.abs(headPitch) * .12 + anticipation * .035;
+    data.headRig.position.y = damp(data.headRig.position.y, data.headRigBase.y + neckClearance, 12, dt);
+    data.headRig.position.z = damp(data.headRig.position.z, data.headRigBase.z + Math.max(0, -headPitch) * .13, 12, dt);
 
-    const eyeX = pointer.smoothX * .145;
-    const eyeY = pointer.smoothY * .098;
+    const eyeX = pointer.smoothX * .155;
+    const eyeY = pointer.smoothY * .105;
     data.eyeL.position.x = damp(data.eyeL.position.x, data.eyeLBase.x + eyeX, 19, dt);
     data.eyeR.position.x = damp(data.eyeR.position.x, data.eyeRBase.x + eyeX, 19, dt);
     data.eyeL.position.y = damp(data.eyeL.position.y, data.eyeLBase.y + eyeY, 19, dt);
@@ -1350,13 +1364,13 @@ function initCinematicJourney() {
 
     // Water entry reads as an event: ring burst at the surface plus a short
     // brightening. The ring is visual-only and cannot interfere with portal UI.
-    const splash = smoothstep(.17, .205, smoothProgress) * (1 - smoothstep(.225, .29, smoothProgress));
-    if (smoothProgress < .155) splashSoundArmed = true;
-    if (smoothProgress > .195 && splashSoundArmed) {
+    const splash = smoothstep(.218, .238, smoothProgress) * (1 - smoothstep(.255, .292, smoothProgress));
+    if (smoothProgress < .19) splashSoundArmed = true;
+    if (smoothProgress > .232 && splashSoundArmed) {
       splashSoundArmed = false;
       playWaterSplash();
     }
-    const entryPath = sampleDivePath(.22);
+    const entryPath = sampleDivePath(.235);
     splashRing.position.x = entryPath.x;
     splashRing.material.opacity = splash * .78;
     splashRing.scale.setScalar(.7 + splash * 2.3);
