@@ -140,6 +140,20 @@ const rawRequest = async (route) => {
     assert.deepEqual(releaseNotes.data.slice(0, 3).map(note => note.version), ['3.2', '3.1', '3.0']);
     assert.equal(releaseNotes.data.find(note => note.id === '2026-08-safeguarding').title, 'Safeguarding and family records');
 
+    const opaqueCredentialSignup = await request('/api/signup', {
+      method: 'POST',
+      body: {
+        username: 'credential-test@example.test',
+        pin: 'fuckPass1',
+        name: 'Credential Test',
+        role: 'parent',
+        schoolName: 'Credential Test School',
+        termsAccepted: true,
+        linkedLearners: []
+      }
+    });
+    assert.equal(opaqueCredentialSignup.response.status, 201);
+
     const stickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaLogin.cookie, body: { type: 'Call family', details: 'Confirm the pickup time after 15:00.', colour: 'teal', recordedBy: 'Alpha Administrator' } });
     assert.equal(stickyNote.response.status, 200);
     const alphaStickyNotes = await request('/api/modules/stickyNotes', { cookie: alphaLogin.cookie });
