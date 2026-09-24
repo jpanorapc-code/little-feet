@@ -168,6 +168,60 @@
   }
 }
 
+
+.cinematic-life-2d {
+  position: absolute;
+  z-index: .5;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  opacity: .58;
+  will-change: transform;
+  transform: translate3d(0,0,0);
+}
+.cinematic-fish-2d {
+  width: min(46vw, 720px);
+  aspect-ratio: 3 / 1;
+  background-image: url('/assets/images/cinematic-fish-school.svg');
+  filter: saturate(.82) brightness(.80);
+}
+.cinematic-fish-2d-a { left: 6%; top: 30%; }
+.cinematic-fish-2d-b { right: 4%; top: 59%; opacity: .42; transform: scaleX(-1); }
+.cinematic-jelly-2d {
+  width: min(18vw, 250px);
+  aspect-ratio: 13 / 18;
+  background-image: url('/assets/images/cinematic-jellyfish.svg');
+  filter: saturate(.92) brightness(.84);
+}
+.cinematic-jelly-2d-a { right: 12%; top: 37%; }
+.cinematic-jelly-2d-b { left: 9%; top: 69%; opacity: .44; }
+.cinematic-manta-2d {
+  width: min(35vw, 520px);
+  aspect-ratio: 19 / 9;
+  left: 32%;
+  top: 76%;
+  background-image: url('/assets/images/cinematic-manta.svg');
+  opacity: .34;
+  filter: saturate(.78) brightness(.72);
+}
+.cinematic-journey:not(.is-active) .cinematic-life-2d,
+.cinematic-journey.is-user-paused .cinematic-life-2d {
+  will-change: auto;
+}
+@media (max-width: 900px) {
+  .cinematic-fish-2d { width: 60vw; opacity: .42; }
+  .cinematic-jelly-2d { width: 24vw; }
+  .cinematic-manta-2d { width: 48vw; opacity: .28; }
+}
+@media (max-width: 560px) {
+  .cinematic-fish-2d-b,
+  .cinematic-jelly-2d-b,
+  .cinematic-manta-2d { display: none; }
+  .cinematic-fish-2d { width: 68vw; opacity: .34; }
+  .cinematic-jelly-2d { width: 30vw; opacity: .32; }
+}
+
 #littleFeetCinematicCanvas {
   filter: saturate(.92) brightness(.96);
 }
