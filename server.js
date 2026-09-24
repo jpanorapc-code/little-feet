@@ -1829,11 +1829,11 @@ app.post('/api/accounts', (req, res) => {
 app.put('/api/accounts/:username', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const account = db.users.find(entry => entry.username === req.params.username);
+  const account = findAccountByUsername(req.params.username);
   if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (username && username !== account.username && db.users.some(entry => entry.username.toLowerCase() === String(username).toLowerCase())) return res.status(409).json({ message: 'That username is already in use.' });
+  if (username && db.users.some(entry => entry !== account && accountMatchesUsername(entry, username))) return res.status(409).json({ message: 'That username is already in use.' });
   if (username) account.username = String(username).trim();
   if (pin) account.pinHash = hashPin(pin);
   if (name) account.name = String(name).trim();
