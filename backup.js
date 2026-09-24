@@ -2550,7 +2550,7 @@ async function loadTickets(checkForNew = false) {
                 <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+              ${currentUser?.role === 'admin' && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeURIComponent(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
@@ -2668,6 +2668,36 @@ async function requestOwnAccountDeletion() {
   } catch {
     alert('Unable to reach the account deletion service. Please try again.');
   }
+}
+
+async function requestSchoolDeletion() {
+  if (!currentUser || currentUser.role !== 'principal') return alert('Only the school principal can request deletion of the entire school workspace.');
+  if (!confirm('Are you sure you want to request deletion of the ENTIRE school workspace? This includes all school accounts and all data linked to this school.')) return;
+  try {
+    const response = await fetch('/api/school-deletion-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to submit the school deletion request.');
+    alert('Full school deletion request sent to the administrator as a high-priority support ticket.');
+    if (typeof loadTickets === 'function') loadTickets();
+  } catch {
+    alert('Unable to reach the school deletion service. Please try again.');
+  }
+}
+
+async function executeSchoolDeletion(ticketId) {
+  if (currentUser?.role !== 'admin') return alert('Administrator access is required.');
+  const confirmation = prompt('This permanently deletes every account and all data linked to this school. Type DELETE SCHOOL exactly to continue.');
+  if (confirmation === null) return;
+  if (confirmation.trim() !== 'DELETE SCHOOL') return alert('School deletion cancelled. The confirmation text did not match.');
+  const response = await fetch('/api/school-deletion/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticketId, confirmation: confirmation.trim() })
+  });
+  const result = await response.json();
+  if (!response.ok) return alert(result.message || 'Unable to delete the school workspace.');
+  alert(`School workspace deleted: ${result.deletedSchoolName || result.deletedSchoolId}. You will now be signed out.`);
+  window.location.reload();
 }
 
 // Emergency Broadcasts
