@@ -2498,15 +2498,18 @@ app.get('/api/chat/messages/:groupId', (req, res) => {
   res.json(msgs);
 });
 app.post('/api/chat/messages', (req, res) => {
-  const { groupId, sender, message, textColor } = req.body;
+  const { groupId, message, textColor } = req.body;
   const actor = getSessionAccount(req);
   const group = db.chatGroups.find(entry => entry.id === groupId && recordInSchool(entry, actor));
   if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  const cleanMessage = String(message || '').trim();
+  if (!cleanMessage) return res.status(400).json({ message: 'A message is required.' });
+  if (cleanMessage.length > 4000) return res.status(413).json({ message: 'Messages are limited to 4,000 characters.' });
   if (!db.groupMessages[groupId]) db.groupMessages[groupId] = [];
   const msgObj = {
     id: crypto.randomUUID(),
     sender: actor.username,
-    message,
+    message: cleanMessage,
     textColor: safeTextColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
@@ -2547,12 +2550,14 @@ app.post('/api/chat/direct', (req, res) => {
   const senderAccount = getSessionAccount(req);
   const recipientAccount = findAccountByUsername(recipient);
   if (!canUseDirectChat(senderAccount, recipientAccount)) return res.status(403).json({ message: 'You can only message approved contacts at your school.' });
-  if (!String(message || '').trim()) return res.status(400).json({ message: 'A message is required.' });
+  const cleanMessage = String(message || '').trim();
+  if (!cleanMessage) return res.status(400).json({ message: 'A message is required.' });
+  if (cleanMessage.length > 4000) return res.status(413).json({ message: 'Messages are limited to 4,000 characters.' });
   const msgObj = tagSchoolRecord(senderAccount, {
     id: crypto.randomUUID(),
     sender: senderAccount.username,
-    recipient,
-    message,
+    recipient: recipientAccount.username,
+    message: cleanMessage,
     textColor: safeTextColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
@@ -2597,10 +2602,22 @@ app.get('/api/broadcasts', (req, res) => {
 app.post('/api/broadcasts', (req, res) => {
   const actor = requireSafetyStaff(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
-  if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
+  const bcMessage = String(req.body?.bcMessage || '').trim();
+  const bcPriority = String(req.body?.bcPriority || 'Campus Notice').trim().slice(0, 80);
+  const latitude = Number(req.body?.location?.lat);
+  const longitude = Number(req.body?.location?.lng);
+  const radiusKm = Number(req.body?.radiusKm);
+  if (!bcMessage || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    return res.status(400).json({ message: 'A message and valid alert location are required.' });
+  }
+  if (bcMessage.length > 2000) return res.status(413).json({ message: 'Emergency alerts are limited to 2,000 characters.' });
+  if (!Number.isFinite(radiusKm) || radiusKm < 0.1 || radiusKm > 100) return res.status(400).json({ message: 'Alert radius must be between 0.1 km and 100 km.' });
   const item = tagSchoolRecord(actor, {
-    ...req.body,
     id: crypto.randomUUID(),
+    bcMessage,
+    bcPriority,
+    radiusKm,
+    location: { lat: latitude, lng: longitude },
     issuedBy: actor.username,
     issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
