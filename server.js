@@ -2118,9 +2118,21 @@ app.post('/api/badges', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) {
     return res.status(403).json({ message: 'Only authorised school staff can award badges.' });
   }
-  const { actorUsername: _actorUsername, ...item } = req.body;
-  item.awardedBy = actor.username;
-  db.badges.unshift(tagSchoolRecord(actor, item));
+  const studentName = String(req.body?.studentName || '').trim().slice(0, 160);
+  const category = String(req.body?.category || '').trim().slice(0, 80);
+  const title = String(req.body?.title || req.body?.awardName || '').trim().slice(0, 160);
+  const note = String(req.body?.note || '').trim().slice(0, 1000);
+  if (!studentName || !category || !title) return res.status(400).json({ message: 'Choose a learner, milestone category, and badge title.' });
+  const item = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    studentName,
+    category,
+    title,
+    note,
+    awardedBy: actor.username,
+    createdAt: new Date().toISOString()
+  });
+  db.badges.unshift(item);
   res.json({ success: true, item });
 });
 app.delete('/api/badges/:id', (req, res) => {
@@ -2351,7 +2363,11 @@ app.post('/api/tickets', (req, res) => {
   }
   const item = tagSchoolRecord(creator, {
     ...ticketDetails,
-    id: String(ticketDetails.id || crypto.randomUUID()),
+    id: crypto.randomUUID(),
+    department: String(ticketDetails.department || 'Admin').trim().slice(0, 80),
+    priority: String(ticketDetails.priority || 'Normal').trim().slice(0, 40),
+    subject: String(ticketDetails.subject || '').trim().slice(0, 200),
+    message: String(ticketDetails.message || '').trim().slice(0, 5000),
     createdBy: creator.username,
     createdByName: creator.name || creator.username,
     assignedTo: assignedAccount?.username || '',
@@ -2425,8 +2441,11 @@ app.post('/api/tickets/update', (req, res) => {
     if (assignedTo && (!assignedAccount || !isSameSchool(actor, assignedAccount))) return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
     ticket.assignedTo = assignedAccount?.username || '';
   }
-  if (status) ticket.status = status;
-  if (feedback !== undefined) ticket.feedback = feedback;
+  if (status !== undefined) {
+    if (!['Open', 'Completed'].includes(status)) return res.status(400).json({ message: 'Ticket status must be Open or Completed.' });
+    ticket.status = status;
+  }
+  if (feedback !== undefined) ticket.feedback = String(feedback || '').trim().slice(0, 5000);
   ticket.updatedBy = actor.username;
   res.json({ success: true, ticket });
 });
