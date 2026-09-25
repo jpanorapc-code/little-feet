@@ -20,6 +20,54 @@ const getSharedGeometry = (key, factory) => {
   return sharedGeometry[key];
 };
 
+function createMicroReliefTexture(kind = 'feather') {
+  const size = kind === 'ice' ? 128 : 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) return null;
+
+  const image = context.createImageData(size, size);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const index = (y * size + x) * 4;
+      const grain =
+        Math.sin(x * .73 + y * .19) * .38 +
+        Math.cos(x * .17 - y * .91) * .31 +
+        Math.sin((x + y) * .41) * .19;
+      const streak = kind === 'feather'
+        ? Math.sin((x * .42) + (y * 1.12)) * .16
+        : Math.sin(x * .13 + y * .07) * .10;
+      const value = Math.round(clamp(.54 + grain * .17 + streak, .18, .88) * 255);
+      image.data[index] = value;
+      image.data[index + 1] = value;
+      image.data[index + 2] = value;
+      image.data[index + 3] = 255;
+    }
+  }
+  context.putImageData(image, 0, 0);
+
+  if (kind === 'ice') {
+    context.strokeStyle = 'rgba(245,255,255,.22)';
+    context.lineWidth = 1;
+    for (let line = 0; line < 11; line += 1) {
+      const y = (line * 17 + 9) % size;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(size, (y + 15 + line * 3) % size);
+      context.stroke();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(kind === 'ice' ? 3.5 : 6.5, kind === 'ice' ? 3.5 : 8.5);
+  texture.needsUpdate = true;
+  return texture;
+}
+
 const stationBlueprints = [
   { at: 0.05, title: 'Surface', kicker: 'Little Feet · cinematic home', text: 'Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.', candidates: [['feedTab','School Feed']] },
   { at: 0.24, title: 'Take the plunge', kicker: 'Scroll to dive', text: 'Keep scrolling. The mascot leaves the ice, crosses the waterline, and the portal opens beneath the surface.', candidates: [['scheduleTab','Timetable'],['feedTab','School Feed']] },
@@ -120,20 +168,30 @@ function createWebbedFootGeometry() {
 function createMascot() {
   const group = new THREE.Group();
   group.name = 'LittleFeetMascotV3';
+  const featherRelief = createMicroReliefTexture('feather');
 
   const featherBlue = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: .90,
+    roughness: .88,
+    roughnessMap: featherRelief,
+    bumpMap: featherRelief,
+    bumpScale: .020,
     metalness: 0
   });
   const featherDark = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: .92,
+    roughness: .90,
+    roughnessMap: featherRelief,
+    bumpMap: featherRelief,
+    bumpScale: .018,
     metalness: 0
   });
   const white = new THREE.MeshStandardMaterial({
     color: 0xf6fbfc,
-    roughness: .94,
+    roughness: .92,
+    roughnessMap: featherRelief,
+    bumpMap: featherRelief,
+    bumpScale: .013,
     metalness: 0
   });
   const orange = new THREE.MeshStandardMaterial({
@@ -174,12 +232,14 @@ function createMascot() {
   belly.position.set(0, -.30, .79);
   group.add(belly);
 
-  const chestRig = new THREE.Group();
+  const chestRig = new THREE.Bone();
+  chestRig.name = 'ChestBone';
   chestRig.position.set(0, .12, 0);
   group.add(chestRig);
 
   // Head sinks into the shoulders like the Meshy reference: no visible neck.
-  const headRig = new THREE.Group();
+  const headRig = new THREE.Bone();
+  headRig.name = 'HeadBone';
   headRig.position.set(0, .76, .03);
   chestRig.add(headRig);
 
@@ -250,8 +310,10 @@ function createMascot() {
   headRig.add(lowerBeak);
 
   // Short thick flippers instead of the old long arms.
-  const leftShoulder = new THREE.Group();
-  const rightShoulder = new THREE.Group();
+  const leftShoulder = new THREE.Bone();
+  const rightShoulder = new THREE.Bone();
+  leftShoulder.name = 'LeftFlipperBone';
+  rightShoulder.name = 'RightFlipperBone';
   leftShoulder.position.set(-.77, .06, -.02);
   rightShoulder.position.set(.77, .06, -.02);
   chestRig.add(leftShoulder, rightShoulder);
@@ -269,8 +331,10 @@ function createMascot() {
   rightShoulder.add(rightFlipperMesh);
 
   // Big webbed feet, visibly wider than the old oval feet.
-  const leftHip = new THREE.Group();
-  const rightHip = new THREE.Group();
+  const leftHip = new THREE.Bone();
+  const rightHip = new THREE.Bone();
+  leftHip.name = 'LeftFootBone';
+  rightHip.name = 'RightFootBone';
   leftHip.position.set(-.38, -1.10, .24);
   rightHip.position.set(.38, -1.10, .24);
   group.add(leftHip, rightHip);
@@ -284,7 +348,8 @@ function createMascot() {
   leftHip.add(footLMesh);
   rightHip.add(footRMesh);
 
-  const tailRig = new THREE.Group();
+  const tailRig = new THREE.Bone();
+  tailRig.name = 'TailBone';
   tailRig.position.set(0, -.82, -.62);
   const tail = new THREE.Mesh(new THREE.ConeGeometry(.25, .52, 5), featherDark);
   tail.rotation.x = Math.PI / 2;
@@ -302,7 +367,12 @@ function createMascot() {
     eyeLBase: eyeL.position.clone(), eyeRBase: eyeR.position.clone(),
     headRigBase: headRig.position.clone(),
     bodyBaseScale: body.scale.clone(), bellyBaseScale: belly.scale.clone(),
-    beakBaseScale: beak.scale.clone(), lowerBeakBaseScale: lowerBeak.scale.clone()
+    beakBaseScale: beak.scale.clone(), lowerBeakBaseScale: lowerBeak.scale.clone(),
+    rigCollision: {
+      headPitchMin: -.40, headPitchMax: .34,
+      headYaw: .62, flipperMin: .18, flipperMax: 1.12,
+      footPitchMin: -.34, footPitchMax: .88
+    }
   };
 
   group.scale.setScalar(.98);
@@ -331,6 +401,7 @@ function roughenIceGeometry(geometry, strength = .10) {
 
 function createIceShelf() {
   const group = new THREE.Group();
+  const iceRelief = createMicroReliefTexture('ice');
   const top = new THREE.Mesh(
     roughenIceGeometry(new THREE.CylinderGeometry(3.45, 3.05, .62, 52, 4), .075),
     new THREE.MeshPhysicalMaterial({
@@ -339,9 +410,12 @@ function createIceShelf() {
       metalness: .01,
       clearcoat: .84,
       clearcoatRoughness: .16,
-      transmission: .16,
+      transmission: .12,
       ior: 1.31,
-      thickness: .82
+      thickness: .82,
+      roughnessMap: iceRelief,
+      bumpMap: iceRelief,
+      bumpScale: .048
     })
   );
   top.position.y = .02;
@@ -356,9 +430,12 @@ function createIceShelf() {
       roughness: .36,
       clearcoat: .38,
       clearcoatRoughness: .26,
-      transmission: .08,
+      transmission: .06,
       ior: 1.31,
-      thickness: 1.1
+      thickness: 1.1,
+      roughnessMap: iceRelief,
+      bumpMap: iceRelief,
+      bumpScale: .055
     })
   );
   underside.position.y = -.88;
@@ -398,17 +475,52 @@ function createBubbles(count, spread, depth, size) {
 
 function createStationRing(color) {
   const group = new THREE.Group();
+  const outerMaterial = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 6.0,
+    roughness: .10,
+    metalness: .12
+  });
   const ring = new THREE.Mesh(
-    getSharedGeometry('stationRingOuter', () => new THREE.TorusGeometry(2.15, .055, 12, 80)),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 4.2, roughness: .16, metalness: .3 })
+    getSharedGeometry('stationRingOuter', () => new THREE.TorusGeometry(2.15, .062, 12, 80)),
+    outerMaterial
   );
   ring.rotation.y = Math.PI / 2.25;
+
+  const innerMaterial = new THREE.MeshBasicMaterial({
+    color: 0xe8ffff,
+    transparent: true,
+    opacity: .76,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
   const inner = new THREE.Mesh(
-    getSharedGeometry('stationRingInner', () => new THREE.TorusGeometry(1.52, .024, 10, 72)),
-    new THREE.MeshBasicMaterial({ color: 0xd7ffff, transparent: true, opacity: .62, blending: THREE.AdditiveBlending })
+    getSharedGeometry('stationRingInner', () => new THREE.TorusGeometry(1.52, .029, 10, 72)),
+    innerMaterial
   );
   inner.rotation.copy(ring.rotation);
-  group.add(ring, inner);
+
+  const halo = new THREE.Mesh(
+    getSharedGeometry('stationRingHalo', () => new THREE.TorusGeometry(2.18, .15, 10, 72)),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: .14,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  halo.rotation.copy(ring.rotation);
+
+  // One cheap point light per station gives the ring actual local emission.
+  // No shadows: the glow affects the mascot/ice without recreating the old GPU-heavy scene.
+  const glow = new THREE.PointLight(color, 2.2, 8.5, 2);
+  glow.position.set(0, 0, .65);
+  glow.castShadow = false;
+
+  group.add(halo, ring, inner, glow);
+  group.userData = { ring, inner, halo, glow };
   return group;
 }
 
@@ -484,6 +596,15 @@ function initCinematicJourney() {
     progressBar.style.width = (progress * 100).toFixed(2) + '%';
     const depth = progress < .235 ? 'Surface' : Math.max(1, Math.round((progress - .215) * 44)) + ' m below';
     depthLabel.textContent = depth;
+
+    const submergedVisual = smoothstep(.205, .292, progress);
+    const deepVisual = smoothstep(.32, .95, progress);
+    stage.style.setProperty('--surface-air-opacity', (1 - submergedVisual).toFixed(3));
+    stage.style.setProperty('--depth-dim', deepVisual.toFixed(3));
+    stage.style.setProperty('--neon-boost', deepVisual.toFixed(3));
+    stage.style.setProperty('--panel-glow', clamp(.10 + deepVisual * .90).toFixed(3));
+    stage.style.setProperty('--water-opacity', clamp(.58 + submergedVisual * .34).toFixed(3));
+    stage.dataset.depthVisual = deepVisual.toFixed(3);
 
     // A station becomes active when its scroll milestone is actually reached.
     // This keeps the text/tab destination synchronized with what the mascot is
@@ -737,6 +858,35 @@ function initCinematicJourney() {
     scene.add(ring);
     return ring;
   });
+
+  // Lightweight collision volumes keep the hero clear of the iceberg and
+  // station portals without adding a physics engine.
+  const resolveSceneCollision = (position, progress) => {
+    const corrected = { ...position };
+
+    // During launch, never let the body cut through the solid ice volume.
+    if (progress > .13 && progress < .30 && corrected.y < 1.55 && corrected.y > -1.75) {
+      const dx = corrected.x - ice.position.x;
+      const dz = corrected.z - ice.position.z;
+      const radial = Math.hypot(dx, dz);
+      const minRadius = 3.62;
+      if (radial < minRadius) {
+        const scale = minRadius / Math.max(.001, radial);
+        corrected.x = ice.position.x + dx * scale;
+        corrected.z = ice.position.z + dz * scale;
+      }
+    }
+
+    // Keep the mascot in front of each luminous station ring instead of
+    // allowing a ring plane to slice through the body at a station hold.
+    ringData.forEach(item => {
+      const distance2d = Math.hypot(corrected.x - item.x, corrected.y - item.y);
+      if (distance2d < 2.45) corrected.z = Math.max(corrected.z, -.55);
+    });
+
+    return corrected;
+  };
+  stage.dataset.collisionProfile = 'bone-limits-scene-spheres-v1';
 
   // Depth is now supplied by the portrait background and lightweight 2D parallax.
   // The old 3D mist/terrace/haze backdrop created the blob silhouettes, so it is not added.
@@ -1271,11 +1421,12 @@ function initCinematicJourney() {
     const idleBob = surface * (Math.sin(time * 1.55) * .035 + Math.sin(time * .63 + 1.2) * .018);
     const pathBob = propulsion * Math.sin(swimPhase * .55) * (.05 + effort * .10);
 
-    mascot.position.set(
-      path.x,
-      path.y + idleBob + stationBob + pathBob - anticipation * .17,
-      path.z
-    );
+    const collisionSafePath = resolveSceneCollision({
+      x: path.x,
+      y: path.y + idleBob + stationBob + pathBob - anticipation * .17,
+      z: path.z
+    }, progress);
+    mascot.position.set(collisionSafePath.x, collisionSafePath.y, collisionSafePath.z);
 
     // Directional body steering. While travelling the torso points into the
     // actual path; when the user settles on a tab station the penguin brakes,
@@ -1470,8 +1621,12 @@ function initCinematicJourney() {
       travelSign < 0 && propulsion > .2 ? .08 : -.10,
       diveFocus
     );
-    const headYaw = clamp(requestedYaw, -.72, .72);
-    const headPitch = clamp(requestedPitch + preen * .14, -.46, .40);
+    const headYaw = clamp(requestedYaw, -data.rigCollision.headYaw, data.rigCollision.headYaw);
+    const headPitch = clamp(
+      requestedPitch + preen * .14,
+      data.rigCollision.headPitchMin,
+      data.rigCollision.headPitchMax
+    );
     data.headRig.rotation.y = damp(data.headRig.rotation.y, headYaw, 14.5, dt);
     data.headRig.rotation.x = damp(data.headRig.rotation.x, headPitch, 14.5, dt);
     data.headRig.rotation.z = damp(
@@ -1532,6 +1687,25 @@ function initCinematicJourney() {
     data.eyeL.scale.y = blink;
     data.eyeR.scale.y = blink;
 
+    // Final joint limits are the procedural rig's self-collision guard.
+    // They stop the head, flippers, feet and tail from folding through the torso.
+    data.leftFlipper.rotation.z = clamp(
+      data.leftFlipper.rotation.z,
+      -data.rigCollision.flipperMax,
+      -data.rigCollision.flipperMin
+    );
+    data.rightFlipper.rotation.z = clamp(
+      data.rightFlipper.rotation.z,
+      data.rigCollision.flipperMin,
+      data.rigCollision.flipperMax
+    );
+    data.leftFlipper.rotation.x = clamp(data.leftFlipper.rotation.x, -.18, 1.05);
+    data.rightFlipper.rotation.x = clamp(data.rightFlipper.rotation.x, -.18, 1.05);
+    data.footL.rotation.x = clamp(data.footL.rotation.x, data.rigCollision.footPitchMin, data.rigCollision.footPitchMax);
+    data.footR.rotation.x = clamp(data.footR.rotation.x, data.rigCollision.footPitchMin, data.rigCollision.footPitchMax);
+    data.tailRig.rotation.x = clamp(data.tailRig.rotation.x, -.18, .24);
+    data.tailRig.rotation.y = clamp(data.tailRig.rotation.y, -.42, .42);
+
     // The station itself is a behaviour beat, not just a coordinate.
     if (stationHold > .82 && stationPose.index !== lastSettledStation) {
       lastSettledStation = stationPose.index;
@@ -1551,12 +1725,19 @@ function initCinematicJourney() {
   };
 
   const animateWorld = (time, dt, progress) => {
+    const deepGlow = smoothstep(.30, .95, progress);
     rings.forEach((ring, index) => {
       const distance = Math.abs(progress - stations[Math.min(index + 2, stations.length - 1)].at);
       const proximity = 1 - smoothstep(.03, .15, distance);
       ring.rotation.z = time * (.05 + index * .012);
       const pulse = 1 + Math.sin(time * 1.55 + index * .8) * .035 + proximity * .08;
       ring.scale.setScalar(pulse);
+
+      const depthBoost = deepGlow * (1.5 + index * .55);
+      ring.userData.ring.material.emissiveIntensity = 5.2 + depthBoost * 2.6 + proximity * 4.2;
+      ring.userData.inner.material.opacity = clamp(.58 + deepGlow * .22 + proximity * .18, .58, .98);
+      ring.userData.halo.material.opacity = clamp(.10 + deepGlow * .16 + proximity * .20, .10, .42);
+      ring.userData.glow.intensity = 1.8 + depthBoost * 1.15 + proximity * 3.2;
     });
   };
 
@@ -1730,9 +1911,10 @@ function initCinematicJourney() {
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
     ice.visible = smoothProgress < .42;
-    cyanLight.intensity = lerp(6, 14, submerged) + splash * 3.5;
-    violetLight.intensity = lerp(2, 11, smoothstep(.45, .85, smoothProgress));
-    sun.intensity = lerp(5, 1.7, submerged);
+    ambient.intensity = lerp(2.2, .62, deepening);
+    cyanLight.intensity = lerp(7.5, 5.2, deepening) + splash * 3.5;
+    violetLight.intensity = lerp(1.8, 14.5, smoothstep(.42, .92, smoothProgress));
+    sun.intensity = lerp(5, .58, deepening);
   };
 
   let firstFrameRendered = false;
