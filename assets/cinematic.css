@@ -49,6 +49,11 @@
   }
 }
 .cinematic-stage {
+  --surface-air-opacity: 1;
+  --depth-dim: 0;
+  --neon-boost: 0;
+  --panel-glow: .10;
+  --water-opacity: .58;
   position: absolute;
   top: 0;
   left: 0;
@@ -82,6 +87,22 @@
   pointer-events: none;
   background: #03162c;
 }
+.cinematic-depth-picture::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 16, 38, 0) 0%,
+      rgba(0, 10, 32, .18) 42%,
+      rgba(0, 5, 22, .88) 100%
+    );
+  opacity: var(--depth-dim, 0);
+}
+
 .cinematic-depth-picture::after {
   content: "";
   position: absolute;
@@ -121,121 +142,128 @@
   }
 }
 
-
+/* Above-water cap: the opening frame must read as air/sky over the ice,
+   never as ocean sitting above land. It fades only after the mascot dives. */
+.cinematic-surface-air {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: .28;
+  height: 43%;
+  pointer-events: none;
+  opacity: var(--surface-air-opacity, 1);
+  background:
+    radial-gradient(ellipse at 72% 8%, rgba(255,255,255,.94) 0 8%, rgba(224,248,255,.62) 18%, transparent 42%),
+    linear-gradient(180deg, rgba(207,244,255,.98) 0%, rgba(170,226,246,.96) 56%, rgba(112,194,226,.72) 82%, rgba(73,165,210,0) 100%);
+  box-shadow: inset 0 -18px 36px rgba(188,244,255,.18);
+  transition: opacity .16s linear;
+}
 
 .cinematic-water-surface,
 .cinematic-water-current {
   position: absolute;
   pointer-events: none;
-  z-index: .35;
+  z-index: .38;
   overflow: hidden;
 }
 
-/* Visible surface water sits behind the WebGL iceberg/penguin. */
+/* The visible water starts below the ice. The air cap above remains dry. */
 .cinematic-water-surface {
   left: -8%;
   width: 116%;
-  top: 30%;
-  height: 34%;
-  opacity: .88;
+  top: 40%;
+  height: 60%;
+  opacity: var(--water-opacity, .58);
   background:
+    radial-gradient(ellipse at 50% 0%, rgba(223,253,255,.48) 0 2%, rgba(115,222,247,.22) 12%, transparent 28%),
     linear-gradient(
       180deg,
-      rgba(210, 251, 255, 0) 0%,
-      rgba(177, 244, 255, .18) 8%,
-      rgba(83, 205, 239, .34) 20%,
-      rgba(25, 155, 211, .32) 42%,
-      rgba(9, 96, 166, .20) 68%,
-      rgba(3, 53, 105, 0) 100%
+      rgba(190, 246, 255, .08) 0%,
+      rgba(77, 199, 233, .19) 16%,
+      rgba(18, 124, 190, .18) 48%,
+      rgba(3, 46, 104, .10) 78%,
+      rgba(2, 24, 67, 0) 100%
     );
 }
 
-/* Broad moving ripples. Only the pseudo layer moves: no layout, no shader. */
 .cinematic-water-surface::before {
   content: "";
   position: absolute;
-  left: -10%;
-  top: 8%;
-  width: 120%;
-  height: 78%;
+  left: -8%;
+  top: 2%;
+  width: 116%;
+  height: 38%;
   background:
+    radial-gradient(ellipse at 18% 5%, rgba(224,255,255,.42) 0 1.5%, transparent 9%),
+    radial-gradient(ellipse at 47% 7%, rgba(184,245,255,.34) 0 1.2%, transparent 8%),
+    radial-gradient(ellipse at 76% 4%, rgba(214,252,255,.38) 0 1.4%, transparent 8%),
     repeating-linear-gradient(
-      177deg,
-      transparent 0 20px,
-      rgba(213, 252, 255, .26) 21px 23px,
-      rgba(91, 207, 239, .10) 24px 26px,
-      transparent 27px 48px
-    ),
-    repeating-linear-gradient(
-      183deg,
-      transparent 0 31px,
-      rgba(63, 178, 226, .16) 32px 34px,
-      transparent 35px 64px
+      178deg,
+      transparent 0 58px,
+      rgba(175, 238, 252, .10) 60px 62px,
+      transparent 64px 124px
     );
-  transform: translate3d(-4%, 0, 0);
-  animation: cinematicSurfaceDrift 16s ease-in-out infinite alternate;
+  transform: translate3d(-2%, 0, 0);
+  animation: cinematicSurfaceDrift 18s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-/* A distinct waterline so the iceberg reads as sitting ON the water. */
 .cinematic-water-surface::after {
   content: "";
   position: absolute;
-  left: 8%;
-  right: 8%;
-  top: 7%;
-  height: 16px;
+  left: 3%;
+  right: 3%;
+  top: 0;
+  height: 22px;
   border-radius: 50%;
   background:
     linear-gradient(
       180deg,
-      rgba(240, 255, 255, 0) 0%,
-      rgba(232, 255, 255, .72) 36%,
-      rgba(117, 222, 247, .34) 58%,
-      rgba(32, 143, 203, 0) 100%
+      rgba(255,255,255,0) 0%,
+      rgba(235,255,255,.88) 34%,
+      rgba(99,221,249,.48) 55%,
+      rgba(32,143,203,0) 100%
     );
   box-shadow:
-    0 5px 18px rgba(112, 225, 250, .18),
-    0 -2px 10px rgba(230, 255, 255, .12);
-  transform: translate3d(-2%, 0, 0) scaleX(1.02);
-  animation: cinematicSurfaceShimmer 9s ease-in-out infinite alternate;
+    0 0 22px rgba(154,239,255,.48),
+    0 8px 28px rgba(54,190,229,.24);
+  transform: translate3d(-1%, 0, 0) scaleX(1.015);
+  animation: cinematicSurfaceShimmer 10s ease-in-out infinite alternate;
   will-change: transform, opacity;
 }
 
-/* Deeper motion is intentionally softer so there is no visible hard stop. */
 .cinematic-water-current {
   left: -8%;
   width: 116%;
-  top: 48%;
-  height: 48%;
-  opacity: .34;
+  top: 49%;
+  height: 51%;
+  opacity: calc(.20 + var(--depth-dim, 0) * .22);
   background:
     linear-gradient(
       180deg,
       rgba(6, 62, 117, 0) 0%,
-      rgba(18, 115, 178, .10) 16%,
-      rgba(48, 172, 216, .12) 46%,
-      rgba(18, 92, 153, .08) 74%,
-      rgba(3, 31, 71, 0) 100%
+      rgba(18, 115, 178, .08) 18%,
+      rgba(48, 172, 216, .10) 44%,
+      rgba(29, 85, 158, .09) 72%,
+      rgba(1, 18, 55, .20) 100%
     );
 }
 
 .cinematic-water-current::before {
   content: "";
   position: absolute;
-  left: -10%;
+  left: -8%;
   top: -8%;
-  width: 120%;
+  width: 116%;
   height: 116%;
   background:
     repeating-linear-gradient(
-      169deg,
-      transparent 0 42px,
-      rgba(128, 224, 247, .12) 44px 46px,
-      transparent 48px 92px
+      171deg,
+      transparent 0 88px,
+      rgba(120, 221, 247, .075) 90px 92px,
+      transparent 94px 182px
     );
-  transform: translate3d(-3%, 0, 0);
-  animation: cinematicCurrentDrift 24s ease-in-out infinite alternate;
+  transform: translate3d(-2%, 0, 0);
+  animation: cinematicCurrentDrift 28s ease-in-out infinite alternate;
   will-change: transform;
 }
 
@@ -250,30 +278,28 @@
 }
 
 @keyframes cinematicSurfaceDrift {
-  from { transform: translate3d(-4%, -1px, 0); }
-  to   { transform: translate3d(4%, 3px, 0); }
+  from { transform: translate3d(-2%, -1px, 0); }
+  to   { transform: translate3d(2.5%, 3px, 0); }
 }
 
 @keyframes cinematicSurfaceShimmer {
-  from { transform: translate3d(-2%, 0, 0) scaleX(1.02); opacity: .76; }
-  to   { transform: translate3d(2.5%, 1px, 0) scaleX(.98); opacity: 1; }
+  from { transform: translate3d(-1%, 0, 0) scaleX(1.015); opacity: .80; }
+  to   { transform: translate3d(1.8%, 1px, 0) scaleX(.985); opacity: 1; }
 }
 
 @keyframes cinematicCurrentDrift {
-  from { transform: translate3d(-3%, 0, 0); }
-  to   { transform: translate3d(3%, -4px, 0); }
+  from { transform: translate3d(-2%, 0, 0); }
+  to   { transform: translate3d(2%, -3px, 0); }
 }
 
 @media (max-width: 900px) {
   .cinematic-water-surface {
-    top: 32%;
-    height: 30%;
-    opacity: .76;
+    top: 42%;
+    height: 58%;
   }
   .cinematic-water-current {
-    top: 50%;
-    height: 42%;
-    opacity: .26;
+    top: 51%;
+    height: 49%;
   }
 }
 
@@ -282,12 +308,23 @@
   z-index: .5;
   pointer-events: none;
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: cover;
   background-position: center;
-  opacity: .58;
+  opacity: calc(.36 + var(--neon-boost, 0) * .34);
   will-change: auto;
   transform: translate3d(0,0,0);
   animation-play-state: paused !important;
+  mix-blend-mode: screen;
+  filter:
+    saturate(calc(1.05 + var(--neon-boost, 0) * .75))
+    brightness(calc(.90 + var(--neon-boost, 0) * .32))
+    drop-shadow(0 0 calc(5px + var(--neon-boost, 0) * 18px) rgba(73,221,255,.42));
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
 }
 .cinematic-journey.is-active:not(.is-user-paused) .cinematic-life-2d {
   animation-play-state: running !important;
@@ -296,14 +333,18 @@
 .cinematic-fish-2d {
   width: min(46vw, 720px);
   aspect-ratio: 3 / 1;
-  background-image: url('/assets/images/cinematic-fish-school.svg');
+  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Fish_school_%28Unsplash%29.jpg/1280px-Fish_school_%28Unsplash%29.jpg');
+  -webkit-mask-image: url('/assets/images/cinematic-fish-school.svg');
+  mask-image: url('/assets/images/cinematic-fish-school.svg');
 }
 .cinematic-fish-2d-a { left: 6%; top: 30%; animation: cinematicFishDriftA 25s ease-in-out infinite alternate; }
 .cinematic-fish-2d-b { right: 4%; top: 59%; opacity: .42; animation: cinematicFishDriftB 31s ease-in-out infinite alternate; }
 .cinematic-jelly-2d {
   width: min(18vw, 250px);
   aspect-ratio: 13 / 18;
-  background-image: url('/assets/images/cinematic-jellyfish.svg');
+  background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Jellyfish01.jpg/960px-Jellyfish01.jpg');
+  -webkit-mask-image: url('/assets/images/cinematic-jellyfish.svg');
+  mask-image: url('/assets/images/cinematic-jellyfish.svg');
 }
 .cinematic-jelly-2d-a { right: 12%; top: 37%; animation: cinematicJellyDriftA 23s ease-in-out infinite alternate; }
 .cinematic-jelly-2d-b { left: 9%; top: 69%; opacity: .44; animation: cinematicJellyDriftB 29s ease-in-out infinite alternate; }
@@ -312,7 +353,9 @@
   aspect-ratio: 19 / 9;
   left: 32%;
   top: 76%;
-  background-image: url('/assets/images/cinematic-manta.svg');
+  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/P2140268_Manta_Ray.jpg/960px-P2140268_Manta_Ray.jpg');
+  -webkit-mask-image: url('/assets/images/cinematic-manta.svg');
+  mask-image: url('/assets/images/cinematic-manta.svg');
   opacity: .34;
   animation: cinematicMantaDrift 35s ease-in-out infinite alternate;
 }
@@ -383,9 +426,18 @@
   border: 1px solid rgba(151, 247, 255, .28);
   border-radius: 22px;
   background: linear-gradient(145deg, rgba(3, 24, 48, .78), rgba(6, 57, 86, .36));
-  box-shadow: 0 18px 55px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.12);
+  box-shadow:
+    0 18px 55px rgba(0,0,0,.26),
+    0 0 calc(20px + var(--panel-glow, .1) * 44px) rgba(65, 224, 255, calc(.08 + var(--panel-glow, .1) * .30)),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 0 calc(12px + var(--panel-glow, .1) * 24px) rgba(86,255,242, calc(.03 + var(--panel-glow, .1) * .12));
+  border-color: rgba(151, 247, 255, calc(.26 + var(--panel-glow, .1) * .30));
   /* Preserve the glass colour/contrast without live-blurring the moving WebGL canvas. */
-  background: linear-gradient(145deg, rgba(3, 24, 48, .80), rgba(6, 57, 86, .42));
+  background: linear-gradient(
+    145deg,
+    rgba(2, 18, 42, calc(.78 + var(--depth-dim, 0) * .12)),
+    rgba(5, 58, 92, calc(.40 + var(--panel-glow, .1) * .08))
+  );
   pointer-events: auto;
 }
 .cinematic-kicker {
@@ -466,7 +518,9 @@
   border-color: rgba(126,255,245,.78);
   color: #fff;
   background: linear-gradient(110deg, rgba(0,174,188,.38), rgba(86,74,207,.28));
-  box-shadow: 0 0 24px rgba(38,221,255,.18), inset 0 1px 0 rgba(255,255,255,.12);
+  box-shadow:
+    0 0 calc(24px + var(--panel-glow, .1) * 30px) rgba(38,221,255, calc(.18 + var(--panel-glow, .1) * .20)),
+    inset 0 1px 0 rgba(255,255,255,.12);
 }
 .cinematic-stop.is-current::before {
   background: #d6ff64;
