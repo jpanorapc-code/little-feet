@@ -24,10 +24,15 @@ function registerFinanceAutomation(app, deps) {
     return Number.isNaN(parsed.getTime()) ? period : new Intl.DateTimeFormat('en-ZA', { month: 'long', year: 'numeric', timeZone: 'Africa/Johannesburg' }).format(parsed);
   };
   const financeParents = actor => db.users.filter(account =>
-    account.role === 'parent' && isSameSchool(actor, account) && account.verificationStatus !== 'Suspended'
+    account.role === 'parent'
+    && isSameSchool(actor, account)
+    && account.verificationStatus === 'Active'
+    && (!account.parentRelationshipStatus || /approved/i.test(String(account.parentRelationshipStatus)))
   );
   const staffForPayroll = actor => db.users.filter(account =>
-    ['teacher', 'principal', 'admin'].includes(account.role) && isSameSchool(actor, account)
+    ['teacher', 'principal', 'admin'].includes(account.role)
+    && isSameSchool(actor, account)
+    && account.verificationStatus === 'Active'
   );
   const safeDateRange = (req) => {
     const today = dateKeyInSouthAfrica();
@@ -96,7 +101,7 @@ function registerFinanceAutomation(app, deps) {
     let changed = false;
     const schoolIds = [...new Set((db.financeRecurringRules || []).filter(rule => rule.active !== false).map(rule => rule.schoolId).filter(Boolean))];
     for (const schoolId of schoolIds) {
-      const actor = db.users.find(account => ['admin', 'principal'].includes(account.role) && accountSchoolId(account) === schoolId);
+      const actor = db.users.find(account => ['admin', 'principal'].includes(account.role) && account.verificationStatus === 'Active' && accountSchoolId(account) === schoolId);
       if (!actor) continue;
       const result = runRecurringRulesForActor(actor);
       if (result.created.length) changed = true;
@@ -467,7 +472,7 @@ function registerFinanceAutomation(app, deps) {
     const actor = financeActor(req);
     if (!actor) return res.status(403).json({ message: 'Principal or administrator finance access is required.' });
     const account = findAccountByUsername(req.params.username);
-    if (!account || !['teacher', 'principal', 'admin'].includes(account.role) || !isSameSchool(actor, account)) {
+    if (!account || account.verificationStatus !== 'Active' || !['teacher', 'principal', 'admin'].includes(account.role) || !isSameSchool(actor, account)) {
       return res.status(404).json({ message: 'Staff account not found for this school.' });
     }
     const employeeNumber = limitedText(req.body?.employeeNumber || '', 80);
@@ -505,12 +510,15 @@ function registerFinanceAutomation(app, deps) {
     const periodEnd = validDateKey(req.body?.periodEnd);
     const payDate = validDateKey(req.body?.payDate);
     const note = limitedText(req.body?.note || '', 500);
+    const payFrequency = ['monthly', 'weekly'].includes(req.body?.payFrequency) ? req.body.payFrequency : 'monthly';
     if (!periodStart || !periodEnd || !payDate || periodStart > periodEnd || note === null) {
       return res.status(400).json({ message: 'Enter a valid payroll period and pay date.' });
     }
     const requested = Array.isArray(req.body?.usernames) ? new Set(req.body.usernames.map(normalizeUsername)) : null;
     const profiles = financeRecords('payrollProfiles', actor).filter(profile =>
-      profile.active !== false && (!requested || requested.has(normalizeUsername(profile.username)))
+      profile.active !== false
+      && profile.payFrequency === payFrequency
+      && (!requested || requested.has(normalizeUsername(profile.username)))
     );
     if (!profiles.length) return res.status(400).json({ message: 'Create at least one active payroll profile first.' });
     const lines = profiles.map(profile => {
@@ -523,7 +531,7 @@ function registerFinanceAutomation(app, deps) {
       };
     });
     const run = tagSchoolRecord(actor, {
-      id: crypto.randomUUID(), periodStart, periodEnd, payDate, note, status: 'draft',
+      id: crypto.randomUUID(), periodStart, periodEnd, payDate, payFrequency, note, status: 'draft',
       lines, createdAt: new Date().toISOString(), createdBy: actor.username,
       totals: {
         gross: cents(lines.reduce((sum, line) => sum + line.gross, 0)),
