@@ -131,4 +131,9 @@ assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area
 assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
 assert.match(page, /cinematic\.css\?v=20260925-cinematic-v11/);
 
+assert.match(page, /Little Feet™ School Portal/);
+assert.match(page, /Official site: <a href="https:\/\/littlefeet\.co\.za\//);
+assert.match(page, /Built for South African ECD and school communities across learning, operations, family engagement, finance, safeguarding and privacy workflows/);
+assert.doesNotMatch(page, /<strong>Portal status:<\/strong>/);
+assert.doesNotMatch(page, /Designed to support ECD, education, POPIA and safeguarding workflows/);
 console.log('Web quality regression test passed.');
