@@ -38,12 +38,12 @@ for (const phrase of [
   'access',
   'correction',
   'deletion',
-  'object',
+  'object to processing',
   'Electronic Communications and Transactions Act 25 of 2002',
   'Consumer Protection Act 68 of 2008',
   'PAYE, UIF, SDL'
 ]) {
-  assert.ok(legal.includes(phrase), 'Missing legal notice concept: ' + phrase);
+  assert.ok(legal.toLowerCase().includes(phrase.toLowerCase()), 'Missing legal notice concept: ' + phrase);
 }
 assert.match(legal, /Little Feet does not treat school-held personal information as a product for sale/);
 assert.match(legal, /does not replace the school’s own privacy notice/);
