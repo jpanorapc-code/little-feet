@@ -12,7 +12,7 @@ const checklist = fs.readFileSync(path.join(root, 'VIDEO_REVIEW_CHECKLIST.md'), 
 
 assert.match(page, /<meta name="description" content="Little Feet is an early childhood development portal/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
-assert.match(page, /<link rel="canonical" href="https://littlefeet.co.za/">/);
+assert.ok(page.includes('<link rel="canonical" href="https://littlefeet.co.za/">'));
 assert.match(page, /<script type="application/ld+json">/);
 assert.equal((page.match(/<h1\b/gi) || []).length, 1, 'The public document should expose one primary H1.');
 assert.match(page, /<h1 role="button" tabindex="0"/);
@@ -38,9 +38,9 @@ assert.match(server, /app\.get\('\/robots\.txt'/);
 assert.match(server, /app\.get\('\/sitemap\.xml'/);
 assert.match(robots, /User-agent: \*/);
 assert.match(robots, /Disallow: \/api\//);
-assert.match(robots, /Sitemap: https:\/\/littlefeet\.co\.za\/sitemap\.xml/);
-assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
-assert.match(sitemap, /<loc>https:\/\/littlefeet\.co\.za\/<\/loc>/);
+assert.ok(robots.includes('Sitemap: https://littlefeet.co.za/sitemap.xml'));
+assert.ok(sitemap.includes('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'));
+assert.ok(sitemap.includes('<loc>https://littlefeet.co.za/</loc>'));
 assert.match(checklist, /Source set reviewed: the 19 videos/);
 assert.match(checklist, /Rules applied during this review/);
 
