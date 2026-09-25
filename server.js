@@ -7,6 +7,7 @@ const Database = require('better-sqlite3');
 const { Pool } = require('pg');
 const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
+const { registerFinanceAutomation } = require('./finance-automation-server');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
@@ -1789,6 +1790,14 @@ const createParentPaymentRecord = (body, actor) => {
   });
   return { record };
 };
+
+registerFinanceAutomation(app, {
+  db, getSessionAccount, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
+  findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
+  dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
+  applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
+  scheduleReplicaSnapshot, persistenceReady
+});
 
 app.get('/api/parent-payments/parents', (req, res) => {
   const actor = getSessionAccount(req);
