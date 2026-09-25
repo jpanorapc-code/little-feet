@@ -123,6 +123,12 @@ const requestPayloadTooComplex = (root, { maxDepth = 64, maxNodes = 5000 } = {})
 };
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
 const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, max);
+const limitedText = (value, max = 500) => {
+  const text = String(value ?? '').trim();
+  return text.length <= max ? text : null;
+};
+const validSecretLength = (value, { min = 1, max = 128 } = {}) =>
+  typeof value === 'string' && value.length >= min && value.length <= max;
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
 const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
 const APPLICATION_STAGE_SELECTIONS = new Set([
@@ -1075,7 +1081,7 @@ app.post('/api/login', (req, res) => {
   if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
   }
-  const user = normalizedUsername && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
+  const user = normalizedUsername && validSecretLength(pin) && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
   if (user) {
     if (String(user.verificationStatus || '').includes('verification pending')) {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
@@ -2875,10 +2881,10 @@ app.get('/api/visitor-meetings', (req, res) => {
 
 app.post('/api/visitor-meetings', (req, res) => {
   const parent = getSessionAccount(req);
-  const host = findAccountByUsername(req.body?.hostUsername);
-  const proposedAt = String(req.body?.proposedAt || '').trim();
-  const purpose = String(req.body?.purpose || '').trim();
-  if (!parent || parent.role !== 'parent' || !host || !['teacher', 'principal'].includes(host.role) || !isSameSchool(parent, host) || !proposedAt || !purpose) return res.status(400).json({ message: 'Choose an authorised teacher or principal, a proposed time, and a meeting purpose.' });
+  const host = findAccountByUsername(limitedText(req.body?.hostUsername, 160) || '');
+  const proposedAt = limitedText(req.body?.proposedAt, 80);
+  const purpose = limitedText(req.body?.purpose, 1200);
+  if (!parent || parent.role !== 'parent' || !host || !['teacher', 'principal'].includes(host.role) || !isSameSchool(parent, host) || !proposedAt || !purpose) return res.status(400).json({ message: 'Choose an authorised teacher or principal, a proposed time, and a meeting purpose within the allowed limits.' });
   const meeting = tagSchoolRecord(parent, { id: crypto.randomUUID(), parentUsername: parent.username, parentName: parent.name || parent.username, hostUsername: host.username, hostName: host.name || host.username, proposedAt, agreedAt: null, purpose, status: 'awaiting-teacher-response', requestedAt: new Date().toISOString() });
   db.visitorMeetings.unshift(meeting);
   res.status(201).json({ success: true, meeting });
@@ -2923,6 +2929,7 @@ app.post('/api/campus-visitors/check-in', (req, res) => {
   const actor = requireSafetyStaff(req);
   const passCode = String(req.body?.passCode || '').trim().toUpperCase();
   if (!actor || !passCode) return res.status(403).json({ message: 'An authorised staff member and visitor pass are required.' });
+  if (!/^LFV-[A-F0-9]{8}$/.test(passCode)) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
   const visitor = db.campusVisitors.find(entry => entry.status === 'approved' && recordInSchool(entry, actor) && matchesPin(passCode, entry.passCodeHash));
   if (!visitor) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
   visitor.status = 'checked-in';
@@ -3080,10 +3087,20 @@ app.get('/api/registry', (req, res) => {
 app.post('/api/registry', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
-  const required = ['learnerName', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
-  if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields.' });
-  const learnerName = String(req.body.learnerName || '').trim();
-  const className = String(req.body.className || '').trim();
+  const learnerName = limitedText(req.body?.learnerName, 160);
+  const className = limitedText(req.body?.className, 120);
+  const dateOfBirth = limitedText(req.body?.dateOfBirth, 20);
+  const guardianName = limitedText(req.body?.guardianName, 160);
+  const guardianPhone = limitedText(req.body?.guardianPhone, 80);
+  const guardianEmail = limitedText(req.body?.guardianEmail, 160);
+  const address = limitedText(req.body?.address, 500);
+  const emergencyContact = limitedText(req.body?.emergencyContact, 500);
+  const medicalNotes = limitedText(req.body?.medicalNotes, 2000);
+  const consent = limitedText(req.body?.consent || 'Pending verification', 120);
+  if (!learnerName || !dateOfBirth || !guardianName || !guardianPhone || !address || guardianEmail === null || className === null || emergencyContact === null || medicalNotes === null || consent === null) {
+    return res.status(400).json({ message: 'Complete the required learner fields and keep each field within its allowed length.' });
+  }
+  if (!validDateKey(dateOfBirth) || dateOfBirth >= dateKeyInSouthAfrica()) return res.status(400).json({ message: 'Enter a valid learner date of birth.' });
   if (actor.role === 'teacher' && (!className || !normaliseAssignedClasses(actor.assignedClasses).includes(normalizeComparableText(className)))) {
     return res.status(403).json({ message: 'Teachers can register learners only in their assigned classes.' });
   }
@@ -3091,14 +3108,14 @@ app.post('/api/registry', (req, res) => {
     id: crypto.randomUUID(),
     learnerName,
     className,
-    dateOfBirth: encryptField(String(req.body.dateOfBirth || '').trim()),
-    guardianName: String(req.body.guardianName || '').trim(),
-    guardianPhone: encryptField(String(req.body.guardianPhone || '').trim()),
-    guardianEmail: encryptField(String(req.body.guardianEmail || '').trim()),
-    address: encryptField(String(req.body.address || '').trim()),
-    emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
-    medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
-    consent: String(req.body.consent || 'Pending verification'),
+    dateOfBirth: encryptField(dateOfBirth),
+    guardianName,
+    guardianPhone: encryptField(guardianPhone),
+    guardianEmail: encryptField(guardianEmail || ''),
+    address: encryptField(address),
+    emergencyContact: encryptField(emergencyContact || ''),
+    medicalNotes: encryptField(medicalNotes || ''),
+    consent,
     createdAt: new Date().toISOString(),
     createdBy: actor.username
   });
@@ -3113,11 +3130,11 @@ app.post('/api/registry', (req, res) => {
       id: crypto.randomUUID(),
       studentName: learnerName,
       className,
-      parentName: String(req.body.guardianName || '').trim(),
-      contactEmail: String(req.body.guardianEmail || '').trim(),
-      dateOfBirth: encryptField(String(req.body.dateOfBirth || '').trim()),
-      medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
-      emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
+      parentName: guardianName,
+      contactEmail: guardianEmail || '',
+      dateOfBirth: encryptField(dateOfBirth),
+      medicalNotes: encryptField(medicalNotes || ''),
+      emergencyContact: encryptField(emergencyContact || ''),
       authorisedPickups: encryptField(''),
       registeredAt: new Date().toISOString(),
       registeredBy: actor.username
@@ -3136,9 +3153,11 @@ app.get('/api/consents', (req, res) => {
 app.post('/api/consents', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save consent records.' });
-  const { learnerName, guardianName, internalUpdates, marketingPhotos } = req.body;
-  if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), guardianName: String(guardianName), internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
+  const learnerName = limitedText(req.body?.learnerName, 160);
+  const guardianName = limitedText(req.body?.guardianName, 160);
+  const { internalUpdates, marketingPhotos } = req.body;
+  if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required and must be within 160 characters.' });
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName, guardianName, internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
   db.consentRecords = db.consentRecords.filter(entry => !recordInSchool(entry, actor) || entry.learnerName.toLowerCase() !== record.learnerName.toLowerCase());
   db.consentRecords.unshift(record);
   res.status(201).json({ success: true, record });
@@ -3146,10 +3165,14 @@ app.post('/api/consents', (req, res) => {
 
 app.post('/api/pickups/verify', (req, res) => {
   const actor = getSessionAccount(req);
-  const { learnerName, pickupAdult, verificationCode, action } = req.body;
+  const learnerName = limitedText(req.body?.learnerName, 160);
+  const pickupAdult = limitedText(req.body?.pickupAdult, 160);
+  const verificationCode = req.body?.verificationCode;
+  const action = limitedText(req.body?.action, 40);
+  const allowedActions = new Set(['Check-in', 'Pickup / release']);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record pickups.' });
-  if (!learnerName || !pickupAdult || !verificationCode || !action) return res.status(400).json({ message: 'Learner, pickup adult, verification code, and action are required.' });
-  const entry = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), pickupAdult: String(pickupAdult), verificationCode: hashPin(verificationCode), action: String(action), recordedBy: actor.username, timestamp: new Date().toISOString() });
+  if (!learnerName || !pickupAdult || !validSecretLength(verificationCode) || !allowedActions.has(action)) return res.status(400).json({ message: 'Learner, pickup adult, a valid verification code, and a supported action are required.' });
+  const entry = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName, pickupAdult, verificationCode: hashPin(verificationCode), action, recordedBy: actor.username, timestamp: new Date().toISOString() });
   db.pickupLogs.unshift(entry);
   res.status(201).json({ success: true, entry: { ...entry, verificationCode: undefined } });
 });
@@ -3164,7 +3187,7 @@ app.get('/api/release-notes', (req, res) => res.json((db.releaseNotes || []).sli
 app.post('/api/report-signing-pin', (req, res) => {
   const { pin } = req.body;
   const user = getSessionAccount(req);
-  if (!user || !pin || String(pin).length < 4) return res.status(400).json({ message: 'Choose a signing PIN with at least 4 characters.' });
+  if (!user || !validSecretLength(pin, { min: 4, max: 128 })) return res.status(400).json({ message: 'Choose a signing PIN between 4 and 128 characters.' });
   user.reportSigningPinHash = hashPin(pin);
   res.json({ success: true });
 });
@@ -3179,16 +3202,21 @@ app.get('/api/report-reviews', (req, res) => {
   res.json(reports.map(reportReviewView));
 });
 app.post('/api/report-reviews', (req, res) => {
-  const { studentName, reportTitle, period, parentUsername, signatureData, signingPin } = req.body;
+  const studentName = limitedText(req.body?.studentName, 160);
+  const reportTitle = limitedText(req.body?.reportTitle, 240);
+  const period = limitedText(req.body?.period, 120);
+  const parentUsername = limitedText(req.body?.parentUsername, 160);
+  const signatureData = req.body?.signatureData;
+  const signingPin = req.body?.signingPin;
   const teacher = getSessionAccount(req);
-  const parent = findAccountByUsername(parentUsername);
-  if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
+  if (!teacher || !teacher.reportSigningPinHash || !validSecretLength(signingPin) || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
+  const parent = parentUsername ? findAccountByUsername(parentUsername) : null;
   if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
   const learner = learnerRecordsVisibleTo(db.students, teacher).find(entry => normalizeComparableText(entry.studentName) === normalizeComparableText(studentName));
   if (!learner) return res.status(403).json({ message: 'You do not have access to that learner.' });
   if (!isParentLinkedToLearner(parent, learner)) return res.status(400).json({ message: 'Choose the approved parent account linked to this learner.' });
-  if (!studentName || !reportTitle || !period || !parentUsername || !validSignatureData(signatureData)) return res.status(400).json({ message: 'Complete the report details and provide a valid signature.' });
-  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), className: learner.className || '', reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: encryptField(signatureData), teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
+  if (!studentName || !reportTitle || !period || !parentUsername || !validSignatureData(signatureData)) return res.status(400).json({ message: 'Complete the report details within the allowed limits and provide a valid signature.' });
+  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName, className: learner.className || '', reportTitle, period, teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: encryptField(signatureData), teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
   db.reportReviews.unshift(report);
   res.status(201).json({ success: true, report: reportReviewView(report) });
 });
@@ -3197,7 +3225,7 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
   const user = getSessionAccount(req);
   const report = db.reportReviews.find(entry => entry.id === req.params.id && recordInSchool(entry, user));
   if (!report || !user || user.role !== 'parent' || normalizeUsername(report.parentUsername) !== normalizeUsername(user.username)) return res.status(403).json({ message: 'Only the linked parent account can sign this report.' });
-  if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
+  if (!user.reportSigningPinHash || !validSecretLength(signingPin) || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
   if (!validSignatureData(signatureData)) return res.status(400).json({ message: 'Add a valid signature before confirming.' });
   report.parentSignature = encryptField(signatureData);
   report.parentSignedAt = new Date().toISOString();
