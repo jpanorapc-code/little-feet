@@ -1,0 +1,25 @@
+{
+  "name": "Little Feet ECD Portal",
+  "short_name": "Little Feet",
+  "description": "Early childhood development portal for school communication, attendance, learning records, safeguarding and family engagement.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#071827",
+  "theme_color": "#0d9488",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-transparent.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ]
+}

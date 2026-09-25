@@ -1,4 +1,5 @@
 let currentUser = null;
+window.getLittleFeetCurrentUser = () => currentUser;
 let parentPaymentData = null;
 let bookRegisterData = null;
 const errorLog = [];
@@ -13,8 +14,6 @@ let knownTicketIds = new Set();
 let ticketsLoaded = false;
 let ticketAssigneeAccounts = [];
 let portalAudioContext = null;
-let startupChimePending = false;
-let startupChimePrompt = null;
 let schoolStatusTimer = null;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
@@ -25,24 +24,16 @@ let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
 let latestServerErrors = [];
-let startupChimePlayed = false;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
-let welcomeThemeAudio = null;
-let welcomeThemeStopTimer = null;
-let startupChimeStarting = false;
-let loginChimeAudio = null;
-let loginChimeStopTimer = null;
-let loginChimeFadeTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
 let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
-const WELCOME_THEME_MAX_MS = 8000;
 const DEFAULT_WALLPAPER_URL = 'assets/4k/little-feet-wallpaper-no-moon-4k.jpg';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
@@ -75,38 +66,21 @@ function getPortalAudioContext() {
   return portalAudioContext;
 }
 
+window.getPortalAudioContext = getPortalAudioContext;
+window.isPortalAudioMuted = () => portalAudioMuted;
+
+function announcePortalAudioState() {
+  try {
+    window.dispatchEvent(new CustomEvent('littlefeet:audiochange', { detail: { muted: portalAudioMuted } }));
+  } catch { /* Audio state broadcast is optional. */ }
+}
+
 function unlockPortalAudio() {
   try {
     if (portalAudioMuted) return;
-    if (startupChimePending) playStartupChime();
     const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(() => { if (startupChimePending) playStartupChime(); }).catch(showStartupChimePrompt);
-    } else if (startupChimePending) {
-      playStartupChime();
-    }
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   } catch { /* Sound remains optional when unavailable on a device. */ }
-}
-
-// Some mobile browsers only permit sound after an explicit second tap.  This
-// small, visible fallback is shown only when the browser blocks the first one.
-function showStartupChimePrompt() {
-  if (portalAudioMuted || startupChimePlayed || startupChimePrompt) return;
-  const prompt = document.createElement('button');
-  prompt.type = 'button';
-  prompt.className = 'action-btn btn-green';
-  prompt.textContent = '🔊 Play welcome theme';
-  prompt.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:10020;box-shadow:0 12px 30px rgba(0,0,0,.35);';
-  prompt.addEventListener('click', () => {
-    prompt.remove();
-    startupChimePrompt = null;
-    playStartupChime();
-  });
-  document.body.append(prompt);
-  startupChimePrompt = prompt;
-  window.setTimeout(() => {
-    if (startupChimePrompt === prompt) { prompt.remove(); startupChimePrompt = null; }
-  }, 12000);
 }
 
 function southAfricaNow(date = new Date()) {
@@ -214,8 +188,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!event.target.checked) clearRememberedLogin();
   });
   restoreCustomWallpaper().catch(() => {});
-  startupChimePending = true;
-  playStartupChime();
   const dateEl = document.getElementById('todayDateStr');
   if (dateEl) dateEl.textContent = new Date().toISOString().split('T')[0];
 
@@ -387,7 +359,6 @@ function handleMascotLegacyTap(event) {
 function openWindtLegacy() {
   if (!currentUser) return;
   openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p><details style="border-top:1px solid rgba(45,212,191,.35);padding-top:12px;"><summary style="cursor:pointer;color:#99f6e4;font-weight:800;">’n Brief van Pa</summary><div style="display:grid;gap:12px;margin-top:12px;color:var(--text-dark);"><p style="margin:0;">My seun ek is so trots op jou so ver as wat jy gekom het, as ek nie daar meer is nie ek is jammer jy is die beste ding wat in my lewe gebeur het en ek weet jy gan n success wees in lewe pa glo vas jy sal kan beter doen as wat ek sou kon, asseblief kyk mooi na jou ma as ek nie meer daar is nie.</p><p style="margin:0;">Btw jou middle naam is based op my child hood game hero Marcus Fenix jou ma wou nie hê ek moes jou dit noem nie maar pa het inageval want jy deserve die beste.</p><p style="margin:0;">Die Windt Legacy gan nie oor wat gedoen was nie en aan gaan met dit nie dit gaan oor wat jy voor sit vir jou familie sodat die volgende generation kan streef en nog beter doen as die laaste.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Christiaan Windt in and out, love you my Potato.</p></div></details></article>`);
-  stopWelcomeTheme();
   playWindtLegacyNote();
 }
 
@@ -398,16 +369,6 @@ function showPortalTourSlide(index) {
   portalTourIndex = (index + slides.length) % slides.length;
   slides.forEach((slide, slideIndex) => slide.classList.toggle('is-active', slideIndex === portalTourIndex));
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
-}
-
-function stopWelcomeTheme() {
-  if (welcomeThemeStopTimer) window.clearTimeout(welcomeThemeStopTimer);
-  welcomeThemeStopTimer = null;
-  startupChimeStarting = false;
-  if (!welcomeThemeAudio) return;
-  welcomeThemeAudio.pause();
-  welcomeThemeAudio.currentTime = 0;
-  welcomeThemeAudio = null;
 }
 
 function portalAudioPreferenceKey() {
@@ -425,20 +386,7 @@ function updatePortalAudioControls() {
   });
 }
 
-function stopLoginChime() {
-  if (loginChimeStopTimer) window.clearTimeout(loginChimeStopTimer);
-  if (loginChimeFadeTimer) window.clearInterval(loginChimeFadeTimer);
-  loginChimeStopTimer = null;
-  loginChimeFadeTimer = null;
-  if (!loginChimeAudio) return;
-  loginChimeAudio.pause();
-  loginChimeAudio.currentTime = 0;
-  loginChimeAudio = null;
-}
-
 function stopAllPortalAudio() {
-  stopWelcomeTheme();
-  stopLoginChime();
   stopWindtLegacyNote();
   stopWallpaperTheme();
 }
@@ -456,6 +404,7 @@ function loadPortalAudioPreference() {
   } catch { portalAudioMuted = false; }
   if (portalAudioMuted) stopAllPortalAudio();
   updatePortalAudioControls();
+  announcePortalAudioState();
 }
 
 function togglePortalAudioMute() {
@@ -467,40 +416,12 @@ function togglePortalAudioMute() {
     if (accountKey) localStorage.setItem(accountKey, String(portalAudioMuted));
   } catch {}
   if (portalAudioMuted) {
-    startupChimePending = false;
-    startupChimePrompt?.remove();
-    startupChimePrompt = null;
     stopAllPortalAudio();
   } else if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) {
     startWallpaperTheme();
-  } else if (!currentUser && !startupChimePlayed) {
-    startupChimePending = true;
-    playStartupChime();
   }
   updatePortalAudioControls();
-}
-
-// A five-second login cue taken from the supplied main theme keeps the same musical identity.
-function playLoginChime() {
-  stopWelcomeTheme();
-  stopLoginChime();
-  if (portalAudioMuted) return;
-  try {
-    loginChimeAudio = new Audio('assets/audio/little-feet-theme.mp3');
-    loginChimeAudio.preload = 'auto';
-    loginChimeAudio.volume = 0.5;
-    loginChimeAudio.currentTime = 0;
-    loginChimeAudio.play().catch(() => {});
-    loginChimeStopTimer = window.setTimeout(() => {
-      let step = 0;
-      loginChimeFadeTimer = window.setInterval(() => {
-        if (!loginChimeAudio) return stopLoginChime();
-        step += 1;
-        loginChimeAudio.volume = Math.max(0.01, 0.5 * (1 - step / 8));
-        if (step >= 8) stopLoginChime();
-      }, 75);
-    }, 4400);
-  } catch { stopLoginChime(); }
+  announcePortalAudioState();
 }
 
 function playWindtLegacyNote() {
@@ -517,41 +438,6 @@ function stopWindtLegacyNote() {
   windtLegacyAudio.pause();
   windtLegacyAudio.currentTime = 0;
   windtLegacyAudio = null;
-}
-
-// The supplied Little Feet theme plays once after the first permitted interaction.
-function playStartupChime() {
-  if (startupChimePlayed || startupChimeStarting) return;
-  if (portalAudioMuted) {
-    startupChimePending = false;
-    return;
-  }
-  try {
-    startupChimePending = false;
-    if (!welcomeThemeAudio) {
-      welcomeThemeAudio = new Audio('assets/audio/little-feet-theme.mp3');
-      welcomeThemeAudio.preload = 'auto';
-      welcomeThemeAudio.volume = 0.58;
-    }
-    welcomeThemeAudio.loop = false;
-    welcomeThemeAudio.currentTime = 0;
-    startupChimeStarting = true;
-    welcomeThemeAudio.play().then(() => {
-      startupChimeStarting = false;
-      startupChimePlayed = true;
-      startupChimePrompt?.remove();
-      startupChimePrompt = null;
-      welcomeThemeStopTimer = window.setTimeout(stopWelcomeTheme, WELCOME_THEME_MAX_MS);
-    }).catch(() => {
-      startupChimeStarting = false;
-      startupChimePending = true;
-      showStartupChimePrompt();
-    });
-  } catch {
-    startupChimeStarting = false;
-    startupChimePending = true;
-    showStartupChimePrompt();
-  }
 }
 
 function movePortalTour(direction) {
@@ -894,11 +780,16 @@ function logAppError(code, reason) {
   }
 }
 
+let modalReturnFocus = null;
+
 function openModal(title, contentHtml) {
+  const modal = document.getElementById('appModal');
+  modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = contentHtml;
   document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
-  document.getElementById('appModal').classList.remove('hidden');
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => modal.querySelector('.modal-close')?.focus());
 }
 
 function sanitiseDebugText(value) {
@@ -996,7 +887,15 @@ function closeModal() {
   visitorScannerStream = null;
   stopWindtLegacyNote();
   document.getElementById('appModal').classList.add('hidden');
+  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+  modalReturnFocus = null;
 }
+
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const modal = document.getElementById('appModal');
+  if (modal && !modal.classList.contains('hidden')) closeModal();
+});
 
 function toggleDarkMode() {
   document.body.classList.toggle('light-mode');
@@ -1114,7 +1013,6 @@ function setupSession() {
   renderRoleHomePanel();
   configureDebugMode();
   applyUserPreferences();
-  playLoginChime();
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
@@ -1184,12 +1082,7 @@ function logout() {
   releaseNotesRefreshTimer = null;
   currentUser = null;
   exitWallpaperMode();
-  stopWelcomeTheme();
   stopWindtLegacyNote();
-  startupChimePlayed = false;
-  startupChimePending = false;
-  startupChimePrompt?.remove();
-  startupChimePrompt = null;
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
   if (ticketMonitorId) { clearInterval(ticketMonitorId); ticketMonitorId = null; }
   knownTicketIds = new Set();
@@ -1248,7 +1141,7 @@ function loadWorkspaceOnDemand(tabId) {
     visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
     notesTab: [loadStickyNotes],
-    progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords)]
+    progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords), () => window.loadCurriculumRecords?.()]
   };
   (loaders[tabId] || []).forEach(load => Promise.resolve().then(load).catch(() => {}));
 }
@@ -1278,7 +1171,6 @@ function startWallpaperMode() {
   const overlay = document.getElementById('wallpaperOverlay');
   if (!currentUser || !overlay) return;
   clearTimeout(wallpaperIdleTimer);
-  stopWelcomeTheme();
   overlay.classList.add('is-visible');
   overlay.setAttribute('aria-hidden', 'false');
   startWallpaperTheme();
@@ -1860,7 +1752,7 @@ function openSchoolDetail(index) {
   const coordinates = `${school.lat.toFixed(5)}, ${school.lng.toFixed(5)}`;
   const verifiedParent = currentUser?.role === 'parent' && !String(currentUser?.verificationStatus || '').toLowerCase().includes('pending');
   const application = verifiedParent
-    ? `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0 0 12px;color:var(--text-muted);font-size:.84rem;">Your verified Little Feet account is required. The application is sent directly to this school’s principal when its school account is active. Do not include medical or other sensitive details here.</p><form onsubmit="submitSchoolApplication(event, ${index})" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;"><label>Parent / guardian name<input name="guardianName" autocomplete="section-applicant name" required value="${escapeWorkspaceText(currentUser.name || '')}"></label><label>Contact email<input name="contactEmail" type="email" autocomplete="section-applicant email" required value="${escapeWorkspaceText(currentUser.username || '')}"></label><label>Contact phone<input name="contactPhone" autocomplete="section-applicant tel" required inputmode="tel"></label><label>Learner name<input name="learnerName" autocomplete="section-learner name" required></label><label>Date of birth<input name="dateOfBirth" type="date" autocomplete="section-learner bday" required></label><label>Age group / intended grade<input name="gradeOrAgeGroup" required placeholder="e.g. Grade R / Toddler"></label><label>Intended start date<input name="intendedStart" type="date" required></label><label>Home area / suburb<input name="homeArea" autocomplete="section-applicant address-level2" required></label><label style="grid-column:1/-1;">Application note<textarea name="notes" required rows="3" placeholder="Why you are applying, preferred contact time, and any non-sensitive information the school should know."></textarea></label><label for="schoolApplicationConsent" style="grid-column:1/-1;display:flex;gap:8px;align-items:flex-start;"><input id="schoolApplicationConsent" name="applicationConsent" type="checkbox" required> I confirm these details are accurate and I am authorised to apply for this learner.</label><button class="submit-btn" style="grid-column:1/-1;">Send application to principal</button></form></section>`
+    ? `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0 0 12px;color:var(--text-muted);font-size:.84rem;">Your verified Little Feet account is required. The application is sent directly to this school’s principal when its school account is active. Do not include medical or other sensitive details here.</p><div style="padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);margin-bottom:12px;"><strong>Which age group?</strong><p class="meta" style="margin:5px 0 0;">Day care / ECD usually covers birth to about 5; primary schools typically Grades R–7; secondary/high schools typically Grades 8–12. Curriculum phases overlap those school types, so choose the learner’s exact intended grade where possible.</p></div><form onsubmit="submitSchoolApplication(event, ${index})" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;"><label>Parent / guardian name<input name="guardianName" autocomplete="section-applicant name" required value="${escapeWorkspaceText(currentUser.name || '')}"></label><label>Contact email<input name="contactEmail" type="email" autocomplete="section-applicant email" required value="${escapeWorkspaceText(currentUser.username || '')}"></label><label>Contact phone<input name="contactPhone" autocomplete="section-applicant tel" required inputmode="tel"></label><label>Learner name<input name="learnerName" autocomplete="section-learner name" required></label><label>Date of birth<input name="dateOfBirth" type="date" autocomplete="section-learner bday" required></label><label>Age group / intended grade<select name="gradeOrAgeGroup" required>${window.LittleFeetEducationStages?.optionMarkup?.() || '<option value="">Choose age group / intended grade</option><option>Grade R · Reception</option><option>Grade 1</option><option>Grade 2</option><option>Grade 3</option><option>Grade 4</option><option>Grade 5</option><option>Grade 6</option><option>Grade 7</option><option>Grade 8</option><option>Grade 9</option><option>Grade 10</option><option>Grade 11</option><option>Grade 12</option>'}</select></label><label>Intended start date<input name="intendedStart" type="date" required></label><label>Home area / suburb<input name="homeArea" autocomplete="section-applicant address-level2" required></label><label style="grid-column:1/-1;">Application note<textarea name="notes" required rows="3" placeholder="Why you are applying, preferred contact time, and any non-sensitive information the school should know."></textarea></label><label for="schoolApplicationConsent" style="grid-column:1/-1;display:flex;gap:8px;align-items:flex-start;"><input id="schoolApplicationConsent" name="applicationConsent" type="checkbox" required> I confirm these details are accurate and I am authorised to apply for this learner.</label><button class="submit-btn" style="grid-column:1/-1;">Send application to principal</button></form></section>`
     : `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0;color:var(--text-muted);">Applications require an active, verified parent account. Sign in with your approved Little Feet parent account first.</p></section>`;
   openModal('School details', `<div style="display:grid;gap:12px;"><div><h3 style="margin:0 0 5px;">${escapeWorkspaceText(school.name)}</h3><p style="margin:0;color:var(--text-muted);">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(detail.street || 'Address not listed')}, ${escapeWorkspaceText(detail.suburb || '')}, ${escapeWorkspaceText(detail.town || '')}</p></div><div><label for="schoolCoordinates">Coordinates</label><input id="schoolCoordinates" readonly value="${coordinates}"><button type="button" class="action-btn btn-blue" style="margin-top:8px;" onclick="navigator.clipboard?.writeText(document.getElementById('schoolCoordinates').value); this.textContent='Copied'">Copy coordinates</button></div>${application}</div>`);
 }
@@ -2263,12 +2155,12 @@ async function loadBadges() {
       ? list.map(b => `
           <div class="item-row" style="justify-content: space-between; align-items: flex-start;">
             <div>
-              <span class="badge-tag" style="background:#10b981;">${b.category}</span>
-              <strong style="font-size:1.05rem; color:#fff;">${b.title || b.awardName}</strong>
-              <span style="color:#a7f3d0;">— ${b.studentName}</span>
-              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${b.note}"</p>
+              <span class="badge-tag" style="background:#10b981;">${escapeWorkspaceText(b.category)}</span>
+              <strong style="font-size:1.05rem; color:#fff;">${escapeWorkspaceText(b.title || b.awardName)}</strong>
+              <span style="color:#a7f3d0;">— ${escapeWorkspaceText(b.studentName)}</span>
+              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${escapeWorkspaceText(b.note)}"</p>
             </div>
-            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${b.id}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${encodeURIComponent(String(b.id || ''))}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No milestone badges awarded yet.</p>';
   } catch (err) {
@@ -2313,10 +2205,11 @@ if (badgeForm) {
   });
 }
 
-async function deleteBadge(id) {
+async function deleteBadge(encodedId) {
   if (!canManageBadges()) return alert('Only authorised school staff can remove badges.');
   if (!confirm('Are you sure you want to delete this awarded badge?')) return;
-  const response = await fetch(`/api/badges/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
+  const id = decodeURIComponent(String(encodedId || ''));
+  const response = await fetch(`/api/badges/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   if (!response.ok) {
     const result = await response.json();
     return alert(result.message || 'Unable to remove this badge.');
@@ -2556,7 +2449,7 @@ async function loadTickets(checkForNew = false) {
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
-              <button type="button" onclick="editTicketModal('${t.id}', '${t.status}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
+              <button type="button" onclick="editTicketModal('${encodeURIComponent(String(t.id || ''))}', '${encodeURIComponent(String(t.status || 'Open'))}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
             </div>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
@@ -2620,14 +2513,16 @@ if (ticketForm) {
   });
 }
 
-function editTicketModal(id, currentStatus, encodedFeedback, encodedAssignee) {
+function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssignee) {
+  const id = decodeURIComponent(encodedId || '');
+  const currentStatus = decodeURIComponent(encodedStatus || 'Open');
   const currentFeedback = decodeURIComponent(encodedFeedback || '');
   const currentAssignee = decodeURIComponent(encodedAssignee || '');
   const html = `
     <form id="editTicketForm">
       <div>
         <label for="editFeedback">Admin Feedback & Notes</label>
-        <textarea id="editFeedback" rows="3" required>${currentFeedback || ''}</textarea>
+        <textarea id="editFeedback" rows="3" required>${escapeWorkspaceText(currentFeedback || '')}</textarea>
       </div>
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
@@ -2938,7 +2833,7 @@ async function loadGroupChatMessages() {
   }
 
   try {
-    const res = await fetch(`/api/chat/messages/${groupId}`);
+    const res = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}`);
     const msgs = await res.json();
     if (res.status === 404) {
       if (chatBox) chatBox.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">This channel is no longer available. Refreshing the channel list…</p>';
@@ -2951,7 +2846,7 @@ async function loadGroupChatMessages() {
       ? msgs.map(m => {
           const isMe = currentUser && m.sender === currentUser.username;
           const moderation = currentUser?.role === 'admin' && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${groupId}','${m.id}')">Delete</button>` : '';
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${encodeURIComponent(groupId)}','${encodeURIComponent(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
               <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
@@ -2966,8 +2861,10 @@ async function loadGroupChatMessages() {
   }
 }
 
-async function deleteGroupChatMessage(groupId, messageId) {
+async function deleteGroupChatMessage(encodedGroupId, encodedMessageId) {
   if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this chat message?')) return;
+  const groupId = decodeURIComponent(String(encodedGroupId || ''));
+  const messageId = decodeURIComponent(String(encodedMessageId || ''));
   const response = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to delete this message.');
@@ -3011,7 +2908,7 @@ async function deleteCurrentGroup() {
 
   if (!confirm('Are you sure you want to delete this group channel?')) return;
 
-  await fetch(`/api/chat/groups/${groupId}`, { method: 'DELETE' });
+  await fetch(`/api/chat/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
   await loadChatGroups();
   loadGroupChatMessages();
 }
@@ -3051,7 +2948,7 @@ async function loadDirectChatMessages() {
       ? msgs.map(m => {
           const isMe = m.sender === currentUser.username;
           const moderation = currentUser?.role === 'admin' && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${m.id}')">Delete</button>` : '';
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${encodeURIComponent(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
               <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
@@ -3066,8 +2963,9 @@ async function loadDirectChatMessages() {
   }
 }
 
-async function deleteDirectChatMessage(messageId) {
+async function deleteDirectChatMessage(encodedMessageId) {
   if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this private message?')) return;
+  const messageId = decodeURIComponent(String(encodedMessageId || ''));
   const response = await fetch(`/api/chat/direct/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to delete this message.');
@@ -3376,11 +3274,11 @@ async function openSubscriptionsModal() {
       <section style="margin-bottom:26px;">
         <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">INSTITUTIONAL PRICING & BENEFITS</div>
         <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">School Subscriptions & Operational Advantages</h2>
-        <p style="margin:0 0 12px; color:#10b981; font-size:1rem; font-weight:700;">Predictable Pricing Models Designed for Scalability</p>
+        <p style="margin:0 0 7px; color:#10b981; font-size:1rem; font-weight:700;">Predictable Pricing Models Designed for Scalability</p><p style="margin:0 0 12px;color:var(--text-muted);font-size:.8rem;">Plan names show a common fit, not an age restriction. Choose by learner capacity and the exact grades your institution offers.</p>
         <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; margin-bottom:12px;">
           <table style="width:100%; min-width:700px; border-collapse:collapse; text-align:left; font-size:.82rem;">
-            <thead><tr style="background:#065f46; color:#fff;"><th style="padding:10px;">Package tier</th><th style="padding:10px;">School learners</th><th style="padding:10px;">Monthly fee</th><th style="padding:10px;">Extra learner fee</th></tr></thead>
-            <tbody><tr><td style="padding:10px;"><strong>Micro / ECD Tier</strong></td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 / learner / month</td></tr><tr style="background:rgba(16,185,129,.10);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 / learner / month</td></tr><tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr></tbody>
+            <thead><tr style="background:#065f46; color:#fff;"><th style="padding:10px;">Package tier</th><th style="padding:10px;">Common institution / age fit</th><th style="padding:10px;">School learners</th><th style="padding:10px;">Monthly fee</th><th style="padding:10px;">Extra learner fee</th></tr></thead>
+            <tbody><tr><td style="padding:10px;"><strong>Micro / ECD Tier</strong></td><td style="padding:10px;">Day care / ECD · Birth–4/5 · small Grade R or micro school</td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 / learner / month</td></tr><tr style="background:rgba(16,185,129,.10);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Primary · typically Grades R–7 · approx. 5–13 years</td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 / learner / month</td></tr><tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Large primary, secondary/high Grades 8–12, or combined school</td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr></tbody>
           </table>
         </div>
         ${subscriptionPricingOverview}
@@ -3550,7 +3448,11 @@ async function loadParentPayments() {
     if (!response.ok) throw new Error(data.message || 'Unable to load parent payments.');
     parentPaymentData = data;
     const summary = data.summary || {};
-    summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>`;
+    const ageing = data.ageing || {};
+    const ageingMarkup = ['principal', 'admin'].includes(currentUser.role)
+      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color);"><span class="meta" style="display:block;margin-bottom:7px;">Debtor ageing · open balance by days overdue</span><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;"><div><span class="meta">Current</span><strong style="display:block;">${formatSubscriptionMoney(ageing.current)}</strong></div><div><span class="meta">1–30 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days1to30)}</strong></div><div><span class="meta">31–60 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days31to60)}</strong></div><div><span class="meta">61–90 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days61to90)}</strong></div><div><span class="meta">90+ days</span><strong style="display:block;color:${Number(ageing.days90plus || 0) > 0 ? '#fca5a5' : 'inherit'};">${formatSubscriptionMoney(ageing.days90plus)}</strong></div></div></div>`
+      : '';
+    summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>${ageingMarkup}`;
     const admin = ['principal', 'admin'].includes(currentUser.role);
     list.innerHTML = data.payments?.length ? data.payments.map(payment => {
       const arrangement = payment.arrangementActive ? `<p style="margin:4px 0;color:#99f6e4;">Approved arrangement: ${formatSubscriptionMoney(payment.arrangementAmount)} due ${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementNote ? ` · ${escapeWorkspaceText(payment.arrangementNote)}` : ''}</p>` : '';
@@ -3613,14 +3515,30 @@ async function reconcileParentPayment(event, encodedReference) {
 function openParentPaymentReport() {
   if (!parentPaymentData) return loadParentPayments();
   const summary = parentPaymentData.summary || {};
-  const rows = (parentPaymentData.payments || []).map(payment => `<tr><td style="padding:8px;">${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? `<br><span class="meta">${escapeWorkspaceText(payment.learnerName)}</span>` : ''}</td><td style="padding:8px;">${escapeWorkspaceText(payment.description)}</td><td style="padding:8px;">${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementActive ? `<br><span class="meta">${escapeWorkspaceText(payment.arrangementNote || 'Approved arrangement')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.amountDue)}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.paidAmount)}${payment.paymentHistory?.length ? `<br><span class="meta">${payment.paymentHistory.map(item => `${formatSubscriptionMoney(item.amount)} ${escapeWorkspaceText(item.status)} · ${new Date(item.receivedAt).toLocaleDateString()}`).join('<br>')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.balance)}${payment.arrears ? `<br><span style="color:#fca5a5;">Arrears ${formatSubscriptionMoney(payment.arrears)}</span>` : ''}</td></tr>`).join('');
-  openModal('Full parent payment report', `<p class="meta">Generated ${parentPaymentData.recalculatedAt ? new Date(parentPaymentData.recalculatedAt).toLocaleString() : 'now'}. Paid history and approved arrangements are included in the totals below.</p><div class="workspace-card" style="display:flex;gap:18px;flex-wrap:wrap;"><strong>Due: ${formatSubscriptionMoney(summary.amountDue)}</strong><strong>Paid: ${formatSubscriptionMoney(summary.paidAmount)}</strong><strong>Open: ${formatSubscriptionMoney(summary.balance)}</strong><strong>Arrears: ${formatSubscriptionMoney(summary.arrears)}</strong></div><div style="overflow:auto;margin-top:12px;"><table style="width:100%;min-width:720px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:8px;">Account</th><th style="padding:8px;">Description</th><th style="padding:8px;">Due / arrangement</th><th style="padding:8px;">Due</th><th style="padding:8px;">Paid / history</th><th style="padding:8px;">Balance</th></tr></thead><tbody>${rows || '<tr><td colspan="6" style="padding:12px;">No payment records.</td></tr>'}</tbody></table></div>`);
+  const ageing = parentPaymentData.ageing || {};
+  const rows = (parentPaymentData.payments || []).map(payment => `<tr><td style="padding:8px;">${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? `<br><span class="meta">${escapeWorkspaceText(payment.learnerName)}</span>` : ''}</td><td style="padding:8px;">${escapeWorkspaceText(payment.description)}</td><td style="padding:8px;">${escapeWorkspaceText(payment.effectiveDueDate)}${payment.daysPastDue ? `<br><span style="color:#fca5a5;">${Number(payment.daysPastDue)} days overdue</span>` : '<br><span class="meta">Current</span>'}${payment.arrangementActive ? `<br><span class="meta">${escapeWorkspaceText(payment.arrangementNote || 'Approved arrangement')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.amountDue)}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.paidAmount)}${payment.paymentHistory?.length ? `<br><span class="meta">${payment.paymentHistory.map(item => `${formatSubscriptionMoney(item.amount)} ${escapeWorkspaceText(item.status)} · ${new Date(item.receivedAt).toLocaleDateString()}`).join('<br>')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.balance)}${payment.arrears ? `<br><span style="color:#fca5a5;">Arrears ${formatSubscriptionMoney(payment.arrears)}</span>` : ''}</td></tr>`).join('');
+  const ageingSummary = ['principal', 'admin'].includes(currentUser?.role)
+    ? `<div class="workspace-card" style="margin-top:10px;"><strong>Debtor ageing</strong><p class="meta" style="margin:6px 0 0;">Current ${formatSubscriptionMoney(ageing.current)} · 1–30 ${formatSubscriptionMoney(ageing.days1to30)} · 31–60 ${formatSubscriptionMoney(ageing.days31to60)} · 61–90 ${formatSubscriptionMoney(ageing.days61to90)} · 90+ ${formatSubscriptionMoney(ageing.days90plus)}</p></div>`
+    : '';
+  openModal('Full parent payment report', `<p class="meta">Generated ${parentPaymentData.recalculatedAt ? new Date(parentPaymentData.recalculatedAt).toLocaleString() : 'now'}. Paid history, approved arrangements and live ageing are calculated from the current ledger.</p><div class="workspace-card" style="display:flex;gap:18px;flex-wrap:wrap;"><strong>Due: ${formatSubscriptionMoney(summary.amountDue)}</strong><strong>Paid: ${formatSubscriptionMoney(summary.paidAmount)}</strong><strong>Open: ${formatSubscriptionMoney(summary.balance)}</strong><strong>Arrears: ${formatSubscriptionMoney(summary.arrears)}</strong></div>${ageingSummary}<div style="overflow:auto;margin-top:12px;"><table style="width:100%;min-width:760px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:8px;">Account</th><th style="padding:8px;">Description</th><th style="padding:8px;">Due / ageing</th><th style="padding:8px;">Due</th><th style="padding:8px;">Paid / history</th><th style="padding:8px;">Balance</th></tr></thead><tbody>${rows || '<tr><td colspan="6" style="padding:12px;">No payment records.</td></tr>'}</tbody></table></div>`);
 }
 
 function exportParentPaymentReport() {
   if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
-  const rows = (parentPaymentData?.payments || []).map(payment => ({ Parent: payment.parentName, 'Parent Username': payment.parentUsername, Learner: payment.learnerName, Description: payment.description, 'Original Due Date': payment.dueDate, 'Effective Due Date': payment.effectiveDueDate, 'Approved Arrangement Amount': payment.arrangementAmount || '', 'Approved Arrangement Note': payment.arrangementNote || '', 'Amount Due': payment.amountDue, 'Paid Amount': payment.paidAmount, 'Payment History': (payment.paymentHistory || []).map(item => `${item.amount} ${item.status} ${item.receivedAt}`).join(' | '), Balance: payment.balance, Arrears: payment.arrears, Status: payment.status, Reference: payment.reference }));
-  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Payment report'); XLSX.writeFile(workbook, `LittleFeet_Parent_Payment_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const rows = (parentPaymentData?.payments || []).map(payment => ({ Parent: payment.parentName, 'Parent Username': payment.parentUsername, Learner: payment.learnerName, Description: payment.description, 'Original Due Date': payment.dueDate, 'Effective Due Date': payment.effectiveDueDate, 'Days Past Due': payment.daysPastDue || 0, 'Approved Arrangement Amount': payment.arrangementAmount || '', 'Approved Arrangement Note': payment.arrangementNote || '', 'Amount Due': payment.amountDue, 'Paid Amount': payment.paidAmount, 'Payment History': (payment.paymentHistory || []).map(item => `${item.amount} ${item.status} ${item.receivedAt}`).join(' | '), Balance: payment.balance, Arrears: payment.arrears, Status: payment.status, Reference: payment.reference }));
+  const ageing = parentPaymentData?.ageing || {};
+  const ageingRows = [
+    { 'Ageing Bucket': 'Current', Amount: ageing.current || 0 },
+    { 'Ageing Bucket': '1–30 days', Amount: ageing.days1to30 || 0 },
+    { 'Ageing Bucket': '31–60 days', Amount: ageing.days31to60 || 0 },
+    { 'Ageing Bucket': '61–90 days', Amount: ageing.days61to90 || 0 },
+    { 'Ageing Bucket': '90+ days', Amount: ageing.days90plus || 0 },
+    { 'Ageing Bucket': 'Total open', Amount: ageing.totalOpen || 0 }
+  ];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Payment report');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(ageingRows), 'Debtor ageing');
+  XLSX.writeFile(workbook, `LittleFeet_Parent_Payment_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function signParentPayment(encodedId) {

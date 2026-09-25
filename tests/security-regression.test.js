@@ -39,6 +39,25 @@ assert.match(server, /school-deletion-request/);
 assert.match(server, /school-deletion\/execute/);
 assert.match(server, /LF_API_MUTATION_RATE_LIMIT/);
 assert.match(server, /LF_API_READ_RATE_LIMIT/);
+assert.match(server, /Backup server is read-only/);
+assert.match(server, /!replicaMode && !process\.env\.DATABASE_URL/);
+assert.match(server, /status: readiness\.ready \? 'READY' : 'NOT_READY'/);
+assert.doesNotMatch(server, /res\.json\(\{ status: 'OK', database:/);
+assert.match(server, /MODERATION_EXEMPT_FIELDS/);
+assert.match(server, /'pin', 'password', 'passcode', 'verificationcode'/);
+assert.match(server, /'signature', 'signaturedata', 'mediaurl', 'photourl'/);
+assert.match(server, /state: true/);
+assert.match(server, /if \(!actor\) return res\.json\(\{ status, timestamp:/);
+assert.match(server, /while \(publicRateLimits\.size > 10000\)/);
+assert.match(server, /id: crypto\.randomUUID\(\),\n    studentName,/);
+assert.match(server, /Ticket status must be Open or Completed/);
+assert.match(client, /escapeWorkspaceText\(b\.category\)/);
+assert.match(client, /escapeWorkspaceText\(currentFeedback/);
+assert.match(server, /Messages are limited to 4,000 characters/);
+assert.match(server, /Emergency alerts are limited to 2,000 characters/);
+assert.match(server, /Alert radius must be between 0\.1 km and 100 km/);
+assert.doesNotMatch(server, /\{ id: crypto\.randomUUID\(\), \.\.\.req\.body/);
+assert.doesNotMatch(server, /\{ id: crypto\.randomUUID\(\), \.\.\.item/);
 
 const forbiddenClientPatterns = [
   /\$\{p\.caption\}/,
@@ -51,7 +70,10 @@ const forbiddenClientPatterns = [
   /\$\{t\.message\}/,
   /\$\{t\.feedback\}/,
   /\$\{b\.bcMessage\}/,
-  /\$\{b\.bcPriority\s*\|\|/
+  /\$\{b\.bcPriority\s*\|\|/,
+  /\$\{b\.category\}/,
+  /\$\{b\.studentName\}/,
+  /\$\{b\.note\}/
 ];
 for (const pattern of forbiddenClientPatterns) {
   assert.doesNotMatch(client, pattern, `Unsafe raw interpolation still present: ${pattern}`);

@@ -37,7 +37,7 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
 
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
-  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
+  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', LF_TEST_ALLOW_REPLICA_WRITES: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
   stdio: ['ignore', 'ignore', 'pipe']
 });
 let childErrorOutput = '';
@@ -81,12 +81,18 @@ const rawRequest = async (route) => {
     const health = await request('/api/health');
     assert.equal(health.response.status, 200);
     assert.equal(health.response.headers.get('cache-control'), 'no-store');
+    assert.equal(Object.prototype.hasOwnProperty.call(health.data, 'instance'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(health.data, 'activeRequests'), false);
     const readiness = await request('/api/ready');
     assert.equal(readiness.response.status, 503);
-    assert.equal(readiness.data.checks.database, false);
+    assert.equal(readiness.data.ready, false);
+    assert.equal(readiness.data.status, 'NOT_READY');
+    assert.equal(Object.prototype.hasOwnProperty.call(readiness.data, 'checks'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(readiness.data, 'environment'), false);
     const keepalive = await request('/api/keepalive');
     assert.equal(keepalive.response.status, 200);
     assert.equal(keepalive.data.status, 'OK');
+    assert.equal(Object.prototype.hasOwnProperty.call(keepalive.data, 'database'), false);
     for (const privatePath of ['/server.js', '/auth-crypto.js', '/package.json', '/littlefeet-replica.json', '/littlefeet.db']) {
       const privateFile = await rawRequest(privatePath);
       assert.equal(privateFile.response.status, 404);
@@ -112,6 +118,10 @@ const rawRequest = async (route) => {
     assert.equal(alphaParentLogin.response.status, 200);
     assert.equal(bravoLogin.response.status, 200);
     assert.equal(bravoParentLogin.response.status, 200);
+    const authenticatedHealth = await request('/api/health', { cookie: alphaLogin.cookie });
+    assert.equal(authenticatedHealth.response.status, 200);
+    assert.equal(authenticatedHealth.data.instance, 'STANDBY');
+    assert.equal(Number.isInteger(authenticatedHealth.data.activeRequests), true);
     const originalAlphaCookie = alphaLogin.cookie;
     const migratedAlphaLogin = await request('/api/login', { method: 'POST', cookie: originalAlphaCookie, body: { username: 'alpha-admin', pin: 'AlphaPass1' } });
     assert.equal(migratedAlphaLogin.response.status, 200);
@@ -135,6 +145,27 @@ const rawRequest = async (route) => {
     assert.equal(releaseNotes.response.status, 200);
     assert.deepEqual(releaseNotes.data.slice(0, 3).map(note => note.version), ['3.2', '3.1', '3.0']);
     assert.equal(releaseNotes.data.find(note => note.id === '2026-08-safeguarding').title, 'Safeguarding and family records');
+
+    const opaqueCredentialSignup = await request('/api/signup', {
+      method: 'POST',
+      body: {
+        username: 'credential-test@example.test',
+        pin: 'fuckPass1',
+        name: 'Credential Test',
+        role: 'parent',
+        schoolName: 'Credential Test School',
+        termsAccepted: true,
+        linkedLearners: []
+      }
+    });
+    assert.equal(opaqueCredentialSignup.response.status, 201);
+
+    const oversizedBroadcast = await request('/api/broadcasts', {
+      method: 'POST',
+      cookie: alphaLogin.cookie,
+      body: { bcPriority: 'Campus Notice', bcMessage: 'x'.repeat(2001), radiusKm: 5, location: { lat: -25.7, lng: 28.2 } }
+    });
+    assert.equal(oversizedBroadcast.response.status, 413);
 
     const stickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaLogin.cookie, body: { type: 'Call family', details: 'Confirm the pickup time after 15:00.', colour: 'teal', recordedBy: 'Alpha Administrator' } });
     assert.equal(stickyNote.response.status, 200);
@@ -166,7 +197,10 @@ const rawRequest = async (route) => {
 
     const secondLearner = await request('/api/students/import', { method: 'POST', cookie: alphaLogin.cookie, body: { students: [{ studentName: 'Alpha Other Learner', className: 'A2', parentName: 'Another Parent', contactEmail: 'another.parent@example.test' }] } });
     assert.equal(secondLearner.response.status, 201);
-    await request('/api/schedules', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-schedule-linked', studentName: 'Alpha Learner', activity: 'Reading' } });
+    const generatedSchedule = await request('/api/schedules', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-schedule-linked', studentName: 'Alpha Learner', activity: 'Reading' } });
+    assert.equal(generatedSchedule.response.status, 200);
+    assert.notEqual(generatedSchedule.data.item.id, 'alpha-schedule-linked');
+    assert.match(generatedSchedule.data.item.id, /^[0-9a-f-]{36}$/i);
     await request('/api/schedules', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-schedule-other', studentName: 'Alpha Other Learner', activity: 'Painting' } });
     await request('/api/worksheets', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-worksheet-linked', studentName: 'Alpha Learner', title: 'Letters' } });
     await request('/api/worksheets', { method: 'POST', cookie: alphaLogin.cookie, body: { id: 'alpha-worksheet-other', studentName: 'Alpha Other Learner', title: 'Numbers' } });

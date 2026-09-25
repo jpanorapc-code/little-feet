@@ -2,21 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d9488">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Little Feet">
   <!-- Set this to the public standby URL when deploying behind a load balancer. -->
   <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
   <meta name="referrer" content="no-referrer-when-downgrade">
+  <meta name="description" content="Little Feet is an early childhood development portal for school communication, attendance, learning records, safeguarding and family engagement.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://littlefeet.co.za/">
   <title>Little Feet | ECD Portal</title>
   <link rel="icon" type="image/png" href="/logo.png">
-  <link rel="stylesheet" href="/assets/cinematic.css?v=20260924-cinematic-v1">
-  <script src="/vendor/xlsx.js"></script>
-  <script src="/vendor/qrcode.js"></script>
+  <link rel="apple-touch-icon" href="/logo.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
+  <link rel="stylesheet" href="/assets/cinematic.css?v=20260925-cinematic-v8">
+  <script src="/vendor/xlsx.js" defer></script>
+  <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
-  <script src="/vendor/leaflet.js"></script>
-  <script src="/vendor/leaflet-markercluster.js"></script>
+  <script src="/vendor/leaflet.js" defer></script>
+  <script src="/vendor/leaflet-markercluster.js" defer></script>
   <style>
     :root {
       --primary-color: #0d9488;
@@ -218,7 +229,7 @@
     .brand-header img { position:relative; z-index:2; height:156px; width:156px; object-fit:contain; padding:0; background:transparent; border:0; cursor:pointer; animation:logoPulse 2.8s ease-in-out infinite alternate; border-radius:18px; }
     .nav-brand img { background: #ffffff !important; }
     @keyframes logoPulse { from { filter: brightness(1.18) contrast(1.05) drop-shadow(0 0 5px rgba(45,212,191,.55)); } to { filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 18px rgba(45,212,191,1)); } }
-    .brand-header h2 { position:relative; z-index:3; margin-top:2px; margin-bottom:4px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2.25rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
+    .brand-header h1 { position:relative; z-index:3; margin-top:2px; margin-bottom:4px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2.25rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
     .brand-header p.slogan { position:relative; z-index:3; display:inline-block; margin:0; padding:5px 11px; border:1px solid rgba(45,212,191,.38); border-radius:999px; background:rgba(13,148,136,.11); color:#99f6e4; font-size:.69rem; font-style:normal; font-weight:800; letter-spacing:1.45px; text-transform:uppercase; animation:sloganLift 3s ease-in-out infinite; }
     @keyframes titleShimmer { to { background-position:220% center; } }
     @keyframes sloganLift { 50% { transform:translateY(-2px); box-shadow:0 7px 18px rgba(13,148,136,.28); } }
@@ -948,7 +959,7 @@
       box-shadow:0 7px 18px rgba(2,8,23,.25), inset 0 0 0 2px rgba(226,232,240,.18);
       object-fit:cover;
     }
-    .brand-header h2 { margin:3px 0 7px; font-size:2.15rem; text-align:center; }
+    .brand-header h1 { margin:3px 0 7px; font-size:2.15rem; text-align:center; }
     .brand-header p.slogan { background:rgba(7,28,47,.52); text-align:center; }
     body.light-mode #authSection > .auth-card { background:linear-gradient(155deg, rgba(222,244,253,.72), rgba(190,225,241,.58)) !important; }
     .sticky-note-form { display:grid; grid-template-columns:minmax(180px,.75fr) minmax(240px,1.6fr) minmax(130px,.5fr) auto; gap:12px; align-items:end; margin-bottom:18px; padding:14px; border:1px solid rgba(45,212,191,.25); border-radius:14px; background:linear-gradient(125deg, rgba(14,116,144,.10), rgba(13,148,136,.08)); }
@@ -1302,7 +1313,7 @@
         padding-top:194px;
       }
       .mascot-stage { top:0; }
-      .brand-header h2 {
+      .brand-header h1 {
         margin:4px 0 6px;
         font-size:clamp(1.72rem, 8.7vw, 1.95rem);
         line-height:1.08;
@@ -1375,9 +1386,9 @@
   </div>
 
   <!-- Modal Component -->
-  <div id="appModal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <button class="modal-close" onclick="closeModal()">✕</button>
+  <div id="appModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card" tabindex="-1">
+      <button type="button" class="modal-close" onclick="closeModal()" aria-label="Close dialog">✕</button>
       <div id="modalTitle" style="font-size: 1.2rem; font-weight: 700; color: var(--primary-color); margin-bottom: 12px;">Notice</div>
       <div id="modalBody">Body Content</div>
     </div>
@@ -1390,9 +1401,9 @@
     <div class="card auth-card">
       <div class="brand-header">
         <div class="mascot-stage">
-          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="goToMainMenu()" title="Click to go to Main Menu" onerror="this.style.display='none'">
+          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet mascot — open main menu" onerror="this.style.display='none'">
         </div>
-        <h2 onclick="goToMainMenu()" title="Click to go to Main Menu">Little Feet</h2>
+        <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet — open main menu">Little Feet</h1>
         <p class="slogan">Every Little Step Matters</p>
       </div>
       <form id="loginForm">
@@ -1415,7 +1426,7 @@
           <label for="rememberLogin" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">Save login details on this device</label>
         </div>
         <button type="submit" class="submit-btn"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span>Secure Account Login</span></button>
-        <button type="button" class="action-btn btn-blue" data-portal-audio-mute data-mute-label="Mute theme &amp; login tune" data-unmute-label="Unmute theme &amp; login tune" onclick="togglePortalAudioMute()" style="width:100%;margin-top:9px;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute theme &amp; login tune</span></button>
+        <button type="button" class="action-btn btn-blue" data-portal-audio-mute data-mute-label="Mute Little Feet sounds" data-unmute-label="Unmute Little Feet sounds" onclick="togglePortalAudioMute()" style="width:100%;margin-top:9px;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet sounds</span></button>
         <div class="social-signin" aria-label="Sign in with a connected provider">
           <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')">Continue with Google</button>
           <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
@@ -1549,6 +1560,20 @@
         <aside id="runtimeErrorBanner" class="wellbeing-banner runtime-error-banner hidden" aria-live="assertive"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><p><strong>We detected a technical issue.</strong> Your Support Desk ticket is prepared; add any useful notes before you send it.</p><button type="button" class="action-btn btn-red" onclick="openRuntimeErrorSupport()">Open Support Desk</button><button type="button" onclick="dismissRuntimeErrorBanner()" aria-label="Dismiss technical issue notice" title="Dismiss">×</button></aside>
         <section id="littleFeetCinematicJourney" class="cinematic-journey" aria-label="Cinematic Little Feet navigation">
           <div id="littleFeetCinematicStage" class="cinematic-stage">
+            <picture class="cinematic-depth-picture" aria-hidden="true">
+              <source media="(min-width: 2200px) and (min-height: 1200px)" srcset="/assets/images/little-feet-ocean-depth-4k.webp">
+              <img id="cinematicDepthBackdrop" class="cinematic-depth-image"
+                src="/assets/images/little-feet-ocean-depth-1080.webp"
+                alt="" decoding="async" fetchpriority="high">
+            </picture>
+            <div class="cinematic-surface-air" aria-hidden="true"></div>
+            <div class="cinematic-water-surface" aria-hidden="true"></div>
+            <div class="cinematic-water-current" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-fish-2d cinematic-fish-2d-a" id="cinematicFish2dA" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-fish-2d cinematic-fish-2d-b" id="cinematicFish2dB" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-jelly-2d cinematic-jelly-2d-a" id="cinematicJelly2dA" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-jelly-2d cinematic-jelly-2d-b" id="cinematicJelly2dB" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-manta-2d" id="cinematicManta2d" aria-hidden="true"></div>
             <canvas id="littleFeetCinematicCanvas" aria-hidden="true"></canvas>
             <div class="cinematic-loading" aria-live="polite">Preparing the Little Feet ocean…</div>
             <div class="cinematic-ui">
@@ -1564,7 +1589,10 @@
                   <div class="cinematic-progress-label"><span>Scroll to dive</span><span id="cinematicDepthLabel">Surface</span></div>
                   <div class="cinematic-progress-track"><div id="cinematicProgressBar" class="cinematic-progress-bar"></div></div>
                 </div>
-                <button id="cinematicSkip" type="button" class="cinematic-skip">Skip cinematic</button>
+                <div class="cinematic-footer-actions">
+                  <button id="cinematicPause" type="button" class="cinematic-skip" aria-pressed="false">Pause cinematic</button>
+                  <button id="cinematicSkip" type="button" class="cinematic-skip">Skip cinematic</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1636,11 +1664,23 @@
             <div>
               <label for="postAudience">Target Audience <span class="req">*</span></label>
               <select id="postAudience">
-                <option value="All">Audience: All Parents & Campus Staff</option>
-                <option value="Toddlers">Classroom: Toddler Group (Ages 1-3)</option>
-                <option value="Preschool">Classroom: Preschool Group (Ages 4-6)</option>
-                <option value="Primary">Classroom: Primary School (Ages 7-12)</option>
-                <option value="HighSchool">Classroom: High School (Ages 13-18)</option>
+                <option value="All">Audience: All Parents &amp; Campus Staff</option>
+                <optgroup label="Day care / ECD">
+                  <option value="Infants">ECD · Babies / infants (birth–23 months)</option>
+                  <option value="Toddlers">ECD · Toddlers (24–35 months)</option>
+                  <option value="Preschool">ECD · Preschool (36–59 months)</option>
+                  <option value="GradeR">Grade R · Reception (typically about 5–6 years)</option>
+                </optgroup>
+                <optgroup label="Primary school">
+                  <option value="Foundation">Foundation Phase · Grades R–3 (approx. 5–9)</option>
+                  <option value="Intermediate">Intermediate Phase · Grades 4–6 (approx. 10–12)</option>
+                  <option value="Senior">Senior Phase · Grades 7–9 (approx. 13–15)</option>
+                  <option value="Primary">Whole primary school · typically Grades R–7</option>
+                </optgroup>
+                <optgroup label="Secondary / high school">
+                  <option value="FET">FET Phase · Grades 10–12 (approx. 16–18)</option>
+                  <option value="HighSchool">Whole secondary / high school · typically Grades 8–12</option>
+                </optgroup>
               </select>
             </div>
             <div>
@@ -2146,7 +2186,7 @@
           <p style="color:var(--text-muted);margin-bottom:14px;">Record the core enrolment and emergency information required before a learner is placed in a class.</p>
           <form id="registryForm" class="workspace-grid">
             <div><label for="registryLearnerName">Learner full name *</label><input id="registryLearnerName" name="learnerName" autocomplete="section-learner name" required></div><div><label for="registryDateOfBirth">Date of birth *</label><input id="registryDateOfBirth" name="dateOfBirth" type="date" autocomplete="section-learner bday" required></div>
-            <div><label for="registryClassName">Grade / class</label><input id="registryClassName" name="className" placeholder="e.g. Toddlers"></div><div><label for="registryGuardianName">Parent / guardian name *</label><input id="registryGuardianName" name="guardianName" autocomplete="section-guardian name" required></div>
+            <div><label for="registryClassName">Age group / grade / class</label><input id="registryClassName" name="className" list="educationStageOptions" placeholder="e.g. ECD · 2-year-olds / Grade R / Grade 4" oninput="updateRegistryStageGuidance(this.value)" onchange="updateRegistryStageGuidance(this.value)"><div id="registryStageGuidance" class="meta" style="margin-top:6px;display:grid;gap:3px;"><strong>Choose an age group or grade</strong><span>Little Feet will show the matching day-care, primary or high-school record guidance.</span></div></div><div><label for="registryGuardianName">Parent / guardian name *</label><input id="registryGuardianName" name="guardianName" autocomplete="section-guardian name" required></div>
             <div><label for="registryGuardianPhone">Guardian phone *</label><input id="registryGuardianPhone" name="guardianPhone" type="tel" autocomplete="section-guardian tel" required></div><div><label for="registryGuardianEmail">Guardian email</label><input id="registryGuardianEmail" name="guardianEmail" type="email" autocomplete="section-guardian email"></div>
             <div><label for="registryAddress">Home address *</label><input id="registryAddress" name="address" autocomplete="section-guardian street-address" required></div><div><label for="registryEmergencyContact">Emergency contact & phone</label><input id="registryEmergencyContact" name="emergencyContact" placeholder="Name · phone"></div>
             <div><label for="registryMedicalNotes">Medical / allergy notes</label><input id="registryMedicalNotes" name="medicalNotes" placeholder="Allergies, medication, care notes"></div><div><label for="registryConsent">Consent status</label><select id="registryConsent" name="consent"><option>Pending verification</option><option>Parent consent received</option></select></div>
@@ -2176,7 +2216,7 @@
             <div><label for="accountRole">Role *</label><select id="accountRole" required><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option></select></div>
             <div><label for="accountSchoolName">Linked school name *</label><input id="accountSchoolName" name="schoolName" autocomplete="section-managed-account organization" required placeholder="e.g. Little Feet ECD Portal"></div>
             <div><label for="accountStoreUrl">Official school web-store link</label><input id="accountStoreUrl" name="schoolStoreUrl" type="url" autocomplete="off" placeholder="https://... (leave empty if none)"></div>
-            <div><label for="accountAssignedClasses">Assigned classroom(s)</label><input id="accountAssignedClasses" name="assignedClasses" placeholder="Teachers only · e.g. Preschool, Toddlers"></div>
+            <div><label for="accountAssignedClasses">Assigned classroom(s)</label><input id="accountAssignedClasses" name="assignedClasses" placeholder="Teachers only · e.g. ECD Preschool, Grade R, Grade 4"></div>
             <div style="grid-column:1/-1;"><label for="accountLinkedLearners">Approved parent–learner relationship <span style="font-weight:normal;">(parent accounts only · maximum 4)</span></label><div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="accountLinkedLearners" name="linkedLearnersDisplay" placeholder="Choose up to four learners" readonly style="flex:1 1 260px;margin-bottom:0;"><button type="button" class="action-btn btn-blue" onclick="openLearnerLinkPicker()">👨‍👩‍👧 Approve learner links</button></div><small style="display:block;margin-top:7px;color:var(--text-muted);">Only an administrator can assign these links. This grants the parent access to the selected learners.</small></div>
             <div style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;"><button class="submit-btn" id="accountSaveButton">Create account</button><button type="button" onclick="resetAccountForm()" class="action-btn btn-blue">Clear form</button><button type="button" id="accountDeleteButton" onclick="deleteSelectedAccount()" class="action-btn btn-red" style="display:none;">Delete this user/account</button></div>
           </form>
@@ -2237,14 +2277,14 @@
           <section id="subscriptionBillingOverview" class="workspace-card" style="margin-top:18px;" aria-live="polite"><p style="margin:0;color:var(--text-muted);">Loading subscription pricing…</p></section>
           <section class="workspace-card" style="margin-top:18px;">
             <div class="card-header-bar"><h3>Published school subscription guide</h3><span class="badge-tag info">SCHOOL PLANS</span></div>
-            <p style="color:var(--text-muted);margin:0 0 12px;">Use this as the public learner-capacity guide. Your editable cost, selling price, add-on margin and payment settings remain in the section above.</p>
+            <p style="color:var(--text-muted);margin:0 0 12px;">Use this as the public learner-capacity guide. Tier names show a common fit, not an age restriction: a school should choose by learner capacity and the grades it actually offers.</p>
             <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;">
               <table style="width:100%;min-width:700px;border-collapse:collapse;text-align:left;">
-                <thead><tr><th style="padding:10px;">Package tier</th><th style="padding:10px;">School size</th><th style="padding:10px;">Monthly price</th><th style="padding:10px;">Extra learner rate</th></tr></thead>
+                <thead><tr><th style="padding:10px;">Package tier</th><th style="padding:10px;">Common fit</th><th style="padding:10px;">School size</th><th style="padding:10px;">Monthly price</th><th style="padding:10px;">Extra learner rate</th></tr></thead>
                 <tbody>
-                  <tr><td style="padding:10px;"><strong>Micro / ECD</strong></td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 per learner / month</td></tr>
-                  <tr style="background:rgba(45,212,191,.08);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 per learner / month</td></tr>
-                  <tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr>
+                  <tr><td style="padding:10px;"><strong>Micro / ECD</strong></td><td style="padding:10px;">Day care / ECD · Birth–4/5 · small Grade R or micro school</td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 per learner / month</td></tr>
+                  <tr style="background:rgba(45,212,191,.08);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Primary · typically Grades R–7 · approx. 5–13 years</td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 per learner / month</td></tr>
+                  <tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Large primary, secondary/high Grades 8–12, or combined school</td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2356,6 +2396,7 @@
             <div class="workspace-card"><h3>Milestone observation</h3><p>Record a dated observation against motor, speech, social, or another framework area.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Milestone observation')"><input name="details" placeholder="Learner · framework area · observation" required><button class="submit-btn">Save observation</button></form></div>
             <div class="workspace-card"><h3>Portfolio evidence</h3><p>Use Worksheets for photo evidence, then add the developmental context here for the learner portfolio.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Portfolio tag')"><input name="details" placeholder="Learner · evidence title · development tag" required><button class="submit-btn">Tag portfolio</button></form></div>
             <div class="workspace-card"><h3>Term progress report</h3><p>Create a report request from the observations and assessment records saved for a learner.</p><form onsubmit="saveWorkspaceRecord(event,'reports','Progress report request')"><input name="details" placeholder="Learner · term · educator summary" required><button class="submit-btn">Create report request</button></form></div>
+            <div class="workspace-card" style="grid-column:1/-1;"><div class="card-header-bar"><h3>South African curriculum observation</h3><span class="badge-tag info">NCF · CAPS GRADE R</span></div><p>Capture a structured observation against the Department of Basic Education framework while keeping your existing milestone and portfolio records unchanged.</p><form id="curriculumObservationForm" onsubmit="saveCurriculumObservation(event)" style="display:grid;gap:10px;"><div class="workspace-grid"><label>Framework<select id="curriculumFramework" name="framework" onchange="updateCurriculumAreas()" required><option value="ncf_birth_to_four">NCF Birth–4</option><option value="caps_grade_r">CAPS Grade R</option></select></label><label>Learning area<select id="curriculumArea" name="area" required></select></label></div><div class="workspace-grid"><label>Learner<input name="learnerName" maxlength="160" required placeholder="Learner name"></label><label>Evidence reference (optional)<input name="evidenceReference" maxlength="240" placeholder="Worksheet, photo, activity or report reference"></label></div><label>Observation<textarea name="observation" rows="3" maxlength="1200" required placeholder="Record what was observed, using factual developmental language."></textarea></label><p class="meta" style="margin:0;">Framework source: <span id="curriculumFrameworkSource">Department of Basic Education · National Curriculum Framework</span>. This record supports teacher documentation; it does not replace the official curriculum document or professional judgement.</p><button class="submit-btn">Save framework observation</button></form></div>
           </div>
           <div class="workspace-results-grid">
             <section class="workspace-results-panel" aria-labelledby="portfolioResultsTitle">
@@ -2365,6 +2406,10 @@
             <section class="workspace-results-panel is-reports" aria-labelledby="reportResultsTitle">
               <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-chart"></use></svg></span><div><h3 id="reportResultsTitle">Report requests</h3><p>Progress reports waiting to be prepared or reviewed.</p></div></div>
               <div id="reportsRecords" class="record-list" aria-live="polite" data-empty-icon="document" data-empty-title="No report requests yet" data-empty-text="Create a term progress report above when an educator summary is ready."></div>
+            </section>
+            <section class="workspace-results-panel" aria-labelledby="curriculumResultsTitle" style="grid-column:1/-1;">
+              <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-growth"></use></svg></span><div><h3 id="curriculumResultsTitle">NCF &amp; Grade R framework observations</h3><p>Structured observations linked to the South African curriculum framework.</p></div></div>
+              <div id="curriculumRecords" class="record-list" aria-live="polite"></div>
             </section>
           </div>
         </div>
@@ -2389,10 +2434,11 @@
             <div class="workspace-card"><h3>Profile icon</h3><p>Choose the icon shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="👤" aria-label="Person" title="Person" onclick="selectProfileIcon(this.dataset.profileIcon)">👤</button><button type="button" class="profile-icon-choice" data-profile-icon="🧑‍🏫" aria-label="Educator" title="Educator" onclick="selectProfileIcon(this.dataset.profileIcon)">🧑‍🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="👨‍👩‍👧" aria-label="Family" title="Family" onclick="selectProfileIcon(this.dataset.profileIcon)">👨‍👩‍👧</button><button type="button" class="profile-icon-choice" data-profile-icon="🏫" aria-label="School" title="School" onclick="selectProfileIcon(this.dataset.profileIcon)">🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="🌟" aria-label="Star" title="Star" onclick="selectProfileIcon(this.dataset.profileIcon)">🌟</button><button type="button" class="profile-icon-choice" data-profile-icon="🌱" aria-label="Seedling" title="Seedling" onclick="selectProfileIcon(this.dataset.profileIcon)">🌱</button><button type="button" class="profile-icon-choice" data-profile-icon="🐾" aria-label="Little feet" title="Little feet" onclick="selectProfileIcon(this.dataset.profileIcon)">🐾</button><button type="button" class="profile-icon-choice" data-profile-icon="📚" aria-label="Books" title="Books" onclick="selectProfileIcon(this.dataset.profileIcon)">📚</button><button type="button" class="profile-icon-choice" data-profile-icon="🎨" aria-label="Creative arts" title="Creative arts" onclick="selectProfileIcon(this.dataset.profileIcon)">🎨</button><button type="button" class="profile-icon-choice" data-profile-icon="🏆" aria-label="Achievement" title="Achievement" onclick="selectProfileIcon(this.dataset.profileIcon)">🏆</button></div></div>
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. English is currently the complete interface; Afrikaans labels will expand as translations are reviewed.</p><select id="languagePreference" onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans (in progress)</option></select></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without reloading the map or interrupting your work.</p><select id="refreshPreference" onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="60000">Every minute</option><option value="120000">Every 2 minutes</option><option value="300000">Every 5 minutes</option></select></div>
-            <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute all welcome, login and wallpaper sound. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
+            <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute penguin calls, alerts, wallpaper audio and other optional Little Feet sounds. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
             <div class="workspace-card" data-roles="parent"><h3>Link a learner with a school code</h3><p>Enter the code from the printed school form. Your request stays pending until an administrator approves the relationship.</p><input id="parentLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><button type="button" class="action-btn btn-green" onclick="redeemLearnerAccessCode()">Request learner link</button></div>
             <div class="workspace-card" data-roles="parent,teacher,principal,district"><h3>Request account deletion</h3><p>Ask your school administrator to delete your Little Feet account. This creates a support ticket for review; your account is not deleted immediately.</p><button type="button" class="action-btn btn-red" onclick="requestOwnAccountDeletion()">Request account deletion</button></div><div class="workspace-card" data-roles="principal"><h3>Request full school deletion</h3><p>This requests permanent deletion of the entire school workspace: all school accounts and all data linked to this school. An administrator must review and explicitly approve it.</p><button type="button" class="action-btn btn-red" onclick="requestSchoolDeletion()">Request full school deletion</button></div>
             <div class="workspace-card"><h3>Navigation</h3><p>On desktop, double-click the left sidebar to collapse or expand it. Use the category headings to show or hide each group.</p><button type="button" class="action-btn btn-green" onclick="toggleSidebarCollapse()">Toggle sidebar</button></div>
+            <div class="workspace-card"><h3>Install Little Feet</h3><p id="pwaInstallStatus">Your browser will offer installation when it supports this app.</p><button id="pwaInstallButton" type="button" class="action-btn btn-green" onclick="installLittleFeetApp()" hidden>Install app on this device</button><p id="pwaConnectionStatus" class="meta" aria-live="polite" style="margin-top:8px;">Checking connection…</p><p class="meta" style="margin-top:6px;">For privacy, offline mode stores only the public app shell. School records, messages, payments and learner data are never cached by the service worker.</p></div>
           </div>
         </div>
       </div>
@@ -2411,11 +2457,39 @@
         </section>
       </div>
 
+      <datalist id="educationStageOptions">
+        <option value="ECD · Baby (Birth–11 months)"></option>
+        <option value="ECD · 1-year-olds (12–23 months)"></option>
+        <option value="ECD · 2-year-olds (24–35 months)"></option>
+        <option value="ECD · 3-year-olds (36–47 months)"></option>
+        <option value="ECD · 4-year-olds (48–59 months)"></option>
+        <option value="ECD · 5-year-olds (60–71 months)"></option>
+        <option value="Grade R · Reception"></option>
+        <option value="Grade 1"></option><option value="Grade 2"></option><option value="Grade 3"></option>
+        <option value="Grade 4"></option><option value="Grade 5"></option><option value="Grade 6"></option>
+        <option value="Grade 7"></option><option value="Grade 8"></option><option value="Grade 9"></option>
+        <option value="Grade 10"></option><option value="Grade 11"></option><option value="Grade 12"></option>
+      </datalist>
+
       <!-- 11. User Guide -->
       <div id="guideTab" class="tab-content">
         <div class="card">
           <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
           <p style="color:var(--text-muted);margin-bottom:18px;">A quick guide to using Little Feet safely and effectively. Features shown may vary by your school role.</p>
+          <section class="workspace-card" style="margin-bottom:18px;">
+            <div class="card-header-bar"><h3>Age groups, school types &amp; records</h3><span class="badge-tag info">SOUTH AFRICA GUIDE</span></div>
+            <p style="color:var(--text-muted);margin:0 0 12px;">Age ranges are practical guidance, not a reason to refuse a learner. Use the learner’s exact grade and the school’s admission policy where they differ.</p>
+            <div style="overflow:auto;"><table style="width:100%;min-width:850px;border-collapse:collapse;text-align:left;font-size:.8rem;">
+              <thead><tr><th style="padding:9px;">Institution / phase</th><th style="padding:9px;">Typical age / grades</th><th style="padding:9px;">Little Feet records to prepare</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:9px;"><strong>Day care / ECD</strong><br>NCF Birth–4</td><td style="padding:9px;">Birth–11 months · baby<br>12–23 months · 1-year-olds<br>24–35 months · 2-year-olds<br>36–47 months · 3-year-olds<br>48–59 months · 4-year-olds<br>60–71 months · 5-year-olds / transition</td><td style="padding:9px;">Guardian and emergency contacts, authorised pickup, nutrition and care routines, health/allergy and medication information where lawfully required, consent choices, attendance and age-appropriate developmental observations. Confirm separately when a 5-year-old is in Grade R.</td></tr>
+                <tr style="background:rgba(45,212,191,.06);"><td style="padding:9px;"><strong>Grade R</strong><br>Foundation Phase</td><td style="padding:9px;">Reception year · typically about 5–6</td><td style="padding:9px;">Grade R placement, guardian contacts, attendance, consent, pickup controls, Foundation observations and reports. Public-school admission commonly requires the official birth certificate and immunisation record.</td></tr>
+                <tr><td style="padding:9px;"><strong>Primary school</strong></td><td style="padding:9px;">Typically Grades R–7 · about 5–13<br>Foundation R–3 · Intermediate 4–6 · Grade 7 begins Senior Phase</td><td style="padding:9px;">Grade/class, guardian and emergency contacts, attendance, timetable, learning evidence, assessments, reports and consent. For learners transferring schools, keep the transfer card or previous school report where applicable.</td></tr>
+                <tr style="background:rgba(45,212,191,.06);"><td style="padding:9px;"><strong>Secondary / high school</strong></td><td style="padding:9px;">Typically Grades 8–12 · about 14–18<br>Senior 8–9 · FET 10–12</td><td style="padding:9px;">Grade, timetable/subjects, attendance, assessment evidence, reports, guardian/emergency contacts and applicable transfer/previous-report information.</td></tr>
+              </tbody>
+            </table></div>
+            <p class="meta" style="margin:10px 0 0;">For public-school admission, DBE guidance lists a birth certificate and immunisation card, plus a transfer card or last report for a learner who attended another school. Additional immigration documents can apply to non-South-African citizens. Little Feet should record the school’s verification status, not replace official documents or government systems.</p>
+          </section>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;font-size:.86rem;line-height:1.55;">
             <button type="button" class="guide-link-card" onclick="openGuideWorkspace('feedTab')"><h3 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><span>Feed &amp; Communication</span></h3><p>Use <strong>Feed</strong> to view school updates. Staff can publish notices and attach approved photos. Keep messages clear, child-safe, and audience-specific.</p><span class="guide-open">Open Feed →</span></button>
             <button type="button" class="guide-link-card" onclick="openGuideWorkspace('scheduleTab')"><h3 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-document"></use></svg></span><span>Schedules &amp; Results</span></h3><p>Open <strong>Schedule</strong> for class activities and assessments. Staff can enter records manually or use the supported Excel workflow where available.</p><span class="guide-open">Open Schedule →</span></button>
@@ -2439,11 +2513,12 @@
         <div>
           <p id="footerSchoolName" style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet School Portal</p>
           <div class="footer-links">
-            <a onclick="openLegalModal('Privacy & Safeguarding Notice', 'Little Feet provides role-based workspaces, consent records, audit registers, and encrypted storage for selected sensitive fields. Your school remains responsible for its lawful basis, staff training, retention, vendor agreements, incident response, access reviews, and legal review.')">Privacy & Safeguarding</a>
-            <a onclick="openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
-            <a onclick="openWorkspace('guideTab')">Help &amp; Guide</a>
-            <a onclick="openWorkspace('settingsTab')">Settings</a>
-            <a onclick="openDonationModal()">Donate</a>
+            <a href="#privacy-safeguarding" onclick="event.preventDefault(); openLegalModal('Privacy & Safeguarding Notice', 'Little Feet provides role-based workspaces, consent records, audit registers, and encrypted storage for selected sensitive fields. Your school remains responsible for its lawful basis, staff training, retention, vendor agreements, incident response, access reviews, and legal review.')">Privacy & Safeguarding</a>
+            <a href="#terms-of-service" onclick="event.preventDefault(); openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
+            <a href="#copyright-content" onclick="event.preventDefault(); openLegalModal('Copyright & Content Reporting', 'Only upload content your school is authorised to use. If you believe material in Little Feet infringes copyright or should not be displayed, report it through the Support Desk so the school can review access, removal, retention and any required legal process.')">Copyright &amp; Content Reporting</a>
+            <a href="#guideTab" onclick="event.preventDefault(); openWorkspace('guideTab')">Help &amp; Guide</a>
+            <a href="#settingsTab" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</a>
+            <a href="#donate" onclick="event.preventDefault(); openDonationModal()">Donate</a>
           </div>
           <p style="margin-top: 6px; font-size: 0.7rem; color: #64748b;">© 2026 Little Feet. All rights reserved.</p>
         </div>
@@ -2456,14 +2531,17 @@
   </div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
-    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-no-moon-4k.jpg" alt="Active Little Feet wallpaper">
+    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-no-moon-4k.jpg" alt="Active Little Feet wallpaper" loading="lazy" decoding="async">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260914-support-banner" defer></script>
-  <script type="module" src="/assets/cinematic.js?v=20260924-cinematic-v1"></script>
+  <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
+  <script src="backup.js?v=20260925-strengthen-v3" defer></script>
+  <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
+  <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
+  <script src="/assets/cinematic-loader.js?v=20260925-cinematic-v44" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);

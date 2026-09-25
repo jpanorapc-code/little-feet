@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360">
+<defs>
+ <linearGradient id="manta" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#a6efff" stop-opacity=".62"/>
+  <stop offset=".46" stop-color="#3fa9d9" stop-opacity=".48"/>
+  <stop offset="1" stop-color="#123c71" stop-opacity=".26"/>
+ </linearGradient>
+</defs>
+<path d="M380 152C298 70 197 54 74 100c66 32 111 72 164 112 47 36 94 52 142 52 48 0 95-16 142-52 53-40 98-80 164-112-123-46-224-30-306 52Z" fill="url(#manta)" stroke="#bfeeff" stroke-opacity=".16"/>
+<path d="M380 210c-8 64-3 100 26 142" fill="none" stroke="#7bc6e8" stroke-opacity=".34" stroke-width="7" stroke-linecap="round"/>
+</svg>

@@ -11,10 +11,15 @@ const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const isProduction = process.env.NODE_ENV === 'production';
+const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
+const loginUsernameAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
+const MAX_DISTRIBUTED_LOGIN_ATTEMPTS = 20;
+const SCHOOL_SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
+const SCHOOL_SEARCH_CACHE_MAX_ENTRIES = 250;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
@@ -25,7 +30,7 @@ let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
 const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
 const productionConfigurationErrors = [];
-if (isProduction && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
+if (isProduction && !replicaMode && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
 if (isProduction && !fieldEncryptionConfigured) productionConfigurationErrors.push('LF_FIELD_ENCRYPTION_KEY');
 if (isProduction && !sessionSecretConfigured) productionConfigurationErrors.push('SESSION_SECRET');
 if (productionConfigurationErrors.length) {
@@ -88,13 +93,69 @@ const containsBlockedLanguage = (value) => {
   return blockedTerms.some(term => new RegExp(`(^|[^a-z])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z])`, 'i').test(normalised)
     || (term.length >= 4 && compact.includes(term)));
 };
-const requestContainsBlockedLanguage = (value) => {
+const MODERATION_EXEMPT_FIELDS = new Set([
+  'pin', 'password', 'passcode', 'verificationcode', 'accesscode',
+  'signature', 'signaturedata', 'mediaurl', 'photourl',
+  'accountnumber', 'reference', 'transactionid', 'bankreference'
+]);
+const requestContainsBlockedLanguage = (value, fieldName = '') => {
+  if (MODERATION_EXEMPT_FIELDS.has(String(fieldName || '').toLocaleLowerCase('en-US'))) return false;
   if (typeof value === 'string') return containsBlockedLanguage(value);
-  if (Array.isArray(value)) return value.some(requestContainsBlockedLanguage);
+  if (Array.isArray(value)) return value.some(item => requestContainsBlockedLanguage(item, fieldName));
   if (!value || typeof value !== 'object') return false;
-  return Object.values(value).some(requestContainsBlockedLanguage);
+  return Object.entries(value).some(([key, item]) => requestContainsBlockedLanguage(item, key));
+};
+const requestPayloadTooComplex = (root, { maxDepth = 64, maxNodes = 5000 } = {}) => {
+  const stack = [{ value: root, depth: 0 }];
+  let visited = 0;
+  while (stack.length) {
+    const { value, depth } = stack.pop();
+    visited += 1;
+    if (visited > maxNodes || depth > maxDepth) return true;
+    if (!value || typeof value !== 'object') continue;
+    if (Array.isArray(value)) {
+      for (const item of value) stack.push({ value: item, depth: depth + 1 });
+      continue;
+    }
+    for (const item of Object.values(value)) stack.push({ value: item, depth: depth + 1 });
+  }
+  return false;
 };
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
+const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, max);
+const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
+const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
+const APPLICATION_STAGE_SELECTIONS = new Set([
+  'ECD · Baby (Birth–11 months)',
+  'ECD · 1-year-olds (12–23 months)',
+  'ECD · 2-year-olds (24–35 months)',
+  'ECD · 3-year-olds (36–47 months)',
+  'ECD · 4-year-olds (48–59 months)',
+  'ECD · 5-year-olds (60–71 months)',
+  // Legacy values remain accepted so old clients and saved drafts do not break.
+  'ECD · Infant care (Birth–12 months)',
+  'ECD · Toddler (Approx. 1–3 years)',
+  'ECD · Preschool (Approx. 3–4 years)',
+  'Grade R · Reception',
+  'Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'
+]);
+const educationStageForSelection = value => {
+  const selection = boundedText(value, 80);
+  if (/^ECD · Baby/i.test(selection) || /^ECD · Infant/i.test(selection)) return 'Day care / ECD · Baby / infant';
+  if (/^ECD · 1-year/i.test(selection)) return 'Day care / ECD · 1-year-olds';
+  if (/^ECD · 2-year/i.test(selection) || /^ECD · Toddler/i.test(selection)) return 'Day care / ECD · 2-year-olds / toddler';
+  if (/^ECD · 3-year/i.test(selection)) return 'Day care / ECD · 3-year-olds';
+  if (/^ECD · 4-year/i.test(selection) || /^ECD · Preschool/i.test(selection)) return 'Day care / ECD · 4-year-olds / preschool';
+  if (/^ECD · 5-year/i.test(selection)) return 'Day care / ECD · 5-year-olds / transition';
+  if (/^Grade R/i.test(selection)) return 'Foundation Phase · Grade R';
+  const match = /^Grade (\d{1,2})$/.exec(selection);
+  const grade = Number(match?.[1] || 0);
+  if (grade >= 1 && grade <= 3) return 'Foundation Phase · Grades 1–3';
+  if (grade >= 4 && grade <= 6) return 'Intermediate Phase · Grades 4–6';
+  if (grade >= 7 && grade <= 9) return 'Senior Phase · Grades 7–9';
+  if (grade >= 10 && grade <= 12) return 'FET Phase · Grades 10–12';
+  return 'Other / school-defined';
+};
 const publicRateLimits = new Map();
 const enforcePublicRateLimit = (req, res, key, limit, windowMs) => {
   const now = Date.now();
@@ -107,6 +168,11 @@ const enforcePublicRateLimit = (req, res, key, limit, windowMs) => {
     for (const [candidate, value] of publicRateLimits) {
       if (now - value.startedAt >= windowMs) publicRateLimits.delete(candidate);
       if (publicRateLimits.size <= 8000) break;
+    }
+    // A distributed spray can leave every entry "active". Keep the limiter
+    // itself bounded rather than letting hostile source churn exhaust memory.
+    while (publicRateLimits.size > 10000) {
+      publicRateLimits.delete(publicRateLimits.keys().next().value);
     }
   }
   if (entry.count <= limit) return true;
@@ -257,22 +323,64 @@ const safeHttpsUrl = value => {
   }
 };
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
-const activeLoginAttempt = (key) => {
-  const entry = loginAttempts.get(key);
-  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) { loginAttempts.delete(key); return null; }
+const activeAttempt = (map, key) => {
+  const entry = map.get(key);
+  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) { map.delete(key); return null; }
   return entry;
+};
+const activeLoginAttempt = key => activeAttempt(loginAttempts, key);
+const activeUsernameAttempt = username => activeAttempt(loginUsernameAttempts, normalizeUsername(username));
+
+const pruneLoginAttempts = (now = Date.now()) => {
+  for (const [key, entry] of loginAttempts) {
+    if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginAttempts.delete(key);
+  }
+  for (const [key, entry] of loginUsernameAttempts) {
+    if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginUsernameAttempts.delete(key);
+  }
+  while (loginAttempts.size > 10000) loginAttempts.delete(loginAttempts.keys().next().value);
+  while (loginUsernameAttempts.size > 10000) loginUsernameAttempts.delete(loginUsernameAttempts.keys().next().value);
+};
+const loginAttemptCleanupTimer = setInterval(pruneLoginAttempts, 5 * 60 * 1000);
+loginAttemptCleanupTimer.unref?.();
+
+const readSchoolSearchCache = (key, now = Date.now()) => {
+  const cached = schoolSearchCache.get(key);
+  if (!cached) return null;
+  if (now - cached.createdAt >= SCHOOL_SEARCH_CACHE_TTL_MS) {
+    schoolSearchCache.delete(key);
+    return null;
+  }
+  return cached;
+};
+const writeSchoolSearchCache = (key, data, now = Date.now()) => {
+  for (const [candidate, entry] of schoolSearchCache) {
+    if (!entry || now - entry.createdAt >= SCHOOL_SEARCH_CACHE_TTL_MS) schoolSearchCache.delete(candidate);
+  }
+  if (schoolSearchCache.has(key)) schoolSearchCache.delete(key);
+  while (schoolSearchCache.size >= SCHOOL_SEARCH_CACHE_MAX_ENTRIES) {
+    schoolSearchCache.delete(schoolSearchCache.keys().next().value);
+  }
+  schoolSearchCache.set(key, { createdAt: now, data });
 };
 
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
 app.use(compression({ threshold: 1024 }));
+app.use('/api', (req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  const hasBody = Number(req.get('content-length') || 0) > 0 || Boolean(req.get('transfer-encoding'));
+  if (!hasBody) return next();
+  if (req.is('application/json') || req.is('application/*+json') || req.is('application/x-www-form-urlencoded')) return next();
+  return res.status(415).json({ message: 'Unsupported request body type. Use JSON or URL-encoded form data.' });
+});
 app.use((req, res, next) => {
   req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
   res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), payment=(), usb=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "base-uri 'self'",
@@ -297,11 +405,14 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
 app.use('/api', (req, res, next) => {
-  if (!['POST', 'PUT', 'PATCH'].includes(req.method) || !requestContainsBlockedLanguage(req.body)) return next();
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  if (requestPayloadTooComplex(req.body)) return res.status(400).json({ message: 'Request structure is too deeply nested or complex.' });
+  if (!requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
 });
 app.use((req, res, next) => {
   if (req.method === 'POST' && req.path === '/api/signup' && !enforcePublicRateLimit(req, res, 'signup', 20, 60 * 60 * 1000)) return;
+  if (req.method === 'GET' && req.path === '/api/nearby-schools' && !enforcePublicRateLimit(req, res, 'nearby-schools', 60, 10 * 60 * 1000)) return;
   if (req.method === 'POST' && req.path === '/api/schools/enrich' && !enforcePublicRateLimit(req, res, 'school-enrich', 60, 10 * 60 * 1000)) return;
   if (req.method === 'POST' && req.path === '/api/donations/intents' && !enforcePublicRateLimit(req, res, 'donation-intent', 30, 60 * 60 * 1000)) return;
   next();
@@ -314,6 +425,19 @@ app.use('/api', (req, res, next) => {
     : Math.max(300, Math.min(3000, Number(process.env.LF_API_READ_RATE_LIMIT) || 1200));
   if (!enforcePublicRateLimit(req, res, isMutation ? 'api-mutation' : 'api-read', limit, 60 * 1000)) return;
   next();
+});
+app.use((req, res, next) => {
+  const allowReplicaWritesForTests = process.env.NODE_ENV === 'test' && process.env.LF_TEST_ALLOW_REPLICA_WRITES === '1';
+  if (!replicaMode || allowReplicaWritesForTests || !req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  // Standby replicas are deliberately read-only. Authentication is allowed so
+  // users can inspect the latest snapshot during failover, but business-data
+  // writes must never return success when there is no durable write path.
+  if (req.method === 'POST' && ['/api/login', '/api/auth/logout'].includes(req.path)) return next();
+  res.setHeader('Retry-After', '30');
+  return res.status(503).json({
+    message: 'Backup server is read-only. Your change was not saved; reconnect to the primary service and retry.',
+    requestId: req.requestId
+  });
 });
 app.use((req, res, next) => {
   persistenceReady.then(async () => {
@@ -392,6 +516,27 @@ const sendPublicRootFile = (req, res) => {
 };
 app.get('/backup.js', sendPublicRootFile);
 app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
+app.get('/manifest.webmanifest', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('application/manifest+json');
+  res.sendFile('manifest.webmanifest', { root: __dirname });
+});
+app.get('/service-worker.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.type('application/javascript');
+  res.sendFile('service-worker.js', { root: __dirname });
+});
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('text/plain');
+  res.sendFile('robots.txt', { root: __dirname });
+});
+app.get('/sitemap.xml', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('application/xml');
+  res.sendFile('sitemap.xml', { root: __dirname });
+});
 app.get('/favicon.ico', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.type('image/png');
@@ -451,7 +596,7 @@ const db = {
   campusVisitors: [],
   visitorMeetings: [],
   registry: [],
-  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [], stickyNotes: [] },
+  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], curriculum: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [], stickyNotes: [] },
   consentRecords: [],
   pickupLogs: [],
   reportReviews: [],
@@ -481,7 +626,6 @@ const db = {
 // PostgreSQL is used whenever DATABASE_URL is configured (the production path).
 // SQLite remains a local-development fallback; the JSON replica is a portable
 // standby snapshot for the backup service.
-const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const databaseFile = path.join(__dirname, 'littlefeet.db');
 const replicaFile = path.join(__dirname, 'littlefeet-replica.json');
 let replicaTimer = null;
@@ -550,7 +694,8 @@ app.use(session({
   }
 }));
 app.use((req, res, next) => {
-  if (!isProduction || !req.session?.littleFeetUser || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const enforceOriginCheck = isProduction || process.env.LF_TEST_ENFORCE_ORIGIN === '1';
+  if (!enforceOriginCheck || !req.session?.littleFeetUser || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
   const source = req.get('origin') || req.get('referer');
   if (!source) return res.status(403).json({ message: 'A same-origin browser request is required.' });
   try {
@@ -914,7 +1059,8 @@ app.post('/api/login', (req, res) => {
   const normalizedUsername = normalizeUsername(username);
   const attemptKey = loginAttemptKey(req, normalizedUsername);
   const previousAttempts = activeLoginAttempt(attemptKey);
-  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS) {
+  const previousUsernameAttempts = activeUsernameAttempt(normalizedUsername);
+  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
   }
   const user = normalizedUsername && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
@@ -923,13 +1069,16 @@ app.post('/api/login', (req, res) => {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
-    if (pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
+    loginUsernameAttempts.delete(normalizedUsername);
+    if (!replicaMode && pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     establishAuthenticatedSession(req, user, (error, safeUser) => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
       res.json({ user: safeUser });
     });
   } else {
     loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
+    loginUsernameAttempts.set(normalizedUsername, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
+    if (loginAttempts.size > 10000 || loginUsernameAttempts.size > 10000) pruneLoginAttempts();
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
 });
@@ -939,12 +1088,15 @@ app.get('/api/health', (req, res) => {
   // Do not count the health probe itself, and do not report normal concurrent
   // dashboard startup requests as server overload.
   const reportedActiveRequests = Math.max(0, activeRequestCount - 1);
+  const status = reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
+  const actor = getSessionAccount(req);
   res.set('Cache-Control', 'no-store');
-  res.json({
-    status: reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK',
+  if (!actor) return res.json({ status, timestamp: new Date().toISOString() });
+  return res.json({
+    status,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
     activeRequests: reportedActiveRequests,
-    timestamp: new Date()
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -955,7 +1107,8 @@ app.get('/api/keepalive', async (_req, res) => {
   try {
     if (postgresPool) await postgresPool.query('SELECT 1');
     else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
-    res.json({ status: 'OK', database: postgresPool ? 'postgresql' : stateDatabase ? 'sqlite' : 'replica', timestamp: new Date().toISOString() });
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
   } catch (error) {
     console.error('Keepalive database probe failed:', error.message);
     res.status(503).json({ status: 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
@@ -978,7 +1131,14 @@ const runtimeReadiness = () => {
 // a missing production secret as a healthy, launch-ready configuration.
 app.get('/api/ready', (req, res) => {
   const readiness = runtimeReadiness();
-  res.status(readiness.ready ? 200 : 503).json({ ...readiness, environment: isProduction ? 'production' : 'development' });
+  res.set('Cache-Control', 'no-store');
+  // Public monitors need only the readiness result. Detailed infrastructure
+  // checks remain available to authenticated administrators.
+  res.status(readiness.ready ? 200 : 503).json({
+    ready: readiness.ready,
+    status: readiness.ready ? 'READY' : 'NOT_READY',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get('/api/production-readiness', (req, res) => {
@@ -1013,19 +1173,22 @@ app.get('/api/production-readiness', (req, res) => {
 // Public self-registration is intentionally limited to school-facing roles.
 app.post('/api/signup', (req, res) => {
   const { username, pin, name, role, schoolName, termsAccepted, linkedLearners } = req.body;
+  const cleanUsername = boundedText(username, 160);
+  const cleanName = boundedText(name, 160);
+  const cleanSchoolName = boundedText(schoolName, 160);
   const selfRegistrationRoles = ['parent', 'teacher', 'principal'];
-  if (!username || !pin || !name || !schoolName || !selfRegistrationRoles.includes(role)) {
+  if (!cleanUsername || !pin || !cleanName || !cleanSchoolName || !selfRegistrationRoles.includes(role)) {
     return res.status(400).json({ message: 'Complete all fields and choose Parent, Teacher, or Principal.' });
   }
   if (!termsAccepted) return res.status(400).json({ message: 'You must accept the school privacy notice and terms before creating an account.' });
-  if (String(pin).length < 4) return res.status(400).json({ message: 'Choose a password or PIN with at least 4 characters.' });
-  if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Choose a password or PIN between 4 and 128 characters.' });
+  if (db.users.some(account => accountMatchesUsername(account, cleanUsername))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   const requestedLinks = linkValidation.links;
   const account = {
-    username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role,
-    schoolName: String(schoolName).trim(), schoolStoreUrl: '', linkedLearners: [],
+    username: cleanUsername, pinHash: hashPin(pin), name: cleanName, role,
+    schoolName: cleanSchoolName, schoolStoreUrl: '', linkedLearners: [],
     requestedLearnerLinks: role === 'parent' ? requestedLinks : [],
     parentRelationshipStatus: role === 'parent' ? 'Pending administrator approval' : undefined,
     subscription: role === 'parent' ? 'basic' : 'school',
@@ -1240,11 +1403,14 @@ const parentPaymentFinancials = (record, asOf = dateKeyInSouthAfrica()) => {
   const balance = Math.max(0, cents(amountDue - paidAmount));
   const effectiveDueDate = parentPaymentDueDate(record);
   const overdue = balance > 0 && effectiveDueDate < asOf;
+  const daysPastDue = overdue
+    ? Math.max(1, Math.floor((Date.parse(asOf + 'T00:00:00Z') - Date.parse(effectiveDueDate + 'T00:00:00Z')) / 86400000))
+    : 0;
   return {
     amountDue, originalAmount: billingAmount(record.amountDue) || amountDue,
     arrangementAmount: billingAmount(record.arrangementAmount) || null,
     paidAmount, balance, arrears: overdue ? balance : 0, dueDate: validDateKey(record.dueDate),
-    effectiveDueDate, status: balance <= 0 ? 'paid' : overdue ? 'in_arrears' : paidAmount > 0 ? 'partially_paid' : 'awaiting_payment',
+    effectiveDueDate, daysPastDue, status: balance <= 0 ? 'paid' : overdue ? 'in_arrears' : paidAmount > 0 ? 'partially_paid' : 'awaiting_payment',
     arrangementActive: Boolean(validDateKey(record.arrangementDueDate) && effectiveDueDate === record.arrangementDueDate && effectiveDueDate >= asOf),
     arrangementNote: String(record.arrangementNote || '').trim()
   };
@@ -1260,6 +1426,20 @@ const parentPaymentSummary = records => (records || []).reduce((summary, record)
   else if (financials.status === 'in_arrears') summary.inArrears += 1;
   return summary;
 }, { count: 0, paid: 0, inArrears: 0, amountDue: 0, paidAmount: 0, balance: 0, arrears: 0 });
+const parentPaymentAgeing = records => {
+  const buckets = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0, totalOpen: 0 };
+  (records || []).forEach(record => {
+    const financials = parentPaymentFinancials(record);
+    if (financials.balance <= 0) return;
+    buckets.totalOpen = cents(buckets.totalOpen + financials.balance);
+    if (!financials.daysPastDue) buckets.current = cents(buckets.current + financials.balance);
+    else if (financials.daysPastDue <= 30) buckets.days1to30 = cents(buckets.days1to30 + financials.balance);
+    else if (financials.daysPastDue <= 60) buckets.days31to60 = cents(buckets.days31to60 + financials.balance);
+    else if (financials.daysPastDue <= 90) buckets.days61to90 = cents(buckets.days61to90 + financials.balance);
+    else buckets.days90plus = cents(buckets.days90plus + financials.balance);
+  });
+  return buckets;
+};
 const parentPaymentView = (record, actor) => {
   const financials = parentPaymentFinancials(record);
   const paymentHistory = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase()).map(event => ({ amount: billingAmount(event.amount) || 0, status: event.status, receivedAt: event.receivedAt, providerTransactionId: event.providerTransactionId || '' }));
@@ -1488,7 +1668,7 @@ app.get('/api/parent-payments', (req, res) => {
   let records = (db.parentPayments || []).filter(record => recordInSchool(record, actor));
   if (actor.role === 'parent') records = records.filter(record => normalizeUsername(record.parentUsername) === normalizeUsername(actor.username));
   const payments = records.map(record => parentPaymentView(record, actor));
-  res.json({ payments, summary: parentPaymentSummary(records), recalculatedAt: new Date().toISOString() });
+  res.json({ payments, summary: parentPaymentSummary(records), ageing: parentPaymentAgeing(records), recalculatedAt: new Date().toISOString() });
 });
 
 app.post('/api/parent-payments', (req, res) => {
@@ -1498,7 +1678,8 @@ app.post('/api/parent-payments', (req, res) => {
   if (result.error) return res.status(400).json({ message: result.error });
   if (!Array.isArray(db.parentPayments)) db.parentPayments = [];
   db.parentPayments.unshift(result.record);
-  res.status(201).json({ success: true, payment: parentPaymentView(result.record, actor), summary: parentPaymentSummary(db.parentPayments.filter(record => recordInSchool(record, actor))) });
+  const schoolRecords = db.parentPayments.filter(record => recordInSchool(record, actor));
+  res.status(201).json({ success: true, payment: parentPaymentView(result.record, actor), summary: parentPaymentSummary(schoolRecords), ageing: parentPaymentAgeing(schoolRecords) });
 });
 
 app.post('/api/parent-payments/:id/acknowledge', (req, res) => {
@@ -1744,29 +1925,35 @@ app.post('/api/accounts', (req, res) => {
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const cleanUsername = boundedText(username, 160);
+  const cleanName = boundedText(name, 160);
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (!username || !pin || !name || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
+  if (!cleanUsername || !pin || !cleanName || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
+  if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Passwords must be between 4 and 128 characters.' });
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'Administrators can create accounts only for their own school.' });
-  if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (db.users.some(account => accountMatchesUsername(account, cleanUsername))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   const normalisedStoreUrl = safeHttpsUrl(schoolStoreUrl);
   if (String(schoolStoreUrl || '').trim() && !normalisedStoreUrl) return res.status(400).json({ message: 'School web-store links must use a valid HTTPS URL.' });
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: normalisedStoreUrl, linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
+  const account = { username: cleanUsername, pinHash: hashPin(pin), name: cleanName, role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: normalisedStoreUrl, linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses).slice(0, 30) : [] };
   db.users.push(account);
   res.status(201).json({ success: true, account: safeAccount(account) });
 });
 app.put('/api/accounts/:username', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const account = db.users.find(entry => entry.username === req.params.username);
+  const account = findAccountByUsername(req.params.username);
   if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (username && username !== account.username && db.users.some(entry => entry.username.toLowerCase() === String(username).toLowerCase())) return res.status(409).json({ message: 'That username is already in use.' });
-  if (username) account.username = String(username).trim();
-  if (pin) account.pinHash = hashPin(pin);
-  if (name) account.name = String(name).trim();
+  if (username && db.users.some(entry => entry !== account && accountMatchesUsername(entry, username))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (username) account.username = boundedText(username, 160);
+  if (pin) {
+    if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Passwords must be between 4 and 128 characters.' });
+    account.pinHash = hashPin(pin);
+  }
+  if (name) account.name = boundedText(name, 160);
   if (role && allowedRoles.includes(role)) account.role = role;
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
   account.schoolName = actor.schoolName;
@@ -1781,7 +1968,7 @@ app.put('/api/accounts/:username', (req, res) => {
     account.parentRelationshipStatus = linkValidation.links.length ? 'Administrator approved' : 'Pending administrator approval';
     account.requestedLearnerLinks = [];
   }
-  account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [];
+  account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses).slice(0, 30) : [];
   res.json({ success: true, account: safeAccount(account) });
 });
 app.delete('/api/accounts/:username', (req, res) => {
@@ -1819,10 +2006,8 @@ app.get('/api/nearby-schools', async (req, res) => {
   }
 
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${radius}`;
-  const cached = schoolSearchCache.get(cacheKey);
-  if (cached && Date.now() - cached.createdAt < 30 * 60 * 1000) {
-    return res.json({ ...cached.data, cached: true });
-  }
+  const cached = readSchoolSearchCache(cacheKey);
+  if (cached) return res.json({ ...cached.data, cached: true });
 
   // A bounding-box lookup is significantly faster than searching every school building by radius.
   // The browser applies the exact circular 20 km check before rendering markers.
@@ -1857,7 +2042,7 @@ app.get('/api/nearby-schools', async (req, res) => {
     }));
 
     const data = { elements: Array.isArray(payload.elements) ? payload.elements : [], source: 'OpenStreetMap' };
-    schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
+    writeSchoolSearchCache(cacheKey, data);
     res.json(data);
   } catch (error) {
     // If the shared Overpass network is busy, use Nominatim's independent
@@ -1897,7 +2082,7 @@ app.get('/api/nearby-schools', async (req, res) => {
         source: 'OpenStreetMap fallback'
       };
       if (!data.elements.length) throw new Error('No nearby schools were returned by the fallback');
-      schoolSearchCache.set(cacheKey, { createdAt: Date.now(), data });
+      writeSchoolSearchCache(cacheKey, data);
       res.json(data);
     } catch (fallbackError) {
       console.error('Nearby school search failed:', error.message, '| fallback failed:', fallbackError.message);
@@ -1979,8 +2164,17 @@ app.post('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
   if (req.body?.mediaUrl !== undefined && req.body.mediaUrl !== null && !validPostMediaData(req.body.mediaUrl)) return res.status(400).json({ message: 'Attached media must be a supported PNG, JPEG, or WebP image under 5 MB.' });
-  const post = tagSchoolRecord(actor, req.body || {});
-  post.createdAt = post.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const audience = boundedText(req.body?.audience || 'All', 40);
+  const caption = boundedText(req.body?.caption, 4000);
+  if (!POST_AUDIENCES.has(audience) || !caption) return res.status(400).json({ message: 'Choose a valid audience and add an update.' });
+  const post = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    audience,
+    caption,
+    mediaUrl: req.body?.mediaUrl || null,
+    createdBy: actor.username,
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  });
   db.posts.unshift(post);
   res.json({ success: true, post });
 });
@@ -2002,7 +2196,12 @@ app.get('/api/schedules', (req, res) => {
 app.post('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create schedules.' });
-  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body });
+  const studentName = boundedText(req.body?.studentName, 160);
+  const dayOfWeek = boundedText(req.body?.dayOfWeek, 20);
+  const timeSlot = boundedText(req.body?.timeSlot, 80);
+  const activity = boundedText(req.body?.activity, 1000);
+  if (!studentName || !activity) return res.status(400).json({ message: 'Complete the learner and activity.' });
+  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), studentName, dayOfWeek, timeSlot, activity, createdBy: actor.username });
   db.schedules.push(item);
   res.json({ success: true, item });
 });
@@ -2011,7 +2210,13 @@ app.post('/api/schedules/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import schedules.' });
   const { schedules } = req.body;
   if (Array.isArray(schedules)) {
-    db.schedules.push(...schedules.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    const cleanSchedules = schedules.slice(0, 2000).map(item => ({
+      studentName: boundedText(item?.studentName, 160),
+      dayOfWeek: boundedText(item?.dayOfWeek, 20),
+      timeSlot: boundedText(item?.timeSlot, 80),
+      activity: boundedText(item?.activity, 1000)
+    })).filter(item => item.studentName && item.activity);
+    db.schedules.push(...cleanSchedules.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID(), createdBy: actor.username })));
   }
   res.json({ success: true });
 });
@@ -2033,7 +2238,18 @@ app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
   if (req.body?.photoUrl !== undefined && req.body.photoUrl !== null && !validWorksheetMediaData(req.body.photoUrl)) return res.status(400).json({ message: 'Attached evidence must be a supported PNG, JPEG, GIF, or WebP image under 5 MB.' });
-  const item = tagSchoolRecord(actor, { ...req.body, uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
+  const studentName = boundedText(req.body?.studentName, 160);
+  const title = boundedText(req.body?.title, 240);
+  const hasGrade = req.body?.grade !== undefined && req.body?.grade !== null && String(req.body.grade).trim() !== '';
+  const grade = hasGrade ? Number(req.body.grade) : null;
+  if (!studentName || !title || (hasGrade && (!Number.isFinite(grade) || grade < 0 || grade > 100))) return res.status(400).json({ message: 'Enter a learner and title; when supplied, the grade must be between 0 and 100.' });
+  const item = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), studentName, title, ...(hasGrade ? { grade } : {}),
+    photoUrl: req.body?.photoUrl || null,
+    submittedBy: actor.username,
+    uploadedAt: new Date().toLocaleDateString(),
+    createdAt: new Date().toISOString()
+  });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
 });
@@ -2064,9 +2280,21 @@ app.post('/api/badges', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) {
     return res.status(403).json({ message: 'Only authorised school staff can award badges.' });
   }
-  const { actorUsername: _actorUsername, ...item } = req.body;
-  item.awardedBy = actor.username;
-  db.badges.unshift(tagSchoolRecord(actor, item));
+  const studentName = String(req.body?.studentName || '').trim().slice(0, 160);
+  const category = String(req.body?.category || '').trim().slice(0, 80);
+  const title = String(req.body?.title || req.body?.awardName || '').trim().slice(0, 160);
+  const note = String(req.body?.note || '').trim().slice(0, 1000);
+  if (!studentName || !category || !title) return res.status(400).json({ message: 'Choose a learner, milestone category, and badge title.' });
+  const item = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    studentName,
+    category,
+    title,
+    note,
+    awardedBy: actor.username,
+    createdAt: new Date().toISOString()
+  });
+  db.badges.unshift(item);
   res.json({ success: true, item });
 });
 app.delete('/api/badges/:id', (req, res) => {
@@ -2111,7 +2339,10 @@ app.get('/api/attendance', (req, res) => {
 app.post('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record attendance.' });
-  const item = tagSchoolRecord(actor, { ...req.body, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+  const studentName = boundedText(req.body?.studentName, 160);
+  const status = boundedText(req.body?.status || 'Checked In', 40);
+  if (!studentName || !ATTENDANCE_STATUSES.has(status)) return res.status(400).json({ message: 'Enter a learner and valid attendance status.' });
+  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), studentName, status, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), recordedBy: actor.username });
   db.attendance.unshift(item);
   res.json({ success: true, item });
 });
@@ -2120,16 +2351,22 @@ app.post('/api/attendance/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import attendance.' });
   const { attendance } = req.body;
   if (Array.isArray(attendance)) {
-    db.attendance.unshift(...attendance.slice(0, 2000).map(item => tagSchoolRecord(actor, { id: crypto.randomUUID(), ...item })));
+    const cleanAttendance = attendance.slice(0, 2000).map(item => ({
+      studentName: boundedText(item?.studentName, 160),
+      status: boundedText(item?.status || 'Checked In', 40)
+    })).filter(item => item.studentName && ATTENDANCE_STATUSES.has(item.status));
+    db.attendance.unshift(...cleanAttendance.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID(), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), recordedBy: actor.username })));
   }
   res.json({ success: true });
 });
 app.post('/api/attendance/toggle', (req, res) => {
   const actor = getSessionAccount(req);
-  const { id, status } = req.body;
+  const { id } = req.body;
+  const status = boundedText(req.body?.status, 40);
   const item = db.attendance.find(a => a.id === id && recordInSchool(a, actor));
   if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Attendance record not found.' });
-  if (item) item.status = status;
+  if (!ATTENDANCE_STATUSES.has(status)) return res.status(400).json({ message: 'Choose a valid attendance status.' });
+  item.status = status;
   res.json({ success: true });
 });
 app.delete('/api/attendance/:id', (req, res) => {
@@ -2160,16 +2397,22 @@ app.post('/api/school-applications', (req, res) => {
   const learnerName = String(req.body?.learnerName || '').trim().slice(0, 120);
   const dateOfBirth = String(req.body?.dateOfBirth || '').trim().slice(0, 20);
   const intendedStart = String(req.body?.intendedStart || '').trim().slice(0, 20);
-  const gradeOrAgeGroup = String(req.body?.gradeOrAgeGroup || '').trim().slice(0, 80);
+  const gradeOrAgeGroup = boundedText(req.body?.gradeOrAgeGroup, 80);
+  const educationStage = educationStageForSelection(gradeOrAgeGroup);
   const homeArea = String(req.body?.homeArea || '').trim().slice(0, 160);
   const notes = String(req.body?.notes || '').trim().slice(0, 1200);
   if (!schoolName || !guardianName || !contactPhone || !contactEmail || !learnerName || !dateOfBirth || !intendedStart || !gradeOrAgeGroup || !homeArea || !notes) {
     return res.status(400).json({ message: 'Complete the contact, learner, start-date, age/grade, area and application details.' });
   }
+  if (!APPLICATION_STAGE_SELECTIONS.has(gradeOrAgeGroup)) {
+    return res.status(400).json({ message: 'Choose a recognised Little Feet age group or school grade.' });
+  }
   if (!/^\S+@\S+\.\S+$/.test(contactEmail)) return res.status(400).json({ message: 'Enter a valid contact email address.' });
+  if (!validDateKey(dateOfBirth) || dateOfBirth >= dateKeyInSouthAfrica()) return res.status(400).json({ message: 'Enter a valid learner date of birth.' });
+  if (!validDateKey(intendedStart)) return res.status(400).json({ message: 'Enter a valid intended start date.' });
   const principal = db.users.find(account => account.role === 'principal' && normalizeComparableText(account.schoolName) === normalizeComparableText(schoolName) && !String(account.verificationStatus || '').toLowerCase().includes('pending'));
   if (!principal) return res.status(409).json({ message: 'This school is not yet available for Little Feet applications. Ask the school to activate its principal account first.' });
-  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, homeArea, notes };
+  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, educationStage, homeArea, notes };
   const ticket = {
     id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
     message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
@@ -2288,16 +2531,25 @@ app.get('/api/tickets', (req, res) => {
   res.json(visibleTickets);
 });
 app.post('/api/tickets', (req, res) => {
-  const { createdBy, assignedTo, ...ticketDetails } = req.body;
+  const assignedTo = boundedText(req.body?.assignedTo, 160);
   const creator = getSessionAccount(req);
   if (!creator) return res.status(401).json({ message: 'Sign in to create a support ticket.' });
   const assignedAccount = creator.role === 'admin' ? findAccountByUsername(assignedTo) : null;
   if (assignedTo && (!assignedAccount || !isSameSchool(creator, assignedAccount))) {
     return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
   }
+  const department = boundedText(req.body?.department || 'Admin', 80);
+  const priority = boundedText(req.body?.priority || 'Normal', 40);
+  const subject = boundedText(req.body?.subject, 200);
+  const message = boundedText(req.body?.message, 5000);
+  if (!subject || !message) return res.status(400).json({ message: 'Add a ticket subject and message.' });
   const item = tagSchoolRecord(creator, {
-    ...ticketDetails,
-    id: String(ticketDetails.id || crypto.randomUUID()),
+    id: crypto.randomUUID(),
+    department,
+    category: boundedText(req.body?.category, 100),
+    priority,
+    subject,
+    message,
     createdBy: creator.username,
     createdByName: creator.name || creator.username,
     assignedTo: assignedAccount?.username || '',
@@ -2371,8 +2623,11 @@ app.post('/api/tickets/update', (req, res) => {
     if (assignedTo && (!assignedAccount || !isSameSchool(actor, assignedAccount))) return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
     ticket.assignedTo = assignedAccount?.username || '';
   }
-  if (status) ticket.status = status;
-  if (feedback !== undefined) ticket.feedback = feedback;
+  if (status !== undefined) {
+    if (!['Open', 'Completed'].includes(status)) return res.status(400).json({ message: 'Ticket status must be Open or Completed.' });
+    ticket.status = status;
+  }
+  if (feedback !== undefined) ticket.feedback = String(feedback || '').trim().slice(0, 5000);
   ticket.updatedBy = actor.username;
   res.json({ success: true, ticket });
 });
@@ -2394,9 +2649,11 @@ app.get('/api/chat/groups', (req, res) => {
 app.post('/api/chat/groups', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create groups.' });
-  const { groupName } = req.body;
+  const groupName = String(req.body?.groupName || '').trim();
+  if (!groupName) return res.status(400).json({ message: 'A group name is required.' });
+  if (groupName.length > 120) return res.status(413).json({ message: 'Group names are limited to 120 characters.' });
   const id = crypto.randomUUID();
-  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName: String(groupName || '').trim().slice(0, 120) }));
+  db.chatGroups.push(tagSchoolRecord(actor, { id, groupName }));
   db.groupMessages[id] = [];
   res.json({ success: true, id });
 });
@@ -2420,15 +2677,18 @@ app.get('/api/chat/messages/:groupId', (req, res) => {
   res.json(msgs);
 });
 app.post('/api/chat/messages', (req, res) => {
-  const { groupId, sender, message, textColor } = req.body;
+  const { groupId, message, textColor } = req.body;
   const actor = getSessionAccount(req);
   const group = db.chatGroups.find(entry => entry.id === groupId && recordInSchool(entry, actor));
   if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  const cleanMessage = String(message || '').trim();
+  if (!cleanMessage) return res.status(400).json({ message: 'A message is required.' });
+  if (cleanMessage.length > 4000) return res.status(413).json({ message: 'Messages are limited to 4,000 characters.' });
   if (!db.groupMessages[groupId]) db.groupMessages[groupId] = [];
   const msgObj = {
     id: crypto.randomUUID(),
     sender: actor.username,
-    message,
+    message: cleanMessage,
     textColor: safeTextColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
@@ -2469,12 +2729,14 @@ app.post('/api/chat/direct', (req, res) => {
   const senderAccount = getSessionAccount(req);
   const recipientAccount = findAccountByUsername(recipient);
   if (!canUseDirectChat(senderAccount, recipientAccount)) return res.status(403).json({ message: 'You can only message approved contacts at your school.' });
-  if (!String(message || '').trim()) return res.status(400).json({ message: 'A message is required.' });
+  const cleanMessage = String(message || '').trim();
+  if (!cleanMessage) return res.status(400).json({ message: 'A message is required.' });
+  if (cleanMessage.length > 4000) return res.status(413).json({ message: 'Messages are limited to 4,000 characters.' });
   const msgObj = tagSchoolRecord(senderAccount, {
     id: crypto.randomUUID(),
     sender: senderAccount.username,
-    recipient,
-    message,
+    recipient: recipientAccount.username,
+    message: cleanMessage,
     textColor: safeTextColor(textColor),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
@@ -2519,10 +2781,22 @@ app.get('/api/broadcasts', (req, res) => {
 app.post('/api/broadcasts', (req, res) => {
   const actor = requireSafetyStaff(req);
   if (!actor) return res.status(403).json({ message: 'Only an administrator or principal can dispatch an emergency broadcast.' });
-  if (!String(req.body?.bcMessage || '').trim() || !req.body?.location) return res.status(400).json({ message: 'A message and alert location are required.' });
+  const bcMessage = String(req.body?.bcMessage || '').trim();
+  const bcPriority = String(req.body?.bcPriority || 'Campus Notice').trim().slice(0, 80);
+  const latitude = Number(req.body?.location?.lat);
+  const longitude = Number(req.body?.location?.lng);
+  const radiusKm = Number(req.body?.radiusKm);
+  if (!bcMessage || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    return res.status(400).json({ message: 'A message and valid alert location are required.' });
+  }
+  if (bcMessage.length > 2000) return res.status(413).json({ message: 'Emergency alerts are limited to 2,000 characters.' });
+  if (!Number.isFinite(radiusKm) || radiusKm < 0.1 || radiusKm > 100) return res.status(400).json({ message: 'Alert radius must be between 0.1 km and 100 km.' });
   const item = tagSchoolRecord(actor, {
-    id: Date.now().toString(),
-    ...req.body,
+    id: crypto.randomUUID(),
+    bcMessage,
+    bcPriority,
+    radiusKm,
+    location: { lat: latitude, lng: longitude },
     issuedBy: actor.username,
     issuedAt: new Date().toISOString(),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -2708,26 +2982,77 @@ app.get('/api/store/orders', (req, res) => {
 });
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
+const moduleRecordCollection = moduleName =>
+  Object.hasOwn(db.moduleRecords || {}, moduleName) && Array.isArray(db.moduleRecords[moduleName])
+    ? db.moduleRecords[moduleName]
+    : null;
+
 app.get('/api/modules/:module', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view workspace records.' });
-  const records = db.moduleRecords[req.params.module];
+  const records = moduleRecordCollection(req.params.module);
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
   res.json(tenantRecords(records, actor));
 });
 app.post('/api/modules/:module', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save workspace records.' });
-  const records = db.moduleRecords[req.params.module];
+  const records = moduleRecordCollection(req.params.module);
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), ...req.body, createdAt: new Date().toLocaleString() });
+
+  let payload;
+  if (req.params.module === 'curriculum') {
+    const allowedFrameworks = new Set(['NCF Birth–4', 'CAPS Grade R']);
+    const allowedAreas = new Set([
+      'ELDA 1 · Well-being',
+      'ELDA 2 · Identity and Belonging',
+      'ELDA 3 · Communication',
+      'ELDA 4 · Exploring Mathematics',
+      'ELDA 5 · Creativity',
+      'ELDA 6 · Knowledge and Understanding of the World',
+      'Home Language',
+      'Mathematics',
+      'Life Skills'
+    ]);
+    const framework = String(req.body?.framework || '').trim();
+    const area = String(req.body?.area || '').trim();
+    const learnerName = String(req.body?.learnerName || '').trim().slice(0, 160);
+    const observation = String(req.body?.observation || '').trim().slice(0, 1200);
+    const evidenceReference = String(req.body?.evidenceReference || '').trim().slice(0, 240);
+    if (!allowedFrameworks.has(framework) || !allowedAreas.has(area) || !learnerName || !observation) {
+      return res.status(400).json({ message: 'Choose a supported NCF or Grade R framework area and enter an observation.' });
+    }
+    if (framework === 'NCF Birth–4' && !area.startsWith('ELDA ')) return res.status(400).json({ message: 'Choose an NCF ELDA for this observation.' });
+    if (framework === 'CAPS Grade R' && area.startsWith('ELDA ')) return res.status(400).json({ message: 'Choose a Grade R CAPS area for this observation.' });
+    payload = {
+      type: 'Framework observation',
+      frameworkKey: framework === 'NCF Birth–4' ? 'ncf_birth_to_four' : 'caps_grade_r',
+      framework,
+      area,
+      learnerName,
+      observation,
+      evidenceReference,
+      details: (learnerName + ' · ' + framework + ' · ' + area + ' · ' + observation).slice(0, 1800),
+      recordedBy: actor.name || actor.username
+    };
+  } else {
+    payload = {
+      type: boundedText(req.body?.type, 160),
+      details: boundedText(req.body?.details, 1800),
+      recordedBy: boundedText(req.body?.recordedBy || actor.name || actor.username, 160),
+      ...(req.params.module === 'stickyNotes' ? { colour: boundedText(req.body?.colour, 20) } : {})
+    };
+    if (!payload.type || !payload.details) return res.status(400).json({ message: 'Add a record type and details.' });
+  }
+
+  const record = tagSchoolRecord(actor, { ...payload, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() });
   records.unshift(record);
   res.json({ success: true, record });
 });
 app.delete('/api/modules/:module/:id', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const records = db.moduleRecords[req.params.module];
+  const records = moduleRecordCollection(req.params.module);
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
   const record = records.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
   if (!record) return res.status(404).json({ message: 'Workspace record not found.' });
@@ -2910,12 +3235,12 @@ app.get('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor) return res.status(403).json({ message: 'Only administrators and principals may view learner codes.' });
   const isAdmin = actor.role === 'admin';
-  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: isAdmin })));
+  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: isAdmin, includeHistory: isAdmin })));
 });
 
 app.get('/api/learner-access-codes/printable-list', (req, res) => {
-  const actor = findLearnerAccessCodeActor(req);
-  if (!actor) return res.status(403).json({ message: 'Only administrators and principals may print the learner-code register.' });
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator may print the full learner-code register.' });
   const learners = tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: false }));
   res.json({
     schoolName: actor.schoolName,
@@ -3062,10 +3387,10 @@ app.post('/api/students/import', (req, res) => {
   let imported = 0;
 
   incoming.forEach((row, index) => {
-    const studentName = String(row?.studentName || '').trim();
-    const className = String(row?.className || '').trim();
-    const parentName = String(row?.parentName || '').trim();
-    const contactEmail = String(row?.contactEmail || '').trim();
+    const studentName = boundedText(row?.studentName, 160);
+    const className = boundedText(row?.className, 120);
+    const parentName = boundedText(row?.parentName, 160);
+    const contactEmail = boundedText(row?.contactEmail, 160);
     if (!studentName || !className) {
       rejected.push({ row: index + 2, reason: 'Learner name and class/grade are required.' });
       return;
@@ -3084,9 +3409,9 @@ app.post('/api/students/import', (req, res) => {
       className,
       parentName,
       contactEmail,
-      medicalNotes: encryptField(String(row?.medicalNotes || '').trim()),
-      emergencyContact: encryptField(String(row?.emergencyContact || '').trim()),
-      authorisedPickups: encryptField(String(row?.authorisedPickups || '').trim()),
+      medicalNotes: encryptField(boundedText(row?.medicalNotes, 2000)),
+      emergencyContact: encryptField(boundedText(row?.emergencyContact, 500)),
+      authorisedPickups: encryptField(boundedText(row?.authorisedPickups, 1000)),
       importedAt: new Date().toISOString(),
       importedBy: actor.username
     });
@@ -3117,7 +3442,8 @@ const microsoftCallbackUrl = 'https://littlefeet.co.za/auth/microsoft/callback';
 if (googleSignInConfigured) passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "https://littlefeet.co.za/auth/google/callback"
+    callbackURL: "https://littlefeet.co.za/auth/google/callback",
+    state: true
   },
   (accessToken, refreshToken, profile, done) => {
     const user = {
