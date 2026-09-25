@@ -147,13 +147,13 @@
 .cinematic-surface-air {
   position: absolute;
   inset: 0 0 auto 0;
-  z-index: .28;
-  height: 43%;
+  z-index: .62;
+  height: 40%;
   pointer-events: none;
   opacity: var(--surface-air-opacity, 1);
   background:
-    radial-gradient(ellipse at 72% 8%, rgba(255,255,255,.94) 0 8%, rgba(224,248,255,.62) 18%, transparent 42%),
-    linear-gradient(180deg, rgba(207,244,255,.98) 0%, rgba(170,226,246,.96) 56%, rgba(112,194,226,.72) 82%, rgba(73,165,210,0) 100%);
+    radial-gradient(ellipse at 72% 8%, rgba(255,255,255,.98) 0 8%, rgba(229,248,255,.82) 20%, transparent 45%),
+    linear-gradient(180deg, rgba(207,244,255,1) 0%, rgba(166,224,245,.99) 58%, rgba(104,190,224,.95) 88%, rgba(73,165,210,.42) 100%);
   box-shadow: inset 0 -18px 36px rgba(188,244,255,.18);
   transition: opacity .16s linear;
 }
@@ -170,7 +170,7 @@
 .cinematic-water-surface {
   left: -8%;
   width: 116%;
-  top: 40%;
+  top: 39.5%;
   height: 60%;
   opacity: var(--water-opacity, .58);
   background:
@@ -337,8 +337,8 @@
   -webkit-mask-image: url('/assets/images/cinematic-fish-school.svg');
   mask-image: url('/assets/images/cinematic-fish-school.svg');
 }
-.cinematic-fish-2d-a { left: 6%; top: 30%; animation: cinematicFishDriftA 25s ease-in-out infinite alternate; }
-.cinematic-fish-2d-b { right: 4%; top: 59%; opacity: .42; animation: cinematicFishDriftB 31s ease-in-out infinite alternate; }
+.cinematic-fish-2d-a { left: 6%; top: 48%; animation: cinematicFishDriftA 25s ease-in-out infinite alternate; }
+.cinematic-fish-2d-b { right: 4%; top: 64%; opacity: .42; animation: cinematicFishDriftB 31s ease-in-out infinite alternate; }
 .cinematic-jelly-2d {
   width: min(18vw, 250px);
   aspect-ratio: 13 / 18;
@@ -346,13 +346,13 @@
   -webkit-mask-image: url('/assets/images/cinematic-jellyfish.svg');
   mask-image: url('/assets/images/cinematic-jellyfish.svg');
 }
-.cinematic-jelly-2d-a { right: 12%; top: 37%; animation: cinematicJellyDriftA 23s ease-in-out infinite alternate; }
-.cinematic-jelly-2d-b { left: 9%; top: 69%; opacity: .44; animation: cinematicJellyDriftB 29s ease-in-out infinite alternate; }
+.cinematic-jelly-2d-a { right: 12%; top: 51%; animation: cinematicJellyDriftA 23s ease-in-out infinite alternate; }
+.cinematic-jelly-2d-b { left: 9%; top: 72%; opacity: .44; animation: cinematicJellyDriftB 29s ease-in-out infinite alternate; }
 .cinematic-manta-2d {
   width: min(35vw, 520px);
   aspect-ratio: 19 / 9;
   left: 32%;
-  top: 76%;
+  top: 79%;
   background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/P2140268_Manta_Ray.jpg/960px-P2140268_Manta_Ray.jpg');
   -webkit-mask-image: url('/assets/images/cinematic-manta.svg');
   mask-image: url('/assets/images/cinematic-manta.svg');
