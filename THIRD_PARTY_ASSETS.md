@@ -14,13 +14,15 @@ This attribution file must remain with any production build that uses the Riley-
 
 ## Cinematic 2D photo textures
 
-The moving 2D sea-life layers use photographic texture sources from Wikimedia Commons while retaining local lightweight SVG masks for shape and animation. These are image-only requests; the WebGL scene does not fetch or execute third-party code.
+The moving 2D sea-life layers use photographic sources from Wikimedia Commons. Fish schools are displayed as softly feathered photographic layers rather than cartoon SVG fish silhouettes. Jellyfish and manta still use lightweight local silhouette masks around photographic texture. These are image-only requests; the WebGL scene does not fetch or execute third-party code.
 
-- Fish school photograph: Milada Vigerova, "Fish school (Unsplash).jpg", CC0 1.0 / public-domain dedication via Wikimedia Commons.
+- Dense sardine school photograph: Stanislav Stelmakhovich, "Underwater view of the sardine run as a dolphin hunts within dense schools of sardines.jpg", CC0 1.0 / public-domain dedication via Wikimedia Commons.
+  Source: https://commons.wikimedia.org/wiki/File:Underwater_view_of_the_sardine_run_as_a_dolphin_hunts_within_dense_schools_of_sardines.jpg
+- Secondary fish school photograph: Milada Vigerova, "Fish school (Unsplash).jpg", CC0 1.0 / public-domain dedication via Wikimedia Commons.
   Source: https://commons.wikimedia.org/wiki/File:Fish_school_(Unsplash).jpg
 - Jellyfish photograph: ErgoSum88, "Jellyfish01.jpg", released into the public domain via Wikimedia Commons.
   Source: https://commons.wikimedia.org/wiki/File:Jellyfish01.jpg
 - Manta ray photograph: Richard Harvey, "P2140268 Manta Ray.jpg", released into the public domain via Wikimedia Commons.
   Source: https://commons.wikimedia.org/wiki/File:P2140268_Manta_Ray.jpg
 
-The files are displayed as moving masked 2D layers to avoid restoring the former expensive 3D animal simulation.
+The files are displayed as moving 2D photographic layers to avoid restoring the former expensive 3D animal simulation. Fish photos use only a soft edge-feather mask; they are not clipped into synthetic fish shapes.
