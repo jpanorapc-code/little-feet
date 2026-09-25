@@ -83,37 +83,40 @@
       height:100%;
       pointer-events:none;
       z-index:0;
-      opacity:.96;
+      opacity:1;
       background-image:
-        radial-gradient(circle, rgba(255,255,255,.96) 0 1px, transparent 1.35px),
-        radial-gradient(circle, rgba(226,232,240,.82) 0 1px, transparent 1.45px),
-        radial-gradient(circle, rgba(196,181,253,.76) 0 1px, transparent 1.5px),
-        radial-gradient(circle, rgba(167,243,208,.72) 0 1px, transparent 1.4px),
-        radial-gradient(circle, rgba(255,255,255,.62) 0 .8px, transparent 1.25px),
-        linear-gradient(180deg,#01030a 0%,#030817 42%,#07111e 72%,#020611 100%);
-      background-size:113px 113px,173px 173px,257px 257px,331px 331px,79px 79px,100% 100%;
-      background-position:11px 7px,47px 91px,121px 33px,207px 159px,31px 51px,0 0;
-      animation:portalStarTwinkle 8s ease-in-out infinite alternate;
+        radial-gradient(circle, rgba(255,255,255,1) 0 1.05px, transparent 1.45px),
+        radial-gradient(circle, rgba(226,232,240,.94) 0 .9px, transparent 1.3px),
+        radial-gradient(circle, rgba(196,181,253,.88) 0 .95px, transparent 1.35px),
+        radial-gradient(circle, rgba(167,243,208,.84) 0 .95px, transparent 1.35px),
+        radial-gradient(circle, rgba(255,255,255,.70) 0 .7px, transparent 1.12px),
+        radial-gradient(circle, rgba(255,255,255,.48) 0 .55px, transparent .95px),
+        linear-gradient(180deg,#01030a 0%,#020617 38%,#051126 70%,#020611 100%);
+      background-size:67px 67px,101px 101px,149px 149px,223px 223px,43px 43px,181px 181px,100% 100%;
+      background-position:7px 5px,31px 61px,79px 23px,151px 113px,19px 29px,127px 73px,0 0;
+      animation:portalStarTwinkle 7.5s ease-in-out infinite alternate;
     }
 
     body.portal-active::after {
       content:"";
       position:fixed;
-      inset:-16% -12%;
+      inset:-18% -14%;
       z-index:0;
       pointer-events:none;
-      opacity:.74;
-      transform:translate3d(-2.5%,-1%,0) rotate(-3deg) scale(1.07);
+      opacity:.92;
+      transform:translate3d(-2%,-1%,0) rotate(-2.5deg) scale(1.08);
       transform-origin:center;
       will-change:transform,opacity;
       background:
-        radial-gradient(ellipse 72% 12% at 7% 14%, rgba(74,222,128,.38) 0%, rgba(34,197,94,.16) 44%, transparent 74%),
-        radial-gradient(ellipse 66% 10% at 54% 10%, rgba(139,92,246,.31) 0%, rgba(124,58,237,.13) 48%, transparent 73%),
-        radial-gradient(ellipse 50% 8% at 94% 19%, rgba(236,72,153,.18) 0%, rgba(168,85,247,.12) 46%, transparent 72%),
-        radial-gradient(ellipse 64% 10% at 93% 79%, rgba(34,197,94,.21) 0%, rgba(139,92,246,.12) 48%, transparent 74%),
-        linear-gradient(112deg, transparent 18%, rgba(74,222,128,.10) 34%, transparent 48%, rgba(139,92,246,.10) 64%, transparent 79%);
+        radial-gradient(ellipse 78% 14% at 4% 9%, rgba(45,255,138,.62) 0%, rgba(34,197,94,.34) 34%, rgba(16,185,129,.12) 56%, transparent 75%),
+        radial-gradient(ellipse 70% 12% at 46% 5%, rgba(139,92,246,.48) 0%, rgba(124,58,237,.27) 36%, rgba(168,85,247,.10) 58%, transparent 76%),
+        radial-gradient(ellipse 50% 10% at 86% 8%, rgba(74,222,128,.55) 0%, rgba(34,197,94,.25) 42%, transparent 73%),
+        radial-gradient(ellipse 46% 9% at 99% 17%, rgba(236,72,153,.34) 0%, rgba(168,85,247,.20) 42%, transparent 72%),
+        radial-gradient(ellipse 62% 10% at 8% 90%, rgba(139,92,246,.26) 0%, rgba(168,85,247,.14) 45%, transparent 75%),
+        radial-gradient(ellipse 68% 12% at 93% 88%, rgba(45,255,138,.30) 0%, rgba(34,197,94,.16) 43%, rgba(139,92,246,.10) 61%, transparent 76%),
+        linear-gradient(108deg, transparent 8%, rgba(74,222,128,.13) 25%, transparent 39%, rgba(139,92,246,.15) 52%, transparent 65%, rgba(236,72,153,.09) 78%, transparent 91%);
       mix-blend-mode:screen;
-      animation:portalAuroraDrift 20s ease-in-out infinite alternate,portalAuroraPulse 9s ease-in-out infinite;
+      animation:portalAuroraDrift 17s ease-in-out infinite alternate,portalAuroraPulse 8s ease-in-out infinite;
     }
 
     @keyframes portalStarTwinkle {
@@ -124,14 +127,15 @@
     }
 
     @keyframes portalAuroraDrift {
-      0% { transform:translate3d(-3.5%,-1.5%,0) rotate(-4deg) scale(1.06); }
-      50% { transform:translate3d(1.5%,1.2%,0) rotate(-1.5deg) scale(1.10); }
-      100% { transform:translate3d(4%,-.5%,0) rotate(2deg) scale(1.07); }
+      0% { transform:translate3d(-4%,-1.5%,0) rotate(-4deg) scale(1.07); }
+      34% { transform:translate3d(-.5%,1.4%,0) rotate(-2deg) scale(1.11); }
+      68% { transform:translate3d(2.2%,-.4%,0) rotate(.5deg) scale(1.09); }
+      100% { transform:translate3d(4.5%,1%,0) rotate(2.5deg) scale(1.12); }
     }
 
     @keyframes portalAuroraPulse {
-      0%,100% { opacity:.60; }
-      50% { opacity:.79; }
+      0%,100% { opacity:.76; }
+      50% { opacity:.96; }
     }
 
     body.portal-active.light-mode { background-color:var(--bg-dark); }
@@ -334,8 +338,8 @@
     .wallpaper-overlay { position:fixed; inset:0; z-index:5000; display:none; align-items:center; justify-content:center; background:#020611; color:#fff; cursor:pointer; overflow:hidden; }
     .wallpaper-overlay.is-visible { display:flex; }
     .wallpaper-aurora-sky { position:absolute; inset:0; z-index:0; overflow:hidden; background:linear-gradient(180deg,#01030a 0%,#030817 48%,#07111e 76%,#020611 100%); opacity:1; transition:opacity .25s ease; }
-    .wallpaper-aurora-sky::before { content:""; position:absolute; inset:0; background-image:radial-gradient(circle,rgba(255,255,255,.98) 0 1px,transparent 1.35px),radial-gradient(circle,rgba(226,232,240,.78) 0 1px,transparent 1.45px),radial-gradient(circle,rgba(196,181,253,.74) 0 1px,transparent 1.5px),radial-gradient(circle,rgba(167,243,208,.68) 0 1px,transparent 1.4px),radial-gradient(circle,rgba(255,255,255,.58) 0 .8px,transparent 1.2px); background-size:109px 109px,167px 167px,251px 251px,337px 337px,73px 73px; background-position:13px 7px,41px 83px,119px 29px,211px 163px,29px 47px; animation:portalStarTwinkle 7s ease-in-out infinite alternate; }
-    .wallpaper-aurora-sky::after { content:""; position:absolute; inset:-18% -12%; opacity:.86; will-change:transform,opacity; background:radial-gradient(ellipse 78% 12% at 4% 14%,rgba(74,222,128,.48) 0%,rgba(34,197,94,.18) 45%,transparent 74%),radial-gradient(ellipse 72% 10% at 51% 10%,rgba(139,92,246,.38) 0%,rgba(124,58,237,.15) 49%,transparent 73%),radial-gradient(ellipse 58% 8% at 96% 19%,rgba(236,72,153,.24) 0%,rgba(168,85,247,.13) 47%,transparent 72%),radial-gradient(ellipse 70% 10% at 94% 81%,rgba(34,197,94,.25) 0%,rgba(139,92,246,.13) 50%,transparent 75%),linear-gradient(112deg,transparent 15%,rgba(74,222,128,.12) 33%,transparent 47%,rgba(139,92,246,.12) 65%,transparent 81%); mix-blend-mode:screen; animation:portalAuroraDrift 18s ease-in-out infinite alternate,portalAuroraPulse 8s ease-in-out infinite; }
+    .wallpaper-aurora-sky::before { content:""; position:absolute; inset:0; background-image:radial-gradient(circle,rgba(255,255,255,1) 0 1.05px,transparent 1.45px),radial-gradient(circle,rgba(226,232,240,.94) 0 .9px,transparent 1.3px),radial-gradient(circle,rgba(196,181,253,.88) 0 .95px,transparent 1.35px),radial-gradient(circle,rgba(167,243,208,.84) 0 .95px,transparent 1.35px),radial-gradient(circle,rgba(255,255,255,.70) 0 .7px,transparent 1.12px),radial-gradient(circle,rgba(255,255,255,.48) 0 .55px,transparent .95px); background-size:67px 67px,101px 101px,149px 149px,223px 223px,43px 43px,181px 181px; background-position:7px 5px,31px 61px,79px 23px,151px 113px,19px 29px,127px 73px; animation:portalStarTwinkle 7s ease-in-out infinite alternate; }
+    .wallpaper-aurora-sky::after { content:""; position:absolute; inset:-20% -14%; opacity:.96; will-change:transform,opacity; background:radial-gradient(ellipse 82% 14% at 3% 10%,rgba(45,255,138,.68) 0%,rgba(34,197,94,.36) 34%,rgba(16,185,129,.12) 58%,transparent 76%),radial-gradient(ellipse 74% 12% at 48% 6%,rgba(139,92,246,.54) 0%,rgba(124,58,237,.30) 36%,rgba(168,85,247,.11) 58%,transparent 76%),radial-gradient(ellipse 54% 10% at 88% 8%,rgba(74,222,128,.60) 0%,rgba(34,197,94,.27) 43%,transparent 73%),radial-gradient(ellipse 48% 9% at 99% 18%,rgba(236,72,153,.38) 0%,rgba(168,85,247,.22) 43%,transparent 72%),radial-gradient(ellipse 64% 11% at 8% 91%,rgba(139,92,246,.31) 0%,rgba(168,85,247,.16) 45%,transparent 75%),radial-gradient(ellipse 72% 12% at 94% 88%,rgba(45,255,138,.34) 0%,rgba(34,197,94,.18) 43%,rgba(139,92,246,.11) 61%,transparent 76%),linear-gradient(108deg,transparent 8%,rgba(74,222,128,.15) 25%,transparent 39%,rgba(139,92,246,.17) 52%,transparent 65%,rgba(236,72,153,.10) 78%,transparent 91%); mix-blend-mode:screen; animation:portalAuroraDrift 16s ease-in-out infinite alternate,portalAuroraPulse 8s ease-in-out infinite; }
     .wallpaper-overlay img { position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .25s ease; }
     .wallpaper-overlay.has-custom-wallpaper img { opacity:1; }
     .wallpaper-overlay.has-custom-wallpaper .wallpaper-aurora-sky { opacity:0; }
