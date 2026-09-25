@@ -6,6 +6,10 @@
 
   const safe = value => window.escapeWorkspaceText ? window.escapeWorkspaceText(value) : String(value ?? '');
   const money = value => window.formatSubscriptionMoney ? window.formatSubscriptionMoney(value) : 'R' + Number(value || 0).toFixed(2);
+  const sheetCell = value => {
+    const text = String(value ?? '');
+    return /^[=+\-@]/.test(text.trimStart()) ? "'" + text : text;
+  };
   const today = () => new Date().toISOString().slice(0, 10);
   const yearStart = () => today().slice(0, 4) + '-01-01';
 
@@ -211,6 +215,7 @@
   async function previewBankStatementFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return alert('Bank statement files are limited to 5 MB.');
     if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data, { type:'array', cellDates:false });
@@ -297,7 +302,7 @@
     window.openModal('Create payroll run', `
       <form onsubmit="createPayrollRun(event)" style="display:grid;gap:10px;">
         <div class="workspace-grid"><label>Period start<input name="periodStart" type="date" required></label><label>Period end<input name="periodEnd" type="date" required></label></div>
-        <label>Pay date<input name="payDate" type="date" required></label>
+        <div class="workspace-grid"><label>Pay date<input name="payDate" type="date" required></label><label>Pay frequency<select name="payFrequency"><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select></label></div>
         <label>Note<input name="note" maxlength="500" placeholder="Optional run note"></label>
         <p class="meta">All active payroll profiles are included. Review and approve the generated run before using the export.</p>
         <button class="submit-btn">Create draft payroll run</button>
@@ -327,7 +332,7 @@
     if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet((run.lines || []).map(line => ({
-      Employee: line.employeeName, Username: line.username, 'Employee Number': line.employeeNumber,
+      Employee: sheetCell(line.employeeName), Username: sheetCell(line.username), 'Employee Number': sheetCell(line.employeeNumber),
       'Base Gross': line.baseGross, Allowances: line.allowances, Gross: line.gross, Deductions: line.deductions, Net: line.net
     }))), 'Payroll');
     XLSX.writeFile(workbook, 'LittleFeet_Payroll_' + run.periodEnd + '.xlsx');
@@ -352,7 +357,7 @@
     if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.rows.map(row => ({
-      Date: row.date, Reference: row.reference, Memo: row.memo, Source: row.sourceType, Account: row.account, Debit: row.debit, Credit: row.credit
+      Date: sheetCell(row.date), Reference: sheetCell(row.reference), Memo: sheetCell(row.memo), Source: sheetCell(row.sourceType), Account: sheetCell(row.account), Debit: row.debit, Credit: row.credit
     }))), 'Journal');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ From:data.period.from, To:data.period.to, Debits:data.totalDebits, Credits:data.totalCredits, Note:data.note }]), 'Read me');
     XLSX.writeFile(workbook, 'LittleFeet_Accounting_Journal_' + data.period.to + '.xlsx');
