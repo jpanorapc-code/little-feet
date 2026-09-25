@@ -2322,6 +2322,7 @@
           <p style="color:var(--text-muted);margin:0 0 14px;">Every balance is recalculated from the payment history. An approved later date or agreed amount is shown clearly and changes when a payment is recorded.</p>
           <div id="parentPaymentsSummary" class="workspace-card" aria-live="polite"><p class="meta">Loading parent payments…</p></div>
           <div id="parentPaymentsActions" data-roles="principal,admin" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button type="button" class="action-btn btn-green" onclick="openParentPaymentAdmin()">Create parent payment</button><button type="button" class="action-btn btn-blue" onclick="loadParentPayments()">Recalculate now</button></div>
+          <div data-roles="parent" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button type="button" class="action-btn btn-blue" onclick="openFinanceStatement()">View / export my statement</button></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="action-btn btn-blue" onclick="openParentPaymentReport()">View full account report</button><button type="button" class="action-btn btn-blue" onclick="exportParentPaymentReport()">Export payment report</button></div>
           <div id="parentPaymentsList" class="record-list" style="margin-top:14px;"></div>
         </div>
