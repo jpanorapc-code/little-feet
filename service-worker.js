@@ -1,13 +1,15 @@
-const CACHE_NAME = 'little-feet-shell-v2';
+const CACHE_NAME = 'little-feet-shell-v3';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/logo.png',
   '/logo-transparent.png',
-  '/backup.js?v=20260925-strengthen-v3',
+  '/backup.js?v=20260925-preferences-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
-  '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1'
+  '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1',
+  '/assets/preferences-enhancements.js?v=20260925-preferences-v1',
+  '/assets/finance-automation.js?v=20260925-finance-v1'
 ];
 
 self.addEventListener('install', event => {
