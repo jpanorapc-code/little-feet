@@ -484,6 +484,51 @@
     .login-legal { margin-top:14px; padding-top:12px; border-top:1px solid rgba(148,163,184,.16); text-align:center; }
     .login-legal-links { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:5px 8px; font-size:.70rem; }
     .login-legal p { max-width:390px; margin:8px auto 0; color:var(--text-muted); font-size:.66rem; line-height:1.4; }
+    /* Compact login card: preserve real account/security guidance without
+       turning sign-in into a long landing page. */
+    #authSection > .auth-card { padding:14px 16px; }
+    .login-card-tools { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:9px; }
+    .login-secure-label { display:inline-flex; align-items:center; gap:6px; min-width:0; color:#99f6e4; font-size:.64rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .login-secure-label .ui-icon { width:.92rem; height:.92rem; }
+    .login-card-actions { display:flex; align-items:center; gap:6px; margin-left:auto; }
+    .login-language-pill { position:relative; display:inline-flex; align-items:center; height:34px; min-width:0; border:1px solid rgba(94,234,212,.28); border-radius:9px; background:rgba(13,148,136,.10); color:#dffcf8; }
+    .login-language-pill .ui-icon { position:absolute; left:8px; width:.92rem; height:.92rem; pointer-events:none; color:#5eead4; }
+    #loginLanguagePreference { width:auto; min-width:116px; height:32px; min-height:32px; margin:0; padding:5px 24px 5px 27px; border:0; border-radius:8px; background:transparent; color:inherit; font-size:.69rem; font-weight:700; cursor:pointer; }
+    #loginLanguagePreference:focus-visible { outline:2px solid rgba(94,234,212,.58); outline-offset:1px; }
+    #loginLanguagePreference option { color:#0f2b48; background:#f8fafc; }
+    .login-audio-compact { display:inline-flex; align-items:center; justify-content:center; gap:5px; width:auto !important; min-height:34px !important; height:34px; margin:0 !important; padding:5px 8px !important; border-radius:9px; font-size:.67rem; }
+    .login-audio-compact .ui-icon { width:.92rem; height:.92rem; }
+    .login-access-note { margin:0 0 10px; color:var(--text-muted); font-size:.68rem; line-height:1.3; text-align:left; }
+    #loginForm > div:not(.social-signin):not(.login-divider):not(.login-utility-row) { margin-bottom:7px; }
+    #loginForm label { margin-bottom:4px; }
+    #loginForm input { margin-bottom:0; }
+    .login-utility-row { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; margin:1px 0 9px; }
+    .login-remember { display:flex; align-items:center; gap:7px; min-width:0; }
+    .login-remember label { margin:0 !important; font-weight:400; cursor:pointer; font-size:.74rem; }
+    .login-help-inline { color:var(--text-muted); font-size:.65rem; line-height:1.2; text-align:right; }
+    #loginForm > .submit-btn { width:100%; max-width:none; min-height:42px; margin:0; }
+    .login-divider { margin:9px auto 7px; }
+    .social-signin { width:100%; margin:0; }
+    .social-signin button { min-height:39px; padding:7px 8px; }
+    .login-account-help, .login-context, .login-help-panel { display:none !important; }
+    .login-new-account { display:flex; align-items:center; justify-content:space-between; gap:9px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border-color); text-align:left; }
+    .login-new-account p { margin:0; flex:0 0 auto; font-size:.72rem; }
+    .login-new-account .action-btn { width:auto; min-height:36px; margin:0; padding:7px 10px; }
+    .login-new-account .login-approval-note { display:none; }
+    .login-legal { margin-top:9px; padding-top:8px; }
+    .login-legal-links { font-size:.66rem; }
+    .login-legal p { display:none; }
+    @media (max-width:420px) {
+      .login-card-tools { align-items:stretch; flex-direction:column; }
+      .login-card-actions { width:100%; margin-left:0; }
+      .login-language-pill { flex:1 1 auto; }
+      #loginLanguagePreference { width:100%; }
+      .login-audio-compact { flex:0 0 auto; }
+      .login-utility-row { align-items:flex-start; flex-direction:column; gap:4px; }
+      .login-help-inline { text-align:left; }
+      .login-new-account { align-items:stretch; flex-direction:column; }
+      .login-new-account .action-btn { width:100%; }
+    }
     @media (max-width:420px) {
       .login-context { padding:12px; }
       .login-trust-row { display:grid; grid-template-columns:minmax(0,1fr); }
@@ -1609,25 +1654,37 @@
         <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet — open main menu">Little Feet</h1>
         <p class="slogan">Every Little Step Matters</p>
       </div>
-      <section class="login-context" aria-labelledby="loginWelcomeTitle">
-        <span class="login-context-kicker"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg>Secure school portal</span>
-        <h2 id="loginWelcomeTitle">Sign in to your Little Feet account</h2>
-        <p>Access attendance, learning records, messages, payments, safeguarding and family updates according to your approved school role.</p>
-        <div class="login-trust-row" aria-label="Account access information">
-          <span class="login-trust-chip"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg>School-managed access</span>
-          <span class="login-trust-chip"><svg class="ui-icon" aria-hidden="true"><use href="#icon-user"></use></svg>Role-based permissions</span>
+      <div class="login-card-tools">
+        <span class="login-secure-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="securePortal">Secure school portal</span></span>
+        <div class="login-card-actions">
+          <label class="login-language-pill" for="loginLanguagePreference" title="Display language">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-globe"></use></svg>
+            <select id="loginLanguagePreference" data-no-draft aria-label="Display language">
+              <option value="en">English</option>
+              <option value="af">Afrikaans</option>
+              <option value="zu">isiZulu</option>
+              <option value="xh">isiXhosa</option>
+              <option value="nso">Sepedi</option>
+              <option value="st">Sesotho</option>
+              <option value="tn">Setswana</option>
+              <option value="ss">siSwati</option>
+              <option value="ve">Tshivenda</option>
+              <option value="ts">itsonga</option>
+              <option value="nr">isiNdebele</option>
+            </select>
+          </label>
+          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound" data-unmute-label="Sound" onclick="togglePortalAudioMute()" aria-label="Toggle Little Feet sounds" title="Little Feet sounds"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span data-lf-i18n="soundShort">Sound</span></button>
         </div>
-      </section>
+      </div>
+      <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
 
       <form id="loginForm">
-        <div class="login-section-label">Little Feet account</div>
         <div>
-          <label for="loginUsername">Staff ID or Parent Email <span class="req">*</span></label>
-          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" autocomplete="username" aria-describedby="loginUsernameHint" required>
-          <small id="loginUsernameHint" class="field-help">Use the Staff ID or parent email registered with your school.</small>
+          <label for="loginUsername"><span data-lf-i18n="usernameLabel">Staff ID or Parent Email</span> <span class="req">*</span></label>
+          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" autocomplete="username" required>
         </div>
         <div>
-          <label for="loginPin">Security PIN / Password <span class="req">*</span></label>
+          <label for="loginPin"><span data-lf-i18n="passwordLabel">Security PIN / Password</span> <span class="req">*</span></label>
           <div class="password-field">
             <input type="password" id="loginPin" placeholder="••••••••" autocomplete="current-password" required>
             <button type="button" class="password-toggle" id="loginPinToggle" aria-label="Show password" aria-controls="loginPin" aria-pressed="false" title="Show password" onclick="toggleLoginPinVisibility()">
@@ -1636,41 +1693,34 @@
             </button>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:15px;">
-          <input type="checkbox" id="rememberLogin" style="width:auto;margin-bottom:0;">
-          <label for="rememberLogin" style="margin-bottom:0;font-weight:normal;cursor:pointer;">Save login details on this device</label>
+        <div class="login-utility-row">
+          <div class="login-remember">
+            <input type="checkbox" id="rememberLogin" style="width:auto;margin:0;">
+            <label for="rememberLogin" data-lf-i18n="rememberEmail">Remember my email</label>
+          </div>
+          <span class="login-help-inline" data-lf-i18n="loginHelp">Forgot PIN/password? Contact your school administrator.</span>
         </div>
-        <p class="login-device-note">Use this option only on a device you trust. Your browser manages saved password credentials where supported.</p>
-        <button type="submit" class="submit-btn"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span>Secure Account Login</span></button>
-        <button type="button" class="action-btn btn-blue" data-portal-audio-mute data-mute-label="Mute Little Feet sounds" data-unmute-label="Unmute Little Feet sounds" onclick="togglePortalAudioMute()" style="width:100%;margin-top:9px;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet sounds</span></button>
+        <button type="submit" class="submit-btn"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="signIn">Secure Account Login</span></button>
 
-        <aside class="login-help-panel" aria-label="Sign-in help">
-          <strong>Need help signing in?</strong>
-          <span>For a forgotten PIN/password, a locked account, or pending school approval, contact your school administrator.</span>
-        </aside>
-
-        <div class="login-divider" aria-hidden="true"><span>or use a connected school account</span></div>
+        <div class="login-divider"><span data-lf-i18n="otherSignIn">Other sign-in options</span></div>
         <div class="social-signin" aria-label="Sign in with a connected provider">
           <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')">Continue with Google</button>
           <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
           <button type="button" data-provider-signin="microsoft" onclick="startProviderSignIn('microsoft')">Continue with Microsoft</button>
         </div>
-        <p class="login-account-help">Connected providers appear only when enabled by your school. Use your Little Feet account until your provider connection is approved.</p>
       </form>
 
       <div class="login-new-account">
-        <p>Need a Little Feet account?</p>
-        <button type="button" class="action-btn btn-blue" onclick="showSignupForm()">Create a Parent, Teacher or Principal account</button>
-        <p class="login-approval-note">Parent–learner links and staff access remain subject to school verification and approval.</p>
+        <p data-lf-i18n="newAccount">New to Little Feet?</p>
+        <button type="button" class="action-btn btn-blue" onclick="showSignupForm()"><span data-lf-i18n="createAccount">Create account</span></button>
       </div>
 
       <div class="login-legal" aria-label="Login legal and privacy information">
         <div class="login-legal-links">
-          <button type="button" class="legal-inline-link" onclick="openPopiaPrivacyNotice()">Privacy &amp; POPIA Notice</button>
+          <button type="button" class="legal-inline-link" onclick="openPopiaPrivacyNotice()" data-lf-i18n="privacyLink">Privacy &amp; POPIA</button>
           <span aria-hidden="true">•</span>
-          <button type="button" class="legal-inline-link" onclick="openTermsOfService()">Terms of Service</button>
+          <button type="button" class="legal-inline-link" onclick="openTermsOfService()" data-lf-i18n="termsLink">Terms</button>
         </div>
-        <p>By signing in, you confirm that you are authorised to access this school portal and will use its information only for authorised school purposes.</p>
       </div>
 
       <form id="signupForm" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);">
@@ -2782,7 +2832,7 @@
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
   <script src="backup.js?v=20260925-aurora-v1" defer></script>
-  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v1" defer></script>
+  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260925-legal-v1" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>

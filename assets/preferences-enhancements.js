@@ -8,7 +8,8 @@
       languageDescription:'Kies jou voorkeur vertoontaal. Onvertaalde inhoud bly in Engels sodat niks verdwyn of breek nie.',
       dashboardRefresh:'Paneelverversing', refreshDescription:'Hou die paneel op datum met ’n sagte verversing wat jou ongestoorde konsep behou.',
       manualRefresh:'Slegs handmatige verversing', autoSmart:'Outomaties (slim)', sound:'Little Feet-klank',
-      navigation:'Navigasie', install:'Installeer Little Feet', theme:'Tema', mute:'Demp Little Feet'
+      navigation:'Navigasie', install:'Installeer Little Feet', theme:'Tema', mute:'Demp Little Feet',
+      securePortal:'Veilige skoolportaal', accessNote:'Skoolbestuurde, rolgebaseerde toegang vir goedgekeurde Little Feet-rekeninge.', usernameLabel:'Personeel-ID of ouer-e-pos', passwordLabel:'Sekuriteits-PIN / Wagwoord', rememberEmail:'Onthou my e-pos', loginHelp:'PIN/wagwoord vergeet? Kontak jou skooladministrateur.', signIn:'Veilige rekeningaanmelding', otherSignIn:'Ander aanmeldopsies', newAccount:'Nuut by Little Feet?', createAccount:'Skep rekening', privacyLink:'Privaatheid & POPIA', termsLink:'Bepalings', soundShort:'Klank'
     },
     zu: {
       overview:'Uhlolojikelele', academics:'Ezemfundo', finance:'Ezezimali', operations:'Imisebenzi', safety:'Ukuphepha', schoolFeed:'Izindaba zesikole', timetable:'Uhlelo lwezikhathi', attendance:'Ukuba khona', development:'Intuthuko', messages:'Imiyalezo', billingFinance:'Izinkokhelo & Ezezimali',
@@ -17,7 +18,8 @@
       languageDescription:'Khetha ulimi oluthandayo. Umbhalo ongakahunyushwa uzohlala ngesiNgisi ukuze lutho lungalahleki.',
       dashboardRefresh:'Vuselela ideshibhodi', refreshDescription:'Gcina ideshibhodi ivuselelwe ngaphandle kokulahlekelwa umbhalo ongakawugcini.',
       manualRefresh:'Vuselela mathupha kuphela', autoSmart:'Okuzenzakalelayo (okuhlakaniphile)', sound:'Umsindo we-Little Feet',
-      navigation:'Ukuzulazula', install:'Faka i-Little Feet', theme:'Itimu', mute:'Thulisa i-Little Feet'
+      navigation:'Ukuzulazula', install:'Faka i-Little Feet', theme:'Itimu', mute:'Thulisa i-Little Feet',
+      securePortal:'Iphothali yesikole evikelekile', accessNote:'Ukufinyelela okulawulwa yisikole ngokwendima kuma-akhawunti agunyaziwe e-Little Feet.', usernameLabel:'I-ID yabasebenzi noma i-imeyili yomzali', passwordLabel:'I-PIN yokuphepha / Iphasiwedi', rememberEmail:'Khumbula i-imeyili yami', loginHelp:'Ukhohlwe i-PIN/iphasiwedi? Xhumana nomphathi wesikole.', signIn:'Ngena ngokuphephile', otherSignIn:'Ezinye izindlela zokungena', newAccount:'Umusha ku-Little Feet?', createAccount:'Dala i-akhawunti', privacyLink:'Ubumfihlo & POPIA', termsLink:'Imigomo', soundShort:'Umsindo'
     },
     xh: {
       overview:'Ushwankathelo', academics:'Imfundo', finance:'Ezemali', operations:'Imisebenzi', safety:'Ukhuseleko', schoolFeed:'Iindaba zesikolo', timetable:'Itheyibhile yexesha', attendance:'Ukuya esikolweni', development:'Uphuhliso', messages:'Imiyalezo', billingFinance:'Amatyala & Ezemali',
@@ -26,7 +28,8 @@
       languageDescription:'Khetha ulwimi olukhethayo. Umbhalo ongekaguqulelwa uya kuhlala ngesiNgesi ukuze kungabikho nto ilahlekileyo.',
       dashboardRefresh:'Hlaziya ideshibhodi', refreshDescription:'Gcina ideshibhodi ihlaziyiwe ngaphandle kokulahlekelwa yidrafti engekagcinwa.',
       manualRefresh:'Hlaziya ngesandla kuphela', autoSmart:'Okuzenzekelayo (okukrelekrele)', sound:'Isandi se-Little Feet',
-      navigation:'Ukukhangela', install:'Faka i-Little Feet', theme:'Umxholo', mute:'Thulisa i-Little Feet'
+      navigation:'Ukukhangela', install:'Faka i-Little Feet', theme:'Umxholo', mute:'Thulisa i-Little Feet',
+      securePortal:'Iphothali yesikolo ekhuselekileyo', accessNote:'Ufikelelo olulawulwa sisikolo ngokwendima kwiiakhawunti ezivunyiweyo ze-Little Feet.', usernameLabel:'I-ID yomsebenzi okanye i-imeyile yomzali', passwordLabel:'I-PIN yokhuseleko / Igama lokugqitha', rememberEmail:'Khumbula i-imeyile yam', loginHelp:'Ulibele i-PIN/igama lokugqitha? Qhagamshelana nomlawuli wesikolo.', signIn:'Ngena ngokukhuselekileyo', otherSignIn:'Ezinye iindlela zokungena', newAccount:'Umtsha kwi-Little Feet?', createAccount:'Yenza iakhawunti', privacyLink:'Ubumfihlo & POPIA', termsLink:'Imiqathango', soundShort:'Isandi'
     },
     nso: {
       overview:'Kakaretšo', academics:'Thuto', finance:'Ditšhelete', operations:'Ditiro', safety:'Polokego', schoolFeed:'Ditaba tša sekolo', timetable:'Lenaneo la dinako', attendance:'Go ba gona', development:'Tlhabollo', messages:'Melaetša', billingFinance:'Ditefelo & Ditšhelete',
@@ -35,7 +38,8 @@
       languageDescription:'Kgetha leleme leo o le ratago. Sengwalwa seo se sego sa fetolelwa se tla dula e le Seisemane.',
       dashboardRefresh:'Mpshafatša dashboard', refreshDescription:'Boloka dashboard e le nakong ntle le go lahlegelwa ke sengwalwa seo se sego sa bolokwa.',
       manualRefresh:'Mpshafatšo ya seatla feela', autoSmart:'Ka go itiragalela', sound:'Modumo wa Little Feet',
-      navigation:'Tshepetšo', install:'Tsenya Little Feet', theme:'Sehlogo', mute:'Homotša Little Feet'
+      navigation:'Tshepetšo', install:'Tsenya Little Feet', theme:'Sehlogo', mute:'Homotša Little Feet',
+      securePortal:'Kgoro ya sekolo ye polokego', accessNote:'Phihlelelo ya sekolo ye go ya ka tema bakeng sa diakhaonto tša Little Feet tše di dumeletšwego.', usernameLabel:'ID ya mošomi goba imeile ya motswadi', passwordLabel:'PIN ya tšhireletšo / Lentšuphetišo', rememberEmail:'Gopola imeile ya ka', loginHelp:'O lebetše PIN/lentšuphetišo? Ikgokaganye le molaodi wa sekolo.', signIn:'Tsena ka polokego', otherSignIn:'Mekgwa ye mengwe ya go tsena', newAccount:'O moswa go Little Feet?', createAccount:'Hlama akhaonto', privacyLink:'Sephiri & POPIA', termsLink:'Melawana', soundShort:'Modumo'
     },
     st: {
       overview:'Kakaretso', academics:'Thuto', finance:'Ditjhelete', operations:'Tshebetso', safety:'Polokeho', schoolFeed:'Ditaba tsa sekolo', timetable:'Lenaneo la nako', attendance:'Boteng', development:'Ntshetsopele', messages:'Melaetsa', billingFinance:'Ditefiso & Ditjhelete',
@@ -44,7 +48,8 @@
       languageDescription:'Kgetha puo eo o e ratang. Mongolo o sa fetolelwang o tla sala ka Senyesemane hore ho se ke ha lahleha letho.',
       dashboardRefresh:'Ntjhafatsa dashboard', refreshDescription:'Boloka dashboard e le ntjha ntle le ho lahlehelwa ke mongolo o sa bolokwang.',
       manualRefresh:'Ntjhafatso ya letsoho feela', autoSmart:'Ka boiketsetso', sound:'Modumo wa Little Feet',
-      navigation:'Tsamaiso', install:'Kenya Little Feet', theme:'Sehlooho', mute:'Kgutsisa Little Feet'
+      navigation:'Tsamaiso', install:'Kenya Little Feet', theme:'Sehlooho', mute:'Kgutsisa Little Feet',
+      securePortal:'Kgoro e sireletsehileng ya sekolo', accessNote:'Phihlello e laolwang ke sekolo ho latela karolo bakeng sa diakhaonto tse amohetsweng tsa Little Feet.', usernameLabel:'ID ya mosebeletsi kapa imeile ya motswadi', passwordLabel:'PIN ya tshireletso / Phasewete', rememberEmail:'Hopola imeile ya ka', loginHelp:'O lebetse PIN/phasewete? Ikopanye le molaodi wa sekolo.', signIn:'Kena ka polokeho', otherSignIn:'Mekgwa e meng ya ho kena', newAccount:'O mocha ho Little Feet?', createAccount:'Theha akhaonto', privacyLink:'Lekunutu & POPIA', termsLink:'Dipehelo', soundShort:'Modumo'
     },
     tn: {
       overview:'Kakaretso', academics:'Thuto', finance:'Ditšhelete', operations:'Ditiro', safety:'Polokesego', schoolFeed:'Dikgang tsa sekolo', timetable:'Lenaneo la nako', attendance:'Go nna teng', development:'Tlhabololo', messages:'Melaetsa', billingFinance:'Dituelo & Ditšhelete',
@@ -53,7 +58,8 @@
       languageDescription:'Tlhopha puo e o e ratang. Mafoko a a sa ranolwang a tla sala ka Sekgoa gore go se ka ga latlhega sepe.',
       dashboardRefresh:'Ntšhwafatsa dashboard', refreshDescription:'Boloka dashboard e le mo nakong ntle le go latlhegelwa ke se o sa se bolokang.',
       manualRefresh:'Ntšhwafatso ya seatla fela', autoSmart:'Ka boitiriso', sound:'Modumo wa Little Feet',
-      navigation:'Tsamaiso', install:'Tsenya Little Feet', theme:'Setlhogo', mute:'Didimatša Little Feet'
+      navigation:'Tsamaiso', install:'Tsenya Little Feet', theme:'Setlhogo', mute:'Didimatša Little Feet',
+      securePortal:'Kgoro ya sekolo e e sireletsegileng', accessNote:'Phitlhelelo e e laolwang ke sekolo go ya ka seabe mo diakhaontong tsa Little Feet tse di amogetsweng.', usernameLabel:'ID ya modiri kgotsa imeile ya motsadi', passwordLabel:'PIN ya tshireletso / Lefoko la sephiri', rememberEmail:'Gakologelwa imeile ya me', loginHelp:'O lebetse PIN/lefoko la sephiri? Ikgolaganye le molaodi wa sekolo.', signIn:'Tsena ka pabalesego', otherSignIn:'Ditsela tse dingwe tsa go tsena', newAccount:'O mosha mo Little Feet?', createAccount:'Tlhama akhaonto', privacyLink:'Boiphitlho & POPIA', termsLink:'Melawana', soundShort:'Modumo'
     },
     ss: {
       overview:'Sibutsetelo', academics:'Temfundvo', finance:'Tetimali', operations:'Imisebenti', safety:'Kuphepha', schoolFeed:'Tindzaba tesikolo', timetable:'Luhlelo lwesikhatsi', attendance:'Kuba khona', development:'Kutfutfuka', messages:'Imilayeto', billingFinance:'Kubhadala & Tetimali',
@@ -62,7 +68,8 @@
       languageDescription:'Khetsa lulwimi lolutsandzako. Lokungakahunyushwa kutawuhlala ngesiNgisi kuze kungalahleki lutfo.',
       dashboardRefresh:'Vuselela ideshibhodi', refreshDescription:'Gcina ideshibhodi ivuselelekile ngaphandle kwekulahlekelwa ngumsebenti longakagcinwa.',
       manualRefresh:'Vuselela ngesandla kuphela', autoSmart:'Ngekutentakalela', sound:'Umsindvo wa Little Feet',
-      navigation:'Kuhamba', install:'Faka Little Feet', theme:'Sihloko', mute:'Thulisa Little Feet'
+      navigation:'Kuhamba', install:'Faka Little Feet', theme:'Sihloko', mute:'Thulisa Little Feet',
+      securePortal:'Iphothali yesikolo lephephile', accessNote:'Kungena lokulawulwa sikolo ngekwendzima kuma-akhawunti e-Little Feet lavunyiwe.', usernameLabel:'I-ID yesisebenti noma i-imeyili yemtali', passwordLabel:'I-PIN yekuphepha / Iphasiwedi', rememberEmail:'Khumbula i-imeyili yami', loginHelp:'Ukhohlwe i-PIN/iphasiwedi? Tsintsana nemphatsi wesikolo.', signIn:'Ngena ngekuphepha', otherSignIn:'Letinye tindlela tekungena', newAccount:'Umusha ku-Little Feet?', createAccount:'Yakha i-akhawunti', privacyLink:'Bumfihlo & POPIA', termsLink:'Imigomo', soundShort:'Umsindvo'
     },
     ve: {
       overview:'Manweledzo', academics:'Pfunzo', finance:'Masheleni', operations:'Mishumo', safety:'Tsireledzo', schoolFeed:'Mafhungo a tshikolo', timetable:'Mbekanyamushumo ya tshifhinga', attendance:'U vha hone', development:'Mvelaphanda', messages:'Milaedza', billingFinance:'Mbadelo & Masheleni',
@@ -71,7 +78,8 @@
       languageDescription:'Nangani luambo lune na lu takalela. Zwi sa athu ṱalutshedzelwa zwi ḓo dzula zwi nga Luisimane uri hu sa xele tshithu.',
       dashboardRefresh:'Dovholosa dashboard', refreshDescription:'Dzudzanyani dashboard i dzule i ya zwino hu songo xela zwe na sa athu vhulunga.',
       manualRefresh:'Dovholosa nga tshanda fhedzi', autoSmart:'Nga u tou itea', sound:'Mubvumo wa Little Feet',
-      navigation:'Tshepetsho', install:'Dzhenisa Little Feet', theme:'Thero', mute:'Fhumudzani Little Feet'
+      navigation:'Tshepetsho', install:'Dzhenisa Little Feet', theme:'Thero', mute:'Fhumudzani Little Feet',
+      securePortal:'Phothala ya tshikolo yo tsireledzeaho', accessNote:'U swikelela hu langwaho nga tshikolo u ya nga mushumo kha dziakhaonto dza Little Feet dzo tendelwaho.', usernameLabel:'ID ya mushumi kana imeiḽi ya mubebi', passwordLabel:'PIN ya tsireledzo / Phasiwede', rememberEmail:'Humbula imeiḽi yanga', loginHelp:'No hangwa PIN/phasiwede? Kwamanani na mulanguli wa tshikolo.', signIn:'Dzhena nga tsireledzo', otherSignIn:'Dziṅwe nḓila dza u dzhena', newAccount:'Ni muswa kha Little Feet?', createAccount:'Sikani akhaonto', privacyLink:'Tshiphiri & POPIA', termsLink:'Milayo', soundShort:'Mubvumo'
     },
     ts: {
       overview:'Nkatsakanyo', academics:'Dyondzo', finance:'Timali', operations:'Mintirho', safety:'Vuhlayiseki', schoolFeed:'Mahungu ya xikolo', timetable:'Xiyimiso xa nkarhi', attendance:'Ku va kona', development:'Nhluvuko', messages:'Mahungu', billingFinance:'Mibalo & Timali',
@@ -80,7 +88,8 @@
       languageDescription:'Hlawula ririmi leri u ri tsakelaka. Marito lama nga si hundzuluxiwaka ma ta sala hi Xinghezi leswaku ku nga lahleki leswi u swi endleke.',
       dashboardRefresh:'Pfuxeta dashboard', refreshDescription:'Hlayisa dashboard yi ri ya sweswi handle ko lahlekeriwa hi leswi u nga si swi hlayisa.',
       manualRefresh:'Pfuxeta hi voko ntsena', autoSmart:'Hi ku tisungulela', sound:'Mpfumawulo wa Little Feet',
-      navigation:'Ku fambafamba', install:'Nghenisa Little Feet', theme:'Nhlokomhaka', mute:'Timela mpfumawulo wa Little Feet'
+      navigation:'Ku fambafamba', install:'Nghenisa Little Feet', theme:'Nhlokomhaka', mute:'Timela mpfumawulo wa Little Feet',
+      securePortal:'Phothali ya xikolo leyi sirhelelekeke', accessNote:'Ku nghena loku lawuriwaka hi xikolo hi ku ya hi xiphemu eka tiakhawunti ta Little Feet leti pfumeleriweke.', usernameLabel:'ID ya mutirhi kumbe imeyili ya mutswari', passwordLabel:'PIN ya vuhlayiseki / Phasiwedi', rememberEmail:'Tsundzuka imeyili ya mina', loginHelp:'U rivele PIN/phasiwedi? Tihlanganise na mulawuri wa xikolo.', signIn:'Nghena hi ku hlayiseka', otherSignIn:'Tindlela tin’wana to nghena', newAccount:'U muntshwa eka Little Feet?', createAccount:'Endla akhawunti', privacyLink:'Vuhlayiseki bya vuxokoxoko & POPIA', termsLink:'Milawu', soundShort:'Mpfumawulo'
     },
     nr: {
       overview:'Isirhunyezo', academics:'Ifundo', finance:'Iimali', operations:'Imisebenzi', safety:'Ukuphepha', schoolFeed:'Iindaba zesikolo', timetable:'Irhelo lesikhathi', attendance:'Ukuba khona', development:'Ukuthuthuka', messages:'Imilayezo', billingFinance:'Ukubhadela & Iimali',
@@ -171,7 +180,42 @@
       const span = button.querySelector('span');
       if (span) span.textContent = translate('mute', selected) || 'Mute Little Feet';
     });
+    document.querySelectorAll('[data-lf-i18n]').forEach(element => {
+      setTranslatedText(element, element.dataset.lfI18n, selected);
+    });
+    const loginLanguage = document.getElementById('loginLanguagePreference');
+    if (loginLanguage && loginLanguage.value !== selected) loginLanguage.value = selected;
     return selected;
+  }
+
+  function readGuestLanguage() {
+    try {
+      const stored = JSON.parse(localStorage.getItem('lf_user_preferences') || '{}');
+      return LANGUAGE_PACKS[stored.language] ? stored.language : 'en';
+    } catch {
+      return 'en';
+    }
+  }
+
+  function setLoginLanguage(language) {
+    const selected = LANGUAGE_PACKS[language] ? language : 'en';
+    try {
+      const stored = JSON.parse(localStorage.getItem('lf_user_preferences') || '{}');
+      localStorage.setItem('lf_user_preferences', JSON.stringify({ ...stored, language:selected }));
+    } catch {}
+    const settingsLanguage = document.getElementById('languagePreference');
+    if (settingsLanguage) settingsLanguage.value = selected;
+    applyLittleFeetLanguage(selected);
+    return selected;
+  }
+
+  function initLoginLanguage() {
+    const select = document.getElementById('loginLanguagePreference');
+    if (!select) return;
+    const selected = readGuestLanguage();
+    select.value = selected;
+    applyLittleFeetLanguage(selected);
+    select.addEventListener('change', () => setLoginLanguage(select.value));
   }
 
   function isDraftEligible(element) {
@@ -295,7 +339,8 @@
     refreshTimer = window.setTimeout(async () => {
       await refreshDashboardSafely();
       const currentPreference = document.getElementById('refreshPreference')?.value || preference;
-      scheduleDashboardRefresh(currentPreference);
+      scheduleDashboardRefresh(currentPreference);,
+      securePortal:'Iphothali yesikolo ephephileko', accessNote:'Ukufikelela okulawulwa sikolo ngokuya ngendima kuma-akhawunti avunyelweko we-Little Feet.', usernameLabel:'I-ID yesisebenzi namkha i-imeyili yomzali', passwordLabel:'I-PIN yokuphepha / Iphasikhodi', rememberEmail:'Khumbula i-imeyili yami', loginHelp:'Ukhohlwe i-PIN/iphasikhodi? Thintana nomphathi wesikolo.', signIn:'Ngena ngokuphepha', otherSignIn:'Ezinye iindlela zokungena', newAccount:'Umusha ku-Little Feet?', createAccount:'Yakha i-akhawunti', privacyLink:'Ubumfihlo & POPIA', termsLink:'Imibandela', soundShort:'Umsindo'
     }, interval);
   }
 
@@ -333,8 +378,15 @@
     }
   });
 
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLoginLanguage, { once:true });
+  } else {
+    initLoginLanguage();
+  }
+
   Object.assign(window, {
     applyLittleFeetLanguage,
+    setLoginLanguage,
     saveDashboardDrafts,
     restoreDashboardDrafts,
     clearDashboardDrafts,

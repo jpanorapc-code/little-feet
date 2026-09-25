@@ -49,7 +49,12 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v9/);
-assert.match(serviceWorker, /preferences-enhancements\.js\?v=20260925-preferences-v1/);
+assert.match(serviceWorker, /little-feet-shell-v10/);
+assert.match(serviceWorker, /preferences-enhancements\.js\?v=20260925-preferences-v2/);
 
+assert.match(page, /id="loginLanguagePreference"/);
+assert.match(preferences, /function setLoginLanguage\(language\)/);
+assert.match(preferences, /localStorage\.setItem\('lf_user_preferences'/);
+assert.match(preferences, /document\.querySelectorAll\('\[data-lf-i18n\]'\)/);
+assert.match(preferences, /initLoginLanguage/);
 console.log('Language and draft-safe refresh regression test passed.');

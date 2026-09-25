@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v9';
+const CACHE_NAME = 'little-feet-shell-v10';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -11,7 +11,7 @@ const SHELL_ASSETS = [
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1',
-  '/assets/preferences-enhancements.js?v=20260925-preferences-v1',
+  '/assets/preferences-enhancements.js?v=20260925-preferences-v2',
   '/assets/legal-notices.js?v=20260925-legal-v1',
   '/assets/finance-automation.js?v=20260925-finance-v1'
 ];
