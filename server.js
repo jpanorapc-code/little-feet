@@ -39,12 +39,35 @@ if (productionConfigurationErrors.length) {
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
 const RENDER_DEPLOY_SHA = String(process.env.RENDER_GIT_COMMIT || '').trim().toLowerCase();
 const RENDER_REPO_SLUG = String(process.env.RENDER_GIT_REPO_SLUG || '').trim();
-const renderDeployAvailable = process.env.RENDER === 'true'
-  && /^[0-9a-f]{40}$/.test(RENDER_DEPLOY_SHA)
-  && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(RENDER_REPO_SLUG);
+const renderDeployAvailable = process.env.RENDER === 'true' && /^[0-9a-f]{40}$/.test(RENDER_DEPLOY_SHA);
+const renderRepoSlugAvailable = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(RENDER_REPO_SLUG);
+const RENDER_DEPLOY_METADATA_FILE = path.join(__dirname, '.render-deploy-release.json');
 let renderDeployReleaseNote = null;
 let renderDeployReleasePromise = null;
 const releaseVersionForUpdateLines = updateLineCount => Number(updateLineCount) <= 8 ? '8.2.9' : '9.0';
+const readBuiltRenderDeployReleaseNote = () => {
+  if (!renderDeployAvailable) return null;
+  try {
+    const built = JSON.parse(fs.readFileSync(RENDER_DEPLOY_METADATA_FILE, 'utf8'));
+    const fullCommitSha = String(built?.fullCommitSha || '').trim().toLowerCase();
+    if (fullCommitSha !== RENDER_DEPLOY_SHA) return null;
+    const updateLineCount = Math.max(1, Number(built?.updateLineCount) || 1);
+    return {
+      id: `render-${RENDER_DEPLOY_SHA}`,
+      version: releaseVersionForUpdateLines(updateLineCount),
+      title: boundedText(built?.title || `Deploy ${RENDER_DEPLOY_SHA.slice(0, 7)}`, 240),
+      summary: boundedText(built?.summary || 'Pulled from the deployed Git commit during the Render build.', 600),
+      publishedAt: Number.isNaN(Date.parse(built?.publishedAt || '')) ? new Date().toISOString() : built.publishedAt,
+      source: 'Render',
+      commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
+      updateLineCount,
+      changeLines: null,
+      releaseType: updateLineCount <= 8 ? 'patch' : 'update'
+    };
+  } catch {
+    return null;
+  }
+};
 const renderDeployFallbackNote = () => renderDeployAvailable ? {
   id: `render-${RENDER_DEPLOY_SHA}`,
   version: '8.2',
@@ -60,6 +83,12 @@ const renderDeployFallbackNote = () => renderDeployAvailable ? {
 const resolveRenderDeployReleaseNote = async () => {
   if (!renderDeployAvailable) return null;
   if (renderDeployReleaseNote) return renderDeployReleaseNote;
+  const builtReleaseNote = readBuiltRenderDeployReleaseNote();
+  if (builtReleaseNote) {
+    renderDeployReleaseNote = builtReleaseNote;
+    return renderDeployReleaseNote;
+  }
+  if (!renderRepoSlugAvailable) return renderDeployFallbackNote();
   if (renderDeployReleasePromise) return renderDeployReleasePromise;
   renderDeployReleasePromise = (async () => {
     const controller = new AbortController();

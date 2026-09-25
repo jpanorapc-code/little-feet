@@ -39,6 +39,7 @@ jobs:
           node --check assets/mobile-pwa.js
           node --check assets/curriculum-frameworks.js
           node --check assets/education-stages.js
+          node --check scripts/write-deploy-release.js
 
       - name: Full regression suite
         run: npm test

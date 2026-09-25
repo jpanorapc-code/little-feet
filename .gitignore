@@ -16,3 +16,6 @@ littlefeet-replica.json.next
 tmp/*
 !tmp/.gitkeep
 .codex-remote-attachments/
+
+# Build-time deploy metadata
+.render-deploy-release.json
