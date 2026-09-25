@@ -779,11 +779,16 @@ function logAppError(code, reason) {
   }
 }
 
+let modalReturnFocus = null;
+
 function openModal(title, contentHtml) {
+  const modal = document.getElementById('appModal');
+  modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = contentHtml;
   document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
-  document.getElementById('appModal').classList.remove('hidden');
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => modal.querySelector('.modal-close')?.focus());
 }
 
 function sanitiseDebugText(value) {
@@ -881,7 +886,15 @@ function closeModal() {
   visitorScannerStream = null;
   stopWindtLegacyNote();
   document.getElementById('appModal').classList.add('hidden');
+  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+  modalReturnFocus = null;
 }
+
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const modal = document.getElementById('appModal');
+  if (modal && !modal.classList.contains('hidden')) closeModal();
+});
 
 function toggleDarkMode() {
   document.body.classList.toggle('light-mode');
