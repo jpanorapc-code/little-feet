@@ -55,6 +55,14 @@ assert.ok(sitemap.includes('<urlset xmlns="http://www.sitemaps.org/schemas/sitem
 assert.ok(sitemap.includes('<loc>https://littlefeet.co.za/</loc>'));
 assert.match(checklist, /Source set reviewed: the 19 videos/);
 assert.match(checklist, /Rules applied during this review/);
+assert.match(server, /RENDER_GIT_COMMIT/);
+assert.match(server, /RENDER_GIT_REPO_SLUG/);
+assert.match(server, /releaseVersionForChangeLines = changeLines => Number\(changeLines\) <= 8 \? '8\.2\.9' : '9\.0'/);
+assert.match(server, /commit\?\.stats\?\.total/);
+assert.match(server, /source: 'Render'/);
+assert.match(client, /Render deploy/);
+assert.match(client, /changed line/);
+assert.match(client, /<svg viewBox="0 0 24 24"/);
 
 const parsedManifest = JSON.parse(manifest);
 assert.equal(parsedManifest.display, 'standalone');
