@@ -49,7 +49,7 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v4/);
+assert.match(serviceWorker, /little-feet-shell-v5/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20260925-preferences-v1/);
 
 console.log('Language and draft-safe refresh regression test passed.');
