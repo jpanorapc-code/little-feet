@@ -1076,19 +1076,30 @@ app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
   const loginUsername = limitedText(username, 160);
   const normalizedUsername = loginUsername ? normalizeUsername(loginUsername) : '';
-  const attemptKey = loginAttemptKey(req, normalizedUsername || '[invalid-username]');
+
+  // Every accepted login alias for the same account shares one username-level
+  // spray bucket. Otherwise an attacker could multiply guesses by rotating
+  // aliases while also rotating source IPs.
+  const matchedAccount = normalizedUsername
+    ? db.users.find(account => accountMatchesUsername(account, normalizedUsername))
+    : null;
+  const attemptIdentity = matchedAccount ? normalizeUsername(matchedAccount.username) : normalizedUsername;
+  const attemptKey = loginAttemptKey(req, attemptIdentity || '[invalid-username]');
   const previousAttempts = activeLoginAttempt(attemptKey);
-  const previousUsernameAttempts = activeUsernameAttempt(normalizedUsername);
+  const previousUsernameAttempts = activeUsernameAttempt(attemptIdentity);
   if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
   }
-  const user = normalizedUsername && validSecretLength(pin) && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
+
+  const user = matchedAccount && validSecretLength(pin) && matchesPin(pin, matchedAccount.pinHash)
+    ? matchedAccount
+    : null;
   if (user) {
     if (String(user.verificationStatus || '').includes('verification pending')) {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
-    loginUsernameAttempts.delete(normalizedUsername);
+    loginUsernameAttempts.delete(attemptIdentity);
     if (!replicaMode && pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     establishAuthenticatedSession(req, user, (error, safeUser) => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
@@ -1096,7 +1107,7 @@ app.post('/api/login', (req, res) => {
     });
   } else {
     loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
-    loginUsernameAttempts.set(normalizedUsername, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
+    loginUsernameAttempts.set(attemptIdentity, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
     if (loginAttempts.size > 10000 || loginUsernameAttempts.size > 10000) pruneLoginAttempts();
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
