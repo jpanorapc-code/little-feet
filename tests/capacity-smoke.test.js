@@ -22,6 +22,7 @@ const students = Array.from({ length: 2000 }, (_, index) => {
 });
 
 fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'server.js'));
+fs.copyFileSync(path.join(root, 'finance-automation-server.js'), path.join(temporaryDirectory, 'finance-automation-server.js'));
 fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory, 'auth-crypto.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({ schools, users, students, learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {} }));
 
