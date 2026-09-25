@@ -610,7 +610,13 @@ async function loadReleaseNotes() {
       board.classList.add('hidden');
       return;
     }
-    board.innerHTML = `<div class="card-header-bar"><div><h2>✨ What’s new</h2><span class="meta">Updates automatically while you are signed in</span></div><button type="button" class="action-btn btn-blue" onclick="dismissReleaseNotes('${latest.id}')">Mark as read</button></div>${notes.slice(0, 3).map(note => `<div class="item-row"><div><strong>Version ${escapeWorkspaceText(note.version)} · ${escapeWorkspaceText(note.title)}</strong><p style="margin-top:4px;color:var(--text-muted);">${escapeWorkspaceText(note.summary)}</p><span class="meta">${new Date(note.publishedAt).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' })}</span></div></div>`).join('')}`;
+    const deployIcon = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><circle cx="6" cy="6" r="2.4"></circle><circle cx="18" cy="18" r="2.4"></circle><path d="M8.4 6h3.2a4 4 0 0 1 4 4v5.6"></path><path d="M6 8.4v7.2"></path></svg>';
+    board.innerHTML = `<div class="card-header-bar"><div><h2>✨ What’s new</h2><span class="meta">Updates automatically from the live deployment while you are signed in</span></div><button type="button" class="action-btn btn-blue" onclick="dismissReleaseNotes('${latest.id}')">Mark as read</button></div>${notes.slice(0, 3).map(note => {
+      const deployMeta = note.source === 'Render'
+        ? `<span class="meta" style="display:flex;align-items:center;gap:7px;margin-top:8px;">${deployIcon}<span>Render deploy · ${escapeWorkspaceText(note.commitSha || '')}${Number.isFinite(Number(note.updateLineCount)) ? ` · ${Number(note.updateLineCount)} update line${Number(note.updateLineCount) === 1 ? '' : 's'} · ${escapeWorkspaceText(note.releaseType || 'patch')}` : ''}</span></span>`
+        : '';
+      return `<div class="item-row"><div><strong>Version ${escapeWorkspaceText(note.version)} · ${escapeWorkspaceText(note.title)}</strong><p style="margin-top:4px;color:var(--text-muted);">${escapeWorkspaceText(note.summary)}</p>${deployMeta}<span class="meta" style="display:block;margin-top:5px;">${new Date(note.publishedAt).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' })}</span></div></div>`;
+    }).join('')}`;
     board.classList.remove('hidden');
   } catch { board.classList.add('hidden'); }
 }
