@@ -138,110 +138,126 @@
       50% { opacity:.96; }
     }
 
-    /* Aurora curtain strobes: narrow luminous shafts that sweep through the
-       ribbons instead of flashing the whole screen. Kept below UI content. */
-    .portal-aurora-strobes,
-    .wallpaper-aurora-strobes {
+    /* Soft standby-style aurora lights. Each glow is independent, blurred and
+       slow-moving so the eye sees drifting light instead of a repeated stripe pattern. */
+    .portal-aurora-lights,
+    .wallpaper-aurora-lights {
       pointer-events:none;
       overflow:hidden;
       mix-blend-mode:screen;
-      filter:blur(1.2px) saturate(1.18);
-      -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 42%,rgba(0,0,0,.44) 72%,transparent 96%);
-      mask-image:linear-gradient(to bottom,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 42%,rgba(0,0,0,.44) 72%,transparent 96%);
+      filter:saturate(1.12);
     }
 
-    .portal-aurora-strobes {
+    .portal-aurora-lights {
       display:none;
       position:fixed;
-      inset:-12% -10%;
+      inset:-14% -10%;
       z-index:0;
-      opacity:.82;
-      transform:skewX(-6deg) translate3d(-3%,0,0);
     }
 
-    body.portal-active .portal-aurora-strobes { display:block; }
+    body.portal-active .portal-aurora-lights { display:block; }
 
-    .wallpaper-aurora-strobes {
+    .wallpaper-aurora-lights {
       position:absolute;
-      inset:-12% -10%;
+      inset:-14% -10%;
       z-index:2;
-      opacity:.90;
-      transform:skewX(-6deg) translate3d(-3%,0,0);
     }
 
-    .portal-aurora-strobes::before,
-    .wallpaper-aurora-strobes::before {
-      content:"";
+    .portal-aurora-lights .aurora-float,
+    .wallpaper-aurora-lights .aurora-float {
       position:absolute;
-      inset:-8% -10%;
-      background:
-        repeating-linear-gradient(
-          96deg,
-          transparent 0 5.8%,
-          rgba(74,222,128,.02) 6.1%,
-          rgba(126,255,193,.24) 6.6%,
-          rgba(225,255,244,.54) 7.0%,
-          rgba(139,92,246,.23) 7.45%,
-          rgba(236,72,153,.10) 7.9%,
-          transparent 8.7% 14.8%
-        );
-      background-size:118% 100%;
-      transform:translate3d(-7%,0,0);
-      transform-origin:center top;
+      border-radius:48% 52% 46% 54% / 62% 38% 62% 38%;
+      filter:blur(34px);
+      opacity:.34;
+      transform-origin:50% 10%;
       will-change:transform,opacity;
-      animation:auroraStrobeSweep 7.2s ease-in-out infinite alternate,auroraStrobeGlow 4.8s ease-in-out infinite;
-    }
-
-    .portal-aurora-strobes::after,
-    .wallpaper-aurora-strobes::after {
-      content:"";
-      position:absolute;
-      inset:-10% -12%;
       background:
-        repeating-linear-gradient(
-          84deg,
-          transparent 0 9%,
-          rgba(167,243,208,.04) 9.4%,
-          rgba(94,234,212,.20) 9.9%,
-          rgba(255,255,255,.38) 10.25%,
-          rgba(196,181,253,.24) 10.7%,
-          transparent 11.4% 21%
-        );
-      background-size:126% 100%;
-      transform:translate3d(6%,0,0);
-      transform-origin:center top;
-      will-change:transform,opacity;
-      animation:auroraStrobeSweepReverse 9.4s ease-in-out infinite alternate,auroraStrobeGlowAlt 6.2s ease-in-out infinite;
+        radial-gradient(ellipse at 50% 12%, var(--aurora-core) 0%, var(--aurora-mid) 30%, rgba(255,255,255,.035) 48%, transparent 72%);
     }
 
-    @keyframes auroraStrobeSweep {
-      0% { transform:translate3d(-9%,-1%,0) scaleY(.94); }
-      38% { transform:translate3d(-1%,2%,0) scaleY(1.05); }
-      72% { transform:translate3d(5%,-.5%,0) scaleY(.98); }
-      100% { transform:translate3d(10%,1.5%,0) scaleY(1.08); }
+    .aurora-float.light-a {
+      --aurora-core:rgba(134,255,196,.70);
+      --aurora-mid:rgba(34,197,94,.28);
+      width:25vw; height:94vh; left:-6%; top:-18%;
+      animation:standbyLightA 19s ease-in-out -6s infinite alternate;
     }
 
-    @keyframes auroraStrobeSweepReverse {
-      0% { transform:translate3d(9%,1%,0) scaleY(1.04); }
-      45% { transform:translate3d(1%,-1.5%,0) scaleY(.96); }
-      100% { transform:translate3d(-8%,1%,0) scaleY(1.07); }
+    .aurora-float.light-b {
+      --aurora-core:rgba(196,181,253,.62);
+      --aurora-mid:rgba(139,92,246,.26);
+      width:22vw; height:82vh; left:19%; top:-28%;
+      opacity:.28;
+      animation:standbyLightB 23s ease-in-out -14s infinite alternate;
     }
 
-    @keyframes auroraStrobeGlow {
-      0%,100% { opacity:.28; }
-      18% { opacity:.82; }
-      31% { opacity:.44; }
-      52% { opacity:.95; }
-      66% { opacity:.50; }
-      84% { opacity:.86; }
+    .aurora-float.light-c {
+      --aurora-core:rgba(167,243,208,.66);
+      --aurora-mid:rgba(20,184,166,.23);
+      width:29vw; height:88vh; left:47%; top:-34%;
+      opacity:.30;
+      animation:standbyLightC 27s ease-in-out -9s infinite alternate;
     }
 
-    @keyframes auroraStrobeGlowAlt {
-      0%,100% { opacity:.20; }
-      27% { opacity:.70; }
-      49% { opacity:.34; }
-      73% { opacity:.78; }
-      88% { opacity:.42; }
+    .aurora-float.light-d {
+      --aurora-core:rgba(244,114,182,.48);
+      --aurora-mid:rgba(168,85,247,.22);
+      width:21vw; height:78vh; right:-4%; top:-20%;
+      opacity:.27;
+      animation:standbyLightD 21s ease-in-out -17s infinite alternate;
+    }
+
+    .aurora-float.light-e {
+      --aurora-core:rgba(110,231,183,.46);
+      --aurora-mid:rgba(34,197,94,.17);
+      width:34vw; height:54vh; right:4%; bottom:-28%;
+      opacity:.22;
+      filter:blur(46px);
+      animation:standbyLightE 31s ease-in-out -11s infinite alternate;
+    }
+
+    .aurora-float.light-f {
+      --aurora-core:rgba(216,180,254,.42);
+      --aurora-mid:rgba(126,34,206,.18);
+      width:30vw; height:48vh; left:6%; bottom:-30%;
+      opacity:.20;
+      filter:blur(48px);
+      animation:standbyLightF 29s ease-in-out -21s infinite alternate;
+    }
+
+    @keyframes standbyLightA {
+      0%   { transform:translate3d(-8%,-2%,0) rotate(-13deg) scale(.86,1.02); opacity:.20; }
+      42%  { transform:translate3d(13%,5%,0) rotate(-4deg) scale(1.04,1.10); opacity:.48; }
+      100% { transform:translate3d(31%,-1%,0) rotate(8deg) scale(.93,1.16); opacity:.31; }
+    }
+
+    @keyframes standbyLightB {
+      0%   { transform:translate3d(-12%,3%,0) rotate(9deg) scale(.91,1.06); opacity:.18; }
+      53%  { transform:translate3d(19%,-4%,0) rotate(-7deg) scale(1.08,.96); opacity:.41; }
+      100% { transform:translate3d(38%,4%,0) rotate(5deg) scale(.96,1.12); opacity:.24; }
+    }
+
+    @keyframes standbyLightC {
+      0%   { transform:translate3d(14%,-3%,0) rotate(-6deg) scale(1.03,.94); opacity:.17; }
+      47%  { transform:translate3d(-14%,5%,0) rotate(7deg) scale(.91,1.14); opacity:.43; }
+      100% { transform:translate3d(-30%,-1%,0) rotate(-10deg) scale(1.06,1.02); opacity:.26; }
+    }
+
+    @keyframes standbyLightD {
+      0%   { transform:translate3d(12%,2%,0) rotate(12deg) scale(.88,1.08); opacity:.16; }
+      39%  { transform:translate3d(-15%,-5%,0) rotate(2deg) scale(1.10,.98); opacity:.38; }
+      100% { transform:translate3d(-34%,3%,0) rotate(-8deg) scale(.95,1.12); opacity:.22; }
+    }
+
+    @keyframes standbyLightE {
+      0%   { transform:translate3d(9%,11%,0) rotate(-5deg) scale(.88); opacity:.12; }
+      55%  { transform:translate3d(-17%,-10%,0) rotate(5deg) scale(1.13); opacity:.31; }
+      100% { transform:translate3d(-31%,-4%,0) rotate(-2deg) scale(.97); opacity:.18; }
+    }
+
+    @keyframes standbyLightF {
+      0%   { transform:translate3d(-10%,8%,0) rotate(6deg) scale(.92); opacity:.11; }
+      45%  { transform:translate3d(18%,-13%,0) rotate(-4deg) scale(1.09); opacity:.29; }
+      100% { transform:translate3d(35%,-5%,0) rotate(7deg) scale(.96); opacity:.17; }
     }
 
     body.portal-active.light-mode { background-color:var(--bg-dark); }
@@ -253,10 +269,8 @@
       body.portal-active::after,
       .wallpaper-aurora-sky::before,
       .wallpaper-aurora-sky::after,
-      .portal-aurora-strobes::before,
-      .portal-aurora-strobes::after,
-      .wallpaper-aurora-strobes::before,
-      .wallpaper-aurora-strobes::after { animation:none !important; }
+      .portal-aurora-lights .aurora-float,
+      .wallpaper-aurora-lights .aurora-float { animation:none !important; }
     }
 
     #portalLoader { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 50% 34%,rgba(13,148,136,.22),rgba(7,17,30,.98) 58%); transition:opacity .35s ease, visibility .35s ease; }
@@ -2724,10 +2738,10 @@
     </footer>
   </div>
 
-  <div class="portal-aurora-strobes" aria-hidden="true"></div>
+  <div class="portal-aurora-lights" aria-hidden="true"><span class="aurora-float light-a"></span><span class="aurora-float light-b"></span><span class="aurora-float light-c"></span><span class="aurora-float light-d"></span><span class="aurora-float light-e"></span><span class="aurora-float light-f"></span></div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet northern lights wallpaper" onclick="exitWallpaperMode()">
-    <div class="wallpaper-aurora-sky" aria-hidden="true"><span class="wallpaper-aurora-strobes"></span></div>
+    <div class="wallpaper-aurora-sky" aria-hidden="true"><span class="wallpaper-aurora-lights"><span class="aurora-float light-a"></span><span class="aurora-float light-b"></span><span class="aurora-float light-c"></span><span class="aurora-float light-d"></span><span class="aurora-float light-e"></span><span class="aurora-float light-f"></span></span></div>
     <img id="wallpaperImage" alt="Custom Little Feet wallpaper" loading="lazy" decoding="async">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment under the northern lights. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
