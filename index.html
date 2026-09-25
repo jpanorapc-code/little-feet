@@ -100,23 +100,14 @@
     body.portal-active::after {
       content:"";
       position:fixed;
-      inset:-18% -14%;
+      inset:0;
       z-index:0;
       pointer-events:none;
-      opacity:.92;
-      transform:translate3d(-2%,-1%,0) rotate(-2.5deg) scale(1.08);
-      transform-origin:center;
-      will-change:transform,opacity;
+      opacity:.72;
       background:
-        radial-gradient(ellipse 78% 14% at 4% 9%, rgba(45,255,138,.62) 0%, rgba(34,197,94,.34) 34%, rgba(16,185,129,.12) 56%, transparent 75%),
-        radial-gradient(ellipse 70% 12% at 46% 5%, rgba(139,92,246,.48) 0%, rgba(124,58,237,.27) 36%, rgba(168,85,247,.10) 58%, transparent 76%),
-        radial-gradient(ellipse 50% 10% at 86% 8%, rgba(74,222,128,.55) 0%, rgba(34,197,94,.25) 42%, transparent 73%),
-        radial-gradient(ellipse 46% 9% at 99% 17%, rgba(236,72,153,.34) 0%, rgba(168,85,247,.20) 42%, transparent 72%),
-        radial-gradient(ellipse 62% 10% at 8% 90%, rgba(139,92,246,.26) 0%, rgba(168,85,247,.14) 45%, transparent 75%),
-        radial-gradient(ellipse 68% 12% at 93% 88%, rgba(45,255,138,.30) 0%, rgba(34,197,94,.16) 43%, rgba(139,92,246,.10) 61%, transparent 76%),
-        linear-gradient(108deg, transparent 8%, rgba(74,222,128,.13) 25%, transparent 39%, rgba(139,92,246,.15) 52%, transparent 65%, rgba(236,72,153,.09) 78%, transparent 91%);
-      mix-blend-mode:screen;
-      animation:portalAuroraDrift 17s ease-in-out infinite alternate,portalAuroraPulse 8s ease-in-out infinite;
+        radial-gradient(ellipse 72% 20% at 4% 4%, rgba(34,197,94,.18) 0%, rgba(16,185,129,.07) 48%, transparent 74%),
+        radial-gradient(ellipse 62% 18% at 96% 8%, rgba(139,92,246,.16) 0%, rgba(168,85,247,.06) 48%, transparent 74%),
+        radial-gradient(ellipse 70% 22% at 74% 100%, rgba(236,72,153,.07) 0%, rgba(139,92,246,.05) 46%, transparent 75%);
     }
 
     @keyframes portalStarTwinkle {
@@ -126,139 +117,87 @@
       100% { opacity:1; }
     }
 
-    @keyframes portalAuroraDrift {
-      0% { transform:translate3d(-4%,-1.5%,0) rotate(-4deg) scale(1.07); }
-      34% { transform:translate3d(-.5%,1.4%,0) rotate(-2deg) scale(1.11); }
-      68% { transform:translate3d(2.2%,-.4%,0) rotate(.5deg) scale(1.09); }
-      100% { transform:translate3d(4.5%,1%,0) rotate(2.5deg) scale(1.12); }
-    }
-
-    @keyframes portalAuroraPulse {
-      0%,100% { opacity:.76; }
-      50% { opacity:.96; }
-    }
-
-    /* Soft standby-style aurora lights. Each glow is independent, blurred and
-       slow-moving so the eye sees drifting light instead of a repeated stripe pattern. */
-    .portal-aurora-lights,
-    .wallpaper-aurora-lights {
+    /* Compact Windows-style ribbon light: three translucent curved bands.
+       The SVG shapes are static; only transform + opacity animate, which keeps
+       the movement on the compositor instead of repainting huge blurred layers. */
+    .portal-ribbons,
+    .wallpaper-ribbons {
       pointer-events:none;
       overflow:hidden;
-      mix-blend-mode:screen;
-      filter:saturate(1.12);
+      contain:paint;
     }
 
-    .portal-aurora-lights {
+    .portal-ribbons {
       display:none;
       position:fixed;
-      inset:-14% -10%;
+      inset:0;
       z-index:0;
     }
 
-    body.portal-active .portal-aurora-lights { display:block; }
+    body.portal-active .portal-ribbons { display:block; }
 
-    .wallpaper-aurora-lights {
+    .wallpaper-ribbons {
       position:absolute;
-      inset:-14% -10%;
+      inset:0;
       z-index:2;
     }
 
-    .portal-aurora-lights .aurora-float,
-    .wallpaper-aurora-lights .aurora-float {
+    .standby-ribbon {
       position:absolute;
-      border-radius:48% 52% 46% 54% / 62% 38% 62% 38%;
-      filter:blur(34px);
+      inset:-7%;
+      width:114%;
+      height:114%;
+      overflow:visible;
       opacity:.34;
-      transform-origin:50% 10%;
       will-change:transform,opacity;
-      background:
-        radial-gradient(ellipse at 50% 12%, var(--aurora-core) 0%, var(--aurora-mid) 30%, rgba(255,255,255,.035) 48%, transparent 72%);
+      backface-visibility:hidden;
+      transform:translate3d(0,0,0);
     }
 
-    .aurora-float.light-a {
-      --aurora-core:rgba(134,255,196,.70);
-      --aurora-mid:rgba(34,197,94,.28);
-      width:25vw; height:94vh; left:-6%; top:-18%;
-      animation:standbyLightA 19s ease-in-out -6s infinite alternate;
+    .standby-ribbon path {
+      fill:none;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      vector-effect:non-scaling-stroke;
     }
 
-    .aurora-float.light-b {
-      --aurora-core:rgba(196,181,253,.62);
-      --aurora-mid:rgba(139,92,246,.26);
-      width:22vw; height:82vh; left:19%; top:-28%;
-      opacity:.28;
-      animation:standbyLightB 23s ease-in-out -14s infinite alternate;
+    .standby-ribbon .ribbon-halo { stroke-width:30; opacity:.12; }
+    .standby-ribbon .ribbon-core { stroke-width:11; opacity:.50; }
+
+    .standby-ribbon.ribbon-a { color:rgb(110,255,185); animation:ribbonDriftA 24s ease-in-out -8s infinite alternate; }
+    .standby-ribbon.ribbon-b { color:rgb(196,181,253); animation:ribbonDriftB 31s ease-in-out -19s infinite alternate; }
+    .standby-ribbon.ribbon-c { color:rgb(244,114,182); animation:ribbonDriftC 27s ease-in-out -13s infinite alternate; }
+
+    .standby-ribbon.ribbon-a .ribbon-halo,
+    .standby-ribbon.ribbon-a .ribbon-core { stroke:currentColor; }
+    .standby-ribbon.ribbon-b .ribbon-halo,
+    .standby-ribbon.ribbon-b .ribbon-core { stroke:currentColor; }
+    .standby-ribbon.ribbon-c .ribbon-halo,
+    .standby-ribbon.ribbon-c .ribbon-core { stroke:currentColor; }
+
+    @keyframes ribbonDriftA {
+      0%   { transform:translate3d(-7%,4%,0) rotate(-3deg) scale(1.02); opacity:.22; }
+      48%  { transform:translate3d(3%,-3%,0) rotate(2deg) scale(1.06); opacity:.42; }
+      100% { transform:translate3d(10%,2%,0) rotate(5deg) scale(1.03); opacity:.28; }
     }
 
-    .aurora-float.light-c {
-      --aurora-core:rgba(167,243,208,.66);
-      --aurora-mid:rgba(20,184,166,.23);
-      width:29vw; height:88vh; left:47%; top:-34%;
-      opacity:.30;
-      animation:standbyLightC 27s ease-in-out -9s infinite alternate;
+    @keyframes ribbonDriftB {
+      0%   { transform:translate3d(8%,-5%,0) rotate(5deg) scale(1.04); opacity:.18; }
+      55%  { transform:translate3d(-2%,4%,0) rotate(-2deg) scale(1.08); opacity:.36; }
+      100% { transform:translate3d(-11%,-1%,0) rotate(-6deg) scale(1.02); opacity:.24; }
     }
 
-    .aurora-float.light-d {
-      --aurora-core:rgba(244,114,182,.48);
-      --aurora-mid:rgba(168,85,247,.22);
-      width:21vw; height:78vh; right:-4%; top:-20%;
-      opacity:.27;
-      animation:standbyLightD 21s ease-in-out -17s infinite alternate;
+    @keyframes ribbonDriftC {
+      0%   { transform:translate3d(-4%,-2%,0) rotate(2deg) scale(1.05); opacity:.14; }
+      43%  { transform:translate3d(6%,5%,0) rotate(-4deg) scale(1.01); opacity:.30; }
+      100% { transform:translate3d(12%,-3%,0) rotate(4deg) scale(1.07); opacity:.20; }
     }
 
-    .aurora-float.light-e {
-      --aurora-core:rgba(110,231,183,.46);
-      --aurora-mid:rgba(34,197,94,.17);
-      width:34vw; height:54vh; right:4%; bottom:-28%;
-      opacity:.22;
-      filter:blur(46px);
-      animation:standbyLightE 31s ease-in-out -11s infinite alternate;
-    }
-
-    .aurora-float.light-f {
-      --aurora-core:rgba(216,180,254,.42);
-      --aurora-mid:rgba(126,34,206,.18);
-      width:30vw; height:48vh; left:6%; bottom:-30%;
-      opacity:.20;
-      filter:blur(48px);
-      animation:standbyLightF 29s ease-in-out -21s infinite alternate;
-    }
-
-    @keyframes standbyLightA {
-      0%   { transform:translate3d(-8%,-2%,0) rotate(-13deg) scale(.86,1.02); opacity:.20; }
-      42%  { transform:translate3d(13%,5%,0) rotate(-4deg) scale(1.04,1.10); opacity:.48; }
-      100% { transform:translate3d(31%,-1%,0) rotate(8deg) scale(.93,1.16); opacity:.31; }
-    }
-
-    @keyframes standbyLightB {
-      0%   { transform:translate3d(-12%,3%,0) rotate(9deg) scale(.91,1.06); opacity:.18; }
-      53%  { transform:translate3d(19%,-4%,0) rotate(-7deg) scale(1.08,.96); opacity:.41; }
-      100% { transform:translate3d(38%,4%,0) rotate(5deg) scale(.96,1.12); opacity:.24; }
-    }
-
-    @keyframes standbyLightC {
-      0%   { transform:translate3d(14%,-3%,0) rotate(-6deg) scale(1.03,.94); opacity:.17; }
-      47%  { transform:translate3d(-14%,5%,0) rotate(7deg) scale(.91,1.14); opacity:.43; }
-      100% { transform:translate3d(-30%,-1%,0) rotate(-10deg) scale(1.06,1.02); opacity:.26; }
-    }
-
-    @keyframes standbyLightD {
-      0%   { transform:translate3d(12%,2%,0) rotate(12deg) scale(.88,1.08); opacity:.16; }
-      39%  { transform:translate3d(-15%,-5%,0) rotate(2deg) scale(1.10,.98); opacity:.38; }
-      100% { transform:translate3d(-34%,3%,0) rotate(-8deg) scale(.95,1.12); opacity:.22; }
-    }
-
-    @keyframes standbyLightE {
-      0%   { transform:translate3d(9%,11%,0) rotate(-5deg) scale(.88); opacity:.12; }
-      55%  { transform:translate3d(-17%,-10%,0) rotate(5deg) scale(1.13); opacity:.31; }
-      100% { transform:translate3d(-31%,-4%,0) rotate(-2deg) scale(.97); opacity:.18; }
-    }
-
-    @keyframes standbyLightF {
-      0%   { transform:translate3d(-10%,8%,0) rotate(6deg) scale(.92); opacity:.11; }
-      45%  { transform:translate3d(18%,-13%,0) rotate(-4deg) scale(1.09); opacity:.29; }
-      100% { transform:translate3d(35%,-5%,0) rotate(7deg) scale(.96); opacity:.17; }
-    }
+    /* Wallpaper Mode covers the portal. Do not keep drawing a second animated
+       scene underneath it. */
+    body.portal-active:has(#wallpaperOverlay.is-visible)::before,
+    body.portal-active:has(#wallpaperOverlay.is-visible)::after { content:none; }
+    body:has(#wallpaperOverlay.is-visible) .portal-ribbons { display:none; }
 
     body.portal-active.light-mode { background-color:var(--bg-dark); }
     body.portal-active.light-mode::before { opacity:.34; }
@@ -266,11 +205,8 @@
 
     @media (prefers-reduced-motion: reduce) {
       body.portal-active::before,
-      body.portal-active::after,
       .wallpaper-aurora-sky::before,
-      .wallpaper-aurora-sky::after,
-      .portal-aurora-lights .aurora-float,
-      .wallpaper-aurora-lights .aurora-float { animation:none !important; }
+      .standby-ribbon { animation:none !important; }
     }
 
     #portalLoader { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 50% 34%,rgba(13,148,136,.22),rgba(7,17,30,.98) 58%); transition:opacity .35s ease, visibility .35s ease; }
@@ -463,7 +399,7 @@
     .wallpaper-overlay.is-visible { display:flex; }
     .wallpaper-aurora-sky { position:absolute; inset:0; z-index:0; overflow:hidden; background:linear-gradient(180deg,#01030a 0%,#030817 48%,#07111e 76%,#020611 100%); opacity:1; transition:opacity .25s ease; }
     .wallpaper-aurora-sky::before { content:""; position:absolute; inset:0; background-image:radial-gradient(circle,rgba(255,255,255,1) 0 1.05px,transparent 1.45px),radial-gradient(circle,rgba(226,232,240,.94) 0 .9px,transparent 1.3px),radial-gradient(circle,rgba(196,181,253,.88) 0 .95px,transparent 1.35px),radial-gradient(circle,rgba(167,243,208,.84) 0 .95px,transparent 1.35px),radial-gradient(circle,rgba(255,255,255,.70) 0 .7px,transparent 1.12px),radial-gradient(circle,rgba(255,255,255,.48) 0 .55px,transparent .95px); background-size:67px 67px,101px 101px,149px 149px,223px 223px,43px 43px,181px 181px; background-position:7px 5px,31px 61px,79px 23px,151px 113px,19px 29px,127px 73px; animation:portalStarTwinkle 7s ease-in-out infinite alternate; }
-    .wallpaper-aurora-sky::after { content:""; position:absolute; inset:-20% -14%; opacity:.96; will-change:transform,opacity; background:radial-gradient(ellipse 82% 14% at 3% 10%,rgba(45,255,138,.68) 0%,rgba(34,197,94,.36) 34%,rgba(16,185,129,.12) 58%,transparent 76%),radial-gradient(ellipse 74% 12% at 48% 6%,rgba(139,92,246,.54) 0%,rgba(124,58,237,.30) 36%,rgba(168,85,247,.11) 58%,transparent 76%),radial-gradient(ellipse 54% 10% at 88% 8%,rgba(74,222,128,.60) 0%,rgba(34,197,94,.27) 43%,transparent 73%),radial-gradient(ellipse 48% 9% at 99% 18%,rgba(236,72,153,.38) 0%,rgba(168,85,247,.22) 43%,transparent 72%),radial-gradient(ellipse 64% 11% at 8% 91%,rgba(139,92,246,.31) 0%,rgba(168,85,247,.16) 45%,transparent 75%),radial-gradient(ellipse 72% 12% at 94% 88%,rgba(45,255,138,.34) 0%,rgba(34,197,94,.18) 43%,rgba(139,92,246,.11) 61%,transparent 76%),linear-gradient(108deg,transparent 8%,rgba(74,222,128,.15) 25%,transparent 39%,rgba(139,92,246,.17) 52%,transparent 65%,rgba(236,72,153,.10) 78%,transparent 91%); mix-blend-mode:screen; animation:portalAuroraDrift 16s ease-in-out infinite alternate,portalAuroraPulse 8s ease-in-out infinite; }
+    .wallpaper-aurora-sky::after { content:""; position:absolute; inset:0; opacity:.82; background:radial-gradient(ellipse 72% 20% at 4% 4%,rgba(34,197,94,.20) 0%,rgba(16,185,129,.08) 48%,transparent 74%),radial-gradient(ellipse 62% 18% at 96% 8%,rgba(139,92,246,.19) 0%,rgba(168,85,247,.07) 48%,transparent 74%),radial-gradient(ellipse 70% 22% at 74% 100%,rgba(236,72,153,.08) 0%,rgba(139,92,246,.05) 46%,transparent 75%); }
     .wallpaper-overlay img { position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .25s ease; }
     .wallpaper-overlay.has-custom-wallpaper img { opacity:1; }
     .wallpaper-overlay.has-custom-wallpaper .wallpaper-aurora-sky { opacity:0; }
@@ -2738,10 +2674,10 @@
     </footer>
   </div>
 
-  <div class="portal-aurora-lights" aria-hidden="true"><span class="aurora-float light-a"></span><span class="aurora-float light-b"></span><span class="aurora-float light-c"></span><span class="aurora-float light-d"></span><span class="aurora-float light-e"></span><span class="aurora-float light-f"></span></div>
+  <div class="portal-ribbons" aria-hidden="true"><svg class="standby-ribbon ribbon-a" viewBox="0 0 1200 700" preserveAspectRatio="none"><path class="ribbon-halo" d="M -120 560 C 150 90 420 700 720 250 S 1080 40 1320 170"/><path class="ribbon-core" d="M -120 560 C 150 90 420 700 720 250 S 1080 40 1320 170"/></svg><svg class="standby-ribbon ribbon-b" viewBox="0 0 1200 700" preserveAspectRatio="none"><path class="ribbon-halo" d="M -100 180 C 210 620 430 40 770 390 S 1110 650 1310 500"/><path class="ribbon-core" d="M -100 180 C 210 620 430 40 770 390 S 1110 650 1310 500"/></svg><svg class="standby-ribbon ribbon-c" viewBox="0 0 1200 700" preserveAspectRatio="none"><path class="ribbon-halo" d="M -140 360 C 90 710 390 260 610 510 S 1010 130 1340 310"/><path class="ribbon-core" d="M -140 360 C 90 710 390 260 610 510 S 1010 130 1340 310"/></svg></div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet northern lights wallpaper" onclick="exitWallpaperMode()">
-    <div class="wallpaper-aurora-sky" aria-hidden="true"><span class="wallpaper-aurora-lights"><span class="aurora-float light-a"></span><span class="aurora-float light-b"></span><span class="aurora-float light-c"></span><span class="aurora-float light-d"></span><span class="aurora-float light-e"></span><span class="aurora-float light-f"></span></span></div>
+    <div class="wallpaper-aurora-sky" aria-hidden="true"><span class="wallpaper-ribbons"><svg class="standby-ribbon ribbon-a" viewBox="0 0 1200 700" preserveAspectRatio="none"><path class="ribbon-halo" d="M -120 560 C 150 90 420 700 720 250 S 1080 40 1320 170"/><path class="ribbon-core" d="M -120 560 C 150 90 420 700 720 250 S 1080 40 1320 170"/></svg><svg class="standby-ribbon ribbon-b" viewBox="0 0 1200 700" preserveAspectRatio="none"><path class="ribbon-halo" d="M -100 180 C 210 620 430 40 770 390 S 1110 650 1310 500"/><path class="ribbon-core" d="M -100 180 C 210 620 430 40 770 390 S 1110 650 1310 500"/></svg><svg class="standby-ribbon ribbon-c" viewBox="0 0 1200 700" preserveAspectRatio="none"><path class="ribbon-halo" d="M -140 360 C 90 710 390 260 610 510 S 1010 130 1340 310"/><path class="ribbon-core" d="M -140 360 C 90 710 390 260 610 510 S 1010 130 1340 310"/></svg></span></div>
     <img id="wallpaperImage" alt="Custom Little Feet wallpaper" loading="lazy" decoding="async">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment under the northern lights. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
