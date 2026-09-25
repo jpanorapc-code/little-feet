@@ -289,7 +289,7 @@ assert.match(cinematic, /at: 0\.225,x:\s+2\.20/);
 assert.match(cinematic, /at: 0\.24, x:\s+2\.72, y: -0\.90/);
 assert.match(cinematic, /headRigBase/);
 assert.match(cinematic, /neckClearance/);
-assert.match(cinematic, /clamp\(requestedYaw, -\.72, \.72\)/);
+assert.match(cinematic, /data\.rigCollision\.headYaw/);
 assert.match(cinematic, /sampleDivePath\(\.235\)/);
 assert.match(cinematic, /lowerBeak/);
 assert.match(cinematic, /surfaceFront > \.82/);
