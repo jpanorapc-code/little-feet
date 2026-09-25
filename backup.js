@@ -34,7 +34,6 @@ let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
-const DEFAULT_WALLPAPER_URL = 'assets/4k/little-feet-wallpaper-no-moon-4k.jpg';
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
 const SAVED_LOGIN_USERNAME_KEY = 'lf_saved_login_username';
@@ -1283,10 +1282,17 @@ async function storedCustomWallpaper() {
 
 function applyCustomWallpaper(blob) {
   const image = document.getElementById('wallpaperImage');
+  const overlay = document.getElementById('wallpaperOverlay');
   if (!image) return;
   if (customWallpaperObjectUrl) URL.revokeObjectURL(customWallpaperObjectUrl);
   customWallpaperObjectUrl = blob ? URL.createObjectURL(blob) : '';
-  image.src = customWallpaperObjectUrl || DEFAULT_WALLPAPER_URL;
+  if (customWallpaperObjectUrl) {
+    image.src = customWallpaperObjectUrl;
+    overlay?.classList.add('has-custom-wallpaper');
+  } else {
+    image.removeAttribute('src');
+    overlay?.classList.remove('has-custom-wallpaper');
+  }
 }
 
 async function restoreCustomWallpaper() {
@@ -1295,6 +1301,8 @@ async function restoreCustomWallpaper() {
     applyCustomWallpaper(blob);
     const status = document.getElementById('customWallpaperStatus');
     if (status) status.textContent = `${blob.name || 'Your custom wallpaper'} is saved on this device and active.`;
+  } else {
+    applyCustomWallpaper(null);
   }
 }
 
@@ -1364,7 +1372,7 @@ async function resetCustomWallpaper() {
     const input = document.getElementById('customWallpaperFile');
     const status = document.getElementById('customWallpaperStatus');
     if (input) input.value = '';
-    if (status) status.textContent = 'The original Little Feet campfire wallpaper is active.';
+    if (status) status.textContent = 'The Little Feet northern lights wallpaper is active.';
   } catch (error) {
     alert(error.message || 'Unable to restore the default wallpaper.');
   }
