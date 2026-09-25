@@ -1074,8 +1074,9 @@ const establishAuthenticatedSession = (req, account, callback) => {
 
 app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
-  const normalizedUsername = normalizeUsername(username);
-  const attemptKey = loginAttemptKey(req, normalizedUsername);
+  const loginUsername = limitedText(username, 160);
+  const normalizedUsername = loginUsername ? normalizeUsername(loginUsername) : '';
+  const attemptKey = loginAttemptKey(req, normalizedUsername || '[invalid-username]');
   const previousAttempts = activeLoginAttempt(attemptKey);
   const previousUsernameAttempts = activeUsernameAttempt(normalizedUsername);
   if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
