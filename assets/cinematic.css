@@ -331,14 +331,36 @@
   will-change: transform;
 }
 .cinematic-fish-2d {
-  width: min(46vw, 720px);
-  aspect-ratio: 3 / 1;
-  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Fish_school_%28Unsplash%29.jpg/1280px-Fish_school_%28Unsplash%29.jpg');
-  -webkit-mask-image: url('/assets/images/cinematic-fish-school.svg');
-  mask-image: url('/assets/images/cinematic-fish-school.svg');
+  width: min(50vw, 780px);
+  aspect-ratio: 16 / 9;
+  background-size: cover;
+  background-position: center;
+  mix-blend-mode: screen;
+  opacity: calc(.42 + var(--neon-boost, 0) * .18);
+  /* Real fish photographs fade naturally into the water. Do not cut them into
+     cartoon oval/triangle silhouettes again. */
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 0 48%, rgba(0,0,0,.88) 64%, rgba(0,0,0,.38) 82%, transparent 100%);
+  mask-image: radial-gradient(ellipse at center, #000 0 48%, rgba(0,0,0,.88) 64%, rgba(0,0,0,.38) 82%, transparent 100%);
+  filter:
+    saturate(calc(1.10 + var(--neon-boost, 0) * .30))
+    contrast(1.12)
+    brightness(calc(.88 + var(--neon-boost, 0) * .18));
 }
-.cinematic-fish-2d-a { left: 6%; top: 48%; animation: cinematicFishDriftA 25s ease-in-out infinite alternate; }
-.cinematic-fish-2d-b { right: 4%; top: 64%; opacity: .42; animation: cinematicFishDriftB 31s ease-in-out infinite alternate; }
+.cinematic-fish-2d-a {
+  left: -2%;
+  top: 47%;
+  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Underwater_view_of_the_sardine_run_as_a_dolphin_hunts_within_dense_schools_of_sardines.jpg/1280px-Underwater_view_of_the_sardine_run_as_a_dolphin_hunts_within_dense_schools_of_sardines.jpg');
+  animation: cinematicFishDriftA 30s ease-in-out infinite alternate;
+}
+.cinematic-fish-2d-b {
+  right: -4%;
+  top: 63%;
+  width: min(44vw, 700px);
+  opacity: .36;
+  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Fish_school_%28Unsplash%29.jpg/1280px-Fish_school_%28Unsplash%29.jpg');
+  background-position: 58% 45%;
+  animation: cinematicFishDriftB 36s ease-in-out infinite alternate;
+}
 .cinematic-jelly-2d {
   width: min(18vw, 250px);
   aspect-ratio: 13 / 18;
@@ -364,12 +386,12 @@
   will-change: auto;
 }
 @keyframes cinematicFishDriftA {
-  from { transform: translate3d(-2vw, -4px, 0) scale(.86); }
-  to   { transform: translate3d(7vw, 10px, 0) scale(.86); }
+  from { transform: translate3d(-3vw, -5px, 0) scale(.88) rotate(-1deg); }
+  to   { transform: translate3d(5vw, 7px, 0) scale(.92) rotate(.7deg); }
 }
 @keyframes cinematicFishDriftB {
-  from { transform: translate3d(5vw, 8px, 0) scale(.68); }
-  to   { transform: translate3d(-7vw, -7px, 0) scale(.68); }
+  from { transform: translate3d(4vw, 6px, 0) scale(.72) rotate(.8deg); }
+  to   { transform: translate3d(-5vw, -5px, 0) scale(.76) rotate(-.6deg); }
 }
 @keyframes cinematicJellyDriftA {
   from { transform: translate3d(-8px, 16px, 0) scale(.72); }
