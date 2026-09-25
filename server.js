@@ -725,6 +725,11 @@ const db = {
   bookRegister: [],
   paymentEvents: [],
   paymentLedger: [],
+  financeRecurringRules: [],
+  financeAdjustments: [],
+  financeReconciliationRuns: [],
+  payrollProfiles: [],
+  payrollRuns: [],
   systemErrors: [],
   subscriptionBilling: {
     pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
@@ -932,7 +937,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -1517,7 +1522,11 @@ const parentPaymentDueDate = record => {
   return arrangement && arrangement > original ? arrangement : original;
 };
 const parentPaymentFinancials = (record, asOf = dateKeyInSouthAfrica()) => {
-  const amountDue = parentPaymentAmount(record);
+  const originalEffectiveAmount = parentPaymentAmount(record);
+  const creditTotal = cents((db.financeAdjustments || [])
+    .filter(adjustment => adjustment.type === 'credit' && String(adjustment.reference || '').toUpperCase() === String(record.reference || '').toUpperCase())
+    .reduce((sum, adjustment) => sum + Number(adjustment.amount || 0), 0));
+  const amountDue = Math.max(0, cents(originalEffectiveAmount - creditTotal));
   const events = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase());
   const paid = cents(events.filter(event => event.status === 'paid').reduce((sum, event) => sum + Number(event.amount || 0), 0));
   const refunded = cents(events.filter(event => event.status === 'refunded').reduce((sum, event) => sum + Number(event.amount || 0), 0));
@@ -1530,6 +1539,7 @@ const parentPaymentFinancials = (record, asOf = dateKeyInSouthAfrica()) => {
     : 0;
   return {
     amountDue, originalAmount: billingAmount(record.amountDue) || amountDue,
+    effectiveAmountBeforeCredits: originalEffectiveAmount, creditTotal,
     arrangementAmount: billingAmount(record.arrangementAmount) || null,
     paidAmount, balance, arrears: overdue ? balance : 0, dueDate: validDateKey(record.dueDate),
     effectiveDueDate, daysPastDue, status: balance <= 0 ? 'paid' : overdue ? 'in_arrears' : paidAmount > 0 ? 'partially_paid' : 'awaiting_payment',
@@ -1607,7 +1617,7 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
   if (numericAmount === null || numericAmount <= 0) return { error: 'Payment amount must be greater than zero.' };
   if (target.type === 'parent_payment') {
     const current = parentPaymentFinancials(target.record);
-    const remaining = normalStatus === 'refunded' ? current.paidAmount : Math.max(0, cents(expectedAmount - current.paidAmount));
+    const remaining = normalStatus === 'refunded' ? current.paidAmount : current.balance;
     if (numericAmount > remaining || (normalStatus !== 'failed' && remaining <= 0)) return { error: `Payment amount cannot exceed the remaining balance of ${remaining.toFixed(2)}.` };
   } else if (numericAmount !== expectedAmount) {
     return { error: `Payment amount must match the expected amount of ${expectedAmount.toFixed(2)}.` };
