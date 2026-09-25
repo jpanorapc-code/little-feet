@@ -309,6 +309,8 @@ function registerFinanceAutomation(app, deps) {
     const reconciliationRuns = financeRecords('financeReconciliationRuns', actor);
     res.json({
       rules,
+      parents: financeParents(actor).map(parent => ({ username: parent.username, name: parent.name || parent.username, linkedLearners: parent.linkedLearners || [] })),
+      staff: staffForPayroll(actor).map(account => ({ username: account.username, name: account.name || account.username, role: account.role })),
       payrollProfiles: profiles,
       payrollRuns: payrollRuns.slice(0, 24),
       recentAdjustments: adjustments.slice(0, 20),
