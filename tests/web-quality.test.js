@@ -40,15 +40,15 @@ assert.match(client, /modalReturnFocus\?\.isConnected/);
 
 assert.match(page, /id="wallpaperImage"[^>]*loading="lazy"[^>]*decoding="async"/);
 assert.match(page, /class="wallpaper-aurora-sky"/);
-assert.match(page, /rgba\(45,255,138,\.62\)/);
-assert.match(page, /rgba\(139,92,246,\.48\)/);
-assert.match(page, /rgba\(236,72,153,\.34\)/);
 assert.match(page, /background-size:67px 67px,101px 101px,149px 149px/);
 assert.match(page, /@keyframes portalStarTwinkle/);
 assert.match(page, /class="portal-ribbons"/);
 assert.match(page, /class="wallpaper-ribbons"/);
 assert.match(page, /class="standby-ribbon ribbon-a"/);
 assert.match(page, /class="standby-ribbon ribbon-c"/);
+assert.match(page, /rgb\(110,255,185\)/);
+assert.match(page, /rgb\(196,181,253\)/);
+assert.match(page, /rgb\(244,114,182\)/);
 assert.match(page, /@keyframes ribbonDriftA/);
 assert.match(page, /@keyframes ribbonDriftC/);
 assert.match(page, /vector-effect="non-scaling-stroke"/);
