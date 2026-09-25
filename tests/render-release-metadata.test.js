@@ -24,7 +24,7 @@ try {
   assert.equal(metadata.updateLineCount, Math.max(1, messageLines.length));
   assert.equal(metadata.version, metadata.updateLineCount <= 8 ? '8.2.9' : '9.0');
 
-  for (const file of ['server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json']) {
+  for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json']) {
     fs.copyFileSync(path.join(root, file), path.join(temp, file));
   }
   fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
