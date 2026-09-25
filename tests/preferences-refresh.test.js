@@ -37,7 +37,7 @@ assert.match(preferences, /current-password','new-password','one-time-code/);
 assert.match(preferences, /SENSITIVE_FIELD/);
 assert.match(preferences, /MAX_DRAFT_VALUE = 5000/);
 assert.match(preferences, /serialized\.length > 250000/);
-assert.match(preferences, /saveDashboardDrafts\(\);[\s\S]*window\.loadAllData\?\.\(\);[\s\S]*window\.loadWorkspaceOnDemand\?\.\(activeTab\)/);
+assert.match(preferences, /saveDashboardDrafts\(\);[\s\S]*Promise\.resolve\(window\.loadAllData\?\.\(\)\)[\s\S]*window\.loadWorkspaceOnDemand\?\.\(activeTab\)/);
 assert.match(preferences, /Date\.now\(\) - lastDraftEditAt < 4000/);
 assert.match(preferences, /FAST_TABS\.has\(tabId\) \? 30000 : 120000/);
 assert.match(preferences, /allowed = new Set\(\[5000,10000,30000,60000,300000,900000,1800000,3600000,7200000,86400000\]\)/);
