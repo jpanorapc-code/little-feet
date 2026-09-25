@@ -508,7 +508,19 @@ const staticFileOptions = {
   }
 };
 app.use('/assets', express.static(path.join(__dirname, 'assets'), staticFileOptions));
-app.use('/output', express.static(path.join(__dirname, 'output'), staticFileOptions));
+const publicOutputDocuments = Object.freeze(new Map([
+  ['LittleFeet_Presentation_2026_Updated.pdf', 'LittleFeet_Presentation_2026_Updated.pdf'],
+  ['LittleFeet_User_Manual_2026_Updated.pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'],
+  ['LittleSteps_Platform_Presentation_2026.pdf', 'LittleSteps_Platform_Presentation_2026.pdf'],
+  ['LittleSteps_User_Manual_2026.pdf', 'LittleSteps_User_Manual_2026.pdf']
+]));
+app.get('/output/pdf/:document', (req, res) => {
+  const document = publicOutputDocuments.get(String(req.params.document || ''));
+  if (!document) return res.sendStatus(404);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.type('application/pdf');
+  res.sendFile(document, { root: path.join(__dirname, 'output', 'pdf') });
+});
 const sendPublicRootFile = (req, res) => {
   if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
