@@ -219,8 +219,8 @@ function registerFinanceAutomation(app, deps) {
       }
       let reference = String(directReference || '').trim().toUpperCase();
       if (!reference) {
-        const haystack = String(description || '').toUpperCase();
-        reference = refs.find(candidate => haystack.includes(candidate)) || '';
+        const tokens = String(description || '').toUpperCase().split(/[^A-Z0-9-]+/).filter(Boolean);
+        reference = refs.find(candidate => tokens.includes(candidate)) || '';
       }
       const target = reference ? findPaymentTarget(reference, actor) : null;
       if (!target) return { index, lineId, status: 'unmatched', amount, bankReference, date: receivedDate, description };
