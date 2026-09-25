@@ -25,6 +25,7 @@ assert.match(server, /POPIA-consent-2026-09-v2/);
 
 for (const phrase of [
   'Protection of Personal Information Act 4 of 2013',
+  'Children’s Act 38 of 2005',
   'accountability',
   'processing limitation',
   'purpose specification',
