@@ -62,7 +62,7 @@
       observation: observation.slice(0, 1200),
       evidenceReference: evidenceReference.slice(0, 240),
       details: (learnerName + ' · ' + framework.label + ' · ' + area + ' · ' + observation).slice(0, 1800),
-      recordedBy: window.currentUser?.name || window.currentUser?.username || 'User'
+      recordedBy: window.getLittleFeetCurrentUser?.()?.name || window.getLittleFeetCurrentUser?.()?.username || 'User'
     };
 
     const response = await fetch('/api/modules/curriculum', {
@@ -84,7 +84,8 @@
 
   async function loadCurriculumRecords() {
     const list = document.getElementById('curriculumRecords');
-    if (!list || !window.currentUser || !['teacher','principal','admin'].includes(window.currentUser.role)) return;
+    const currentUser = window.getLittleFeetCurrentUser?.();
+    if (!list || !currentUser || !['teacher','principal','admin'].includes(currentUser.role)) return;
     try {
       const response = await fetch('/api/modules/curriculum');
       const records = await response.json();
@@ -95,7 +96,7 @@
         const learner = safe(record.learnerName || '');
         const observation = safe(record.observation || record.details || '');
         const evidence = record.evidenceReference ? '<span class="meta">Evidence: ' + safe(record.evidenceReference) + '</span><br>' : '';
-        const remove = window.currentUser?.role === 'admin'
+        const remove = currentUser.role === 'admin'
           ? '<button type="button" class="action-btn btn-red" onclick="deleteCurriculumObservation(\'' + safe(record.id) + '\')">Delete</button>'
           : '';
         return '<div class="item-row"><div><strong>' + learner + '</strong> <span class="badge-tag info">' + framework + '</span><p style="margin:4px 0;"><strong>' + area + '</strong> · ' + observation + '</p>' + evidence + '<span class="meta">' + safe(record.recordedBy || 'User') + ' · ' + safe(record.createdAt || '') + '</span></div>' + remove + '</div>';
