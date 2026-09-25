@@ -331,36 +331,81 @@
   will-change: transform;
 }
 .cinematic-fish-2d {
-  width: min(50vw, 780px);
-  aspect-ratio: 16 / 9;
-  background-size: cover;
-  background-position: center;
-  mix-blend-mode: screen;
-  opacity: calc(.42 + var(--neon-boost, 0) * .18);
-  /* Real fish photographs fade naturally into the water. Do not cut them into
-     cartoon oval/triangle silhouettes again. */
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 0 48%, rgba(0,0,0,.88) 64%, rgba(0,0,0,.38) 82%, transparent 100%);
-  mask-image: radial-gradient(ellipse at center, #000 0 48%, rgba(0,0,0,.88) 64%, rgba(0,0,0,.38) 82%, transparent 100%);
-  filter:
-    saturate(calc(1.10 + var(--neon-boost, 0) * .30))
-    contrast(1.12)
-    brightness(calc(.88 + var(--neon-boost, 0) * .18));
+  width: min(48vw, 760px);
+  aspect-ratio: 16 / 7;
+  overflow: visible;
+  opacity: 1;
+  background: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+  mix-blend-mode: normal;
+  filter: none;
 }
 .cinematic-fish-2d-a {
-  left: -2%;
+  left: 1%;
   top: 47%;
-  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Underwater_view_of_the_sardine_run_as_a_dolphin_hunts_within_dense_schools_of_sardines.jpg/1280px-Underwater_view_of_the_sardine_run_as_a_dolphin_hunts_within_dense_schools_of_sardines.jpg');
   animation: cinematicFishDriftA 30s ease-in-out infinite alternate;
 }
 .cinematic-fish-2d-b {
-  right: -4%;
-  top: 63%;
-  width: min(44vw, 700px);
-  opacity: .36;
-  background-image: url('https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Fish_school_%28Unsplash%29.jpg/1280px-Fish_school_%28Unsplash%29.jpg');
-  background-position: 58% 45%;
+  right: 0;
+  top: 64%;
+  width: min(42vw, 660px);
   animation: cinematicFishDriftB 36s ease-in-out infinite alternate;
 }
+.cinematic-fish-sprite {
+  position: absolute;
+  left: var(--fish-x);
+  top: var(--fish-y);
+  width: var(--fish-width);
+  height: auto;
+  max-width: none;
+  opacity: var(--fish-opacity);
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  animation: cinematicFishIndividual calc(5.4s + var(--fish-phase) * .75s) ease-in-out infinite alternate;
+  animation-delay: var(--fish-delay);
+  filter:
+    saturate(calc(.92 + var(--neon-boost, 0) * .18))
+    brightness(calc(.80 + var(--neon-boost, 0) * .17))
+    drop-shadow(0 2px 3px rgba(0, 22, 42, .34));
+}
+.cinematic-fish-2d-b .cinematic-fish-sprite {
+  transform: scaleX(-1);
+}
+@keyframes cinematicFishIndividual {
+  from {
+    transform:
+      translate3d(-2px, -2px, 0)
+      rotate(var(--fish-tilt))
+      scale(var(--fish-scale));
+  }
+  to {
+    transform:
+      translate3d(5px, 3px, 0)
+      rotate(calc(var(--fish-tilt) + .8deg))
+      scale(calc(var(--fish-scale) * 1.015));
+  }
+}
+.cinematic-fish-2d-b .cinematic-fish-sprite {
+  animation-name: cinematicFishIndividualReverse;
+}
+@keyframes cinematicFishIndividualReverse {
+  from {
+    transform:
+      translate3d(2px, -2px, 0)
+      rotate(calc(var(--fish-tilt) * -1))
+      scaleX(-1)
+      scale(var(--fish-scale));
+  }
+  to {
+    transform:
+      translate3d(-5px, 3px, 0)
+      rotate(calc((var(--fish-tilt) * -1) - .8deg))
+      scaleX(-1)
+      scale(calc(var(--fish-scale) * 1.015));
+  }
+}
+
 .cinematic-jelly-2d {
   width: min(18vw, 250px);
   aspect-ratio: 13 / 18;
