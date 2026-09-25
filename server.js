@@ -2149,7 +2149,7 @@ app.post('/api/schedules', (req, res) => {
   const dayOfWeek = boundedText(req.body?.dayOfWeek, 20);
   const timeSlot = boundedText(req.body?.timeSlot, 80);
   const activity = boundedText(req.body?.activity, 1000);
-  if (!studentName || !dayOfWeek || !timeSlot || !activity) return res.status(400).json({ message: 'Complete the learner, day, time and activity.' });
+  if (!studentName || !activity) return res.status(400).json({ message: 'Complete the learner and activity.' });
   const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), studentName, dayOfWeek, timeSlot, activity, createdBy: actor.username });
   db.schedules.push(item);
   res.json({ success: true, item });
@@ -2164,7 +2164,7 @@ app.post('/api/schedules/import', (req, res) => {
       dayOfWeek: boundedText(item?.dayOfWeek, 20),
       timeSlot: boundedText(item?.timeSlot, 80),
       activity: boundedText(item?.activity, 1000)
-    })).filter(item => item.studentName && item.dayOfWeek && item.timeSlot && item.activity);
+    })).filter(item => item.studentName && item.activity);
     db.schedules.push(...cleanSchedules.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID(), createdBy: actor.username })));
   }
   res.json({ success: true });
@@ -2189,10 +2189,11 @@ app.post('/api/worksheets', (req, res) => {
   if (req.body?.photoUrl !== undefined && req.body.photoUrl !== null && !validWorksheetMediaData(req.body.photoUrl)) return res.status(400).json({ message: 'Attached evidence must be a supported PNG, JPEG, GIF, or WebP image under 5 MB.' });
   const studentName = boundedText(req.body?.studentName, 160);
   const title = boundedText(req.body?.title, 240);
-  const grade = Number(req.body?.grade);
-  if (!studentName || !title || !Number.isFinite(grade) || grade < 0 || grade > 100) return res.status(400).json({ message: 'Enter a learner, title and grade between 0 and 100.' });
+  const hasGrade = req.body?.grade !== undefined && req.body?.grade !== null && String(req.body.grade).trim() !== '';
+  const grade = hasGrade ? Number(req.body.grade) : null;
+  if (!studentName || !title || (hasGrade && (!Number.isFinite(grade) || grade < 0 || grade > 100))) return res.status(400).json({ message: 'Enter a learner and title; when supplied, the grade must be between 0 and 100.' });
   const item = tagSchoolRecord(actor, {
-    id: crypto.randomUUID(), studentName, title, grade,
+    id: crypto.randomUUID(), studentName, title, ...(hasGrade ? { grade } : {}),
     photoUrl: req.body?.photoUrl || null,
     submittedBy: actor.username,
     uploadedAt: new Date().toLocaleDateString(),
