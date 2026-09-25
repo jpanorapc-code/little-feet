@@ -8,7 +8,8 @@
     "test:capacity": "node tests/capacity-smoke.test.js",
     "test:stress": "node tests/capacity-smoke.test.js",
     "start": "node server.js",
-    "start:backup": "node backup-server.js"
+    "start:backup": "node backup-server.js",
+    "postinstall": "node scripts/write-deploy-release.js"
   },
   "keywords": [],
   "author": "",
