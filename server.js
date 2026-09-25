@@ -105,8 +105,15 @@ const requestContainsBlockedLanguage = (value, fieldName = '') => {
 };
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
 const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, max);
-const POST_AUDIENCES = new Set(['All', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
+const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
 const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
+const APPLICATION_STAGE_SELECTIONS = new Set([
+  'ECD · Infant care (Birth–12 months)',
+  'ECD · Toddler (Approx. 1–3 years)',
+  'ECD · Preschool (Approx. 3–4 years)',
+  'Grade R · Reception',
+  'Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'
+]);
 const educationStageForSelection = value => {
   const selection = boundedText(value, 80);
   if (/^ECD · Infant/i.test(selection)) return 'Day care / ECD · Infant';
@@ -2353,6 +2360,9 @@ app.post('/api/school-applications', (req, res) => {
   if (!schoolName || !guardianName || !contactPhone || !contactEmail || !learnerName || !dateOfBirth || !intendedStart || !gradeOrAgeGroup || !homeArea || !notes) {
     return res.status(400).json({ message: 'Complete the contact, learner, start-date, age/grade, area and application details.' });
   }
+  if (!APPLICATION_STAGE_SELECTIONS.has(gradeOrAgeGroup)) {
+    return res.status(400).json({ message: 'Choose a recognised Little Feet age group or school grade.' });
+  }
   if (!/^\S+@\S+\.\S+$/.test(contactEmail)) return res.status(400).json({ message: 'Enter a valid contact email address.' });
   if (!validDateKey(dateOfBirth) || dateOfBirth >= dateKeyInSouthAfrica()) return res.status(400).json({ message: 'Enter a valid learner date of birth.' });
   if (!validDateKey(intendedStart)) return res.status(400).json({ message: 'Enter a valid intended start date.' });
@@ -2928,17 +2938,22 @@ app.get('/api/store/orders', (req, res) => {
 });
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
+const moduleRecordCollection = moduleName =>
+  Object.hasOwn(db.moduleRecords || {}, moduleName) && Array.isArray(db.moduleRecords[moduleName])
+    ? db.moduleRecords[moduleName]
+    : null;
+
 app.get('/api/modules/:module', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view workspace records.' });
-  const records = db.moduleRecords[req.params.module];
+  const records = moduleRecordCollection(req.params.module);
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
   res.json(tenantRecords(records, actor));
 });
 app.post('/api/modules/:module', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save workspace records.' });
-  const records = db.moduleRecords[req.params.module];
+  const records = moduleRecordCollection(req.params.module);
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
 
   let payload;
@@ -2993,7 +3008,7 @@ app.post('/api/modules/:module', (req, res) => {
 app.delete('/api/modules/:module/:id', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const records = db.moduleRecords[req.params.module];
+  const records = moduleRecordCollection(req.params.module);
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
   const record = records.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
   if (!record) return res.status(404).json({ message: 'Workspace record not found.' });
@@ -3176,12 +3191,12 @@ app.get('/api/learner-access-codes', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor) return res.status(403).json({ message: 'Only administrators and principals may view learner codes.' });
   const isAdmin = actor.role === 'admin';
-  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: isAdmin })));
+  res.json(tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: isAdmin, includeHistory: isAdmin })));
 });
 
 app.get('/api/learner-access-codes/printable-list', (req, res) => {
-  const actor = findLearnerAccessCodeActor(req);
-  if (!actor) return res.status(403).json({ message: 'Only administrators and principals may print the learner-code register.' });
+  const actor = getSessionAccount(req);
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ message: 'Only an administrator may print the full learner-code register.' });
   const learners = tenantRecords(db.students, actor).map(learner => learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: false }));
   res.json({
     schoolName: actor.schoolName,
