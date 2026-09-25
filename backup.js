@@ -1142,7 +1142,7 @@ function loadWorkspaceOnDemand(tabId) {
     attendanceTab: [loadAttendance], ticketsTab: [loadTickets, loadTicketAssignees],
     broadcastsTab: [loadBroadcasts], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
     registryTab: [loadRegistry, loadAccounts, loadLearnerAccessCodes],
-    financeTab: [loadSubscriptionBillingOverview], parentPaymentsTab: [loadParentPayments],
+    financeTab: [loadSubscriptionBillingOverview, () => window.loadFinanceAutomationOverview?.()], parentPaymentsTab: [loadParentPayments],
     bookRegisterTab: [loadBookRegister], safetyNetworkTab: [loadSafetyNetwork],
     visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
