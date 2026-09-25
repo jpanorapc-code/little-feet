@@ -646,7 +646,8 @@ app.use(session({
   }
 }));
 app.use((req, res, next) => {
-  if (!isProduction || !req.session?.littleFeetUser || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const enforceOriginCheck = isProduction || process.env.LF_TEST_ENFORCE_ORIGIN === '1';
+  if (!enforceOriginCheck || !req.session?.littleFeetUser || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
   const source = req.get('origin') || req.get('referer');
   if (!source) return res.status(403).json({ message: 'A same-origin browser request is required.' });
   try {
@@ -1873,15 +1874,18 @@ app.post('/api/accounts', (req, res) => {
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const cleanUsername = boundedText(username, 160);
+  const cleanName = boundedText(name, 160);
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (!username || !pin || !name || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
+  if (!cleanUsername || !pin || !cleanName || !allowedRoles.includes(role)) return res.status(400).json({ message: 'Name, username, password, and role are required.' });
+  if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Passwords must be between 4 and 128 characters.' });
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'Administrators can create accounts only for their own school.' });
-  if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (db.users.some(account => accountMatchesUsername(account, cleanUsername))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   const normalisedStoreUrl = safeHttpsUrl(schoolStoreUrl);
   if (String(schoolStoreUrl || '').trim() && !normalisedStoreUrl) return res.status(400).json({ message: 'School web-store links must use a valid HTTPS URL.' });
-  const account = { username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: normalisedStoreUrl, linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [] };
+  const account = { username: cleanUsername, pinHash: hashPin(pin), name: cleanName, role, schoolName: actor.schoolName, schoolId: accountSchoolId(actor), schoolStoreUrl: normalisedStoreUrl, linkedLearners: linkValidation.links, parentRelationshipStatus: role === 'parent' ? 'Administrator approved' : undefined, verificationStatus: 'Active', assignedClasses: role === 'teacher' ? normaliseAssignedClasses(assignedClasses).slice(0, 30) : [] };
   db.users.push(account);
   res.status(201).json({ success: true, account: safeAccount(account) });
 });
@@ -1893,9 +1897,12 @@ app.put('/api/accounts/:username', (req, res) => {
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
   if (username && db.users.some(entry => entry !== account && accountMatchesUsername(entry, username))) return res.status(409).json({ message: 'That username is already in use.' });
-  if (username) account.username = String(username).trim();
-  if (pin) account.pinHash = hashPin(pin);
-  if (name) account.name = String(name).trim();
+  if (username) account.username = boundedText(username, 160);
+  if (pin) {
+    if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Passwords must be between 4 and 128 characters.' });
+    account.pinHash = hashPin(pin);
+  }
+  if (name) account.name = boundedText(name, 160);
   if (role && allowedRoles.includes(role)) account.role = role;
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
   account.schoolName = actor.schoolName;
@@ -1910,7 +1917,7 @@ app.put('/api/accounts/:username', (req, res) => {
     account.parentRelationshipStatus = linkValidation.links.length ? 'Administrator approved' : 'Pending administrator approval';
     account.requestedLearnerLinks = [];
   }
-  account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses) : [];
+  account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses).slice(0, 30) : [];
   res.json({ success: true, account: safeAccount(account) });
 });
 app.delete('/api/accounts/:username', (req, res) => {
@@ -2469,20 +2476,25 @@ app.get('/api/tickets', (req, res) => {
   res.json(visibleTickets);
 });
 app.post('/api/tickets', (req, res) => {
-  const { createdBy, assignedTo, ...ticketDetails } = req.body;
+  const assignedTo = boundedText(req.body?.assignedTo, 160);
   const creator = getSessionAccount(req);
   if (!creator) return res.status(401).json({ message: 'Sign in to create a support ticket.' });
   const assignedAccount = creator.role === 'admin' ? findAccountByUsername(assignedTo) : null;
   if (assignedTo && (!assignedAccount || !isSameSchool(creator, assignedAccount))) {
     return res.status(400).json({ message: 'Choose an account from this school for the ticket assignment.' });
   }
+  const department = boundedText(req.body?.department || 'Admin', 80);
+  const priority = boundedText(req.body?.priority || 'Normal', 40);
+  const subject = boundedText(req.body?.subject, 200);
+  const message = boundedText(req.body?.message, 5000);
+  if (!subject || !message) return res.status(400).json({ message: 'Add a ticket subject and message.' });
   const item = tagSchoolRecord(creator, {
-    ...ticketDetails,
     id: crypto.randomUUID(),
-    department: String(ticketDetails.department || 'Admin').trim().slice(0, 80),
-    priority: String(ticketDetails.priority || 'Normal').trim().slice(0, 40),
-    subject: String(ticketDetails.subject || '').trim().slice(0, 200),
-    message: String(ticketDetails.message || '').trim().slice(0, 5000),
+    department,
+    category: boundedText(req.body?.category, 100),
+    priority,
+    subject,
+    message,
     createdBy: creator.username,
     createdByName: creator.name || creator.username,
     assignedTo: assignedAccount?.username || '',
