@@ -13,7 +13,7 @@ const port = 7150 + Math.floor(Math.random() * 150);
 const base = 'http://127.0.0.1:' + port;
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
-for (const file of ['server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
+for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 fs.mkdirSync(path.join(temp, 'output', 'pdf'), { recursive: true });
