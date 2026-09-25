@@ -44,7 +44,7 @@ const renderDeployAvailable = process.env.RENDER === 'true'
   && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(RENDER_REPO_SLUG);
 let renderDeployReleaseNote = null;
 let renderDeployReleasePromise = null;
-const releaseVersionForChangeLines = changeLines => Number(changeLines) <= 8 ? '8.2.9' : '9.0';
+const releaseVersionForUpdateLines = updateLineCount => Number(updateLineCount) <= 8 ? '8.2.9' : '9.0';
 const renderDeployFallbackNote = () => renderDeployAvailable ? {
   id: `render-${RENDER_DEPLOY_SHA}`,
   version: '8.2',
@@ -53,6 +53,7 @@ const renderDeployFallbackNote = () => renderDeployAvailable ? {
   publishedAt: new Date().toISOString(),
   source: 'Render',
   commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
+  updateLineCount: null,
   changeLines: null,
   releaseType: 'live'
 } : null;
@@ -72,16 +73,18 @@ const resolveRenderDeployReleaseNote = async () => {
       const commit = await response.json();
       const messageLines = String(commit?.commit?.message || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       const title = String(messageLines[0] || `Deploy ${RENDER_DEPLOY_SHA.slice(0, 7)}`).slice(0, 240);
+      const updateLineCount = Math.max(1, messageLines.length);
       const changeLines = Math.max(0, Number(commit?.stats?.total) || 0);
-      const releaseType = changeLines <= 8 ? 'patch' : 'update';
+      const releaseType = updateLineCount <= 8 ? 'patch' : 'update';
       renderDeployReleaseNote = {
         id: `render-${RENDER_DEPLOY_SHA}`,
-        version: releaseVersionForChangeLines(changeLines),
+        version: releaseVersionForUpdateLines(updateLineCount),
         title,
         summary: messageLines.slice(1, 4).join(' · ') || 'Pulled from the live Render deployment using the pushed commit title.',
         publishedAt: commit?.commit?.committer?.date || commit?.commit?.author?.date || new Date().toISOString(),
         source: 'Render',
         commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
+        updateLineCount,
         changeLines,
         releaseType
       };
