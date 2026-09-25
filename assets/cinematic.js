@@ -1579,11 +1579,11 @@ function initCinematicJourney() {
     } else if (tier === 'enhanced') {
       worldInterval = 1 / 20;
       bubbleInterval = 1 / 16;
-      renderPixelRatioTarget = .66;
+      renderPixelRatioTarget = .76;
     } else {
       worldInterval = 1 / 15;
       bubbleInterval = 1 / 12;
-      renderPixelRatioTarget = .76;
+      renderPixelRatioTarget = .66;
     }
 
     renderer.shadowMap.enabled = false;
@@ -1596,8 +1596,8 @@ function initCinematicJourney() {
 
   const recordFramePerformance = workMs => {
     // Measure the actual CPU/render work of a drawn frame, not the interval
-    // between frames. The cinematic is intentionally capped at 30 FPS, so frame
-    // spacing is ~33 ms even when the machine is healthy.
+    // between frames. The cinematic is intentionally capped near 24 FPS, so frame
+    // spacing is ~42 ms even when the machine is healthy.
     if (workMs <= 0 || workMs > 80) return;
     perfFrameTotalMs += workMs;
     perfFrameCount += 1;
