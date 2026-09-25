@@ -13,7 +13,7 @@ const checklist = fs.readFileSync(path.join(root, 'VIDEO_REVIEW_CHECKLIST.md'), 
 assert.match(page, /<meta name="description" content="Little Feet is an early childhood development portal/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
 assert.ok(page.includes('<link rel="canonical" href="https://littlefeet.co.za/">'));
-assert.match(page, /<script type="application/ld+json">/);
+assert.ok(page.includes('<script type="application/ld+json">'));
 assert.equal((page.match(/<h1\b/gi) || []).length, 1, 'The public document should expose one primary H1.');
 assert.match(page, /<h1 role="button" tabindex="0"/);
 
