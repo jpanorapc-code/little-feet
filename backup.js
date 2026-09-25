@@ -1,4 +1,5 @@
 let currentUser = null;
+window.getLittleFeetCurrentUser = () => currentUser;
 let parentPaymentData = null;
 let bookRegisterData = null;
 const errorLog = [];
@@ -1140,7 +1141,7 @@ function loadWorkspaceOnDemand(tabId) {
     visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
     notesTab: [loadStickyNotes],
-    progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords)]
+    progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords), () => window.loadCurriculumRecords?.()]
   };
   (loaders[tabId] || []).forEach(load => Promise.resolve().then(load).catch(() => {}));
 }
@@ -3447,7 +3448,11 @@ async function loadParentPayments() {
     if (!response.ok) throw new Error(data.message || 'Unable to load parent payments.');
     parentPaymentData = data;
     const summary = data.summary || {};
-    summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>`;
+    const ageing = data.ageing || {};
+    const ageingMarkup = ['principal', 'admin'].includes(currentUser.role)
+      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color);"><span class="meta" style="display:block;margin-bottom:7px;">Debtor ageing · open balance by days overdue</span><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;"><div><span class="meta">Current</span><strong style="display:block;">${formatSubscriptionMoney(ageing.current)}</strong></div><div><span class="meta">1–30 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days1to30)}</strong></div><div><span class="meta">31–60 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days31to60)}</strong></div><div><span class="meta">61–90 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days61to90)}</strong></div><div><span class="meta">90+ days</span><strong style="display:block;color:${Number(ageing.days90plus || 0) > 0 ? '#fca5a5' : 'inherit'};">${formatSubscriptionMoney(ageing.days90plus)}</strong></div></div></div>`
+      : '';
+    summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>${ageingMarkup}`;
     const admin = ['principal', 'admin'].includes(currentUser.role);
     list.innerHTML = data.payments?.length ? data.payments.map(payment => {
       const arrangement = payment.arrangementActive ? `<p style="margin:4px 0;color:#99f6e4;">Approved arrangement: ${formatSubscriptionMoney(payment.arrangementAmount)} due ${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementNote ? ` · ${escapeWorkspaceText(payment.arrangementNote)}` : ''}</p>` : '';
