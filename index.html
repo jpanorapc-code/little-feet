@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d9488">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Little Feet">
   <!-- Set this to the public standby URL when deploying behind a load balancer. -->
   <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
   <meta name="referrer" content="no-referrer-when-downgrade">
@@ -11,6 +16,8 @@
   <link rel="canonical" href="https://littlefeet.co.za/">
   <title>Little Feet | ECD Portal</title>
   <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
   <link rel="stylesheet" href="/assets/cinematic.css?v=20260925-cinematic-v8">
   <script src="/vendor/xlsx.js" defer></script>
@@ -2377,6 +2384,7 @@
             <div class="workspace-card"><h3>Milestone observation</h3><p>Record a dated observation against motor, speech, social, or another framework area.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Milestone observation')"><input name="details" placeholder="Learner · framework area · observation" required><button class="submit-btn">Save observation</button></form></div>
             <div class="workspace-card"><h3>Portfolio evidence</h3><p>Use Worksheets for photo evidence, then add the developmental context here for the learner portfolio.</p><form onsubmit="saveWorkspaceRecord(event,'portfolio','Portfolio tag')"><input name="details" placeholder="Learner · evidence title · development tag" required><button class="submit-btn">Tag portfolio</button></form></div>
             <div class="workspace-card"><h3>Term progress report</h3><p>Create a report request from the observations and assessment records saved for a learner.</p><form onsubmit="saveWorkspaceRecord(event,'reports','Progress report request')"><input name="details" placeholder="Learner · term · educator summary" required><button class="submit-btn">Create report request</button></form></div>
+            <div class="workspace-card" style="grid-column:1/-1;"><div class="card-header-bar"><h3>South African curriculum observation</h3><span class="badge-tag info">NCF · CAPS GRADE R</span></div><p>Capture a structured observation against the Department of Basic Education framework while keeping your existing milestone and portfolio records unchanged.</p><form id="curriculumObservationForm" onsubmit="saveCurriculumObservation(event)" style="display:grid;gap:10px;"><div class="workspace-grid"><label>Framework<select id="curriculumFramework" name="framework" onchange="updateCurriculumAreas()" required><option value="ncf_birth_to_four">NCF Birth–4</option><option value="caps_grade_r">CAPS Grade R</option></select></label><label>Learning area<select id="curriculumArea" name="area" required></select></label></div><div class="workspace-grid"><label>Learner<input name="learnerName" maxlength="160" required placeholder="Learner name"></label><label>Evidence reference (optional)<input name="evidenceReference" maxlength="240" placeholder="Worksheet, photo, activity or report reference"></label></div><label>Observation<textarea name="observation" rows="3" maxlength="1200" required placeholder="Record what was observed, using factual developmental language."></textarea></label><p class="meta" style="margin:0;">Framework source: <span id="curriculumFrameworkSource">Department of Basic Education · National Curriculum Framework</span>. This record supports teacher documentation; it does not replace the official curriculum document or professional judgement.</p><button class="submit-btn">Save framework observation</button></form></div>
           </div>
           <div class="workspace-results-grid">
             <section class="workspace-results-panel" aria-labelledby="portfolioResultsTitle">
@@ -2386,6 +2394,10 @@
             <section class="workspace-results-panel is-reports" aria-labelledby="reportResultsTitle">
               <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-chart"></use></svg></span><div><h3 id="reportResultsTitle">Report requests</h3><p>Progress reports waiting to be prepared or reviewed.</p></div></div>
               <div id="reportsRecords" class="record-list" aria-live="polite" data-empty-icon="document" data-empty-title="No report requests yet" data-empty-text="Create a term progress report above when an educator summary is ready."></div>
+            </section>
+            <section class="workspace-results-panel" aria-labelledby="curriculumResultsTitle" style="grid-column:1/-1;">
+              <div class="workspace-results-heading"><span class="workspace-results-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-growth"></use></svg></span><div><h3 id="curriculumResultsTitle">NCF &amp; Grade R framework observations</h3><p>Structured observations linked to the South African curriculum framework.</p></div></div>
+              <div id="curriculumRecords" class="record-list" aria-live="polite"></div>
             </section>
           </div>
         </div>
@@ -2414,6 +2426,7 @@
             <div class="workspace-card" data-roles="parent"><h3>Link a learner with a school code</h3><p>Enter the code from the printed school form. Your request stays pending until an administrator approves the relationship.</p><input id="parentLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><button type="button" class="action-btn btn-green" onclick="redeemLearnerAccessCode()">Request learner link</button></div>
             <div class="workspace-card" data-roles="parent,teacher,principal,district"><h3>Request account deletion</h3><p>Ask your school administrator to delete your Little Feet account. This creates a support ticket for review; your account is not deleted immediately.</p><button type="button" class="action-btn btn-red" onclick="requestOwnAccountDeletion()">Request account deletion</button></div><div class="workspace-card" data-roles="principal"><h3>Request full school deletion</h3><p>This requests permanent deletion of the entire school workspace: all school accounts and all data linked to this school. An administrator must review and explicitly approve it.</p><button type="button" class="action-btn btn-red" onclick="requestSchoolDeletion()">Request full school deletion</button></div>
             <div class="workspace-card"><h3>Navigation</h3><p>On desktop, double-click the left sidebar to collapse or expand it. Use the category headings to show or hide each group.</p><button type="button" class="action-btn btn-green" onclick="toggleSidebarCollapse()">Toggle sidebar</button></div>
+            <div class="workspace-card"><h3>Install Little Feet</h3><p id="pwaInstallStatus">Your browser will offer installation when it supports this app.</p><button id="pwaInstallButton" type="button" class="action-btn btn-green" onclick="installLittleFeetApp()" hidden>Install app on this device</button><p id="pwaConnectionStatus" class="meta" aria-live="polite" style="margin-top:8px;">Checking connection…</p><p class="meta" style="margin-top:6px;">For privacy, offline mode stores only the public app shell. School records, messages, payments and learner data are never cached by the service worker.</p></div>
           </div>
         </div>
       </div>
@@ -2484,7 +2497,9 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="backup.js?v=20260924-audio-cleanup" defer></script>
+  <script src="backup.js?v=20260925-strengthen-v1" defer></script>
+  <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
+  <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
   <script src="/assets/cinematic-loader.js?v=20260925-cinematic-v44" defer></script>
   <script>
     window.addEventListener('load', () => {
