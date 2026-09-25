@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
-  <link rel="stylesheet" href="/assets/cinematic.css?v=20260925-cinematic-v10">
+  <link rel="stylesheet" href="/assets/cinematic.css?v=20260925-cinematic-v11">
   <script src="/vendor/xlsx.js" defer></script>
   <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
@@ -1354,6 +1354,128 @@
         letter-spacing:clamp(.7px, .35vw, 1.25px);
         line-height:1.2;
         white-space:nowrap;
+      }
+    }
+
+    /* Cross-device layout hardening: final guard rails for narrow phones,
+       tablets, foldables, notches, and short landscape screens. */
+    *, *::before, *::after { box-sizing:border-box; }
+    img, picture, video, canvas, iframe { max-width:100%; }
+    input, select, textarea, button { min-width:0; }
+    .container,
+    .tab-content,
+    .tab-content > *,
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .item-row,
+    .chat-shell,
+    .portal-tour,
+    .modal-card { min-width:0; max-width:100%; }
+    .card p,
+    .workspace-card p,
+    .workspace-results-panel p,
+    .item-row,
+    .wellbeing-banner p,
+    .record-list,
+    .chat-box { overflow-wrap:anywhere; word-break:normal; }
+    .modal-overlay {
+      padding:
+        max(12px, env(safe-area-inset-top))
+        max(12px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom))
+        max(12px, env(safe-area-inset-left));
+    }
+
+    @media (max-width:959px) {
+      .app-sidebar {
+        max-width:calc(100vw - max(24px, env(safe-area-inset-right)) - max(12px, env(safe-area-inset-left)));
+      }
+      .container,
+      #dashboardSection footer {
+        width:100%;
+        max-width:100%;
+        margin-left:0;
+      }
+      nav {
+        padding-left:max(10px, env(safe-area-inset-left));
+        padding-right:max(10px, env(safe-area-inset-right));
+      }
+      .modal-card {
+        width:min(100%, 680px);
+        max-width:100%;
+        max-height:calc(100dvh - 24px);
+      }
+    }
+
+    @media (max-width:640px) {
+      .card [style*="grid-template-columns:1fr 1fr"],
+      .workspace-card [style*="grid-template-columns:1fr 1fr"],
+      .modal-card [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns:minmax(0,1fr) !important;
+      }
+      .card [style*="display:flex"],
+      .workspace-card [style*="display:flex"],
+      .item-row [style*="display:flex"],
+      .modal-card [style*="display:flex"] {
+        max-width:100%;
+        flex-wrap:wrap;
+      }
+      .wellbeing-banner { max-width:100%; }
+      .wellbeing-banner p { min-width:0; }
+      .modal-overlay { align-items:flex-start; overflow:auto; }
+      .modal-card { margin-block:auto; }
+      .profile-icon-picker { grid-template-columns:repeat(4,minmax(0,1fr)); }
+      .nav-brand { max-width:100%; }
+      .nav-brand > div { min-width:0; overflow:hidden; }
+      .nav-brand > div > span:first-child {
+        display:block;
+        max-width:100%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+    }
+
+    @media (max-width:360px) {
+      .container { padding-inline:10px; }
+      .card, .workspace-card { padding:12px; }
+      .nav-quickbar { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .nav-term-panel { grid-column:1 / -1; }
+      .profile-icon-picker { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      #authSection > .auth-card { padding:14px; }
+    }
+
+    @media (max-width:900px) and (max-height:600px) and (orientation:landscape) {
+      #authSection {
+        min-height:auto;
+        align-items:flex-start;
+        padding:
+          max(10px, env(safe-area-inset-top))
+          max(14px, env(safe-area-inset-right))
+          max(10px, env(safe-area-inset-bottom))
+          max(14px, env(safe-area-inset-left));
+      }
+      .brand-header {
+        top:0;
+        width:100%;
+        margin-bottom:10px;
+        padding-top:0;
+        overflow:visible;
+      }
+      .mascot-stage { min-height:92px; }
+      .mascot-stage::before { width:88px; height:88px; }
+      .brand-header img { width:80px; height:80px; }
+      .brand-header h1 {
+        margin:2px 0 4px;
+        font-size:1.35rem;
+        white-space:normal;
+      }
+      .brand-header p.slogan {
+        max-width:100%;
+        font-size:.55rem;
+        white-space:normal;
       }
     }
       .legal-inline-link {

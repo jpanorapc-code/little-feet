@@ -843,6 +843,111 @@
   }
 }
 
+/* Cross-device cinematic guard rails. Keep controls inside the stage on
+   narrow/short screens and remove hidden live-ocean layers while paused. */
+.cinematic-stage,
+.cinematic-ui,
+.cinematic-ui > *,
+.cinematic-footer,
+.cinematic-footer > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.cinematic-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.cinematic-journey.is-user-paused .cinematic-depth-picture,
+.cinematic-journey.is-user-paused .cinematic-surface-air,
+.cinematic-journey.is-user-paused .cinematic-water-surface,
+.cinematic-journey.is-user-paused .cinematic-water-current,
+.cinematic-journey.is-user-paused .cinematic-life-2d,
+.cinematic-journey.is-user-paused #littleFeetCinematicCanvas {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 860px) {
+  .cinematic-footer {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .cinematic-progress-shell {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+  .cinematic-footer-actions { margin-left: auto; }
+}
+
+@media (max-width: 560px) {
+  .cinematic-journey.is-user-paused .cinematic-stage {
+    height: min(100dvh, 760px);
+    min-height: min(520px, calc(100dvh - 16px));
+  }
+  .cinematic-ui {
+    gap: 10px;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+  .cinematic-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+  .cinematic-progress-shell { width: 100%; }
+  .cinematic-footer-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    margin: 0;
+  }
+  .cinematic-footer-actions .cinematic-skip {
+    width: 100%;
+    white-space: normal;
+  }
+  .cinematic-paused-picture img { object-position: 50% 50%; }
+}
+
+@media (max-width: 360px) {
+  .cinematic-footer-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .cinematic-journey.is-user-paused .cinematic-stage {
+    height: calc(100dvh - 12px);
+    min-height: 0;
+  }
+  .cinematic-ui {
+    gap: 6px;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+  .cinematic-copy {
+    max-width: min(460px, 58vw);
+    padding: 8px 10px;
+  }
+  .cinematic-copy h2 { font-size: clamp(1.1rem, 3vw, 1.65rem); }
+  .cinematic-copy p { font-size: .70rem; line-height: 1.25; }
+  .cinematic-depth-meter { width: min(220px, 32vw); }
+  .cinematic-stop {
+    padding: 6px 8px 6px 28px;
+    font-size: .68rem;
+  }
+  .cinematic-footer-actions .cinematic-skip {
+    padding: 7px 9px;
+    font-size: .68rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cinematic-journey { height: auto; }
   .cinematic-stage {

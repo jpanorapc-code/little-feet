@@ -21,7 +21,7 @@ const pausedArtworkStat = fs.statSync(pausedArtworkPath);
 
 assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
 assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
-assert.match(page, /href="\/assets\/cinematic\.css\?v=20260925-cinematic-v10"/);
+assert.match(page, /href="\/assets\/cinematic\.css\?v=20260925-cinematic-v11"/);
 assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260925-cinematic-v45" defer/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
 assert.match(page, /id="littleFeetCinematicJourney"/);
@@ -364,5 +364,13 @@ assert.doesNotMatch(cinematicLoader, /innerHTML\s*=/);
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(styles, /\.cinematic-fallback/);
 assert.doesNotMatch(styles, /backdrop-filter/);
+
+assert.match(styles, /Cross-device cinematic guard rails/);
+assert.match(styles, /\.cinematic-footer-actions \{[\s\S]*display: flex[\s\S]*flex-wrap: wrap/);
+assert.match(styles, /@media \(max-width: 560px\)[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+assert.match(styles, /@media \(max-width: 360px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+assert.match(styles, /@media \(max-height: 600px\) and \(orientation: landscape\)/);
+assert.match(styles, /is-user-paused #littleFeetCinematicCanvas[\s\S]*visibility: hidden/);
+assert.match(styles, /min-height: min\(520px, calc\(100dvh - 16px\)\)/);
 
 console.log('Cinematic navigation regression test passed.');

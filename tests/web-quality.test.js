@@ -109,4 +109,12 @@ assert.match(curriculum, /ELDA 1 · Well-being/);
 assert.match(curriculum, /ELDA 6 · Knowledge and Understanding of the World/);
 assert.match(curriculum, /CAPS Grade R/);
 
+assert.match(page, /name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover"/);
+assert.match(page, /Cross-device layout hardening/);
+assert.match(page, /@media \(max-width:360px\)/);
+assert.match(page, /@media \(max-width:900px\) and \(max-height:600px\) and \(orientation:landscape\)/);
+assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area-inset-right/);
+assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
+assert.match(page, /cinematic\.css\?v=20260925-cinematic-v11/);
+
 console.log('Web quality regression test passed.');
