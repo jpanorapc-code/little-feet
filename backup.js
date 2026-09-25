@@ -944,21 +944,42 @@ function selectProfileIcon(icon) {
   applyProfileIcon(icon);
 }
 
+function userPreferencesStorageKey() {
+  return currentUser?.username ? `lf_user_preferences_${encodeURIComponent(currentUser.username)}` : 'lf_user_preferences';
+}
+
+function readUserPreferences() {
+  try {
+    const accountValue = localStorage.getItem(userPreferencesStorageKey());
+    if (accountValue) return JSON.parse(accountValue);
+    const legacyValue = localStorage.getItem('lf_user_preferences');
+    return legacyValue ? JSON.parse(legacyValue) : {};
+  } catch {
+    return {};
+  }
+}
+
 function applyUserPreferences() {
-  const preferences = JSON.parse(localStorage.getItem('lf_user_preferences') || '{}');
+  const preferences = readUserPreferences();
   const language = document.getElementById('languagePreference');
   const refresh = document.getElementById('refreshPreference');
   if (language) language.value = preferences.language || 'en';
   if (refresh) refresh.value = preferences.refresh || '0';
-  document.documentElement.lang = preferences.language || 'en';
+  if (window.applyLittleFeetLanguage) window.applyLittleFeetLanguage(preferences.language || 'en');
+  else document.documentElement.lang = preferences.language || 'en';
   const sidebarCollapsed = localStorage.getItem('lf_sidebar_collapsed') === 'true';
   document.getElementById('dashboardSection')?.classList.toggle('sidebar-collapsed', sidebarCollapsed);
   document.getElementById('mainNavigation')?.classList.toggle('is-collapsed', sidebarCollapsed);
   restoreSidebarGroups();
   applyProfileIcon();
   if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
-  const interval = Number(preferences.refresh || 0);
-  if (interval > 0) dashboardRefreshTimer = setInterval(() => { if (currentUser && !document.hidden) loadAllData(); }, interval);
+  dashboardRefreshTimer = null;
+  if (window.configureDashboardAutoRefresh) {
+    window.configureDashboardAutoRefresh(preferences.refresh || '0');
+  } else {
+    const interval = Number(preferences.refresh || 0);
+    if (interval > 0) dashboardRefreshTimer = setInterval(() => { if (currentUser && !document.hidden) loadAllData(); }, interval);
+  }
 }
 
 function saveUserPreferences() {
@@ -966,9 +987,8 @@ function saveUserPreferences() {
     language: document.getElementById('languagePreference')?.value || 'en',
     refresh: document.getElementById('refreshPreference')?.value || '0'
   };
-  localStorage.setItem('lf_user_preferences', JSON.stringify(preferences));
+  localStorage.setItem(userPreferencesStorageKey(), JSON.stringify(preferences));
   applyUserPreferences();
-  if (preferences.language === 'af') alert('Afrikaans has been saved as your preference. Full text translation will become available as the approved translation catalogue is completed.');
 }
 
 function openGlobalSearch() {
@@ -1022,6 +1042,7 @@ function setupSession() {
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
+  window.setTimeout(() => window.restoreDashboardDrafts?.(), 120);
   startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
@@ -1081,6 +1102,11 @@ function renderRoleHomePanel() {
 }
 
 function logout() {
+  const signingOutUsername = currentUser?.username || '';
+  window.stopDashboardAutoRefresh?.();
+  if (dashboardRefreshTimer) window.clearInterval(dashboardRefreshTimer);
+  dashboardRefreshTimer = null;
+  window.clearDashboardDrafts?.(signingOutUsername);
   clearTimeout(wallpaperIdleTimer);
   if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
   schoolStatusTimer = null;
@@ -1121,6 +1147,7 @@ function syncMobileHeaderOffset() {
 window.addEventListener('resize', syncMobileHeaderOffset);
 
 function switchTab(tabId, btn) {
+  window.saveDashboardDrafts?.();
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const targetTab = document.getElementById(tabId);
@@ -1133,6 +1160,7 @@ function switchTab(tabId, btn) {
   if (btn) btn.classList.add('active');
   closeNavigation();
   loadWorkspaceOnDemand(tabId);
+  window.setTimeout(() => window.restoreDashboardDrafts?.(), 80);
 }
 
 function loadWorkspaceOnDemand(tabId) {
