@@ -109,6 +109,8 @@ async function login(username,pin){
     assert.equal(statementBefore.response.status,200);
     assert.equal(statementBefore.data.parent.username,'alpha-parent');
     assert.equal(statementBefore.data.closingBalance,400);
+    const crossSchoolStatement=await request('/api/finance/statements?from=2020-01-01&to=2099-12-31&parentUsername=alpha-parent',{cookie:bravoAdmin});
+    assert.equal(crossSchoolStatement.response.status,404);
 
     const crossSchoolAdjustment=await request('/api/finance/adjustments',{
       method:'POST',cookie:bravoAdmin,body:{paymentId:invoice.id,type:'credit',amount:10,reason:'Cross-school attempt'}
@@ -155,12 +157,13 @@ async function login(username,pin){
       {id:'bank-line-1',reference:secondInvoice.data.payment.reference,amount:100,date:'2026-09-25',bankReference:'AUTO-100',description:'Exact payment'},
       {id:'bank-line-2',reference:'NOT-A-REFERENCE',amount:75,date:'2026-09-25',bankReference:'FAKE-75',description:'Unknown'},
       {id:'bank-line-3',reference:invoice.reference,amount:999,date:'2026-09-25',bankReference:'BAD-AMOUNT',description:'Mismatch'},
-      {id:'bank-line-4',reference:invoice.reference,amount:-5,date:'2026-09-25',bankReference:'NEGATIVE',description:'Invalid'}
+      {id:'bank-line-4',reference:invoice.reference,amount:-5,date:'2026-09-25',bankReference:'NEGATIVE',description:'Invalid'},
+      {id:'bank-line-5',reference:'',amount:100,date:'2026-09-25',bankReference:'SUBSTRING',description:'XX'+secondInvoice.data.payment.reference+'YY'}
     ];
     const preview=await request('/api/finance/reconciliation/preview',{method:'POST',cookie:principal,body:{lines}});
     assert.equal(preview.response.status,200);
     assert.equal(preview.data.counts.matched,1);
-    assert.equal(preview.data.counts.unmatched,1);
+    assert.equal(preview.data.counts.unmatched,2);
     assert.equal(preview.data.counts.amount_mismatch,1);
     assert.equal(preview.data.counts.invalid,1);
 
@@ -193,9 +196,15 @@ async function login(username,pin){
     });
     assert.equal(profile.response.status,200);
 
+    const wrongFrequencyPayroll=await request('/api/finance/payroll/runs',{
+      method:'POST',cookie:principal,
+      body:{periodStart:'2026-09-01',periodEnd:'2026-09-07',payDate:'2026-09-07',payFrequency:'weekly',note:'No weekly profiles'}
+    });
+    assert.equal(wrongFrequencyPayroll.response.status,400);
+
     const payroll=await request('/api/finance/payroll/runs',{
       method:'POST',cookie:principal,
-      body:{periodStart:'2026-09-01',periodEnd:'2026-09-30',payDate:'2026-09-25',note:'September payroll'}
+      body:{periodStart:'2026-09-01',periodEnd:'2026-09-30',payDate:'2026-09-25',payFrequency:'monthly',note:'September payroll'}
     });
     assert.equal(payroll.response.status,201);
     assert.equal(payroll.data.run.totals.gross,10500);
