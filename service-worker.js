@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v7';
+const CACHE_NAME = 'little-feet-shell-v8';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -6,6 +6,7 @@ const SHELL_ASSETS = [
   '/logo-transparent.png',
   '/assets/4k/little-feet-aurora-stars-4k.svg',
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
+  '/assets/images/little-feet-cinematic-paused-school.avif',
   '/backup.js?v=20260925-aurora-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
@@ -57,7 +58,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (/\.(?:js|css|png|jpe?g|webp|gif|svg|ico|woff2?)$/i.test(url.pathname)) {
+  if (/\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
         if (!response.ok) return response;
