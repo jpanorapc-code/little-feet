@@ -1641,17 +1641,18 @@ app.put('/api/subscription-billing', async (req, res) => {
   }
   if (baseMonthly === null || lateFee === null) return res.status(400).json({ message: 'Enter valid non-negative pricing amounts.' });
   const paymentMethod = req.body?.payment?.method === 'bank_transfer' ? 'bank_transfer' : 'payment_link';
-  const paymentLink = String(req.body?.payment?.paymentLink || '').trim();
-  const accountName = String(req.body?.payment?.accountName || '').trim();
-  const bankName = String(req.body?.payment?.bankName || '').trim();
-  const accountNumber = String(req.body?.payment?.accountNumber || '').trim();
-  const branchCode = String(req.body?.payment?.branchCode || '').trim();
+  const rawPaymentLink = limitedText(req.body?.payment?.paymentLink || '', 2048);
+  const accountName = limitedText(req.body?.payment?.accountName || '', 160);
+  const bankName = limitedText(req.body?.payment?.bankName || '', 160);
+  const accountNumber = limitedText(req.body?.payment?.accountNumber || '', 64);
+  const branchCode = limitedText(req.body?.payment?.branchCode || '', 32);
   const referencePrefix = String(req.body?.payment?.referencePrefix || 'LF').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 16) || 'LF';
+  if (rawPaymentLink === null || accountName === null || bankName === null || accountNumber === null || branchCode === null) {
+    return res.status(400).json({ message: 'Payment configuration contains a field that is too long.' });
+  }
+  const paymentLink = rawPaymentLink ? safeHttpsUrl(rawPaymentLink) : '';
   if (paymentMethod === 'payment_link') {
-    try {
-      const parsed = new URL(paymentLink);
-      if (parsed.protocol !== 'https:') throw new Error('Unsafe protocol');
-    } catch { return res.status(400).json({ message: 'Enter a valid HTTPS payment link.' }); }
+    if (!paymentLink) return res.status(400).json({ message: 'Enter a valid HTTPS payment link without embedded credentials.' });
   } else if (!accountName || !bankName || !accountNumber) {
     return res.status(400).json({ message: 'Account name, bank name, and account number are required for bank transfers.' });
   }
