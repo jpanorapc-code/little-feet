@@ -63,7 +63,8 @@ function createMicroReliefTexture(kind = 'feather') {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(kind === 'ice' ? 3.5 : 6.5, kind === 'ice' ? 3.5 : 8.5);
+  if (kind === 'water') texture.repeat.set(7.5, 7.5);
+  else texture.repeat.set(kind === 'ice' ? 3.5 : 6.5, kind === 'ice' ? 3.5 : 8.5);
   texture.needsUpdate = true;
   return texture;
 }
@@ -444,6 +445,36 @@ function createIceShelf() {
   return group;
 }
 
+function createStaticWaterSurface() {
+  // Cheap visible water: one two-triangle plane, no shader, no CPU vertex animation.
+  // A tiny generated bump texture gives it readable ripples without reviving the old GPU-heavy water.
+  const relief = createMicroReliefTexture('water');
+  const material = new THREE.MeshPhysicalMaterial({
+    color: 0x1599c7,
+    roughness: .22,
+    roughnessMap: relief,
+    bumpMap: relief,
+    bumpScale: .055,
+    metalness: 0,
+    clearcoat: .72,
+    clearcoatRoughness: .18,
+    transmission: .08,
+    transparent: true,
+    opacity: .54,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const surface = new THREE.Mesh(
+    getSharedGeometry('surfaceWaterPlane', () => new THREE.PlaneGeometry(64, 64, 1, 1)),
+    material
+  );
+  surface.rotation.x = -Math.PI / 2;
+  surface.position.y = -.28;
+  surface.renderOrder = -1;
+  surface.userData.relief = relief;
+  return surface;
+}
+
 function createBubbles(count, spread, depth, size) {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
@@ -759,7 +790,7 @@ function initCinematicJourney() {
   stage.dataset.performanceMode = 'true-capped-scheduler-v3';
   stage.dataset.renderFpsCap = String(renderFpsCap);
   stage.dataset.backgroundPause = 'offscreen-hard-stop-v2';
-  stage.dataset.compressionProfile = 'safe-webgl-v15-local-css-water-no-shader';
+  stage.dataset.compressionProfile = 'safe-webgl-v16-static-water-depth-glow';
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -798,6 +829,10 @@ function initCinematicJourney() {
   const violetLight = new THREE.PointLight(0x8c61ff, 10, 16, 2);
   violetLight.position.set(5, -19, -2);
   scene.add(violetLight);
+
+  const waterSurface = createStaticWaterSurface();
+  scene.add(waterSurface);
+  stage.dataset.waterModel = 'single-plane-bump-v1';
 
   const ice = createIceShelf();
   ice.position.set(-2.2, .30, -.25);
@@ -1726,6 +1761,15 @@ function initCinematicJourney() {
 
   const animateWorld = (time, dt, progress) => {
     const deepGlow = smoothstep(.30, .95, progress);
+
+    // Move only the bump texture coordinates. Geometry stays static.
+    if (waterSurface.userData.relief) {
+      waterSurface.userData.relief.offset.x = (time * .010) % 1;
+      waterSurface.userData.relief.offset.y = (time * .006) % 1;
+    }
+    const waterFade = smoothstep(.18, .34, progress);
+    waterSurface.material.opacity = lerp(.56, .06, waterFade);
+    waterSurface.visible = progress < .40;
     rings.forEach((ring, index) => {
       const distance = Math.abs(progress - stations[Math.min(index + 2, stations.length - 1)].at);
       const proximity = 1 - smoothstep(.03, .15, distance);
@@ -1911,6 +1955,8 @@ function initCinematicJourney() {
     dust.material.opacity = .16 + Math.sin(time * .7) * .035;
 
     ice.visible = smoothProgress < .42;
+    // Surface water stays behind the ice and fades once the camera is submerged.
+    waterSurface.position.y = -.28 + Math.sin(time * .55) * .008;
     ambient.intensity = lerp(2.2, .62, deepening);
     cyanLight.intensity = lerp(7.5, 5.2, deepening) + splash * 3.5;
     violetLight.intensity = lerp(1.8, 14.5, smoothstep(.42, .92, smoothProgress));
