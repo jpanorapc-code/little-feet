@@ -12,7 +12,7 @@ const damp = (current, target, lambda, dt) => THREE.MathUtils.lerp(current, targ
 // Keep the authored scene at full detail. Runtime performance is managed
 // separately so a machine is never punished just because it reports more RAM,
 // CPU cores, a high-DPI display, or a high-refresh monitor.
-const SCENE_DETAIL = 'high';
+const SCENE_DETAIL = 'medium';
 
 const sharedGeometry = {};
 const getSharedGeometry = (key, factory) => {
@@ -506,10 +506,10 @@ function initCinematicJourney() {
 
   const quality = SCENE_DETAIL;
   let performanceTier = 'balanced';
-  let renderPixelRatioTarget = .78;
-  let maxRenderPixels = 1280 * 720;
-  let displayPixelRatioLimit = .88;
-  let renderFpsCap = 30;
+  let renderPixelRatioTarget = .68;
+  let maxRenderPixels = 1152 * 648;
+  let displayPixelRatioLimit = .78;
+  let renderFpsCap = 24;
   let measuredRefreshHz = 60;
 
   const classifyViewport = () => {
@@ -546,7 +546,7 @@ function initCinematicJourney() {
     } else {
       // 1080p/1440p/4K TVs and monitors still render the cinematic internally
       // near 720p. CSS scales it to the panel, avoiding a 4K GPU/CPU penalty.
-      maxRenderPixels = 1280 * 720;
+      maxRenderPixels = 1152 * 648;
       displayPixelRatioLimit = .88;
     }
 
@@ -556,11 +556,11 @@ function initCinematicJourney() {
   };
 
   const fpsCapForRefresh = hz => {
-    if (!Number.isFinite(hz) || hz <= 0) return 30;
-    if (hz < 28) return Math.max(15, Math.min(30, Math.round(hz)));
-    if (hz < 38) return 30;
-    if (hz < 56) return Math.max(20, Math.min(30, Math.round(hz / 2)));
-    return 30;
+    if (!Number.isFinite(hz) || hz <= 0) return 24;
+    if (hz < 28) return Math.max(15, Math.min(24, Math.round(hz)));
+    if (hz < 38) return 24;
+    if (hz < 56) return Math.max(18, Math.min(24, Math.round(hz / 2)));
+    return 24;
   };
 
   const measureDisplayRefresh = () => {
@@ -604,7 +604,7 @@ function initCinematicJourney() {
   const rendererOptions = {
     canvas,
     alpha: true,
-    antialias: true,
+    antialias: false,
     powerPreference: 'high-performance'
   };
 
@@ -1575,11 +1575,11 @@ function initCinematicJourney() {
     if (tier === 'reduced') {
       worldInterval = 1 / 10;
       bubbleInterval = 1 / 8;
-      renderPixelRatioTarget = .62;
+      renderPixelRatioTarget = .56;
     } else if (tier === 'enhanced') {
       worldInterval = 1 / 20;
       bubbleInterval = 1 / 16;
-      renderPixelRatioTarget = .88;
+      renderPixelRatioTarget = .66;
     } else {
       worldInterval = 1 / 15;
       bubbleInterval = 1 / 12;
@@ -1601,25 +1601,25 @@ function initCinematicJourney() {
     if (workMs <= 0 || workMs > 80) return;
     perfFrameTotalMs += workMs;
     perfFrameCount += 1;
-    if (perfFrameCount < 60) return;
+    if (perfFrameCount < 24) return;
 
     const averageMs = perfFrameTotalMs / perfFrameCount;
     perfFrameCount = 0;
     perfFrameTotalMs = 0;
 
-    if (averageMs > 24) {
+    if (averageMs > 20) {
       perfGoodWindows = 0;
       applyPerformanceTier('reduced');
       return;
     }
-    if (averageMs > 16) {
+    if (averageMs > 13) {
       perfGoodWindows = 0;
       applyPerformanceTier('balanced');
       return;
     }
 
     perfGoodWindows += 1;
-    if (perfGoodWindows >= 2 && averageMs < 11) applyPerformanceTier('enhanced');
+    if (perfGoodWindows >= 3 && averageMs < 9) applyPerformanceTier('enhanced');
   };
 
   applyPerformanceTier('balanced');
