@@ -110,8 +110,11 @@
   }
 
   async function openFinanceStatement() {
-    const data = await refreshState();
-    const options = (data.parents || []).map(parent => '<option value="' + safe(parent.username) + '">' + safe(parent.name) + '</option>').join('');
+    const currentUser = window.getLittleFeetCurrentUser?.();
+    const parents = currentUser?.role === 'parent'
+      ? [{ username: currentUser.username, name: currentUser.name || currentUser.username }]
+      : ((await refreshState()).parents || []);
+    const options = parents.map(parent => '<option value="' + safe(parent.username) + '">' + safe(parent.name) + '</option>').join('');
     window.openModal('Parent statement', `
       <form onsubmit="loadFinanceStatement(event)" style="display:grid;gap:10px;">
         <label>Parent<select name="parentUsername" required>${options}</select></label>
