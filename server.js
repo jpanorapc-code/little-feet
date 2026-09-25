@@ -14,8 +14,10 @@ const isProduction = process.env.NODE_ENV === 'production';
 const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
+const loginUsernameAttempts = new Map();
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
+const MAX_DISTRIBUTED_LOGIN_ATTEMPTS = 20;
 const SCHOOL_SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
 const SCHOOL_SEARCH_CACHE_MAX_ENTRIES = 250;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
@@ -321,19 +323,23 @@ const safeHttpsUrl = value => {
   }
 };
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
-const activeLoginAttempt = (key) => {
-  const entry = loginAttempts.get(key);
-  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) { loginAttempts.delete(key); return null; }
+const activeAttempt = (map, key) => {
+  const entry = map.get(key);
+  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) { map.delete(key); return null; }
   return entry;
 };
+const activeLoginAttempt = key => activeAttempt(loginAttempts, key);
+const activeUsernameAttempt = username => activeAttempt(loginUsernameAttempts, normalizeUsername(username));
 
 const pruneLoginAttempts = (now = Date.now()) => {
   for (const [key, entry] of loginAttempts) {
     if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginAttempts.delete(key);
   }
-  // Stale entries should normally keep this tiny. The hard ceiling prevents a
-  // distributed username spray from turning the limiter itself into a memory sink.
+  for (const [key, entry] of loginUsernameAttempts) {
+    if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginUsernameAttempts.delete(key);
+  }
   while (loginAttempts.size > 10000) loginAttempts.delete(loginAttempts.keys().next().value);
+  while (loginUsernameAttempts.size > 10000) loginUsernameAttempts.delete(loginUsernameAttempts.keys().next().value);
 };
 const loginAttemptCleanupTimer = setInterval(pruneLoginAttempts, 5 * 60 * 1000);
 loginAttemptCleanupTimer.unref?.();
@@ -1053,7 +1059,8 @@ app.post('/api/login', (req, res) => {
   const normalizedUsername = normalizeUsername(username);
   const attemptKey = loginAttemptKey(req, normalizedUsername);
   const previousAttempts = activeLoginAttempt(attemptKey);
-  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS) {
+  const previousUsernameAttempts = activeUsernameAttempt(normalizedUsername);
+  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
   }
   const user = normalizedUsername && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
@@ -1062,6 +1069,7 @@ app.post('/api/login', (req, res) => {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
+    loginUsernameAttempts.delete(normalizedUsername);
     if (!replicaMode && pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     establishAuthenticatedSession(req, user, (error, safeUser) => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
@@ -1069,7 +1077,8 @@ app.post('/api/login', (req, res) => {
     });
   } else {
     loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
-    if (loginAttempts.size > 10000) pruneLoginAttempts();
+    loginUsernameAttempts.set(normalizedUsername, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
+    if (loginAttempts.size > 10000 || loginUsernameAttempts.size > 10000) pruneLoginAttempts();
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
 });
