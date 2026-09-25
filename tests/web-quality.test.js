@@ -144,4 +144,6 @@ assert.match(page, /\.login-secure-label[\s\S]*white-space:nowrap/);
 assert.match(page, /\.login-card-actions \{ display:grid; grid-template-columns:minmax\(118px,auto\) 34px/);
 assert.match(page, /\.login-audio-compact span \{ position:absolute; width:1px/);
 assert.match(page, /\.login-utility-row \{ display:grid; grid-template-columns:minmax\(0,1fr\) auto/);
+assert.match(page, /Copyright, Trade Marks &amp; IP/);
+assert.match(page, /openCopyrightContentPolicy\(\)/);
 console.log('Web quality regression test passed.');

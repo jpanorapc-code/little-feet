@@ -38,8 +38,8 @@ if (productionConfigurationErrors.length) {
   throw new Error(`Production configuration is missing required secure settings: ${productionConfigurationErrors.join(', ')}`);
 }
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
-const LITTLE_FEET_PRIVACY_VERSION = 'POPIA-2026-09-v2';
-const LITTLE_FEET_TERMS_VERSION = 'TOS-ZA-2026-09-v2';
+const LITTLE_FEET_PRIVACY_VERSION = 'POPIA-2026-09-v3';
+const LITTLE_FEET_TERMS_VERSION = 'TOS-ZA-2026-09-v3';
 const RENDER_DEPLOY_SHA = String(process.env.RENDER_GIT_COMMIT || '').trim().toLowerCase();
 const RENDER_REPO_SLUG = String(process.env.RENDER_GIT_REPO_SLUG || '').trim();
 const renderDeployAvailable = process.env.RENDER === 'true' && /^[0-9a-f]{40}$/.test(RENDER_DEPLOY_SHA);
