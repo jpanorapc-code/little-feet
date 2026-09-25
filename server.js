@@ -1552,6 +1552,7 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
 app.get('/api/subscription-billing', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
+  if (!['teacher', 'principal', 'district', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
   const billing = subscriptionBillingState(actor);
   const isAdmin = actor.role === 'admin';
   const { accountNumberEncrypted, payMePayloadEncrypted, ...adminPayment } = billing.payment;
