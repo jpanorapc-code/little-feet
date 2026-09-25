@@ -6,17 +6,21 @@
   <!-- Set this to the public standby URL when deploying behind a load balancer. -->
   <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
   <meta name="referrer" content="no-referrer-when-downgrade">
+  <meta name="description" content="Little Feet is an early childhood development portal for school communication, attendance, learning records, safeguarding and family engagement.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://littlefeet.co.za/">
   <title>Little Feet | ECD Portal</title>
   <link rel="icon" type="image/png" href="/logo.png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
   <link rel="stylesheet" href="/assets/cinematic.css?v=20260925-cinematic-v8">
-  <script src="/vendor/xlsx.js"></script>
-  <script src="/vendor/qrcode.js"></script>
+  <script src="/vendor/xlsx.js" defer></script>
+  <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
-  <script src="/vendor/leaflet.js"></script>
-  <script src="/vendor/leaflet-markercluster.js"></script>
+  <script src="/vendor/leaflet.js" defer></script>
+  <script src="/vendor/leaflet-markercluster.js" defer></script>
   <style>
     :root {
       --primary-color: #0d9488;
@@ -218,7 +222,7 @@
     .brand-header img { position:relative; z-index:2; height:156px; width:156px; object-fit:contain; padding:0; background:transparent; border:0; cursor:pointer; animation:logoPulse 2.8s ease-in-out infinite alternate; border-radius:18px; }
     .nav-brand img { background: #ffffff !important; }
     @keyframes logoPulse { from { filter: brightness(1.18) contrast(1.05) drop-shadow(0 0 5px rgba(45,212,191,.55)); } to { filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 18px rgba(45,212,191,1)); } }
-    .brand-header h2 { position:relative; z-index:3; margin-top:2px; margin-bottom:4px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2.25rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
+    .brand-header h1 { position:relative; z-index:3; margin-top:2px; margin-bottom:4px; color:transparent; background:linear-gradient(90deg,#f8fafc 5%,#5eead4 40%,#ffffff 62%,#2dd4bf); background-size:220% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:2.25rem; line-height:1; letter-spacing:.035em; cursor:pointer; text-shadow:0 0 20px rgba(45,212,191,.15); animation:titleShimmer 4.5s linear infinite; }
     .brand-header p.slogan { position:relative; z-index:3; display:inline-block; margin:0; padding:5px 11px; border:1px solid rgba(45,212,191,.38); border-radius:999px; background:rgba(13,148,136,.11); color:#99f6e4; font-size:.69rem; font-style:normal; font-weight:800; letter-spacing:1.45px; text-transform:uppercase; animation:sloganLift 3s ease-in-out infinite; }
     @keyframes titleShimmer { to { background-position:220% center; } }
     @keyframes sloganLift { 50% { transform:translateY(-2px); box-shadow:0 7px 18px rgba(13,148,136,.28); } }
@@ -948,7 +952,7 @@
       box-shadow:0 7px 18px rgba(2,8,23,.25), inset 0 0 0 2px rgba(226,232,240,.18);
       object-fit:cover;
     }
-    .brand-header h2 { margin:3px 0 7px; font-size:2.15rem; text-align:center; }
+    .brand-header h1 { margin:3px 0 7px; font-size:2.15rem; text-align:center; }
     .brand-header p.slogan { background:rgba(7,28,47,.52); text-align:center; }
     body.light-mode #authSection > .auth-card { background:linear-gradient(155deg, rgba(222,244,253,.72), rgba(190,225,241,.58)) !important; }
     .sticky-note-form { display:grid; grid-template-columns:minmax(180px,.75fr) minmax(240px,1.6fr) minmax(130px,.5fr) auto; gap:12px; align-items:end; margin-bottom:18px; padding:14px; border:1px solid rgba(45,212,191,.25); border-radius:14px; background:linear-gradient(125deg, rgba(14,116,144,.10), rgba(13,148,136,.08)); }
@@ -1302,7 +1306,7 @@
         padding-top:194px;
       }
       .mascot-stage { top:0; }
-      .brand-header h2 {
+      .brand-header h1 {
         margin:4px 0 6px;
         font-size:clamp(1.72rem, 8.7vw, 1.95rem);
         line-height:1.08;
@@ -1375,9 +1379,9 @@
   </div>
 
   <!-- Modal Component -->
-  <div id="appModal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <button class="modal-close" onclick="closeModal()">✕</button>
+  <div id="appModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card" tabindex="-1">
+      <button type="button" class="modal-close" onclick="closeModal()" aria-label="Close dialog">✕</button>
       <div id="modalTitle" style="font-size: 1.2rem; font-weight: 700; color: var(--primary-color); margin-bottom: 12px;">Notice</div>
       <div id="modalBody">Body Content</div>
     </div>
@@ -1390,9 +1394,9 @@
     <div class="card auth-card">
       <div class="brand-header">
         <div class="mascot-stage">
-          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="goToMainMenu()" title="Click to go to Main Menu" onerror="this.style.display='none'">
+          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet mascot — open main menu" onerror="this.style.display='none'">
         </div>
-        <h2 onclick="goToMainMenu()" title="Click to go to Main Menu">Little Feet</h2>
+        <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet — open main menu">Little Feet</h1>
         <p class="slogan">Every Little Step Matters</p>
       </div>
       <form id="loginForm">
@@ -2456,11 +2460,12 @@
         <div>
           <p id="footerSchoolName" style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet School Portal</p>
           <div class="footer-links">
-            <a onclick="openLegalModal('Privacy & Safeguarding Notice', 'Little Feet provides role-based workspaces, consent records, audit registers, and encrypted storage for selected sensitive fields. Your school remains responsible for its lawful basis, staff training, retention, vendor agreements, incident response, access reviews, and legal review.')">Privacy & Safeguarding</a>
-            <a onclick="openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
-            <a onclick="openWorkspace('guideTab')">Help &amp; Guide</a>
-            <a onclick="openWorkspace('settingsTab')">Settings</a>
-            <a onclick="openDonationModal()">Donate</a>
+            <a href="#privacy-safeguarding" onclick="event.preventDefault(); openLegalModal('Privacy & Safeguarding Notice', 'Little Feet provides role-based workspaces, consent records, audit registers, and encrypted storage for selected sensitive fields. Your school remains responsible for its lawful basis, staff training, retention, vendor agreements, incident response, access reviews, and legal review.')">Privacy & Safeguarding</a>
+            <a href="#terms-of-service" onclick="event.preventDefault(); openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
+            <a href="#copyright-content" onclick="event.preventDefault(); openLegalModal('Copyright & Content Reporting', 'Only upload content your school is authorised to use. If you believe material in Little Feet infringes copyright or should not be displayed, report it through the Support Desk so the school can review access, removal, retention and any required legal process.')">Copyright &amp; Content Reporting</a>
+            <a href="#guideTab" onclick="event.preventDefault(); openWorkspace('guideTab')">Help &amp; Guide</a>
+            <a href="#settingsTab" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</a>
+            <a href="#donate" onclick="event.preventDefault(); openDonationModal()">Donate</a>
           </div>
           <p style="margin-top: 6px; font-size: 0.7rem; color: #64748b;">© 2026 Little Feet. All rights reserved.</p>
         </div>
@@ -2473,7 +2478,7 @@
   </div>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
-    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-no-moon-4k.jpg" alt="Active Little Feet wallpaper">
+    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-no-moon-4k.jpg" alt="Active Little Feet wallpaper" loading="lazy" decoding="async">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
