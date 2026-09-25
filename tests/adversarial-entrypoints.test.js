@@ -42,7 +42,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-teacher', pinHash: hash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] },
     { username: 'alpha-parent@example.test', pinHash: hash('ParentPass1'), name: 'Alpha Parent', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Alpha Learner'] },
     { username: 'bravo-admin', pinHash: hash('BravoAdmin1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
-    { username: 'rate-target', pinHash: hash('TargetPass1'), name: 'Rate Target', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] }
+    { username: 'rate-target', loginAliases: ['rate-target-alias'], pinHash: hash('TargetPass1'), name: 'Rate Target', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] }
   ],
   students: [student],
   posts: [],
@@ -168,6 +168,9 @@ const login = async (username, pin, suppliedCookie = '') => {
       '/tmp/anything',
       '/uploads/anything',
       '/output/pdf/secret-export.pdf',
+      '/output/pdf/%2e%2e%2fserver.js',
+      '/output/pdf/%252e%252e%252fserver.js',
+      '/output/pdf/LittleFeet_User_Manual_2026_Updated.pdf%00.js',
       '/output/%2e%2e/server.js',
       '/output/pdf/%2e%2e/%2e%2e/server.js',
       '/vendor/server.js',
@@ -221,6 +224,23 @@ const login = async (username, pin, suppliedCookie = '') => {
     });
     assert.notEqual(deepRequest.response.status, 500, 'Deep JSON caused an internal server error.');
 
+    let nestedPayload = { leaf: 'safe' };
+    for (let depth = 0; depth < 70; depth += 1) nestedPayload = { child: nestedPayload };
+    const nestedRequest = await request('/api/signup', {
+      method: 'POST',
+      body: { username: 'nested@example.test', pin: 'Password1', name: 'Nested', role: 'parent', schoolName: 'Alpha School', termsAccepted: true, nestedPayload }
+    });
+    assert.equal(nestedRequest.response.status, 400, 'Payload nesting above the structural limit was accepted.');
+
+    const widePayload = Object.fromEntries(Array.from({ length: 5001 }, (_, index) => ['field' + index, index]));
+    const wideRequest = await request('/api/signup', {
+      method: 'POST',
+      body: { username: 'wide@example.test', pin: 'Password1', name: 'Wide', role: 'parent', schoolName: 'Alpha School', termsAccepted: true, widePayload }
+    });
+    assert.equal(wideRequest.response.status, 400, 'Payload node-count limit was bypassed.');
+    const healthAfterParserAttacks = await request('/api/health');
+    assert.equal(healthAfterParserAttacks.response.status, 200, 'Parser attacks destabilised the server.');
+
     // 3. Authentication injection and privilege escalation.
     const injection = await request('/api/login', {
       method: 'POST',
@@ -249,11 +269,11 @@ const login = async (username, pin, suppliedCookie = '') => {
     for (let index = 1; index <= 21; index += 1) {
       distributedAttempt = await request('/api/login', {
         method: 'POST',
-        body: { username: 'rate-target', pin: 'WrongPass' + index },
+        body: { username: index % 2 ? ' RATE-TARGET ' : 'rate-target-alias', pin: 'WrongPass' + index },
         headers: { 'x-forwarded-for': '203.0.113.' + index }
       });
     }
-    assert.equal(distributedAttempt.response.status, 429, 'Changing source IPs bypassed the username-level login spray defense.');
+    assert.equal(distributedAttempt.response.status, 429, 'Changing source IPs plus rotating a login alias bypassed the account-level spray defense.');
 
     // 4. Session fixation: an attacker-supplied cookie must not survive successful login.
     const fixedCookie = 'connect.sid=s%3Aattacker-fixed-session.fake';
@@ -352,6 +372,22 @@ const login = async (username, pin, suppliedCookie = '') => {
     });
     assert.equal(missingOrigin.response.status, 403);
 
+    const crossSiteReferer = await request('/api/modules/operations', {
+      method: 'POST',
+      cookie: alphaTeacher.cookie,
+      headers: { referer: 'https://evil.example/attack' },
+      body: { type: 'Attack', details: 'Cross-site Referer write attempt' }
+    });
+    assert.equal(crossSiteReferer.response.status, 403);
+
+    const sameSiteReferer = await request('/api/modules/operations', {
+      method: 'POST',
+      cookie: alphaTeacher.cookie,
+      headers: { referer: origin + '/dashboard' },
+      body: { type: 'Routine check', details: 'Legitimate same-origin Referer write' }
+    });
+    assert.equal(sameSiteReferer.response.status, 200);
+
     const sameOrigin = await request('/api/modules/operations', {
       method: 'POST',
       cookie: alphaTeacher.cookie,
@@ -385,6 +421,22 @@ const login = async (username, pin, suppliedCookie = '') => {
     assert.equal(bravoDelete.response.status, 404);
     const alphaPosts = await request('/api/posts', { cookie: alphaAdmin.cookie });
     assert.equal(alphaPosts.data.length, 1);
+
+    const alphaModule = await request('/api/modules/operations', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { type: 'IDOR record', details: 'Alpha-only operational record' }
+    });
+    assert.equal(alphaModule.response.status, 200);
+    const bravoModuleDelete = await request('/api/modules/operations/' + encodeURIComponent(alphaModule.data.record.id), {
+      method: 'DELETE', cookie: bravoAdmin.cookie, originHeader: origin
+    });
+    assert.equal(bravoModuleDelete.response.status, 404, 'Cross-tenant generic-module delete was accepted.');
+
+    const bravoAccountUpdate = await request('/api/accounts/alpha-teacher', {
+      method: 'PUT', cookie: bravoAdmin.cookie, originHeader: origin,
+      body: { name: 'Taken over', role: 'admin', schoolName: 'Bravo School' }
+    });
+    assert.equal(bravoAccountUpdate.response.status, 404, 'Cross-tenant account update was accepted.');
 
     // 8. Media/content attacks.
     for (const mediaUrl of [
