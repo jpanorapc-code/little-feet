@@ -99,16 +99,32 @@ function registerFinanceAutomation(app, deps) {
 
   async function runDueRecurringRules() {
     let changed = false;
+    const createdIds = new Set();
+    const ruleSnapshots = new Map();
     const schoolIds = [...new Set((db.financeRecurringRules || []).filter(rule => rule.active !== false).map(rule => rule.schoolId).filter(Boolean))];
     for (const schoolId of schoolIds) {
       const actor = db.users.find(account => ['admin', 'principal'].includes(account.role) && account.verificationStatus === 'Active' && accountSchoolId(account) === schoolId);
       if (!actor) continue;
+      financeRecords('financeRecurringRules', actor).forEach(rule => {
+        if (!ruleSnapshots.has(rule.id)) ruleSnapshots.set(rule.id, { lastRunPeriod: rule.lastRunPeriod || '', lastRunAt: rule.lastRunAt || '' });
+      });
       const result = runRecurringRulesForActor(actor);
+      result.created.forEach(record => createdIds.add(record.id));
       if (result.created.length) changed = true;
     }
-    if (changed) {
+    if (!changed) return;
+    try {
       await saveDatabaseState();
       scheduleReplicaSnapshot();
+    } catch (error) {
+      db.parentPayments = (db.parentPayments || []).filter(record => !createdIds.has(record.id));
+      (db.financeRecurringRules || []).forEach(rule => {
+        const snapshot = ruleSnapshots.get(rule.id);
+        if (!snapshot) return;
+        rule.lastRunPeriod = snapshot.lastRunPeriod;
+        rule.lastRunAt = snapshot.lastRunAt;
+      });
+      throw error;
     }
   }
 
