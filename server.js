@@ -103,6 +103,22 @@ const requestContainsBlockedLanguage = (value, fieldName = '') => {
   if (!value || typeof value !== 'object') return false;
   return Object.entries(value).some(([key, item]) => requestContainsBlockedLanguage(item, key));
 };
+const requestPayloadTooComplex = (root, { maxDepth = 64, maxNodes = 5000 } = {}) => {
+  const stack = [{ value: root, depth: 0 }];
+  let visited = 0;
+  while (stack.length) {
+    const { value, depth } = stack.pop();
+    visited += 1;
+    if (visited > maxNodes || depth > maxDepth) return true;
+    if (!value || typeof value !== 'object') continue;
+    if (Array.isArray(value)) {
+      for (const item of value) stack.push({ value: item, depth: depth + 1 });
+      continue;
+    }
+    for (const item of Object.values(value)) stack.push({ value: item, depth: depth + 1 });
+  }
+  return false;
+};
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
 const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, max);
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
@@ -383,7 +399,9 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
 app.use('/api', (req, res, next) => {
-  if (!['POST', 'PUT', 'PATCH'].includes(req.method) || !requestContainsBlockedLanguage(req.body)) return next();
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  if (requestPayloadTooComplex(req.body)) return res.status(400).json({ message: 'Request structure is too deeply nested or complex.' });
+  if (!requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
 });
 app.use((req, res, next) => {
