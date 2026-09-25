@@ -32,6 +32,21 @@
   top: auto;
   bottom: 0;
 }
+
+/* User pause is also a scroll-bypass mode. Freeze the current visual frame,
+   collapse the 680vh journey to one normal panel, and let the document scroll
+   past it instead of trapping the user inside a stopped sequence. */
+.cinematic-journey.is-user-paused {
+  height: auto !important;
+}
+.cinematic-journey.is-user-paused .cinematic-stage {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: min(100dvh, 860px);
+  min-height: 520px;
+  border-radius: 24px;
+}
 @media (min-width: 960px) {
   #dashboardSection .cinematic-journey.is-active .cinematic-stage {
     left: 260px;
