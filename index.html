@@ -71,43 +71,78 @@
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
-    /* The walking scene belongs to the signed-in portal only. */
+    /* Resolution-independent midnight aurora background for the signed-in portal.
+       Gradients keep the visual sharp at 4K without shipping another multi-megabyte image. */
+    body.portal-active { background-color:#020611; }
+
     body.portal-active::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      background-image: linear-gradient(rgba(5, 16, 27, 0.42), rgba(5, 16, 27, 0.62)), url('assets/4k/little-feet-wallpaper-no-moon-4k.jpg');
-      background-repeat: no-repeat;
-      background-position: center;
-      /* Fill the viewport without leaving unused dark margins around the animation. */
-      background-size: 100% 100%;
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.42;
+      content:"";
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      pointer-events:none;
+      z-index:0;
+      opacity:.96;
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,.96) 0 1px, transparent 1.35px),
+        radial-gradient(circle, rgba(226,232,240,.82) 0 1px, transparent 1.45px),
+        radial-gradient(circle, rgba(196,181,253,.76) 0 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(167,243,208,.72) 0 1px, transparent 1.4px),
+        radial-gradient(circle, rgba(255,255,255,.62) 0 .8px, transparent 1.25px),
+        linear-gradient(180deg,#01030a 0%,#030817 42%,#07111e 72%,#020611 100%);
+      background-size:113px 113px,173px 173px,257px 257px,331px 331px,79px 79px,100% 100%;
+      background-position:11px 7px,47px 91px,121px 33px,207px 159px,31px 51px,0 0;
+      animation:portalStarTwinkle 8s ease-in-out infinite alternate;
     }
 
-    body.portal-active.light-mode::before { opacity: 0.12; }
-
-    /* A gentle localized glow keeps the original campfire warm without affecting the whole page. */
     body.portal-active::after {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      background: radial-gradient(ellipse 13% 18% at 38% 68%, rgba(255, 181, 74, 0.19) 0%, rgba(255, 112, 34, 0.08) 46%, transparent 74%);
-      mix-blend-mode: screen;
-      animation: stepsGlow 2.6s ease-in-out infinite alternate;
+      content:"";
+      position:fixed;
+      inset:-16% -12%;
+      z-index:0;
+      pointer-events:none;
+      opacity:.74;
+      transform:translate3d(-2.5%,-1%,0) rotate(-3deg) scale(1.07);
+      transform-origin:center;
+      will-change:transform,opacity;
+      background:
+        radial-gradient(ellipse 72% 12% at 7% 14%, rgba(74,222,128,.38) 0%, rgba(34,197,94,.16) 44%, transparent 74%),
+        radial-gradient(ellipse 66% 10% at 54% 10%, rgba(139,92,246,.31) 0%, rgba(124,58,237,.13) 48%, transparent 73%),
+        radial-gradient(ellipse 50% 8% at 94% 19%, rgba(236,72,153,.18) 0%, rgba(168,85,247,.12) 46%, transparent 72%),
+        radial-gradient(ellipse 64% 10% at 93% 79%, rgba(34,197,94,.21) 0%, rgba(139,92,246,.12) 48%, transparent 74%),
+        linear-gradient(112deg, transparent 18%, rgba(74,222,128,.10) 34%, transparent 48%, rgba(139,92,246,.10) 64%, transparent 79%);
+      mix-blend-mode:screen;
+      animation:portalAuroraDrift 20s ease-in-out infinite alternate,portalAuroraPulse 9s ease-in-out infinite;
     }
 
-    @keyframes stepsGlow {
-      from { opacity:0.32; transform:scale(.96); }
-      to { opacity:0.82; transform:scale(1.04); }
+    @keyframes portalStarTwinkle {
+      0% { opacity:.84; }
+      38% { opacity:.98; }
+      72% { opacity:.90; }
+      100% { opacity:1; }
     }
 
-    body.portal-active.light-mode::after { opacity: 0.32; }
+    @keyframes portalAuroraDrift {
+      0% { transform:translate3d(-3.5%,-1.5%,0) rotate(-4deg) scale(1.06); }
+      50% { transform:translate3d(1.5%,1.2%,0) rotate(-1.5deg) scale(1.10); }
+      100% { transform:translate3d(4%,-.5%,0) rotate(2deg) scale(1.07); }
+    }
+
+    @keyframes portalAuroraPulse {
+      0%,100% { opacity:.60; }
+      50% { opacity:.79; }
+    }
+
+    body.portal-active.light-mode::before { opacity:.34; }
+    body.portal-active.light-mode::after { opacity:.26; }
+
+    @media (prefers-reduced-motion: reduce) {
+      body.portal-active::before,
+      body.portal-active::after,
+      .wallpaper-aurora-sky::before,
+      .wallpaper-aurora-sky::after { animation:none !important; }
+    }
 
     #portalLoader { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 50% 34%,rgba(13,148,136,.22),rgba(7,17,30,.98) 58%); transition:opacity .35s ease, visibility .35s ease; }
     #portalLoader.is-hidden { opacity:0; visibility:hidden; pointer-events:none; }
@@ -220,7 +255,24 @@
     .btn-blue:hover { background-color: var(--primary-hover); }
 
     #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:32px 20px; position:relative; z-index:1; isolation:isolate; }
-    #authSection::before { content:""; position:fixed; inset:0; border-radius:0; background-image:linear-gradient(rgba(5,16,27,.42),rgba(5,16,27,.64)),url('assets/4k/little-feet-wallpaper-no-moon-4k.jpg'); background-position:center; background-size:cover; background-repeat:no-repeat; opacity:.48; pointer-events:none; z-index:-1; }
+    #authSection::before {
+      content:"";
+      position:fixed;
+      inset:0;
+      border-radius:0;
+      pointer-events:none;
+      z-index:-1;
+      opacity:.78;
+      background-color:#020611;
+      background-image:
+        linear-gradient(rgba(2,6,17,.28),rgba(2,6,17,.54)),
+        radial-gradient(ellipse 78% 16% at 12% 10%,rgba(74,222,128,.28),transparent 72%),
+        radial-gradient(ellipse 68% 13% at 76% 14%,rgba(139,92,246,.24),transparent 72%),
+        radial-gradient(circle,rgba(255,255,255,.76) 0 1px,transparent 1.4px),
+        radial-gradient(circle,rgba(196,181,253,.58) 0 1px,transparent 1.45px);
+      background-size:100% 100%,100% 100%,100% 100%,151px 151px,239px 239px;
+      background-position:0 0,0 0,0 0,17px 21px,83px 57px;
+    }
     #authSection > .auth-card { position:relative; z-index:1; width:min(100%,450px) !important; max-width:450px !important; margin:0; padding:18px; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
     .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:24px; padding-top:10px; overflow:hidden; }
     .mascot-stage { position:relative; display:grid; place-items:center; min-height:180px; margin-bottom:4px; }
@@ -278,15 +330,20 @@
     @media (max-width: 700px) { .milestone-picker { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media (max-width: 420px) { .milestone-picker { grid-template-columns:1fr; } .milestone-choice { min-height:82px; flex-direction:row; align-items:center; } .milestone-choice > span { display:flex; flex-direction:column; gap:4px; } }
 
-    .wallpaper-overlay { position:fixed; inset:0; z-index:5000; display:none; align-items:center; justify-content:center; background:#04101a; color:#fff; cursor:pointer; overflow:hidden; }
+    .wallpaper-overlay { position:fixed; inset:0; z-index:5000; display:none; align-items:center; justify-content:center; background:#020611; color:#fff; cursor:pointer; overflow:hidden; }
     .wallpaper-overlay.is-visible { display:flex; }
-    .wallpaper-overlay img { width:100%; height:100%; object-fit:cover; }
-    .wallpaper-overlay::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at center, transparent 34%, rgba(1,8,16,.56) 100%); pointer-events:none; }
-    .wallpaper-overlay-copy { position:absolute; z-index:1; bottom:clamp(22px,6vh,68px); left:50%; transform:translateX(-50%); width:min(92vw,640px); text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.85); }
+    .wallpaper-aurora-sky { position:absolute; inset:0; z-index:0; overflow:hidden; background:linear-gradient(180deg,#01030a 0%,#030817 48%,#07111e 76%,#020611 100%); opacity:1; transition:opacity .25s ease; }
+    .wallpaper-aurora-sky::before { content:""; position:absolute; inset:0; background-image:radial-gradient(circle,rgba(255,255,255,.98) 0 1px,transparent 1.35px),radial-gradient(circle,rgba(226,232,240,.78) 0 1px,transparent 1.45px),radial-gradient(circle,rgba(196,181,253,.74) 0 1px,transparent 1.5px),radial-gradient(circle,rgba(167,243,208,.68) 0 1px,transparent 1.4px),radial-gradient(circle,rgba(255,255,255,.58) 0 .8px,transparent 1.2px); background-size:109px 109px,167px 167px,251px 251px,337px 337px,73px 73px; background-position:13px 7px,41px 83px,119px 29px,211px 163px,29px 47px; animation:portalStarTwinkle 7s ease-in-out infinite alternate; }
+    .wallpaper-aurora-sky::after { content:""; position:absolute; inset:-18% -12%; opacity:.86; will-change:transform,opacity; background:radial-gradient(ellipse 78% 12% at 4% 14%,rgba(74,222,128,.48) 0%,rgba(34,197,94,.18) 45%,transparent 74%),radial-gradient(ellipse 72% 10% at 51% 10%,rgba(139,92,246,.38) 0%,rgba(124,58,237,.15) 49%,transparent 73%),radial-gradient(ellipse 58% 8% at 96% 19%,rgba(236,72,153,.24) 0%,rgba(168,85,247,.13) 47%,transparent 72%),radial-gradient(ellipse 70% 10% at 94% 81%,rgba(34,197,94,.25) 0%,rgba(139,92,246,.13) 50%,transparent 75%),linear-gradient(112deg,transparent 15%,rgba(74,222,128,.12) 33%,transparent 47%,rgba(139,92,246,.12) 65%,transparent 81%); mix-blend-mode:screen; animation:portalAuroraDrift 18s ease-in-out infinite alternate,portalAuroraPulse 8s ease-in-out infinite; }
+    .wallpaper-overlay img { position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .25s ease; }
+    .wallpaper-overlay.has-custom-wallpaper img { opacity:1; }
+    .wallpaper-overlay.has-custom-wallpaper .wallpaper-aurora-sky { opacity:0; }
+    .wallpaper-overlay::after { content:''; position:absolute; inset:0; z-index:1; background:radial-gradient(circle at center, transparent 34%, rgba(1,8,16,.56) 100%); pointer-events:none; }
+    .wallpaper-overlay-copy { position:absolute; z-index:2; bottom:clamp(22px,6vh,68px); left:50%; transform:translateX(-50%); width:min(92vw,640px); text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.85); }
     .wallpaper-overlay-copy h2 { margin:0 0 8px; font-size:clamp(1.4rem,3vw,2.45rem); }
     .wallpaper-overlay-copy p { margin:0; color:#d8f5ef; font-size:clamp(.8rem,1.5vw,1rem); }
-    .wallpaper-exit { position:absolute; z-index:2; top:18px; right:18px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
-    .wallpaper-mute { position:absolute; z-index:2; top:18px; right:150px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
+    .wallpaper-exit { position:absolute; z-index:3; top:18px; right:18px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
+    .wallpaper-mute { position:absolute; z-index:3; top:18px; right:150px; border:1px solid rgba(255,255,255,.45); border-radius:999px; background:rgba(5,19,32,.68); color:#fff; padding:9px 13px; font:inherit; cursor:pointer; }
 
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -2474,7 +2531,7 @@
             <div class="workspace-card"><h3>How to return</h3><p>Click anywhere, press any key, touch the screen, or use the visible Exit button.</p><button type="button" class="action-btn btn-blue" onclick="startWallpaperMode()">Preview exit options</button></div>
             <div class="workspace-card"><h3>Automatic start</h3><p>Enabled for this device after <strong>one hour</strong> with no activity.</p><span class="badge-tag">ON</span></div>
             <div class="workspace-card"><h3>Wallpaper sound</h3><p>Mute or restore all Little Feet sound. Your choice is remembered for this account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
-            <div class="workspace-card" style="grid-column:1/-1;"><h3>Use your own wallpaper</h3><p>Saved only on this device. JPG, PNG, WebP, or GIF; maximum 8 MB and 3840 × 2160. Animated GIFs must be 8 seconds or shorter.</p><input id="customWallpaperFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-green" onclick="importCustomWallpaper()">Use selected wallpaper</button><button type="button" class="action-btn btn-blue" onclick="resetCustomWallpaper()">Restore Little Feet wallpaper</button></div><p id="customWallpaperStatus" class="meta" style="margin-top:9px;">The original Little Feet campfire wallpaper is active.</p></div>
+            <div class="workspace-card" style="grid-column:1/-1;"><h3>Use your own wallpaper</h3><p>Saved only on this device. JPG, PNG, WebP, or GIF; maximum 8 MB and 3840 × 2160. Animated GIFs must be 8 seconds or shorter.</p><input id="customWallpaperFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-green" onclick="importCustomWallpaper()">Use selected wallpaper</button><button type="button" class="action-btn btn-blue" onclick="resetCustomWallpaper()">Restore Little Feet wallpaper</button></div><p id="customWallpaperStatus" class="meta" style="margin-top:9px;">The Little Feet northern lights wallpaper is active.</p></div>
           </div>
         </section>
       </div>
@@ -2552,15 +2609,16 @@
     </footer>
   </div>
 
-  <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet campfire wallpaper" onclick="exitWallpaperMode()">
-    <img id="wallpaperImage" src="assets/4k/little-feet-wallpaper-no-moon-4k.jpg" alt="Active Little Feet wallpaper" loading="lazy" decoding="async">
-    <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
+  <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet northern lights wallpaper" onclick="exitWallpaperMode()">
+    <div class="wallpaper-aurora-sky" aria-hidden="true"></div>
+    <img id="wallpaperImage" alt="Custom Little Feet wallpaper" loading="lazy" decoding="async">
+    <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment under the northern lights. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
     <button type="button" class="wallpaper-mute" data-portal-audio-mute onclick="event.stopPropagation(); togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260925-preferences-v1" defer></script>
+  <script src="backup.js?v=20260925-aurora-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v1" defer></script>
   <script src="/assets/legal-notices.js?v=20260925-legal-v1" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
