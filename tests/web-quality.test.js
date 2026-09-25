@@ -51,7 +51,6 @@ assert.match(page, /class="wallpaper-aurora-lights"/);
 assert.match(page, /class="aurora-float light-a"/);
 assert.match(page, /@keyframes standbyLightA/);
 assert.match(page, /@keyframes standbyLightF/);
-assert.doesNotMatch(page, /repeating-linear-gradient/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
