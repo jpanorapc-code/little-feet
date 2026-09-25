@@ -130,6 +130,7 @@ const limitedText = (value, max = 500) => {
 const validSecretLength = (value, { min = 1, max = 128 } = {}) =>
   typeof value === 'string' && value.length >= min && value.length <= max;
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
+const CHAT_ROLES = new Set(['parent', 'teacher', 'principal', 'admin']);
 const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
 const APPLICATION_STAGE_SELECTIONS = new Set([
   'ECD · Baby (Birth–11 months)',
@@ -224,7 +225,7 @@ const recordInSchool = (record, actor) => Boolean(record && actor && record.scho
 const tagSchoolRecord = (actor, record) => ({ ...record, schoolId: accountSchoolId(actor), schoolName: actor.schoolName });
 const tenantRecords = (records, actor) => (Array.isArray(records) ? records.filter(record => recordInSchool(record, actor)) : []);
 const canUseDirectChat = (first, second) => {
-  if (!first || !second || first.username === second.username || !isSameSchool(first, second)) return false;
+  if (!first || !second || !CHAT_ROLES.has(first.role) || !CHAT_ROLES.has(second.role) || first.username === second.username || !isSameSchool(first, second)) return false;
   const parent = first.role === 'parent' ? first : second.role === 'parent' ? second : null;
   if (!parent) return true;
   const staffMember = parent === first ? second : first;
@@ -2674,6 +2675,7 @@ app.delete('/api/tickets/:id', (req, res) => {
 app.get('/api/chat/groups', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view school chat groups.' });
+  if (!CHAT_ROLES.has(actor.role)) return res.status(403).json({ message: 'This role cannot access school chat.' });
   res.json(tenantRecords(db.chatGroups, actor));
 });
 app.post('/api/chat/groups', (req, res) => {
@@ -2701,16 +2703,18 @@ app.delete('/api/chat/groups/:id', (req, res) => {
 // Chat - Messages
 app.get('/api/chat/messages/:groupId', (req, res) => {
   const actor = getSessionAccount(req);
+  if (!actor || !CHAT_ROLES.has(actor.role)) return res.status(403).json({ message: 'This role cannot access school chat.' });
   const group = db.chatGroups.find(entry => entry.id === req.params.groupId && recordInSchool(entry, actor));
-  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
   const msgs = db.groupMessages[req.params.groupId] || [];
   res.json(msgs);
 });
 app.post('/api/chat/messages', (req, res) => {
   const { groupId, message, textColor } = req.body;
   const actor = getSessionAccount(req);
+  if (!actor || !CHAT_ROLES.has(actor.role)) return res.status(403).json({ message: 'This role cannot access school chat.' });
   const group = db.chatGroups.find(entry => entry.id === groupId && recordInSchool(entry, actor));
-  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
   const cleanMessage = String(message || '').trim();
   if (!cleanMessage) return res.status(400).json({ message: 'A message is required.' });
   if (cleanMessage.length > 4000) return res.status(413).json({ message: 'Messages are limited to 4,000 characters.' });
@@ -2742,6 +2746,7 @@ app.delete('/api/chat/messages/:groupId/:messageId', (req, res) => {
 app.get('/api/chat/direct/users', (req, res) => {
   const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'A valid signed-in account is required.' });
+  if (!CHAT_ROLES.has(viewer.role)) return res.status(403).json({ message: 'This role cannot access direct chat.' });
   res.json(db.users.filter(user => canUseDirectChat(viewer, user)).map(safeAccount));
 });
 app.get('/api/chat/direct/:user1/:user2', (req, res) => {
