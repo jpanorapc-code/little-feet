@@ -10,7 +10,7 @@
 
   const stages = Object.freeze([
     ...ecdCareBands,
-    Object.freeze({ id:'grade-r', label:'Grade R · Reception', ages:'Typically about 5–6 years', grades:'Grade R', institution:'Primary school or registered Grade R setting', framework:'Foundation Phase', records:'Grade R placement · guardian/emergency contacts · attendance · consent · pickup controls · Foundation learning observations · reports · admission-document verification status' }),
+    Object.freeze({ id:'grade-r', label:'Grade R · Reception', ages:'Public-school admission: age 4 turning 5 by 30 June of the admission year; many learners are 5–6 during Grade R', grades:'Grade R', institution:'Primary school or registered Grade R setting', framework:'Foundation Phase', records:'Grade R placement · guardian/emergency contacts · attendance · consent · pickup controls · Foundation learning observations · reports · admission-document verification status' }),
     Object.freeze({ id:'foundation', label:'Foundation Phase', ages:'Approx. 5–9 years', grades:'Grades R–3', institution:'Primary school', framework:'CAPS Foundation Phase', records:'Grade/class · guardian/emergency contacts · attendance · timetable · Home Language · Mathematics · Life Skills · assessments · reports · consent' }),
     Object.freeze({ id:'intermediate', label:'Intermediate Phase', ages:'Approx. 10–12 years', grades:'Grades 4–6', institution:'Primary school', framework:'CAPS Intermediate Phase', records:'Grade/class · guardian/emergency contacts · attendance · timetable · subject learning evidence · assessments · reports · consent · transfer/previous-report status where applicable' }),
     Object.freeze({ id:'senior', label:'Senior Phase', ages:'Approx. 13–15 years', grades:'Grades 7–9', institution:'Primary (Grade 7) / secondary school', framework:'CAPS Senior Phase', records:'Grade/class · subjects · timetable · guardian/emergency contacts · attendance · assessment evidence · reports · subject-choice preparation · transfer/previous-report status where applicable' }),
@@ -34,7 +34,7 @@
       label:'Day care / ECD',
       range:'Birth through the pre-school years',
       grades:'Before Grade R; some centres may also offer Grade R',
-      note:'Use the exact care band by age in months. NCF is specifically Birth–4; confirm separately when a 5-year-old is in Grade R.',
+      note:'Use the exact care band by age in months. NCF is specifically Birth–4. For a 5-year-old, confirm whether the learner remains in an ECD programme or is entering Grade R; public-school Grade R admission is age 4 turning 5 by 30 June of the admission year.',
       records:'Emergency/guardian contacts, authorised pickup, nutrition/care routines, allergies/medication where lawfully required, consent, attendance and age-appropriate developmental observations.'
     }),
     Object.freeze({

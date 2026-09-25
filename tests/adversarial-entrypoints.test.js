@@ -17,6 +17,10 @@ for (const file of ['server.js', 'auth-crypto.js', 'backup.js', 'manifest.webman
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 
+fs.mkdirSync(path.join(temp, 'output', 'pdf'), { recursive: true });
+fs.writeFileSync(path.join(temp, 'output', 'pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'), '%PDF-1.4\npublic-test-document\n');
+fs.writeFileSync(path.join(temp, 'output', 'pdf', 'secret-export.pdf'), '%PDF-1.4\nprivate-test-document\n');
+
 const student = {
   id: 'alpha-student-1',
   studentName: 'Alpha Learner',
@@ -38,7 +42,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-teacher', pinHash: hash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] },
     { username: 'alpha-parent@example.test', pinHash: hash('ParentPass1'), name: 'Alpha Parent', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Alpha Learner'] },
     { username: 'bravo-admin', pinHash: hash('BravoAdmin1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
-    { username: 'rate-target', pinHash: hash('TargetPass1'), name: 'Rate Target', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] }
+    { username: 'rate-target', loginAliases: ['rate-target-alias'], pinHash: hash('TargetPass1'), name: 'Rate Target', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] }
   ],
   students: [student],
   posts: [],
@@ -163,6 +167,12 @@ const login = async (username, pin, suppliedCookie = '') => {
       '/tests/security-regression.test.js',
       '/tmp/anything',
       '/uploads/anything',
+      '/output/pdf/secret-export.pdf',
+      '/output/pdf/%2e%2e%2fserver.js',
+      '/output/pdf/%252e%252e%252fserver.js',
+      '/output/pdf/LittleFeet_User_Manual_2026_Updated.pdf%00.js',
+      '/output/%2e%2e/server.js',
+      '/output/pdf/%2e%2e/%2e%2e/server.js',
       '/vendor/server.js',
       '/vendor/%2e%2e%2fserver.js',
       '/%2e%2e/server.js',
@@ -172,6 +182,10 @@ const login = async (username, pin, suppliedCookie = '') => {
       assert.equal(result.status, 404, 'Sensitive/static traversal route leaked: ' + route + ' -> ' + result.status);
       assert.doesNotMatch(result.body, /const express = require|DATABASE_URL|SESSION_SECRET|pinHash/i);
     }
+
+    const allowedPublicDocument = await rawPathRequest('/output/pdf/LittleFeet_User_Manual_2026_Updated.pdf');
+    assert.equal(allowedPublicDocument.status, 200, 'Allowlisted public manual must remain available.');
+    assert.match(allowedPublicDocument.headers['content-type'] || '', /application\/pdf/);
 
     // 2. Parser attacks: malformed and oversized JSON must fail closed.
     const malformed = await request('/api/signup', {
@@ -210,12 +224,40 @@ const login = async (username, pin, suppliedCookie = '') => {
     });
     assert.notEqual(deepRequest.response.status, 500, 'Deep JSON caused an internal server error.');
 
+    let nestedPayload = { leaf: 'safe' };
+    for (let depth = 0; depth < 70; depth += 1) nestedPayload = { child: nestedPayload };
+    const nestedRequest = await request('/api/signup', {
+      method: 'POST',
+      body: { username: 'nested@example.test', pin: 'Password1', name: 'Nested', role: 'parent', schoolName: 'Alpha School', termsAccepted: true, nestedPayload }
+    });
+    assert.equal(nestedRequest.response.status, 400, 'Payload nesting above the structural limit was accepted.');
+
+    const widePayload = Object.fromEntries(Array.from({ length: 5001 }, (_, index) => ['field' + index, index]));
+    const wideRequest = await request('/api/signup', {
+      method: 'POST',
+      body: { username: 'wide@example.test', pin: 'Password1', name: 'Wide', role: 'parent', schoolName: 'Alpha School', termsAccepted: true, widePayload }
+    });
+    assert.equal(wideRequest.response.status, 400, 'Payload node-count limit was bypassed.');
+    const healthAfterParserAttacks = await request('/api/health');
+    assert.equal(healthAfterParserAttacks.response.status, 200, 'Parser attacks destabilised the server.');
+
     // 3. Authentication injection and privilege escalation.
     const injection = await request('/api/login', {
       method: 'POST',
       body: { username: "' OR 1=1 --", pin: "' OR 1=1 --" }
     });
     assert.equal(injection.response.status, 401);
+
+    const oversizedLoginUsername = await request('/api/login', {
+      method: 'POST',
+      body: { username: 'u'.repeat(5000), pin: 'WrongPass1' }
+    });
+    assert.equal(oversizedLoginUsername.response.status, 401);
+    const oversizedLoginPin = await request('/api/login', {
+      method: 'POST',
+      body: { username: 'alpha-admin', pin: 'p'.repeat(5000) }
+    });
+    assert.equal(oversizedLoginPin.response.status, 401);
 
     const elevatedSignup = await request('/api/signup', {
       method: 'POST',
@@ -227,11 +269,11 @@ const login = async (username, pin, suppliedCookie = '') => {
     for (let index = 1; index <= 21; index += 1) {
       distributedAttempt = await request('/api/login', {
         method: 'POST',
-        body: { username: 'rate-target', pin: 'WrongPass' + index },
+        body: { username: index % 2 ? ' RATE-TARGET ' : 'rate-target-alias', pin: 'WrongPass' + index },
         headers: { 'x-forwarded-for': '203.0.113.' + index }
       });
     }
-    assert.equal(distributedAttempt.response.status, 429, 'Changing source IPs bypassed the username-level login spray defense.');
+    assert.equal(distributedAttempt.response.status, 429, 'Changing source IPs plus rotating a login alias bypassed the account-level spray defense.');
 
     // 4. Session fixation: an attacker-supplied cookie must not survive successful login.
     const fixedCookie = 'connect.sid=s%3Aattacker-fixed-session.fake';
@@ -241,6 +283,78 @@ const login = async (username, pin, suppliedCookie = '') => {
     const alphaPrincipal = await login('alpha-principal', 'PrincipalPass1');
     const alphaParent = await login('alpha-parent@example.test', 'ParentPass1');
     const bravoAdmin = await login('bravo-admin', 'BravoAdmin1');
+
+    // Expensive-secret and sensitive-record fields must fail before hashing/encryption/storage.
+    const oversizedReportPin = await request('/api/report-signing-pin', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { pin: '9'.repeat(5000) }
+    });
+    assert.equal(oversizedReportPin.response.status, 400);
+    const validReportPin = await request('/api/report-signing-pin', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { pin: 'TeacherSign1' }
+    });
+    assert.equal(validReportPin.response.status, 200);
+    const oversizedReportAttempt = await request('/api/report-reviews', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: {
+        studentName: 'Alpha Learner',
+        reportTitle: 'Term report',
+        period: 'Term 3',
+        parentUsername: 'alpha-parent@example.test',
+        signingPin: 'x'.repeat(5000),
+        signatureData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+      }
+    });
+    assert.equal(oversizedReportAttempt.response.status, 403);
+
+    const oversizedPickupCode = await request('/api/pickups/verify', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { learnerName: 'Alpha Learner', pickupAdult: 'Alpha Parent', verificationCode: '7'.repeat(5000), action: 'Pickup / release' }
+    });
+    assert.equal(oversizedPickupCode.response.status, 400);
+    const invalidPickupAction = await request('/api/pickups/verify', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { learnerName: 'Alpha Learner', pickupAdult: 'Alpha Parent', verificationCode: '1234', action: 'Override security' }
+    });
+    assert.equal(invalidPickupAction.response.status, 400);
+
+    const oversizedRegistry = await request('/api/registry', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: {
+        learnerName: 'Alpha Learner', className: 'Grade 1', dateOfBirth: '2019-01-01',
+        guardianName: 'G'.repeat(161), guardianPhone: '0123456789', guardianEmail: 'alpha-parent@example.test',
+        address: 'Pretoria', emergencyContact: '', medicalNotes: '', consent: 'Pending verification'
+      }
+    });
+    assert.equal(oversizedRegistry.response.status, 400);
+    const futureRegistryDob = await request('/api/registry', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: {
+        learnerName: 'Alpha Learner', className: 'Grade 1', dateOfBirth: '2999-01-01',
+        guardianName: 'Alpha Parent', guardianPhone: '0123456789', guardianEmail: 'alpha-parent@example.test',
+        address: 'Pretoria', emergencyContact: '', medicalNotes: '', consent: 'Pending verification'
+      }
+    });
+    assert.equal(futureRegistryDob.response.status, 400);
+
+    const oversizedConsent = await request('/api/consents', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { learnerName: 'L'.repeat(161), guardianName: 'Alpha Parent', internalUpdates: true, marketingPhotos: false }
+    });
+    assert.equal(oversizedConsent.response.status, 400);
+
+    const oversizedMeeting = await request('/api/visitor-meetings', {
+      method: 'POST', cookie: alphaParent.cookie, originHeader: origin,
+      body: { hostUsername: 'alpha-teacher', proposedAt: '2026-10-01T10:00', purpose: 'P'.repeat(1201) }
+    });
+    assert.equal(oversizedMeeting.response.status, 400);
+
+    const malformedVisitorPass = await request('/api/campus-visitors/check-in', {
+      method: 'POST', cookie: alphaPrincipal.cookie, originHeader: origin,
+      body: { passCode: 'LFV-' + 'A'.repeat(5000) }
+    });
+    assert.equal(malformedVisitorPass.response.status, 404);
 
     // 5. Same-origin mutation enforcement.
     const crossOrigin = await request('/api/modules/operations', {
@@ -257,6 +371,22 @@ const login = async (username, pin, suppliedCookie = '') => {
       body: { type: 'Attack', details: 'Missing origin write attempt' }
     });
     assert.equal(missingOrigin.response.status, 403);
+
+    const crossSiteReferer = await request('/api/modules/operations', {
+      method: 'POST',
+      cookie: alphaTeacher.cookie,
+      headers: { referer: 'https://evil.example/attack' },
+      body: { type: 'Attack', details: 'Cross-site Referer write attempt' }
+    });
+    assert.equal(crossSiteReferer.response.status, 403);
+
+    const sameSiteReferer = await request('/api/modules/operations', {
+      method: 'POST',
+      cookie: alphaTeacher.cookie,
+      headers: { referer: origin + '/dashboard' },
+      body: { type: 'Routine check', details: 'Legitimate same-origin Referer write' }
+    });
+    assert.equal(sameSiteReferer.response.status, 200);
 
     const sameOrigin = await request('/api/modules/operations', {
       method: 'POST',
@@ -291,6 +421,22 @@ const login = async (username, pin, suppliedCookie = '') => {
     assert.equal(bravoDelete.response.status, 404);
     const alphaPosts = await request('/api/posts', { cookie: alphaAdmin.cookie });
     assert.equal(alphaPosts.data.length, 1);
+
+    const alphaModule = await request('/api/modules/operations', {
+      method: 'POST', cookie: alphaTeacher.cookie, originHeader: origin,
+      body: { type: 'IDOR record', details: 'Alpha-only operational record' }
+    });
+    assert.equal(alphaModule.response.status, 200);
+    const bravoModuleDelete = await request('/api/modules/operations/' + encodeURIComponent(alphaModule.data.record.id), {
+      method: 'DELETE', cookie: bravoAdmin.cookie, originHeader: origin
+    });
+    assert.equal(bravoModuleDelete.response.status, 404, 'Cross-tenant generic-module delete was accepted.');
+
+    const bravoAccountUpdate = await request('/api/accounts/alpha-teacher', {
+      method: 'PUT', cookie: bravoAdmin.cookie, originHeader: origin,
+      body: { name: 'Taken over', role: 'admin', schoolName: 'Bravo School' }
+    });
+    assert.equal(bravoAccountUpdate.response.status, 404, 'Cross-tenant account update was accepted.');
 
     // 8. Media/content attacks.
     for (const mediaUrl of [

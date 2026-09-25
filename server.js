@@ -123,7 +123,14 @@ const requestPayloadTooComplex = (root, { maxDepth = 64, maxNodes = 5000 } = {})
 };
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
 const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, max);
+const limitedText = (value, max = 500) => {
+  const text = String(value ?? '').trim();
+  return text.length <= max ? text : null;
+};
+const validSecretLength = (value, { min = 1, max = 128 } = {}) =>
+  typeof value === 'string' && value.length >= min && value.length <= max;
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
+const CHAT_ROLES = new Set(['parent', 'teacher', 'principal', 'admin']);
 const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
 const APPLICATION_STAGE_SELECTIONS = new Set([
   'ECD · Baby (Birth–11 months)',
@@ -218,7 +225,7 @@ const recordInSchool = (record, actor) => Boolean(record && actor && record.scho
 const tagSchoolRecord = (actor, record) => ({ ...record, schoolId: accountSchoolId(actor), schoolName: actor.schoolName });
 const tenantRecords = (records, actor) => (Array.isArray(records) ? records.filter(record => recordInSchool(record, actor)) : []);
 const canUseDirectChat = (first, second) => {
-  if (!first || !second || first.username === second.username || !isSameSchool(first, second)) return false;
+  if (!first || !second || !CHAT_ROLES.has(first.role) || !CHAT_ROLES.has(second.role) || first.username === second.username || !isSameSchool(first, second)) return false;
   const parent = first.role === 'parent' ? first : second.role === 'parent' ? second : null;
   if (!parent) return true;
   const staffMember = parent === first ? second : first;
@@ -508,7 +515,19 @@ const staticFileOptions = {
   }
 };
 app.use('/assets', express.static(path.join(__dirname, 'assets'), staticFileOptions));
-app.use('/output', express.static(path.join(__dirname, 'output'), staticFileOptions));
+const publicOutputDocuments = Object.freeze(new Map([
+  ['LittleFeet_Presentation_2026_Updated.pdf', 'LittleFeet_Presentation_2026_Updated.pdf'],
+  ['LittleFeet_User_Manual_2026_Updated.pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'],
+  ['LittleSteps_Platform_Presentation_2026.pdf', 'LittleSteps_Platform_Presentation_2026.pdf'],
+  ['LittleSteps_User_Manual_2026.pdf', 'LittleSteps_User_Manual_2026.pdf']
+]));
+app.get('/output/pdf/:document', (req, res) => {
+  const document = publicOutputDocuments.get(String(req.params.document || ''));
+  if (!document) return res.sendStatus(404);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.type('application/pdf');
+  res.sendFile(document, { root: path.join(__dirname, 'output', 'pdf') });
+});
 const sendPublicRootFile = (req, res) => {
   if (/\.js$/i.test(req.path)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -1056,20 +1075,32 @@ const establishAuthenticatedSession = (req, account, callback) => {
 
 app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
-  const normalizedUsername = normalizeUsername(username);
-  const attemptKey = loginAttemptKey(req, normalizedUsername);
+  const loginUsername = limitedText(username, 160);
+  const normalizedUsername = loginUsername ? normalizeUsername(loginUsername) : '';
+
+  // Every accepted login alias for the same account shares one username-level
+  // spray bucket. Otherwise an attacker could multiply guesses by rotating
+  // aliases while also rotating source IPs.
+  const matchedAccount = normalizedUsername
+    ? db.users.find(account => accountMatchesUsername(account, normalizedUsername))
+    : null;
+  const attemptIdentity = matchedAccount ? normalizeUsername(matchedAccount.username) : normalizedUsername;
+  const attemptKey = loginAttemptKey(req, attemptIdentity || '[invalid-username]');
   const previousAttempts = activeLoginAttempt(attemptKey);
-  const previousUsernameAttempts = activeUsernameAttempt(normalizedUsername);
+  const previousUsernameAttempts = activeUsernameAttempt(attemptIdentity);
   if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
   }
-  const user = normalizedUsername && db.users.find(u => accountMatchesUsername(u, normalizedUsername) && matchesPin(pin, u.pinHash));
+
+  const user = matchedAccount && validSecretLength(pin) && matchesPin(pin, matchedAccount.pinHash)
+    ? matchedAccount
+    : null;
   if (user) {
     if (String(user.verificationStatus || '').includes('verification pending')) {
       return res.status(403).json({ message: 'This account is waiting for school approval. Please contact your school administrator.' });
     }
     loginAttempts.delete(attemptKey);
-    loginUsernameAttempts.delete(normalizedUsername);
+    loginUsernameAttempts.delete(attemptIdentity);
     if (!replicaMode && pinHashNeedsUpgrade(user.pinHash)) user.pinHash = hashPin(pin);
     establishAuthenticatedSession(req, user, (error, safeUser) => {
       if (error) return res.status(500).json({ message: 'Unable to establish a secure sign-in session. Please try again.' });
@@ -1077,7 +1108,7 @@ app.post('/api/login', (req, res) => {
     });
   } else {
     loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
-    loginUsernameAttempts.set(normalizedUsername, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
+    loginUsernameAttempts.set(attemptIdentity, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
     if (loginAttempts.size > 10000 || loginUsernameAttempts.size > 10000) pruneLoginAttempts();
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
@@ -1521,6 +1552,7 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
 app.get('/api/subscription-billing', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
+  if (!['teacher', 'principal', 'district', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
   const billing = subscriptionBillingState(actor);
   const isAdmin = actor.role === 'admin';
   const { accountNumberEncrypted, payMePayloadEncrypted, ...adminPayment } = billing.payment;
@@ -1947,14 +1979,22 @@ app.put('/api/accounts/:username', (req, res) => {
   if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (username && db.users.some(entry => entry !== account && accountMatchesUsername(entry, username))) return res.status(409).json({ message: 'That username is already in use.' });
-  if (username) account.username = boundedText(username, 160);
+  const cleanUpdatedUsername = username === undefined ? '' : limitedText(username, 160);
+  const cleanUpdatedName = name === undefined ? '' : limitedText(name, 160);
+  if (username !== undefined && !cleanUpdatedUsername) return res.status(400).json({ message: 'Usernames must be between 1 and 160 characters.' });
+  if (name !== undefined && !cleanUpdatedName) return res.status(400).json({ message: 'Names must be between 1 and 160 characters.' });
+  if (role !== undefined && !allowedRoles.includes(role)) return res.status(400).json({ message: 'Choose a supported account role.' });
+  if (cleanUpdatedUsername && db.users.some(entry => entry !== account && accountMatchesUsername(entry, cleanUpdatedUsername))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (account.role === 'admin' && role && role !== 'admin' && db.users.filter(entry => entry.role === 'admin' && isSameSchool(actor, entry)).length <= 1) {
+    return res.status(400).json({ message: 'Create another administrator before changing the final administrator account to another role.' });
+  }
+  if (cleanUpdatedUsername) account.username = cleanUpdatedUsername;
   if (pin) {
     if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Passwords must be between 4 and 128 characters.' });
     account.pinHash = hashPin(pin);
   }
-  if (name) account.name = boundedText(name, 160);
-  if (role && allowedRoles.includes(role)) account.role = role;
+  if (cleanUpdatedName) account.name = cleanUpdatedName;
+  if (role) account.role = role;
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
   account.schoolName = actor.schoolName;
   account.schoolId = accountSchoolId(actor);
@@ -2644,6 +2684,7 @@ app.delete('/api/tickets/:id', (req, res) => {
 app.get('/api/chat/groups', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view school chat groups.' });
+  if (!CHAT_ROLES.has(actor.role)) return res.status(403).json({ message: 'This role cannot access school chat.' });
   res.json(tenantRecords(db.chatGroups, actor));
 });
 app.post('/api/chat/groups', (req, res) => {
@@ -2671,16 +2712,18 @@ app.delete('/api/chat/groups/:id', (req, res) => {
 // Chat - Messages
 app.get('/api/chat/messages/:groupId', (req, res) => {
   const actor = getSessionAccount(req);
+  if (!actor || !CHAT_ROLES.has(actor.role)) return res.status(403).json({ message: 'This role cannot access school chat.' });
   const group = db.chatGroups.find(entry => entry.id === req.params.groupId && recordInSchool(entry, actor));
-  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
   const msgs = db.groupMessages[req.params.groupId] || [];
   res.json(msgs);
 });
 app.post('/api/chat/messages', (req, res) => {
   const { groupId, message, textColor } = req.body;
   const actor = getSessionAccount(req);
+  if (!actor || !CHAT_ROLES.has(actor.role)) return res.status(403).json({ message: 'This role cannot access school chat.' });
   const group = db.chatGroups.find(entry => entry.id === groupId && recordInSchool(entry, actor));
-  if (!actor || !group) return res.status(404).json({ message: 'Chat group not found.' });
+  if (!group) return res.status(404).json({ message: 'Chat group not found.' });
   const cleanMessage = String(message || '').trim();
   if (!cleanMessage) return res.status(400).json({ message: 'A message is required.' });
   if (cleanMessage.length > 4000) return res.status(413).json({ message: 'Messages are limited to 4,000 characters.' });
@@ -2712,6 +2755,7 @@ app.delete('/api/chat/messages/:groupId/:messageId', (req, res) => {
 app.get('/api/chat/direct/users', (req, res) => {
   const viewer = getSessionAccount(req);
   if (!viewer) return res.status(401).json({ message: 'A valid signed-in account is required.' });
+  if (!CHAT_ROLES.has(viewer.role)) return res.status(403).json({ message: 'This role cannot access direct chat.' });
   res.json(db.users.filter(user => canUseDirectChat(viewer, user)).map(safeAccount));
 });
 app.get('/api/chat/direct/:user1/:user2', (req, res) => {
@@ -2863,10 +2907,10 @@ app.get('/api/visitor-meetings', (req, res) => {
 
 app.post('/api/visitor-meetings', (req, res) => {
   const parent = getSessionAccount(req);
-  const host = findAccountByUsername(req.body?.hostUsername);
-  const proposedAt = String(req.body?.proposedAt || '').trim();
-  const purpose = String(req.body?.purpose || '').trim();
-  if (!parent || parent.role !== 'parent' || !host || !['teacher', 'principal'].includes(host.role) || !isSameSchool(parent, host) || !proposedAt || !purpose) return res.status(400).json({ message: 'Choose an authorised teacher or principal, a proposed time, and a meeting purpose.' });
+  const host = findAccountByUsername(limitedText(req.body?.hostUsername, 160) || '');
+  const proposedAt = limitedText(req.body?.proposedAt, 80);
+  const purpose = limitedText(req.body?.purpose, 1200);
+  if (!parent || parent.role !== 'parent' || !host || !['teacher', 'principal'].includes(host.role) || !isSameSchool(parent, host) || !proposedAt || !purpose) return res.status(400).json({ message: 'Choose an authorised teacher or principal, a proposed time, and a meeting purpose within the allowed limits.' });
   const meeting = tagSchoolRecord(parent, { id: crypto.randomUUID(), parentUsername: parent.username, parentName: parent.name || parent.username, hostUsername: host.username, hostName: host.name || host.username, proposedAt, agreedAt: null, purpose, status: 'awaiting-teacher-response', requestedAt: new Date().toISOString() });
   db.visitorMeetings.unshift(meeting);
   res.status(201).json({ success: true, meeting });
@@ -2911,6 +2955,7 @@ app.post('/api/campus-visitors/check-in', (req, res) => {
   const actor = requireSafetyStaff(req);
   const passCode = String(req.body?.passCode || '').trim().toUpperCase();
   if (!actor || !passCode) return res.status(403).json({ message: 'An authorised staff member and visitor pass are required.' });
+  if (!/^LFV-[A-F0-9]{8}$/.test(passCode)) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
   const visitor = db.campusVisitors.find(entry => entry.status === 'approved' && recordInSchool(entry, actor) && matchesPin(passCode, entry.passCodeHash));
   if (!visitor) return res.status(404).json({ message: 'Visitor pass not found, already used, or not approved.' });
   visitor.status = 'checked-in';
@@ -3068,10 +3113,20 @@ app.get('/api/registry', (req, res) => {
 app.post('/api/registry', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add register records.' });
-  const required = ['learnerName', 'dateOfBirth', 'guardianName', 'guardianPhone', 'address'];
-  if (required.some(field => !String(req.body[field] || '').trim())) return res.status(400).json({ message: 'Complete all required registry fields.' });
-  const learnerName = String(req.body.learnerName || '').trim();
-  const className = String(req.body.className || '').trim();
+  const learnerName = limitedText(req.body?.learnerName, 160);
+  const className = limitedText(req.body?.className, 120);
+  const dateOfBirth = limitedText(req.body?.dateOfBirth, 20);
+  const guardianName = limitedText(req.body?.guardianName, 160);
+  const guardianPhone = limitedText(req.body?.guardianPhone, 80);
+  const guardianEmail = limitedText(req.body?.guardianEmail, 160);
+  const address = limitedText(req.body?.address, 500);
+  const emergencyContact = limitedText(req.body?.emergencyContact, 500);
+  const medicalNotes = limitedText(req.body?.medicalNotes, 2000);
+  const consent = limitedText(req.body?.consent || 'Pending verification', 120);
+  if (!learnerName || !dateOfBirth || !guardianName || !guardianPhone || !address || guardianEmail === null || className === null || emergencyContact === null || medicalNotes === null || consent === null) {
+    return res.status(400).json({ message: 'Complete the required learner fields and keep each field within its allowed length.' });
+  }
+  if (!validDateKey(dateOfBirth) || dateOfBirth >= dateKeyInSouthAfrica()) return res.status(400).json({ message: 'Enter a valid learner date of birth.' });
   if (actor.role === 'teacher' && (!className || !normaliseAssignedClasses(actor.assignedClasses).includes(normalizeComparableText(className)))) {
     return res.status(403).json({ message: 'Teachers can register learners only in their assigned classes.' });
   }
@@ -3079,14 +3134,14 @@ app.post('/api/registry', (req, res) => {
     id: crypto.randomUUID(),
     learnerName,
     className,
-    dateOfBirth: encryptField(String(req.body.dateOfBirth || '').trim()),
-    guardianName: String(req.body.guardianName || '').trim(),
-    guardianPhone: encryptField(String(req.body.guardianPhone || '').trim()),
-    guardianEmail: encryptField(String(req.body.guardianEmail || '').trim()),
-    address: encryptField(String(req.body.address || '').trim()),
-    emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
-    medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
-    consent: String(req.body.consent || 'Pending verification'),
+    dateOfBirth: encryptField(dateOfBirth),
+    guardianName,
+    guardianPhone: encryptField(guardianPhone),
+    guardianEmail: encryptField(guardianEmail || ''),
+    address: encryptField(address),
+    emergencyContact: encryptField(emergencyContact || ''),
+    medicalNotes: encryptField(medicalNotes || ''),
+    consent,
     createdAt: new Date().toISOString(),
     createdBy: actor.username
   });
@@ -3101,11 +3156,11 @@ app.post('/api/registry', (req, res) => {
       id: crypto.randomUUID(),
       studentName: learnerName,
       className,
-      parentName: String(req.body.guardianName || '').trim(),
-      contactEmail: String(req.body.guardianEmail || '').trim(),
-      dateOfBirth: encryptField(String(req.body.dateOfBirth || '').trim()),
-      medicalNotes: encryptField(String(req.body.medicalNotes || '').trim()),
-      emergencyContact: encryptField(String(req.body.emergencyContact || '').trim()),
+      parentName: guardianName,
+      contactEmail: guardianEmail || '',
+      dateOfBirth: encryptField(dateOfBirth),
+      medicalNotes: encryptField(medicalNotes || ''),
+      emergencyContact: encryptField(emergencyContact || ''),
       authorisedPickups: encryptField(''),
       registeredAt: new Date().toISOString(),
       registeredBy: actor.username
@@ -3124,9 +3179,11 @@ app.get('/api/consents', (req, res) => {
 app.post('/api/consents', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save consent records.' });
-  const { learnerName, guardianName, internalUpdates, marketingPhotos } = req.body;
-  if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), guardianName: String(guardianName), internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
+  const learnerName = limitedText(req.body?.learnerName, 160);
+  const guardianName = limitedText(req.body?.guardianName, 160);
+  const { internalUpdates, marketingPhotos } = req.body;
+  if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required and must be within 160 characters.' });
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName, guardianName, internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
   db.consentRecords = db.consentRecords.filter(entry => !recordInSchool(entry, actor) || entry.learnerName.toLowerCase() !== record.learnerName.toLowerCase());
   db.consentRecords.unshift(record);
   res.status(201).json({ success: true, record });
@@ -3134,10 +3191,14 @@ app.post('/api/consents', (req, res) => {
 
 app.post('/api/pickups/verify', (req, res) => {
   const actor = getSessionAccount(req);
-  const { learnerName, pickupAdult, verificationCode, action } = req.body;
+  const learnerName = limitedText(req.body?.learnerName, 160);
+  const pickupAdult = limitedText(req.body?.pickupAdult, 160);
+  const verificationCode = req.body?.verificationCode;
+  const action = limitedText(req.body?.action, 40);
+  const allowedActions = new Set(['Check-in', 'Pickup / release']);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record pickups.' });
-  if (!learnerName || !pickupAdult || !verificationCode || !action) return res.status(400).json({ message: 'Learner, pickup adult, verification code, and action are required.' });
-  const entry = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName: String(learnerName), pickupAdult: String(pickupAdult), verificationCode: hashPin(verificationCode), action: String(action), recordedBy: actor.username, timestamp: new Date().toISOString() });
+  if (!learnerName || !pickupAdult || !validSecretLength(verificationCode) || !allowedActions.has(action)) return res.status(400).json({ message: 'Learner, pickup adult, a valid verification code, and a supported action are required.' });
+  const entry = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName, pickupAdult, verificationCode: hashPin(verificationCode), action, recordedBy: actor.username, timestamp: new Date().toISOString() });
   db.pickupLogs.unshift(entry);
   res.status(201).json({ success: true, entry: { ...entry, verificationCode: undefined } });
 });
@@ -3152,7 +3213,7 @@ app.get('/api/release-notes', (req, res) => res.json((db.releaseNotes || []).sli
 app.post('/api/report-signing-pin', (req, res) => {
   const { pin } = req.body;
   const user = getSessionAccount(req);
-  if (!user || !pin || String(pin).length < 4) return res.status(400).json({ message: 'Choose a signing PIN with at least 4 characters.' });
+  if (!user || !validSecretLength(pin, { min: 4, max: 128 })) return res.status(400).json({ message: 'Choose a signing PIN between 4 and 128 characters.' });
   user.reportSigningPinHash = hashPin(pin);
   res.json({ success: true });
 });
@@ -3167,16 +3228,21 @@ app.get('/api/report-reviews', (req, res) => {
   res.json(reports.map(reportReviewView));
 });
 app.post('/api/report-reviews', (req, res) => {
-  const { studentName, reportTitle, period, parentUsername, signatureData, signingPin } = req.body;
+  const studentName = limitedText(req.body?.studentName, 160);
+  const reportTitle = limitedText(req.body?.reportTitle, 240);
+  const period = limitedText(req.body?.period, 120);
+  const parentUsername = limitedText(req.body?.parentUsername, 160);
+  const signatureData = req.body?.signatureData;
+  const signingPin = req.body?.signingPin;
   const teacher = getSessionAccount(req);
-  const parent = findAccountByUsername(parentUsername);
-  if (!teacher || !teacher.reportSigningPinHash || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
+  if (!teacher || !teacher.reportSigningPinHash || !validSecretLength(signingPin) || !matchesPin(signingPin, teacher.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your teacher signing PIN before publishing a report.' });
+  const parent = parentUsername ? findAccountByUsername(parentUsername) : null;
   if (!['teacher', 'principal', 'admin'].includes(teacher.role) || !parent || parent.role !== 'parent' || !isSameSchool(teacher, parent)) return res.status(400).json({ message: 'Choose an authorised teacher and a linked parent account.' });
   const learner = learnerRecordsVisibleTo(db.students, teacher).find(entry => normalizeComparableText(entry.studentName) === normalizeComparableText(studentName));
   if (!learner) return res.status(403).json({ message: 'You do not have access to that learner.' });
   if (!isParentLinkedToLearner(parent, learner)) return res.status(400).json({ message: 'Choose the approved parent account linked to this learner.' });
-  if (!studentName || !reportTitle || !period || !parentUsername || !validSignatureData(signatureData)) return res.status(400).json({ message: 'Complete the report details and provide a valid signature.' });
-  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName: String(studentName), className: learner.className || '', reportTitle: String(reportTitle), period: String(period), teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: encryptField(signatureData), teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
+  if (!studentName || !reportTitle || !period || !parentUsername || !validSignatureData(signatureData)) return res.status(400).json({ message: 'Complete the report details within the allowed limits and provide a valid signature.' });
+  const report = tagSchoolRecord(teacher, { id: crypto.randomUUID(), studentName, className: learner.className || '', reportTitle, period, teacherUsername: teacher.username, parentUsername: parent.username, teacherSignature: encryptField(signatureData), teacherSignedAt: new Date().toISOString(), parentSignature: null, parentSignedAt: null, status: 'Awaiting parent signature', createdAt: new Date().toISOString() });
   db.reportReviews.unshift(report);
   res.status(201).json({ success: true, report: reportReviewView(report) });
 });
@@ -3185,7 +3251,7 @@ app.post('/api/report-reviews/:id/sign', (req, res) => {
   const user = getSessionAccount(req);
   const report = db.reportReviews.find(entry => entry.id === req.params.id && recordInSchool(entry, user));
   if (!report || !user || user.role !== 'parent' || normalizeUsername(report.parentUsername) !== normalizeUsername(user.username)) return res.status(403).json({ message: 'Only the linked parent account can sign this report.' });
-  if (!user.reportSigningPinHash || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
+  if (!user.reportSigningPinHash || !validSecretLength(signingPin) || !matchesPin(signingPin, user.reportSigningPinHash)) return res.status(403).json({ message: 'Set and enter your parent signing PIN before signing.' });
   if (!validSignatureData(signatureData)) return res.status(400).json({ message: 'Add a valid signature before confirming.' });
   report.parentSignature = encryptField(signatureData);
   report.parentSignedAt = new Date().toISOString();
