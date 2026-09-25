@@ -39,6 +39,8 @@ jobs:
           node --check assets/mobile-pwa.js
           node --check assets/curriculum-frameworks.js
           node --check assets/education-stages.js
+          node --check finance-automation-server.js
+          node --check assets/finance-automation.js
           node --check scripts/write-deploy-release.js
 
       - name: Full regression suite
