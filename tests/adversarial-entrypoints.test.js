@@ -13,7 +13,7 @@ const port = 6800 + Math.floor(Math.random() * 200);
 const origin = 'http://127.0.0.1:' + port;
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
-for (const file of ['server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
+for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 
