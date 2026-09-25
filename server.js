@@ -3328,10 +3328,10 @@ app.post('/api/students/import', (req, res) => {
   let imported = 0;
 
   incoming.forEach((row, index) => {
-    const studentName = String(row?.studentName || '').trim();
-    const className = String(row?.className || '').trim();
-    const parentName = String(row?.parentName || '').trim();
-    const contactEmail = String(row?.contactEmail || '').trim();
+    const studentName = boundedText(row?.studentName, 160);
+    const className = boundedText(row?.className, 120);
+    const parentName = boundedText(row?.parentName, 160);
+    const contactEmail = boundedText(row?.contactEmail, 160);
     if (!studentName || !className) {
       rejected.push({ row: index + 2, reason: 'Learner name and class/grade are required.' });
       return;
@@ -3350,9 +3350,9 @@ app.post('/api/students/import', (req, res) => {
       className,
       parentName,
       contactEmail,
-      medicalNotes: encryptField(String(row?.medicalNotes || '').trim()),
-      emergencyContact: encryptField(String(row?.emergencyContact || '').trim()),
-      authorisedPickups: encryptField(String(row?.authorisedPickups || '').trim()),
+      medicalNotes: encryptField(boundedText(row?.medicalNotes, 2000)),
+      emergencyContact: encryptField(boundedText(row?.emergencyContact, 500)),
+      authorisedPickups: encryptField(boundedText(row?.authorisedPickups, 1000)),
       importedAt: new Date().toISOString(),
       importedBy: actor.username
     });
