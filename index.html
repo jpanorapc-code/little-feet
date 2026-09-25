@@ -1449,7 +1449,7 @@
         <div><label for="signupRole">I am a *</label><select id="signupRole" required><option value="parent">Parent / Guardian</option><option value="teacher">Teacher / Educator</option><option value="principal">Principal</option></select></div>
         <div><label for="signupSchool">Linked school name *</label><input id="signupSchool" required autocomplete="organization" placeholder="Enter your school name"></div>
         <div><label for="signupLinkedLearners">Learner name(s) for your request <span style="font-weight:normal;">(parents only)</span></label><input id="signupLinkedLearners" name="requestedLearnerLinks" placeholder="Optional — your school must approve every learner link"><small style="display:block;margin-top:-6px;margin-bottom:10px;color:var(--text-muted);">For privacy, typing a learner name does not create access. An administrator must confirm the parent–learner relationship.</small></div>
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:.78rem;"><input id="signupTermsAccepted" type="checkbox" required style="width:auto;margin-top:3px;"> <span>I confirm I am authorised to create this account and accept the school privacy notice and terms of use. I understand that child data may only be used for authorised school purposes.</span></label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:.78rem;"><input id="signupTermsAccepted" type="checkbox" required style="width:auto;margin-top:3px;"> <span>I confirm I am authorised to create this account and have read and accept the <button type="button" class="legal-inline-link" onclick="openPopiaPrivacyNotice()">Privacy &amp; POPIA Notice</button> and <button type="button" class="legal-inline-link" onclick="openTermsOfService()">Terms of Service</button>. I understand that child data may only be used for authorised school purposes.</span></label>
         <div style="display:flex;gap:9px;flex-wrap:wrap;"><button class="submit-btn" style="margin:0;">Create account</button><button type="button" class="action-btn btn-blue" onclick="hideSignupForm()">Cancel</button></div>
       </form>
 
@@ -2518,8 +2518,8 @@
         <div>
           <p id="footerSchoolName" style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet School Portal</p>
           <div class="footer-links">
-            <a href="#privacy-safeguarding" onclick="event.preventDefault(); openLegalModal('Privacy & Safeguarding Notice', 'Little Feet provides role-based workspaces, consent records, audit registers, and encrypted storage for selected sensitive fields. Your school remains responsible for its lawful basis, staff training, retention, vendor agreements, incident response, access reviews, and legal review.')">Privacy & Safeguarding</a>
-            <a href="#terms-of-service" onclick="event.preventDefault(); openLegalModal('Terms of Service', 'Authorised school personnel and approved families may use this portal only for legitimate school purposes. Your school controls account approval, learner relationships, and access to school records.')">Terms of Service</a>
+            <a href="#privacy-safeguarding" onclick="event.preventDefault(); openPopiaPrivacyNotice()">Privacy &amp; POPIA</a>
+            <a href="#terms-of-service" onclick="event.preventDefault(); openTermsOfService()">Terms of Service</a>
             <a href="#copyright-content" onclick="event.preventDefault(); openLegalModal('Copyright & Content Reporting', 'Only upload content your school is authorised to use. If you believe material in Little Feet infringes copyright or should not be displayed, report it through the Support Desk so the school can review access, removal, retention and any required legal process.')">Copyright &amp; Content Reporting</a>
             <a href="#guideTab" onclick="event.preventDefault(); openWorkspace('guideTab')">Help &amp; Guide</a>
             <a href="#settingsTab" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</a>
@@ -2545,6 +2545,7 @@
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
   <script src="backup.js?v=20260925-preferences-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v1" defer></script>
+  <script src="/assets/legal-notices.js?v=20260925-legal-v1" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
