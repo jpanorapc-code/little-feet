@@ -104,6 +104,23 @@ const requestContainsBlockedLanguage = (value, fieldName = '') => {
   return Object.entries(value).some(([key, item]) => requestContainsBlockedLanguage(item, key));
 };
 const safeTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
+const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, max);
+const POST_AUDIENCES = new Set(['All', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
+const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
+const educationStageForSelection = value => {
+  const selection = boundedText(value, 80);
+  if (/^ECD · Infant/i.test(selection)) return 'Day care / ECD · Infant';
+  if (/^ECD · Toddler/i.test(selection)) return 'Day care / ECD · Toddler';
+  if (/^ECD · Preschool/i.test(selection)) return 'Day care / ECD · Preschool';
+  if (/^Grade R/i.test(selection)) return 'Foundation Phase · Grade R';
+  const match = /^Grade (\d{1,2})$/.exec(selection);
+  const grade = Number(match?.[1] || 0);
+  if (grade >= 1 && grade <= 3) return 'Foundation Phase · Grades 1–3';
+  if (grade >= 4 && grade <= 6) return 'Intermediate Phase · Grades 4–6';
+  if (grade >= 7 && grade <= 9) return 'Senior Phase · Grades 7–9';
+  if (grade >= 10 && grade <= 12) return 'FET Phase · Grades 10–12';
+  return 'Other / school-defined';
+};
 const publicRateLimits = new Map();
 const enforcePublicRateLimit = (req, res, key, limit, windowMs) => {
   const now = Date.now();
@@ -317,7 +334,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), payment=(), usb=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "base-uri 'self'",
@@ -1104,19 +1121,22 @@ app.get('/api/production-readiness', (req, res) => {
 // Public self-registration is intentionally limited to school-facing roles.
 app.post('/api/signup', (req, res) => {
   const { username, pin, name, role, schoolName, termsAccepted, linkedLearners } = req.body;
+  const cleanUsername = boundedText(username, 160);
+  const cleanName = boundedText(name, 160);
+  const cleanSchoolName = boundedText(schoolName, 160);
   const selfRegistrationRoles = ['parent', 'teacher', 'principal'];
-  if (!username || !pin || !name || !schoolName || !selfRegistrationRoles.includes(role)) {
+  if (!cleanUsername || !pin || !cleanName || !cleanSchoolName || !selfRegistrationRoles.includes(role)) {
     return res.status(400).json({ message: 'Complete all fields and choose Parent, Teacher, or Principal.' });
   }
   if (!termsAccepted) return res.status(400).json({ message: 'You must accept the school privacy notice and terms before creating an account.' });
-  if (String(pin).length < 4) return res.status(400).json({ message: 'Choose a password or PIN with at least 4 characters.' });
-  if (db.users.some(account => accountMatchesUsername(account, username))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Choose a password or PIN between 4 and 128 characters.' });
+  if (db.users.some(account => accountMatchesUsername(account, cleanUsername))) return res.status(409).json({ message: 'That username is already in use.' });
   const linkValidation = role === 'parent' ? validateLearnerLinks(linkedLearners) : { links: [] };
   if (linkValidation.error) return res.status(400).json({ message: linkValidation.error });
   const requestedLinks = linkValidation.links;
   const account = {
-    username: String(username).trim(), pinHash: hashPin(pin), name: String(name).trim(), role,
-    schoolName: String(schoolName).trim(), schoolStoreUrl: '', linkedLearners: [],
+    username: cleanUsername, pinHash: hashPin(pin), name: cleanName, role,
+    schoolName: cleanSchoolName, schoolStoreUrl: '', linkedLearners: [],
     requestedLearnerLinks: role === 'parent' ? requestedLinks : [],
     parentRelationshipStatus: role === 'parent' ? 'Pending administrator approval' : undefined,
     subscription: role === 'parent' ? 'basic' : 'school',
@@ -2086,8 +2106,17 @@ app.post('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
   if (req.body?.mediaUrl !== undefined && req.body.mediaUrl !== null && !validPostMediaData(req.body.mediaUrl)) return res.status(400).json({ message: 'Attached media must be a supported PNG, JPEG, or WebP image under 5 MB.' });
-  const post = tagSchoolRecord(actor, { ...(req.body || {}), id: crypto.randomUUID() });
-  post.createdAt = post.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const audience = boundedText(req.body?.audience || 'All', 40);
+  const caption = boundedText(req.body?.caption, 4000);
+  if (!POST_AUDIENCES.has(audience) || !caption) return res.status(400).json({ message: 'Choose a valid audience and add an update.' });
+  const post = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(),
+    audience,
+    caption,
+    mediaUrl: req.body?.mediaUrl || null,
+    createdBy: actor.username,
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  });
   db.posts.unshift(post);
   res.json({ success: true, post });
 });
@@ -2109,7 +2138,12 @@ app.get('/api/schedules', (req, res) => {
 app.post('/api/schedules', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can create schedules.' });
-  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID() });
+  const studentName = boundedText(req.body?.studentName, 160);
+  const dayOfWeek = boundedText(req.body?.dayOfWeek, 20);
+  const timeSlot = boundedText(req.body?.timeSlot, 80);
+  const activity = boundedText(req.body?.activity, 1000);
+  if (!studentName || !dayOfWeek || !timeSlot || !activity) return res.status(400).json({ message: 'Complete the learner, day, time and activity.' });
+  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), studentName, dayOfWeek, timeSlot, activity, createdBy: actor.username });
   db.schedules.push(item);
   res.json({ success: true, item });
 });
@@ -2118,7 +2152,13 @@ app.post('/api/schedules/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import schedules.' });
   const { schedules } = req.body;
   if (Array.isArray(schedules)) {
-    db.schedules.push(...schedules.slice(0, 2000).map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID() })));
+    const cleanSchedules = schedules.slice(0, 2000).map(item => ({
+      studentName: boundedText(item?.studentName, 160),
+      dayOfWeek: boundedText(item?.dayOfWeek, 20),
+      timeSlot: boundedText(item?.timeSlot, 80),
+      activity: boundedText(item?.activity, 1000)
+    })).filter(item => item.studentName && item.dayOfWeek && item.timeSlot && item.activity);
+    db.schedules.push(...cleanSchedules.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID(), createdBy: actor.username })));
   }
   res.json({ success: true });
 });
@@ -2140,7 +2180,17 @@ app.post('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
   if (req.body?.photoUrl !== undefined && req.body.photoUrl !== null && !validWorksheetMediaData(req.body.photoUrl)) return res.status(400).json({ message: 'Attached evidence must be a supported PNG, JPEG, GIF, or WebP image under 5 MB.' });
-  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), uploadedAt: new Date().toLocaleDateString(), createdAt: new Date().toISOString() });
+  const studentName = boundedText(req.body?.studentName, 160);
+  const title = boundedText(req.body?.title, 240);
+  const grade = Number(req.body?.grade);
+  if (!studentName || !title || !Number.isFinite(grade) || grade < 0 || grade > 100) return res.status(400).json({ message: 'Enter a learner, title and grade between 0 and 100.' });
+  const item = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), studentName, title, grade,
+    photoUrl: req.body?.photoUrl || null,
+    submittedBy: actor.username,
+    uploadedAt: new Date().toLocaleDateString(),
+    createdAt: new Date().toISOString()
+  });
   db.worksheets.unshift(item);
   res.json({ success: true, item });
 });
@@ -2230,7 +2280,10 @@ app.get('/api/attendance', (req, res) => {
 app.post('/api/attendance', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can record attendance.' });
-  const item = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+  const studentName = boundedText(req.body?.studentName, 160);
+  const status = boundedText(req.body?.status || 'Checked In', 40);
+  if (!studentName || !ATTENDANCE_STATUSES.has(status)) return res.status(400).json({ message: 'Enter a learner and valid attendance status.' });
+  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), studentName, status, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), recordedBy: actor.username });
   db.attendance.unshift(item);
   res.json({ success: true, item });
 });
@@ -2239,16 +2292,22 @@ app.post('/api/attendance/import', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import attendance.' });
   const { attendance } = req.body;
   if (Array.isArray(attendance)) {
-    db.attendance.unshift(...attendance.slice(0, 2000).map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID() })));
+    const cleanAttendance = attendance.slice(0, 2000).map(item => ({
+      studentName: boundedText(item?.studentName, 160),
+      status: boundedText(item?.status || 'Checked In', 40)
+    })).filter(item => item.studentName && ATTENDANCE_STATUSES.has(item.status));
+    db.attendance.unshift(...cleanAttendance.map(item => tagSchoolRecord(actor, { ...item, id: crypto.randomUUID(), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), recordedBy: actor.username })));
   }
   res.json({ success: true });
 });
 app.post('/api/attendance/toggle', (req, res) => {
   const actor = getSessionAccount(req);
-  const { id, status } = req.body;
+  const { id } = req.body;
+  const status = boundedText(req.body?.status, 40);
   const item = db.attendance.find(a => a.id === id && recordInSchool(a, actor));
   if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Attendance record not found.' });
-  if (item) item.status = status;
+  if (!ATTENDANCE_STATUSES.has(status)) return res.status(400).json({ message: 'Choose a valid attendance status.' });
+  item.status = status;
   res.json({ success: true });
 });
 app.delete('/api/attendance/:id', (req, res) => {
@@ -2279,16 +2338,19 @@ app.post('/api/school-applications', (req, res) => {
   const learnerName = String(req.body?.learnerName || '').trim().slice(0, 120);
   const dateOfBirth = String(req.body?.dateOfBirth || '').trim().slice(0, 20);
   const intendedStart = String(req.body?.intendedStart || '').trim().slice(0, 20);
-  const gradeOrAgeGroup = String(req.body?.gradeOrAgeGroup || '').trim().slice(0, 80);
+  const gradeOrAgeGroup = boundedText(req.body?.gradeOrAgeGroup, 80);
+  const educationStage = educationStageForSelection(gradeOrAgeGroup);
   const homeArea = String(req.body?.homeArea || '').trim().slice(0, 160);
   const notes = String(req.body?.notes || '').trim().slice(0, 1200);
   if (!schoolName || !guardianName || !contactPhone || !contactEmail || !learnerName || !dateOfBirth || !intendedStart || !gradeOrAgeGroup || !homeArea || !notes) {
     return res.status(400).json({ message: 'Complete the contact, learner, start-date, age/grade, area and application details.' });
   }
   if (!/^\S+@\S+\.\S+$/.test(contactEmail)) return res.status(400).json({ message: 'Enter a valid contact email address.' });
+  if (!validDateKey(dateOfBirth) || dateOfBirth >= dateKeyInSouthAfrica()) return res.status(400).json({ message: 'Enter a valid learner date of birth.' });
+  if (!validDateKey(intendedStart)) return res.status(400).json({ message: 'Enter a valid intended start date.' });
   const principal = db.users.find(account => account.role === 'principal' && normalizeComparableText(account.schoolName) === normalizeComparableText(schoolName) && !String(account.verificationStatus || '').toLowerCase().includes('pending'));
   if (!principal) return res.status(409).json({ message: 'This school is not yet available for Little Feet applications. Ask the school to activate its principal account first.' });
-  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, homeArea, notes };
+  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, educationStage, homeArea, notes };
   const ticket = {
     id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
     message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
@@ -2866,7 +2928,13 @@ app.post('/api/modules/:module', (req, res) => {
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
 
-  let payload = { ...req.body };
+  let payload = {
+    type: boundedText(req.body?.type, 160),
+    details: boundedText(req.body?.details, 1800),
+    recordedBy: boundedText(req.body?.recordedBy || actor.name || actor.username, 160),
+    ...(req.params.module === 'stickyNotes' ? { colour: boundedText(req.body?.colour, 20) } : {})
+  };
+  if (!payload.type || !payload.details) return res.status(400).json({ message: 'Add a record type and details.' });
   if (req.params.module === 'curriculum') {
     const allowedFrameworks = new Set(['NCF Birth–4', 'CAPS Grade R']);
     const allowedAreas = new Set([
