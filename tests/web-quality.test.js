@@ -39,6 +39,16 @@ assert.match(client, /event\.key !== 'Escape'/);
 assert.match(client, /modalReturnFocus\?\.isConnected/);
 
 assert.match(page, /id="wallpaperImage"[^>]*loading="lazy"[^>]*decoding="async"/);
+assert.match(page, /class="wallpaper-aurora-sky"/);
+assert.match(page, /@keyframes portalAuroraDrift/);
+assert.match(page, /@keyframes portalStarTwinkle/);
+assert.match(page, /prefers-reduced-motion: reduce/);
+assert.match(page, /backup\.js\?v=20260925-aurora-v1/);
+assert.doesNotMatch(page, /little-feet-wallpaper-no-moon-4k\.jpg/);
+assert.doesNotMatch(page, /campfire wallpaper/i);
+assert.match(client, /classList\.add\('has-custom-wallpaper'\)/);
+assert.match(client, /classList\.remove\('has-custom-wallpaper'\)/);
+assert.match(client, /northern lights wallpaper is active/);
 assert.match(page, /href="#privacy-safeguarding"/);
 assert.match(page, /href="#terms-of-service"/);
 assert.match(page, /href="#copyright-content"/);
