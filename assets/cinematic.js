@@ -1412,6 +1412,11 @@ function initCinematicJourney() {
   };
 
   const calculateScroll = () => {
+    if (cinematicUserPaused) {
+      journey.classList.remove('is-active', 'is-after');
+      stage.dataset.exitHoldActive = 'false';
+      return;
+    }
     if (journeyTravel < 2) refreshJourneyMetrics();
     const raw = (window.scrollY - journeyTop) / journeyTravel;
     const insideJourney = window.scrollY >= journeyTop && window.scrollY <= journeyEnd;
@@ -2121,6 +2126,7 @@ function initCinematicJourney() {
   // client pauses it, stop every cinematic update completely.
   let journeyInViewport = false;
   let cinematicUserPaused = false;
+  let pausedScrollProgress = null;
   try {
     cinematicUserPaused = localStorage.getItem('lf_cinematic_paused') === 'true';
   } catch { /* Storage can be unavailable in locked-down browsers. */ }
@@ -2170,16 +2176,29 @@ function initCinematicJourney() {
   };
 
   pauseButton?.addEventListener('click', () => {
+    const wasPaused = cinematicUserPaused;
     cinematicUserPaused = !cinematicUserPaused;
     try { localStorage.setItem('lf_cinematic_paused', String(cinematicUserPaused)); } catch { /* Optional preference. */ }
-    syncPauseUi();
+
     if (cinematicUserPaused) {
+      pausedScrollProgress = scrollProgress;
       stopCinematicLoop();
       stage.dataset.cinematicIdle = 'paused-by-user';
-    } else {
-      markCinematicActivity();
-      syncCinematicRuntime();
+      syncPauseUi();
+      calculateScroll();
+      return;
     }
+
+    syncPauseUi();
+    refreshJourneyMetrics();
+    if (wasPaused && pausedScrollProgress !== null) {
+      const resumeProgress = clamp(pausedScrollProgress);
+      pausedScrollProgress = null;
+      window.scrollTo({ top: journeyTop + journeyTravel * resumeProgress, behavior: 'auto' });
+    }
+    calculateScroll();
+    markCinematicActivity();
+    syncCinematicRuntime();
   });
   syncPauseUi();
 
