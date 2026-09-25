@@ -11,7 +11,7 @@ const temp = fs.mkdtempSync(path.join(tempRoot, 'replica-restore-'));
 const port = 6100 + Math.floor(Math.random() * 300);
 const pinHash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
-for (const file of ['server.js', 'auth-crypto.js', 'backup.js']) {
+for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 
