@@ -88,7 +88,7 @@ assert.match(client, /northern lights wallpaper is active/);
 assert.match(page, /href="#privacy-safeguarding"/);
 assert.match(page, /href="#terms-of-service"/);
 assert.match(page, /href="#copyright-content"/);
-assert.match(page, /Copyright &amp; Content Reporting/);
+assert.match(page, /Copyright, Trade Marks &amp; IP/);
 
 assert.match(server, /app\.get\('\/manifest\.webmanifest'/);
 assert.match(server, /app\.get\('\/service-worker\.js'/);
