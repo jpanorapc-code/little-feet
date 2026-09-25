@@ -229,6 +229,8 @@ const rawRequest = async (route) => {
     assert.equal((await request('/api/registry', { cookie: alphaDistrictLogin.cookie })).response.status, 403);
     assert.equal((await request('/api/consents', { cookie: alphaDistrictLogin.cookie })).response.status, 403);
     assert.equal((await request('/api/pickups', { cookie: alphaDistrictLogin.cookie })).response.status, 403);
+    assert.equal((await request('/api/chat/groups', { cookie: alphaDistrictLogin.cookie })).response.status, 403);
+    assert.equal((await request('/api/chat/direct/users', { cookie: alphaDistrictLogin.cookie })).response.status, 403);
     assert.equal((await request('/api/registry', { cookie: bravoLogin.cookie })).data.length, 0);
     assert.equal((await request('/api/consents', { cookie: bravoLogin.cookie })).data.length, 0);
     assert.equal((await request('/api/pickups', { cookie: bravoLogin.cookie })).data.length, 0);
