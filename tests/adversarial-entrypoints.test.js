@@ -36,7 +36,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-admin', pinHash: hash('AdminPass1'), name: 'Alpha Admin', role: 'admin', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-principal', pinHash: hash('PrincipalPass1'), name: 'Alpha Principal', role: 'principal', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-teacher', pinHash: hash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] },
-    { username: 'alpha-parent@example.test', pinHash: hash('ParentPass1'), name: 'Alpha Parent', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Alpha Learner'] },
+    { username: 'alpha-parent@example.test', pinHash: hash('ParentPass1'), reportSigningPinHash: hash('4321'), name: 'Alpha Parent', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Alpha Learner'] },
     { username: 'bravo-admin', pinHash: hash('BravoAdmin1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
     { username: 'rate-target', pinHash: hash('TargetPass1'), name: 'Rate Target', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] }
   ],
@@ -66,6 +66,23 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   }],
   paymentEvents: [],
   paymentLedger: [],
+  reportReviews: [{
+    id: 'report-signing-target',
+    studentName: 'Alpha Learner',
+    className: 'Grade 1',
+    reportTitle: 'Term report',
+    period: 'Term 3',
+    teacherUsername: 'alpha-teacher',
+    parentUsername: 'alpha-parent@example.test',
+    teacherSignature: 'encrypted-placeholder',
+    teacherSignedAt: '2026-09-20T08:00:00.000Z',
+    parentSignature: null,
+    parentSignedAt: null,
+    status: 'Awaiting parent signature',
+    createdAt: '2026-09-20T08:00:00.000Z',
+    schoolId: 'school-alpha',
+    schoolName: 'Alpha School'
+  }],
   schoolBilling: {},
   directMessages: [],
   chatGroups: [],
@@ -460,7 +477,21 @@ const login = async (username, pin, suppliedCookie = '') => {
     assert.match(serverSource, /code_challenge_method:\s*'S256'/);
     assert.match(serverSource, /code_verifier:\s*verifier/);
 
-    // 15. Ensure attack attempts did not corrupt normal state.
+    // 15. Secondary-secret brute force: rotating source IPs must not bypass
+    // a per-account signing-PIN limiter once the primary session is stolen.
+    let signingPinAttempt;
+    for (let index = 1; index <= 21; index += 1) {
+      signingPinAttempt = await request('/api/report-reviews/report-signing-target/sign', {
+        method: 'POST',
+        cookie: alphaParent.cookie,
+        originHeader: origin,
+        headers: { 'x-forwarded-for': '198.51.100.' + index },
+        body: { signingPin: '0000', signatureData: 'not-used-for-wrong-pin' }
+      });
+    }
+    assert.equal(signingPinAttempt.response.status, 429, 'Rotating source IPs bypassed signing-PIN brute-force protection.');
+
+    // 16. Ensure attack attempts did not corrupt normal state.
     const health = await request('/api/health', { cookie: alphaAdmin.cookie });
     assert.equal(health.response.status, 200);
     assert.ok(['OK', 'BUSY'].includes(health.data.status));
