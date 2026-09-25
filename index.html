@@ -1666,8 +1666,9 @@
               <select id="postAudience">
                 <option value="All">Audience: All Parents &amp; Campus Staff</option>
                 <optgroup label="Day care / ECD">
-                  <option value="Toddlers">ECD · Toddlers (approx. 1–3 years)</option>
-                  <option value="Preschool">ECD · Preschool / NCF (approx. 3–4 years)</option>
+                  <option value="Infants">ECD · Babies / infants (birth–23 months)</option>
+                  <option value="Toddlers">ECD · Toddlers (24–35 months)</option>
+                  <option value="Preschool">ECD · Preschool (36–59 months)</option>
                   <option value="GradeR">Grade R · Reception (typically about 5–6 years)</option>
                 </optgroup>
                 <optgroup label="Primary school">
@@ -2185,7 +2186,7 @@
           <p style="color:var(--text-muted);margin-bottom:14px;">Record the core enrolment and emergency information required before a learner is placed in a class.</p>
           <form id="registryForm" class="workspace-grid">
             <div><label for="registryLearnerName">Learner full name *</label><input id="registryLearnerName" name="learnerName" autocomplete="section-learner name" required></div><div><label for="registryDateOfBirth">Date of birth *</label><input id="registryDateOfBirth" name="dateOfBirth" type="date" autocomplete="section-learner bday" required></div>
-            <div><label for="registryClassName">Grade / class</label><input id="registryClassName" name="className" list="educationStageOptions" placeholder="e.g. ECD Toddler / Grade R / Grade 4"></div><div><label for="registryGuardianName">Parent / guardian name *</label><input id="registryGuardianName" name="guardianName" autocomplete="section-guardian name" required></div>
+            <div><label for="registryClassName">Age group / grade / class</label><input id="registryClassName" name="className" list="educationStageOptions" placeholder="e.g. ECD · 2-year-olds / Grade R / Grade 4" oninput="updateRegistryStageGuidance(this.value)" onchange="updateRegistryStageGuidance(this.value)"><div id="registryStageGuidance" class="meta" style="margin-top:6px;display:grid;gap:3px;"><strong>Choose an age group or grade</strong><span>Little Feet will show the matching day-care, primary or high-school record guidance.</span></div></div><div><label for="registryGuardianName">Parent / guardian name *</label><input id="registryGuardianName" name="guardianName" autocomplete="section-guardian name" required></div>
             <div><label for="registryGuardianPhone">Guardian phone *</label><input id="registryGuardianPhone" name="guardianPhone" type="tel" autocomplete="section-guardian tel" required></div><div><label for="registryGuardianEmail">Guardian email</label><input id="registryGuardianEmail" name="guardianEmail" type="email" autocomplete="section-guardian email"></div>
             <div><label for="registryAddress">Home address *</label><input id="registryAddress" name="address" autocomplete="section-guardian street-address" required></div><div><label for="registryEmergencyContact">Emergency contact & phone</label><input id="registryEmergencyContact" name="emergencyContact" placeholder="Name · phone"></div>
             <div><label for="registryMedicalNotes">Medical / allergy notes</label><input id="registryMedicalNotes" name="medicalNotes" placeholder="Allergies, medication, care notes"></div><div><label for="registryConsent">Consent status</label><select id="registryConsent" name="consent"><option>Pending verification</option><option>Parent consent received</option></select></div>
@@ -2457,9 +2458,12 @@
       </div>
 
       <datalist id="educationStageOptions">
-        <option value="ECD · Infant care (Birth–12 months)"></option>
-        <option value="ECD · Toddler (Approx. 1–3 years)"></option>
-        <option value="ECD · Preschool (Approx. 3–4 years)"></option>
+        <option value="ECD · Baby (Birth–11 months)"></option>
+        <option value="ECD · 1-year-olds (12–23 months)"></option>
+        <option value="ECD · 2-year-olds (24–35 months)"></option>
+        <option value="ECD · 3-year-olds (36–47 months)"></option>
+        <option value="ECD · 4-year-olds (48–59 months)"></option>
+        <option value="ECD · 5-year-olds (60–71 months)"></option>
         <option value="Grade R · Reception"></option>
         <option value="Grade 1"></option><option value="Grade 2"></option><option value="Grade 3"></option>
         <option value="Grade 4"></option><option value="Grade 5"></option><option value="Grade 6"></option>
@@ -2478,7 +2482,7 @@
             <div style="overflow:auto;"><table style="width:100%;min-width:850px;border-collapse:collapse;text-align:left;font-size:.8rem;">
               <thead><tr><th style="padding:9px;">Institution / phase</th><th style="padding:9px;">Typical age / grades</th><th style="padding:9px;">Little Feet records to prepare</th></tr></thead>
               <tbody>
-                <tr><td style="padding:9px;"><strong>Day care / ECD</strong><br>NCF Birth–4</td><td style="padding:9px;">Birth to about 5<br>Infant · toddler · preschool</td><td style="padding:9px;">Guardian and emergency contacts, authorised pickup, health/allergy and medication information where lawfully required, consent choices, daily-care logs, attendance and NCF developmental observations.</td></tr>
+                <tr><td style="padding:9px;"><strong>Day care / ECD</strong><br>NCF Birth–4</td><td style="padding:9px;">Birth–11 months · baby<br>12–23 months · 1-year-olds<br>24–35 months · 2-year-olds<br>36–47 months · 3-year-olds<br>48–59 months · 4-year-olds<br>60–71 months · 5-year-olds / transition</td><td style="padding:9px;">Guardian and emergency contacts, authorised pickup, nutrition and care routines, health/allergy and medication information where lawfully required, consent choices, attendance and age-appropriate developmental observations. Confirm separately when a 5-year-old is in Grade R.</td></tr>
                 <tr style="background:rgba(45,212,191,.06);"><td style="padding:9px;"><strong>Grade R</strong><br>Foundation Phase</td><td style="padding:9px;">Reception year · typically about 5–6</td><td style="padding:9px;">Grade R placement, guardian contacts, attendance, consent, pickup controls, Foundation observations and reports. Public-school admission commonly requires the official birth certificate and immunisation record.</td></tr>
                 <tr><td style="padding:9px;"><strong>Primary school</strong></td><td style="padding:9px;">Typically Grades R–7 · about 5–13<br>Foundation R–3 · Intermediate 4–6 · Grade 7 begins Senior Phase</td><td style="padding:9px;">Grade/class, guardian and emergency contacts, attendance, timetable, learning evidence, assessments, reports and consent. For learners transferring schools, keep the transfer card or previous school report where applicable.</td></tr>
                 <tr style="background:rgba(45,212,191,.06);"><td style="padding:9px;"><strong>Secondary / high school</strong></td><td style="padding:9px;">Typically Grades 8–12 · about 14–18<br>Senior 8–9 · FET 10–12</td><td style="padding:9px;">Grade, timetable/subjects, attendance, assessment evidence, reports, guardian/emergency contacts and applicable transfer/previous-report information.</td></tr>
@@ -2533,8 +2537,8 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="/assets/education-stages.js?v=20260925-stages-v1" defer></script>
-  <script src="backup.js?v=20260925-strengthen-v2" defer></script>
+  <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
+  <script src="backup.js?v=20260925-strengthen-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
   <script src="/assets/cinematic-loader.js?v=20260925-cinematic-v44" defer></script>
