@@ -37,6 +37,65 @@ if (productionConfigurationErrors.length) {
   throw new Error(`Production configuration is missing required secure settings: ${productionConfigurationErrors.join(', ')}`);
 }
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
+const RENDER_DEPLOY_SHA = String(process.env.RENDER_GIT_COMMIT || '').trim().toLowerCase();
+const RENDER_REPO_SLUG = String(process.env.RENDER_GIT_REPO_SLUG || '').trim();
+const renderDeployAvailable = process.env.RENDER === 'true'
+  && /^[0-9a-f]{40}$/.test(RENDER_DEPLOY_SHA)
+  && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(RENDER_REPO_SLUG);
+let renderDeployReleaseNote = null;
+let renderDeployReleasePromise = null;
+const releaseVersionForChangeLines = changeLines => Number(changeLines) <= 8 ? '8.2.9' : '9.0';
+const renderDeployFallbackNote = () => renderDeployAvailable ? {
+  id: `render-${RENDER_DEPLOY_SHA}`,
+  version: '8.2',
+  title: `Live Render deployment · ${RENDER_DEPLOY_SHA.slice(0, 7)}`,
+  summary: 'Render identified the live commit, but its pushed title could not be resolved yet.',
+  publishedAt: new Date().toISOString(),
+  source: 'Render',
+  commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
+  changeLines: null,
+  releaseType: 'live'
+} : null;
+const resolveRenderDeployReleaseNote = async () => {
+  if (!renderDeployAvailable) return null;
+  if (renderDeployReleaseNote) return renderDeployReleaseNote;
+  if (renderDeployReleasePromise) return renderDeployReleasePromise;
+  renderDeployReleasePromise = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(`https://api.github.com/repos/${RENDER_REPO_SLUG}/commits/${RENDER_DEPLOY_SHA}`, {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'LittleFeetReleaseFeed/1.0' },
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`GitHub commit lookup returned ${response.status}`);
+      const commit = await response.json();
+      const messageLines = String(commit?.commit?.message || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const title = String(messageLines[0] || `Deploy ${RENDER_DEPLOY_SHA.slice(0, 7)}`).slice(0, 240);
+      const changeLines = Math.max(0, Number(commit?.stats?.total) || 0);
+      const releaseType = changeLines <= 8 ? 'patch' : 'update';
+      renderDeployReleaseNote = {
+        id: `render-${RENDER_DEPLOY_SHA}`,
+        version: releaseVersionForChangeLines(changeLines),
+        title,
+        summary: messageLines.slice(1, 4).join(' · ') || 'Pulled from the live Render deployment using the pushed commit title.',
+        publishedAt: commit?.commit?.committer?.date || commit?.commit?.author?.date || new Date().toISOString(),
+        source: 'Render',
+        commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
+        changeLines,
+        releaseType
+      };
+      return renderDeployReleaseNote;
+    } catch (error) {
+      console.warn('Render deploy release metadata lookup failed:', error.message);
+      return renderDeployFallbackNote();
+    } finally {
+      clearTimeout(timeout);
+      renderDeployReleasePromise = null;
+    }
+  })();
+  return renderDeployReleasePromise;
+};
 const CURRENT_RELEASE_NOTES = Object.freeze([
   Object.freeze({
     id: '2026-09-10-capitec-payme', version: '3.2', title: 'Free Capitec Pay Me option',
@@ -3208,7 +3267,11 @@ app.get('/api/pickups', (req, res) => {
   res.json(tenantRecords(db.pickupLogs, actor).map(({ verificationCode, ...entry }) => entry));
 });
 
-app.get('/api/release-notes', (req, res) => res.json((db.releaseNotes || []).slice().sort((first, second) => Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || ''))));
+app.get('/api/release-notes', async (req, res) => {
+  const deployed = await resolveRenderDeployReleaseNote();
+  if (deployed) return res.json([deployed]);
+  res.json((db.releaseNotes || []).slice().sort((first, second) => Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || '')));
+});
 
 app.post('/api/report-signing-pin', (req, res) => {
   const { pin } = req.body;
