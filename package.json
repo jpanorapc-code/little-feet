@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node tests/auth-crypto.test.js && node tests/tenant-isolation.test.js && node tests/security-regression.test.js && node tests/replica-restore.test.js && node tests/cinematic-navigation.test.js && node tests/web-quality.test.js",
+    "test": "node tests/auth-crypto.test.js && node tests/tenant-isolation.test.js && node tests/security-regression.test.js && node tests/replica-restore.test.js && node tests/cinematic-navigation.test.js && node tests/web-quality.test.js && node tests/strengthening-regression.test.js",
     "test:capacity": "node tests/capacity-smoke.test.js",
     "test:stress": "node tests/capacity-smoke.test.js",
     "start": "node server.js",
