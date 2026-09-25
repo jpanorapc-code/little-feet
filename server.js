@@ -38,6 +38,8 @@ if (productionConfigurationErrors.length) {
   throw new Error(`Production configuration is missing required secure settings: ${productionConfigurationErrors.join(', ')}`);
 }
 const fieldKey = crypto.createHash('sha256').update(process.env.LF_FIELD_ENCRYPTION_KEY || 'LittleFeet-development-key-change-before-production').digest();
+const LITTLE_FEET_PRIVACY_VERSION = 'POPIA-2026-09-v2';
+const LITTLE_FEET_TERMS_VERSION = 'TOS-ZA-2026-09-v2';
 const RENDER_DEPLOY_SHA = String(process.env.RENDER_GIT_COMMIT || '').trim().toLowerCase();
 const RENDER_REPO_SLUG = String(process.env.RENDER_GIT_REPO_SLUG || '').trim();
 const renderDeployAvailable = process.env.RENDER === 'true' && /^[0-9a-f]{40}$/.test(RENDER_DEPLOY_SHA);
@@ -1323,7 +1325,10 @@ app.post('/api/signup', (req, res) => {
     parentRelationshipStatus: role === 'parent' ? 'Pending administrator approval' : undefined,
     subscription: role === 'parent' ? 'basic' : 'school',
     verificationStatus: 'Self-registered — school verification pending',
-    termsAcceptedAt: new Date().toISOString(), termsVersion: '2026-08'
+    termsAcceptedAt: new Date().toISOString(),
+    termsVersion: LITTLE_FEET_TERMS_VERSION,
+    privacyAcceptedAt: new Date().toISOString(),
+    privacyVersion: LITTLE_FEET_PRIVACY_VERSION
   };
   account.schoolId = ensureSchool(account.schoolName).id;
   db.users.push(account);
@@ -3296,7 +3301,7 @@ app.post('/api/consents', (req, res) => {
   const guardianName = limitedText(req.body?.guardianName, 160);
   const { internalUpdates, marketingPhotos } = req.body;
   if (!learnerName || !guardianName) return res.status(400).json({ message: 'Learner and guardian details are required and must be within 160 characters.' });
-  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName, guardianName, internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA consent v1' });
+  const record = tagSchoolRecord(actor, { id: crypto.randomUUID(), learnerName, guardianName, internalUpdates: Boolean(internalUpdates), marketingPhotos: Boolean(marketingPhotos), capturedAt: new Date().toISOString(), version: 'POPIA-consent-2026-09-v2' });
   db.consentRecords = db.consentRecords.filter(entry => !recordInSchool(entry, actor) || entry.learnerName.toLowerCase() !== record.learnerName.toLowerCase());
   db.consentRecords.unshift(record);
   res.status(201).json({ success: true, record });
