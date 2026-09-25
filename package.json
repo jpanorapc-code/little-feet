@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node tests/auth-crypto.test.js && node tests/tenant-isolation.test.js && node tests/security-regression.test.js && node tests/replica-restore.test.js && node tests/cinematic-navigation.test.js && node tests/web-quality.test.js && node tests/strengthening-regression.test.js && node tests/adversarial-security.test.js && node tests/adversarial-entrypoints.test.js && node tests/adversarial-sensitive-inputs.test.js && node tests/authorization-matrix.test.js && node tests/render-release-metadata.test.js && node tests/finance-automation.test.js",
+    "test": "node tests/auth-crypto.test.js && node tests/tenant-isolation.test.js && node tests/security-regression.test.js && node tests/replica-restore.test.js && node tests/cinematic-navigation.test.js && node tests/web-quality.test.js && node tests/strengthening-regression.test.js && node tests/adversarial-security.test.js && node tests/adversarial-entrypoints.test.js && node tests/adversarial-sensitive-inputs.test.js && node tests/authorization-matrix.test.js && node tests/render-release-metadata.test.js && node tests/finance-automation.test.js && node tests/preferences-refresh.test.js && node tests/legal-compliance.test.js",
     "test:capacity": "node tests/capacity-smoke.test.js",
     "test:stress": "node tests/capacity-smoke.test.js",
     "start": "node server.js",
