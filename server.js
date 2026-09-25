@@ -451,6 +451,16 @@ const sendPublicRootFile = (req, res) => {
 };
 app.get('/backup.js', sendPublicRootFile);
 app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('text/plain');
+  res.sendFile('robots.txt', { root: __dirname });
+});
+app.get('/sitemap.xml', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('application/xml');
+  res.sendFile('sitemap.xml', { root: __dirname });
+});
 app.get('/favicon.ico', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.type('image/png');
