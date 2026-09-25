@@ -1979,14 +1979,22 @@ app.put('/api/accounts/:username', (req, res) => {
   if (!account || !isSameSchool(actor, account)) return res.status(404).json({ message: 'Account not found.' });
   const { username, pin, name, role, schoolName, schoolStoreUrl, linkedLearners, assignedClasses } = req.body;
   const allowedRoles = ['parent', 'teacher', 'principal', 'district', 'admin'];
-  if (username && db.users.some(entry => entry !== account && accountMatchesUsername(entry, username))) return res.status(409).json({ message: 'That username is already in use.' });
-  if (username) account.username = boundedText(username, 160);
+  const cleanUpdatedUsername = username === undefined ? '' : limitedText(username, 160);
+  const cleanUpdatedName = name === undefined ? '' : limitedText(name, 160);
+  if (username !== undefined && !cleanUpdatedUsername) return res.status(400).json({ message: 'Usernames must be between 1 and 160 characters.' });
+  if (name !== undefined && !cleanUpdatedName) return res.status(400).json({ message: 'Names must be between 1 and 160 characters.' });
+  if (role !== undefined && !allowedRoles.includes(role)) return res.status(400).json({ message: 'Choose a supported account role.' });
+  if (cleanUpdatedUsername && db.users.some(entry => entry !== account && accountMatchesUsername(entry, cleanUpdatedUsername))) return res.status(409).json({ message: 'That username is already in use.' });
+  if (account.role === 'admin' && role && role !== 'admin' && db.users.filter(entry => entry.role === 'admin' && isSameSchool(actor, entry)).length <= 1) {
+    return res.status(400).json({ message: 'Create another administrator before changing the final administrator account to another role.' });
+  }
+  if (cleanUpdatedUsername) account.username = cleanUpdatedUsername;
   if (pin) {
     if (String(pin).length < 4 || String(pin).length > 128) return res.status(400).json({ message: 'Passwords must be between 4 and 128 characters.' });
     account.pinHash = hashPin(pin);
   }
-  if (name) account.name = boundedText(name, 160);
-  if (role && allowedRoles.includes(role)) account.role = role;
+  if (cleanUpdatedName) account.name = cleanUpdatedName;
+  if (role) account.role = role;
   if (schoolName && schoolKey(schoolName) !== schoolKey(actor.schoolName)) return res.status(403).json({ message: 'An account cannot be moved to another school from this workspace.' });
   account.schoolName = actor.schoolName;
   account.schoolId = accountSchoolId(actor);
