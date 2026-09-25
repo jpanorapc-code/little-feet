@@ -129,6 +129,35 @@ async function login(username, pin) {
     const teacher = await login('alpha-teacher', 'TeacherPass1');
     const parent = await login('alpha-parent@example.test', 'ParentPass1');
 
+    const billingBase = {
+      baseMonthly: 350,
+      lateFee: 0,
+      lateFeeEnabled: false,
+      bundles: {
+        5: { costPrice: 0, sellingPrice: 0 },
+        20: { costPrice: 0, sellingPrice: 0 },
+        100: { costPrice: 0, sellingPrice: 0 }
+      }
+    };
+    const credentialLink = await request('/api/subscription-billing', {
+      method:'PUT', cookie:admin,
+      body:{ ...billingBase, payment:{ method:'payment_link', paymentLink:'https://user:password@example.com/pay', referencePrefix:'LF' } }
+    });
+    assert.equal(credentialLink.response.status, 400);
+
+    const oversizedBankField = await request('/api/subscription-billing', {
+      method:'PUT', cookie:admin,
+      body:{ ...billingBase, payment:{ method:'bank_transfer', accountName:'A'.repeat(161), bankName:'Example Bank', accountNumber:'1234567890', branchCode:'123456', referencePrefix:'LF' } }
+    });
+    assert.equal(oversizedBankField.response.status, 400);
+
+    const validPaymentConfig = await request('/api/subscription-billing', {
+      method:'PUT', cookie:admin,
+      body:{ ...billingBase, payment:{ method:'payment_link', paymentLink:'https://payments.example.com/little-feet', referencePrefix:'LF' } }
+    });
+    assert.equal(validPaymentConfig.response.status, 200);
+    assert.equal(validPaymentConfig.data.paymentConfigured, true);
+
     const hugeSigningPin = await request('/api/report-signing-pin', { method:'POST', cookie:teacher, body:{ pin:'9'.repeat(5000) } });
     assert.equal(hugeSigningPin.response.status, 400);
     const normalSigningPin = await request('/api/report-signing-pin', { method:'POST', cookie:teacher, body:{ pin:'TeacherSign1' } });
