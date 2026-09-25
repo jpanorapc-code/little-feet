@@ -35,6 +35,9 @@ jobs:
           node --check backup.js
           node --check backup-server.js
           node --check auth-crypto.js
+          node --check service-worker.js
+          node --check assets/mobile-pwa.js
+          node --check assets/curriculum-frameworks.js
 
       - name: Full regression suite
         run: npm test
