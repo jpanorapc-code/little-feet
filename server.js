@@ -345,6 +345,13 @@ const writeSchoolSearchCache = (key, data, now = Date.now()) => {
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
 app.use(compression({ threshold: 1024 }));
+app.use('/api', (req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  const hasBody = Number(req.get('content-length') || 0) > 0 || Boolean(req.get('transfer-encoding'));
+  if (!hasBody) return next();
+  if (req.is('application/json') || req.is('application/*+json') || req.is('application/x-www-form-urlencoded')) return next();
+  return res.status(415).json({ message: 'Unsupported request body type. Use JSON or URL-encoded form data.' });
+});
 app.use((req, res, next) => {
   req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
   res.setHeader('X-Request-Id', req.requestId);
