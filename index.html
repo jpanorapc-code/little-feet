@@ -111,6 +111,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       body.portal-active::after,
+      #authSection::after,
       .wallpaper-aurora-sky::before { animation:none !important; }
     }
 
@@ -232,16 +233,19 @@
       border-radius:0;
       pointer-events:none;
       z-index:-1;
-      opacity:.78;
-      background-color:#020611;
-      background-image:
-        linear-gradient(rgba(2,6,17,.28),rgba(2,6,17,.54)),
-        radial-gradient(ellipse 78% 16% at 12% 10%,rgba(74,222,128,.28),transparent 72%),
-        radial-gradient(ellipse 68% 13% at 76% 14%,rgba(139,92,246,.24),transparent 72%),
-        radial-gradient(circle,rgba(255,255,255,.76) 0 1px,transparent 1.4px),
-        radial-gradient(circle,rgba(196,181,253,.58) 0 1px,transparent 1.45px);
-      background-size:100% 100%,100% 100%,100% 100%,151px 151px,239px 239px;
-      background-position:0 0,0 0,0 0,17px 21px,83px 57px;
+      opacity:.98;
+      background:#020611 url('/assets/4k/little-feet-aurora-stars-4k.svg') center/cover no-repeat;
+    }
+    #authSection::after {
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:-1;
+      opacity:.14;
+      background:transparent url('/assets/4k/little-feet-star-glow-mask-4k.svg') center/cover no-repeat;
+      animation:portalGlowPulse 5.8s ease-in-out infinite alternate;
+      will-change:opacity;
     }
     #authSection > .auth-card { position:relative; z-index:1; width:min(100%,450px) !important; max-width:450px !important; margin:0; padding:18px; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
     .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:24px; padding-top:10px; overflow:hidden; }
