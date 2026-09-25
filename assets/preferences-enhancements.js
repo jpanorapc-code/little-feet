@@ -98,7 +98,8 @@
       languageDescription:'Khetha ilimi olithandako. Okungakatjhugululwa kuzokuhlala ngesiNgisi ukuze kungalahleki litho.',
       dashboardRefresh:'Vuselela ideshibhodi', refreshDescription:'Gcina ideshibhodi ivuselelwe ngaphandle kokulahlekelwa msebenzi ongakagcinwa.',
       manualRefresh:'Vuselela ngesandla kwaphela', autoSmart:'Ngokuzenzakalela', sound:'Umsindo we-Little Feet',
-      navigation:'Ukuzulazula', install:'Faka i-Little Feet', theme:'Itimu', mute:'Thulisa i-Little Feet'
+      navigation:'Ukuzulazula', install:'Faka i-Little Feet', theme:'Itimu', mute:'Thulisa i-Little Feet',
+      securePortal:'Iphothali yesikolo ephephileko', accessNote:'Ukufikelela okulawulwa sikolo ngokuya ngendima kuma-akhawunti avunyelweko we-Little Feet.', usernameLabel:'I-ID yesisebenzi namkha i-imeyili yomzali', passwordLabel:'I-PIN yokuphepha / Iphasikhodi', rememberEmail:'Khumbula i-imeyili yami', loginHelp:'Ukhohlwe i-PIN/iphasikhodi? Thintana nomphathi wesikolo.', signIn:'Ngena ngokuphepha', otherSignIn:'Ezinye iindlela zokungena', newAccount:'Umusha ku-Little Feet?', createAccount:'Yakha i-akhawunti', privacyLink:'Ubumfihlo & POPIA', termsLink:'Imibandela', soundShort:'Umsindo'
     }
   });
 
@@ -339,8 +340,7 @@
     refreshTimer = window.setTimeout(async () => {
       await refreshDashboardSafely();
       const currentPreference = document.getElementById('refreshPreference')?.value || preference;
-      scheduleDashboardRefresh(currentPreference);,
-      securePortal:'Iphothali yesikolo ephephileko', accessNote:'Ukufikelela okulawulwa sikolo ngokuya ngendima kuma-akhawunti avunyelweko we-Little Feet.', usernameLabel:'I-ID yesisebenzi namkha i-imeyili yomzali', passwordLabel:'I-PIN yokuphepha / Iphasikhodi', rememberEmail:'Khumbula i-imeyili yami', loginHelp:'Ukhohlwe i-PIN/iphasikhodi? Thintana nomphathi wesikolo.', signIn:'Ngena ngokuphepha', otherSignIn:'Ezinye iindlela zokungena', newAccount:'Umusha ku-Little Feet?', createAccount:'Yakha i-akhawunti', privacyLink:'Ubumfihlo & POPIA', termsLink:'Imibandela', soundShort:'Umsindo'
+      scheduleDashboardRefresh(currentPreference);
     }, interval);
   }
 
