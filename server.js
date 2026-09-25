@@ -108,6 +108,13 @@ const boundedText = (value, max = 500) => String(value ?? '').trim().slice(0, ma
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
 const ATTENDANCE_STATUSES = new Set(['Checked In', 'Present', 'Absent', 'Late', 'Excused', 'Checked Out']);
 const APPLICATION_STAGE_SELECTIONS = new Set([
+  'ECD · Baby (Birth–11 months)',
+  'ECD · 1-year-olds (12–23 months)',
+  'ECD · 2-year-olds (24–35 months)',
+  'ECD · 3-year-olds (36–47 months)',
+  'ECD · 4-year-olds (48–59 months)',
+  'ECD · 5-year-olds (60–71 months)',
+  // Legacy values remain accepted so old clients and saved drafts do not break.
   'ECD · Infant care (Birth–12 months)',
   'ECD · Toddler (Approx. 1–3 years)',
   'ECD · Preschool (Approx. 3–4 years)',
@@ -116,9 +123,12 @@ const APPLICATION_STAGE_SELECTIONS = new Set([
 ]);
 const educationStageForSelection = value => {
   const selection = boundedText(value, 80);
-  if (/^ECD · Infant/i.test(selection)) return 'Day care / ECD · Infant';
-  if (/^ECD · Toddler/i.test(selection)) return 'Day care / ECD · Toddler';
-  if (/^ECD · Preschool/i.test(selection)) return 'Day care / ECD · Preschool';
+  if (/^ECD · Baby/i.test(selection) || /^ECD · Infant/i.test(selection)) return 'Day care / ECD · Baby / infant';
+  if (/^ECD · 1-year/i.test(selection)) return 'Day care / ECD · 1-year-olds';
+  if (/^ECD · 2-year/i.test(selection) || /^ECD · Toddler/i.test(selection)) return 'Day care / ECD · 2-year-olds / toddler';
+  if (/^ECD · 3-year/i.test(selection)) return 'Day care / ECD · 3-year-olds';
+  if (/^ECD · 4-year/i.test(selection) || /^ECD · Preschool/i.test(selection)) return 'Day care / ECD · 4-year-olds / preschool';
+  if (/^ECD · 5-year/i.test(selection)) return 'Day care / ECD · 5-year-olds / transition';
   if (/^Grade R/i.test(selection)) return 'Foundation Phase · Grade R';
   const match = /^Grade (\d{1,2})$/.exec(selection);
   const grade = Number(match?.[1] || 0);
