@@ -44,6 +44,28 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   posts: [],
   moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], curriculum: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [], stickyNotes: [] },
   learnerAccessCodes: [],
+  parentPayments: [{
+    id: 'payment-webhook-target',
+    reference: 'LF-WEBHOOK-TEST',
+    parentUsername: 'alpha-parent@example.test',
+    parentName: 'Alpha Parent',
+    learnerName: 'Alpha Learner',
+    description: 'Webhook target',
+    amountDue: 100,
+    dueDate: '2026-09-01',
+    arrangementDueDate: '',
+    arrangementAmount: null,
+    arrangementNote: '',
+    parentSignature: '',
+    parentSignedAt: '',
+    paymentStatus: 'awaiting_payment',
+    createdAt: '2026-09-01T08:00:00.000Z',
+    createdBy: 'alpha-admin',
+    schoolId: 'school-alpha',
+    schoolName: 'Alpha School'
+  }],
+  paymentEvents: [],
+  paymentLedger: [],
   schoolBilling: {},
   directMessages: [],
   chatGroups: [],
@@ -61,7 +83,8 @@ const child = spawn(process.execPath, ['server.js'], {
     LF_TEST_ENFORCE_ORIGIN: '1',
     LF_MAX_API_BODY_MB: '1',
     SESSION_SECRET: 'adversarial-session-secret',
-    LF_FIELD_ENCRYPTION_KEY: 'adversarial-field-key'
+    LF_FIELD_ENCRYPTION_KEY: 'adversarial-field-key',
+    LF_PAYMENT_WEBHOOK_SECRET: 'adversarial-webhook-secret'
   },
   stdio: ['ignore', 'ignore', 'pipe']
 });
@@ -357,7 +380,87 @@ const login = async (username, pin, suppliedCookie = '') => {
     const parentCodes = await request('/api/learner-access-codes', { cookie: alphaParent.cookie });
     assert.equal(parentCodes.response.status, 403);
 
-    // 12. Ensure attack attempts did not corrupt normal state.
+    // 12. Signed webhook boundary: unsigned/forged bodies fail, valid bodies apply once,
+    // and a replay is idempotent rather than duplicating money.
+    const webhookPayload = {
+      eventId: 'evt-1',
+      reference: 'LF-WEBHOOK-TEST',
+      status: 'paid',
+      amount: 100,
+      transactionId: 'txn-1',
+      provider: 'test-provider',
+      occurredAt: '2026-09-25T08:00:00.000Z'
+    };
+    const webhookRaw = JSON.stringify(webhookPayload);
+    const unsignedWebhook = await request('/api/payments/webhook', {
+      method: 'POST',
+      body: webhookRaw,
+      headers: { 'content-type': 'application/json' }
+    });
+    assert.equal(unsignedWebhook.response.status, 401);
+
+    const forgedWebhook = await request('/api/payments/webhook', {
+      method: 'POST',
+      body: webhookRaw,
+      headers: { 'content-type': 'application/json', 'x-little-feet-signature': 'sha256=' + '00'.repeat(32) }
+    });
+    assert.equal(forgedWebhook.response.status, 401);
+
+    const validWebhookSignature = crypto.createHmac('sha256', 'adversarial-webhook-secret').update(webhookRaw).digest('hex');
+    const validWebhook = await request('/api/payments/webhook', {
+      method: 'POST',
+      body: webhookRaw,
+      headers: { 'content-type': 'application/json', 'x-little-feet-signature': 'sha256=' + validWebhookSignature }
+    });
+    assert.equal(validWebhook.response.status, 201);
+    assert.equal(validWebhook.data.duplicate, false);
+
+    const replayWebhook = await request('/api/payments/webhook', {
+      method: 'POST',
+      body: webhookRaw,
+      headers: { 'content-type': 'application/json', 'x-little-feet-signature': 'sha256=' + validWebhookSignature }
+    });
+    assert.equal(replayWebhook.response.status, 200);
+    assert.equal(replayWebhook.data.duplicate, true);
+
+    const tamperedRaw = JSON.stringify({ ...webhookPayload, amount: 9999 });
+    const tamperedWebhook = await request('/api/payments/webhook', {
+      method: 'POST',
+      body: tamperedRaw,
+      headers: { 'content-type': 'application/json', 'x-little-feet-signature': 'sha256=' + validWebhookSignature }
+    });
+    assert.equal(tamperedWebhook.response.status, 401);
+
+    // 13. Bulk-import boundary: lower roles cannot import and oversized batches fail atomically.
+    const teacherImport = await request('/api/students/import', {
+      method: 'POST',
+      cookie: alphaTeacher.cookie,
+      originHeader: origin,
+      body: { students: [{ studentName: 'Injected Learner', className: 'Grade 1' }] }
+    });
+    assert.equal(teacherImport.response.status, 403);
+
+    const tooManyStudents = Array.from({ length: 1001 }, (_, index) => ({ studentName: 'Learner ' + index, className: 'Grade 1' }));
+    const oversizedImport = await request('/api/students/import', {
+      method: 'POST',
+      cookie: alphaPrincipal.cookie,
+      originHeader: origin,
+      body: { students: tooManyStudents }
+    });
+    assert.equal(oversizedImport.response.status, 400);
+    const studentSearchAfterRejectedImport = await request('/api/students/search?className=Grade%201', { cookie: alphaAdmin.cookie });
+    assert.equal(studentSearchAfterRejectedImport.response.status, 200);
+    assert.equal(studentSearchAfterRejectedImport.data.filter(entry => /^Learner \d+$/.test(entry.studentName || '')).length, 0);
+
+    // 14. OAuth source guards: Google state, Yahoo state, and Microsoft state + PKCE must remain present.
+    const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+    assert.match(serverSource, /state:\s*true/);
+    assert.match(serverSource, /req\.query\.state !== req\.session\.yahooOAuthState/);
+    assert.match(serverSource, /req\.query\.state !== req\.session\.microsoftOAuthState/);
+    assert.match(serverSource, /code_challenge_method:\s*'S256'/);
+    assert.match(serverSource, /code_verifier:\s*verifier/);
+
+    // 15. Ensure attack attempts did not corrupt normal state.
     const health = await request('/api/health', { cookie: alphaAdmin.cookie });
     assert.equal(health.response.status, 200);
     assert.ok(['OK', 'BUSY'].includes(health.data.status));
