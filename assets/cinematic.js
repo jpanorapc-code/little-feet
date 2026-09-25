@@ -69,6 +69,67 @@ function createMicroReliefTexture(kind = 'feather') {
   return texture;
 }
 
+const FISH_SPRITE_SRC = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/3/38/Alosa_alosa.png/330px-Alosa_alosa.png';
+
+const fishSchoolLayouts = [
+  [
+    [3, 34, 88, .72, -4, .92, 0.0],
+    [15, 18, 112, .84, 2, .84, -.6],
+    [28, 42, 76, .64, -2, .76, -1.1],
+    [39, 12, 126, .90, 4, .90, -1.8],
+    [51, 32, 98, .78, -3, .82, -2.4],
+    [63, 8, 118, .86, 3, .88, -3.0],
+    [74, 43, 82, .68, -4, .74, -3.7],
+    [84, 20, 106, .81, 1, .86, -4.3],
+    [22, 62, 96, .75, 3, .80, -4.9],
+    [44, 67, 74, .62, -2, .70, -5.5],
+    [66, 63, 104, .79, 2, .82, -6.1],
+    [89, 57, 68, .58, -3, .68, -6.7]
+  ],
+  [
+    [4, 28, 78, .66, 3, .70, -1.0],
+    [18, 52, 108, .82, -2, .82, -1.7],
+    [31, 20, 90, .72, 4, .76, -2.4],
+    [45, 44, 124, .88, -3, .88, -3.1],
+    [60, 16, 84, .68, 2, .72, -3.8],
+    [73, 50, 102, .78, -4, .80, -4.5],
+    [86, 27, 72, .60, 3, .66, -5.2],
+    [25, 73, 82, .67, -1, .70, -5.9],
+    [54, 70, 96, .74, 2, .76, -6.6],
+    [79, 72, 70, .58, -2, .64, -7.3]
+  ]
+];
+
+function populateFishSchools(root = document) {
+  const schools = [...root.querySelectorAll('.cinematic-fish-2d')];
+  schools.forEach((school, schoolIndex) => {
+    if (school.dataset.fishPopulated === 'true') return;
+    const layout = fishSchoolLayouts[schoolIndex] || fishSchoolLayouts[0];
+
+    layout.forEach(([x, y, width, scale, tilt, opacity, delay], fishIndex) => {
+      const fish = document.createElement('img');
+      fish.className = 'cinematic-fish-sprite';
+      fish.src = FISH_SPRITE_SRC;
+      fish.alt = '';
+      fish.setAttribute('aria-hidden', 'true');
+      fish.decoding = 'async';
+      fish.loading = 'lazy';
+      fish.draggable = false;
+      fish.style.setProperty('--fish-x', x + '%');
+      fish.style.setProperty('--fish-y', y + '%');
+      fish.style.setProperty('--fish-width', width + 'px');
+      fish.style.setProperty('--fish-scale', String(scale));
+      fish.style.setProperty('--fish-tilt', tilt + 'deg');
+      fish.style.setProperty('--fish-opacity', String(opacity));
+      fish.style.setProperty('--fish-delay', delay + 's');
+      fish.style.setProperty('--fish-phase', String(fishIndex % 4));
+      school.appendChild(fish);
+    });
+
+    school.dataset.fishPopulated = 'true';
+  });
+}
+
 const stationBlueprints = [
   { at: 0.05, title: 'Surface', kicker: 'Little Feet · cinematic home', text: 'Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.', candidates: [['feedTab','School Feed']] },
   { at: 0.24, title: 'Take the plunge', kicker: 'Scroll to dive', text: 'Keep scrolling. The mascot leaves the ice, crosses the waterline, and the portal opens beneath the surface.', candidates: [['scheduleTab','Timetable'],['feedTab','School Feed']] },
@@ -573,6 +634,8 @@ function initCinematicJourney() {
   const depthBackdropImage = document.getElementById('cinematicDepthBackdrop');
   const dashboard = document.getElementById('dashboardSection');
   if (!journey || !stage || !canvas || !title || !kicker || !copy || !progressBar || !depthLabel || !stopContainer) return;
+
+  populateFishSchools(stage);
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const stations = stationBlueprints.map(station => ({ ...station, target: accessibleNavTarget(station.candidates) }));
