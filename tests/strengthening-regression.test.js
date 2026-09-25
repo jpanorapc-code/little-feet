@@ -11,7 +11,7 @@ const temp = fs.mkdtempSync(path.join(tempRoot, 'strengthening-'));
 const port = 6400 + Math.floor(Math.random() * 250);
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
-for (const file of ['server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
+for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 
