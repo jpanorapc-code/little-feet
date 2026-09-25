@@ -94,6 +94,44 @@
   background: linear-gradient(180deg, rgba(3,20,44,.03), transparent 22%, transparent 76%, rgba(0,0,0,.24));
 }
 
+
+/* Paused cinematic swaps the live ocean for one compact static school scene.
+   The real HTML controls remain above it; WebGL/audio are already hard-stopped
+   by the existing pause runtime. */
+.cinematic-paused-picture {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  background: #07111e;
+  transition: opacity .16s ease;
+}
+.cinematic-paused-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+.cinematic-journey.is-user-paused .cinematic-paused-picture {
+  opacity: 1;
+  visibility: visible;
+}
+.cinematic-journey.is-user-paused .cinematic-loading {
+  display: none;
+}
+.cinematic-journey.is-user-paused .cinematic-copy,
+.cinematic-journey.is-user-paused .cinematic-depth-meter,
+.cinematic-journey.is-user-paused .cinematic-progress-shell {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .cinematic-depth-picture {
   position: absolute;
   inset: 0;
