@@ -2941,13 +2941,7 @@ app.post('/api/modules/:module', (req, res) => {
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
 
-  let payload = {
-    type: boundedText(req.body?.type, 160),
-    details: boundedText(req.body?.details, 1800),
-    recordedBy: boundedText(req.body?.recordedBy || actor.name || actor.username, 160),
-    ...(req.params.module === 'stickyNotes' ? { colour: boundedText(req.body?.colour, 20) } : {})
-  };
-  if (!payload.type || !payload.details) return res.status(400).json({ message: 'Add a record type and details.' });
+  let payload;
   if (req.params.module === 'curriculum') {
     const allowedFrameworks = new Set(['NCF Birth–4', 'CAPS Grade R']);
     const allowedAreas = new Set([
@@ -2982,6 +2976,14 @@ app.post('/api/modules/:module', (req, res) => {
       details: (learnerName + ' · ' + framework + ' · ' + area + ' · ' + observation).slice(0, 1800),
       recordedBy: actor.name || actor.username
     };
+  } else {
+    payload = {
+      type: boundedText(req.body?.type, 160),
+      details: boundedText(req.body?.details, 1800),
+      recordedBy: boundedText(req.body?.recordedBy || actor.name || actor.username, 160),
+      ...(req.params.module === 'stickyNotes' ? { colour: boundedText(req.body?.colour, 20) } : {})
+    };
+    if (!payload.type || !payload.details) return res.status(400).json({ message: 'Add a record type and details.' });
   }
 
   const record = tagSchoolRecord(actor, { ...payload, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() });
