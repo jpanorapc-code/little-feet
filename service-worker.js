@@ -1,12 +1,12 @@
-const CACHE_NAME = 'little-feet-shell-v1';
+const CACHE_NAME = 'little-feet-shell-v2';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/logo.png',
   '/logo-transparent.png',
-  '/backup.js?v=20260925-strengthen-v2',
+  '/backup.js?v=20260925-strengthen-v3',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
-  '/assets/education-stages.js?v=20260925-stages-v1',
+  '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1'
 ];
 
