@@ -2,7 +2,7 @@
   const LANGUAGE_PACKS = Object.freeze({
     en: {},
     af: {
-      overview:'Oorsig', academics:'Akademies', finance:'Finansies', operations:'Bedrywighede', safety:'Veiligheid',
+      overview:'Oorsig', academics:'Akademies', finance:'Finansies', operations:'Bedrywighede', safety:'Veiligheid', schoolFeed:'Skoolnuus', timetable:'Rooster', attendance:'Bywoning', development:'Ontwikkeling', messages:'Boodskappe', billingFinance:'Fakturering & Finansies',
       home:'Tuis', search:'Soek', help:'Kry hulp', settings:'Instellings', signOut:'Meld af',
       personalSettings:'Persoonlike instellings', profileIcon:'Profielikoon', language:'Taal',
       languageDescription:'Kies jou voorkeur vertoontaal. Onvertaalde inhoud bly in Engels sodat niks verdwyn of breek nie.',
@@ -11,7 +11,7 @@
       navigation:'Navigasie', install:'Installeer Little Feet', theme:'Tema', mute:'Demp Little Feet'
     },
     zu: {
-      overview:'Uhlolojikelele', academics:'Ezemfundo', finance:'Ezezimali', operations:'Imisebenzi', safety:'Ukuphepha',
+      overview:'Uhlolojikelele', academics:'Ezemfundo', finance:'Ezezimali', operations:'Imisebenzi', safety:'Ukuphepha', schoolFeed:'Izindaba zesikole', timetable:'Uhlelo lwezikhathi', attendance:'Ukuba khona', development:'Intuthuko', messages:'Imiyalezo', billingFinance:'Izinkokhelo & Ezezimali',
       home:'Ikhaya', search:'Sesha', help:'Thola usizo', settings:'Izilungiselelo', signOut:'Phuma',
       personalSettings:'Izilungiselelo zomuntu', profileIcon:'Isithonjana sephrofayela', language:'Ulimi',
       languageDescription:'Khetha ulimi oluthandayo. Umbhalo ongakahunyushwa uzohlala ngesiNgisi ukuze lutho lungalahleki.',
@@ -20,7 +20,7 @@
       navigation:'Ukuzulazula', install:'Faka i-Little Feet', theme:'Itimu', mute:'Thulisa i-Little Feet'
     },
     xh: {
-      overview:'Ushwankathelo', academics:'Imfundo', finance:'Ezemali', operations:'Imisebenzi', safety:'Ukhuseleko',
+      overview:'Ushwankathelo', academics:'Imfundo', finance:'Ezemali', operations:'Imisebenzi', safety:'Ukhuseleko', schoolFeed:'Iindaba zesikolo', timetable:'Itheyibhile yexesha', attendance:'Ukuya esikolweni', development:'Uphuhliso', messages:'Imiyalezo', billingFinance:'Amatyala & Ezemali',
       home:'Ikhaya', search:'Khangela', help:'Fumana uncedo', settings:'Izicwangciso', signOut:'Phuma',
       personalSettings:'Izicwangciso zobuqu', profileIcon:'I-ayikhoni yeprofayile', language:'Ulwimi',
       languageDescription:'Khetha ulwimi olukhethayo. Umbhalo ongekaguqulelwa uya kuhlala ngesiNgesi ukuze kungabikho nto ilahlekileyo.',
@@ -29,7 +29,7 @@
       navigation:'Ukukhangela', install:'Faka i-Little Feet', theme:'Umxholo', mute:'Thulisa i-Little Feet'
     },
     nso: {
-      overview:'Kakaretšo', academics:'Thuto', finance:'Ditšhelete', operations:'Ditiro', safety:'Polokego',
+      overview:'Kakaretšo', academics:'Thuto', finance:'Ditšhelete', operations:'Ditiro', safety:'Polokego', schoolFeed:'Ditaba tša sekolo', timetable:'Lenaneo la dinako', attendance:'Go ba gona', development:'Tlhabollo', messages:'Melaetša', billingFinance:'Ditefelo & Ditšhelete',
       home:'Gae', search:'Nyaka', help:'Hwetša thušo', settings:'Dipeakanyo', signOut:'Tšwa',
       personalSettings:'Dipeakanyo tša gago', profileIcon:'Seswantšho sa profaele', language:'Leleme',
       languageDescription:'Kgetha leleme leo o le ratago. Sengwalwa seo se sego sa fetolelwa se tla dula e le Seisemane.',
@@ -38,7 +38,7 @@
       navigation:'Tshepetšo', install:'Tsenya Little Feet', theme:'Sehlogo', mute:'Homotša Little Feet'
     },
     st: {
-      overview:'Kakaretso', academics:'Thuto', finance:'Ditjhelete', operations:'Tshebetso', safety:'Polokeho',
+      overview:'Kakaretso', academics:'Thuto', finance:'Ditjhelete', operations:'Tshebetso', safety:'Polokeho', schoolFeed:'Ditaba tsa sekolo', timetable:'Lenaneo la nako', attendance:'Boteng', development:'Ntshetsopele', messages:'Melaetsa', billingFinance:'Ditefiso & Ditjhelete',
       home:'Lehae', search:'Batla', help:'Fumana thuso', settings:'Ditlhophiso', signOut:'Tsoa',
       personalSettings:'Ditlhophiso tsa hao', profileIcon:'Letshwao la profaele', language:'Puo',
       languageDescription:'Kgetha puo eo o e ratang. Mongolo o sa fetolelwang o tla sala ka Senyesemane hore ho se ke ha lahleha letho.',
@@ -47,7 +47,7 @@
       navigation:'Tsamaiso', install:'Kenya Little Feet', theme:'Sehlooho', mute:'Kgutsisa Little Feet'
     },
     tn: {
-      overview:'Kakaretso', academics:'Thuto', finance:'Ditšhelete', operations:'Ditiro', safety:'Polokesego',
+      overview:'Kakaretso', academics:'Thuto', finance:'Ditšhelete', operations:'Ditiro', safety:'Polokesego', schoolFeed:'Dikgang tsa sekolo', timetable:'Lenaneo la nako', attendance:'Go nna teng', development:'Tlhabololo', messages:'Melaetsa', billingFinance:'Dituelo & Ditšhelete',
       home:'Gae', search:'Batla', help:'Fumana thuso', settings:'Dithulaganyo', signOut:'Tswa',
       personalSettings:'Dithulaganyo tsa gago', profileIcon:'Letshwao la profaele', language:'Puo',
       languageDescription:'Tlhopha puo e o e ratang. Mafoko a a sa ranolwang a tla sala ka Sekgoa gore go se ka ga latlhega sepe.',
@@ -56,7 +56,7 @@
       navigation:'Tsamaiso', install:'Tsenya Little Feet', theme:'Setlhogo', mute:'Didimatša Little Feet'
     },
     ss: {
-      overview:'Sibutsetelo', academics:'Temfundvo', finance:'Tetimali', operations:'Imisebenti', safety:'Kuphepha',
+      overview:'Sibutsetelo', academics:'Temfundvo', finance:'Tetimali', operations:'Imisebenti', safety:'Kuphepha', schoolFeed:'Tindzaba tesikolo', timetable:'Luhlelo lwesikhatsi', attendance:'Kuba khona', development:'Kutfutfuka', messages:'Imilayeto', billingFinance:'Kubhadala & Tetimali',
       home:'Ekhaya', search:'Sesha', help:'Tfola lusito', settings:'Tilungiselelo', signOut:'Phuma',
       personalSettings:'Tilungiselelo temuntfu', profileIcon:'Sifaniso sephrofayili', language:'Lulwimi',
       languageDescription:'Khetsa lulwimi lolutsandzako. Lokungakahunyushwa kutawuhlala ngesiNgisi kuze kungalahleki lutfo.',
@@ -65,7 +65,7 @@
       navigation:'Kuhamba', install:'Faka Little Feet', theme:'Sihloko', mute:'Thulisa Little Feet'
     },
     ve: {
-      overview:'Manweledzo', academics:'Pfunzo', finance:'Masheleni', operations:'Mishumo', safety:'Tsireledzo',
+      overview:'Manweledzo', academics:'Pfunzo', finance:'Masheleni', operations:'Mishumo', safety:'Tsireledzo', schoolFeed:'Mafhungo a tshikolo', timetable:'Mbekanyamushumo ya tshifhinga', attendance:'U vha hone', development:'Mvelaphanda', messages:'Milaedza', billingFinance:'Mbadelo & Masheleni',
       home:'Hayani', search:'Ṱoḓa', help:'Wana thuso', settings:'Nzudzanyo', signOut:'Bva',
       personalSettings:'Nzudzanyo dzaṋu', profileIcon:'Tshiga tsha phurofaiḽi', language:'Luambo',
       languageDescription:'Nangani luambo lune na lu takalela. Zwi sa athu ṱalutshedzelwa zwi ḓo dzula zwi nga Luisimane uri hu sa xele tshithu.',
@@ -74,7 +74,7 @@
       navigation:'Tshepetsho', install:'Dzhenisa Little Feet', theme:'Thero', mute:'Fhumudzani Little Feet'
     },
     ts: {
-      overview:'Nkatsakanyo', academics:'Dyondzo', finance:'Timali', operations:'Mintirho', safety:'Vuhlayiseki',
+      overview:'Nkatsakanyo', academics:'Dyondzo', finance:'Timali', operations:'Mintirho', safety:'Vuhlayiseki', schoolFeed:'Mahungu ya xikolo', timetable:'Xiyimiso xa nkarhi', attendance:'Ku va kona', development:'Nhluvuko', messages:'Mahungu', billingFinance:'Mibalo & Timali',
       home:'Kaya', search:'Lava', help:'Kuma mpfuno', settings:'Swiyimiso', signOut:'Huma',
       personalSettings:'Swiyimiso swa wena', profileIcon:'Xifaniso xa phurofayili', language:'Ririmi',
       languageDescription:'Hlawula ririmi leri u ri tsakelaka. Marito lama nga si hundzuluxiwaka ma ta sala hi Xinghezi leswaku ku nga lahleki leswi u swi endleke.',
@@ -83,7 +83,7 @@
       navigation:'Ku fambafamba', install:'Nghenisa Little Feet', theme:'Nhlokomhaka', mute:'Timela mpfumawulo wa Little Feet'
     },
     nr: {
-      overview:'Isirhunyezo', academics:'Ifundo', finance:'Iimali', operations:'Imisebenzi', safety:'Ukuphepha',
+      overview:'Isirhunyezo', academics:'Ifundo', finance:'Iimali', operations:'Imisebenzi', safety:'Ukuphepha', schoolFeed:'Iindaba zesikolo', timetable:'Irhelo lesikhathi', attendance:'Ukuba khona', development:'Ukuthuthuka', messages:'Imilayezo', billingFinance:'Ukubhadela & Iimali',
       home:'Ekhaya', search:'Funa', help:'Thola isizo', settings:'Amasethingi', signOut:'Phuma',
       personalSettings:'Amasethingi womuntu', profileIcon:'Isithonjana sephrofayili', language:'Ilimi',
       languageDescription:'Khetha ilimi olithandako. Okungakatjhugululwa kuzokuhlala ngesiNgisi ukuze kungalahleki litho.',
@@ -132,6 +132,12 @@
     setTranslatedText(document.querySelector('.nav-shortcut[onclick*="homeTab"] span'), 'home', selected);
     setTranslatedText(document.querySelector('.nav-shortcut[onclick*="openGlobalSearch"] span'), 'search', selected);
     setTranslatedText(document.querySelector('.nav-shortcut[onclick*="ticketsTab"] span'), 'help', selected);
+    setTranslatedText(document.querySelector('.nav-btn[onclick*="feedTab"]'), 'schoolFeed', selected);
+    setTranslatedText(document.querySelector('.nav-btn[onclick*="scheduleTab"]'), 'timetable', selected);
+    setTranslatedText(document.querySelector('.nav-btn[onclick*="attendanceTab"]'), 'attendance', selected);
+    setTranslatedText(document.querySelector('.nav-btn[onclick*="progressTab"]'), 'development', selected);
+    setTranslatedText(document.querySelector('.nav-btn[onclick*="chatTab"]'), 'messages', selected);
+    setTranslatedText(document.querySelector('.nav-btn[onclick*="financeTab"]'), 'billingFinance', selected);
     setTranslatedText(document.querySelector('.nav-btn[onclick*="settingsTab"]'), 'settings', selected);
     setTranslatedText(document.querySelector('.sidebar-signout span'), 'signOut', selected);
 
