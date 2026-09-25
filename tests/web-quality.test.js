@@ -44,6 +44,9 @@ assert.match(page, /id="wallpaperImage"[^>]*loading="lazy"[^>]*decoding="async"/
 assert.match(page, /little-feet-aurora-stars-4k\.svg/);
 assert.match(page, /@keyframes portalGlowPulse/);
 assert.match(page, /little-feet-star-glow-mask-4k\.svg/);
+assert.match(page, /#authSection::before[\s\S]*little-feet-aurora-stars-4k\.svg/);
+assert.match(page, /#authSection::after[\s\S]*little-feet-star-glow-mask-4k\.svg/);
+assert.match(page, /#authSection::after[\s\S]*animation:portalGlowPulse 5\.8s/);
 const whiteStarCount = (auroraWallpaper.match(/fill="#ffffff"/g) || []).length;
 const trackedCoreCount = (starGlowMask.match(/class="tracked-star-core"/g) || []).length;
 const trackedHaloCount = (starGlowMask.match(/class="tracked-star-halo"/g) || []).length;
