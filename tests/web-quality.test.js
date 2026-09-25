@@ -26,6 +26,17 @@ assert.match(page, /rel="manifest" href="\/manifest\.webmanifest"/);
 assert.match(page, /name="theme-color" content="#0d9488"/);
 assert.match(page, /id="pwaInstallButton"/);
 assert.match(page, /curriculumObservationForm/);
+assert.match(page, /id="loginWelcomeTitle">Sign in to your Little Feet account/);
+assert.match(page, /School-managed access/);
+assert.match(page, /Role-based permissions/);
+assert.match(page, /aria-describedby="loginUsernameHint"/);
+assert.match(page, /Need help signing in\?/);
+assert.match(page, /forgotten PIN\/password, a locked account, or pending school approval/);
+assert.match(page, /or use a connected school account/);
+assert.match(page, /Parent–learner links and staff access remain subject to school verification and approval/);
+assert.match(page, /onclick="openPopiaPrivacyNotice\(\)">Privacy &amp; POPIA Notice/);
+assert.match(page, /onclick="openTermsOfService\(\)">Terms of Service/);
+assert.match(page, /Use this option only on a device you trust/);
 assert.match(page, /NCF Birth–4/);
 assert.match(page, /CAPS Grade R/);
 
