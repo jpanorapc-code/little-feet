@@ -37,7 +37,8 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-principal', pinHash: hash('PrincipalPass1'), name: 'Alpha Principal', role: 'principal', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-teacher', pinHash: hash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] },
     { username: 'alpha-parent@example.test', pinHash: hash('ParentPass1'), name: 'Alpha Parent', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Alpha Learner'] },
-    { username: 'bravo-admin', pinHash: hash('BravoAdmin1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
+    { username: 'bravo-admin', pinHash: hash('BravoAdmin1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
+    { username: 'rate-target', pinHash: hash('TargetPass1'), name: 'Rate Target', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['Grade 1'] }
   ],
   students: [student],
   posts: [],
@@ -164,6 +165,28 @@ const login = async (username, pin, suppliedCookie = '') => {
     });
     assert.equal(oversize.response.status, 413, 'Oversized API body was not rejected.');
 
+    const wrongContentType = await request('/api/login', {
+      method: 'POST',
+      body: 'username=alpha-admin&pin=AdminPass1',
+      headers: { 'content-type': 'text/plain' }
+    });
+    assert.equal(wrongContentType.response.status, 415, 'Unsupported API content type did not fail closed.');
+
+    const fakeMultipart = await request('/api/login', {
+      method: 'POST',
+      body: '--attack-boundary\r\nContent-Disposition: form-data; name="username"\r\n\r\nalpha-admin\r\n--attack-boundary--',
+      headers: { 'content-type': 'multipart/form-data; boundary=attack-boundary' }
+    });
+    assert.equal(fakeMultipart.response.status, 415, 'Unexpected multipart API body did not fail closed.');
+
+    const deepPayload = '{"payload":' + '['.repeat(12000) + '"safe"' + ']'.repeat(12000) + '}';
+    const deepRequest = await request('/api/signup', {
+      method: 'POST',
+      body: deepPayload,
+      headers: { 'content-type': 'application/json' }
+    });
+    assert.notEqual(deepRequest.response.status, 500, 'Deep JSON caused an internal server error.');
+
     // 3. Authentication injection and privilege escalation.
     const injection = await request('/api/login', {
       method: 'POST',
@@ -176,6 +199,16 @@ const login = async (username, pin, suppliedCookie = '') => {
       body: { username: 'evil-admin', pin: 'Password1', name: 'Evil', role: 'admin', schoolName: 'Alpha School', termsAccepted: true }
     });
     assert.equal(elevatedSignup.response.status, 400);
+
+    let distributedAttempt;
+    for (let index = 1; index <= 21; index += 1) {
+      distributedAttempt = await request('/api/login', {
+        method: 'POST',
+        body: { username: 'rate-target', pin: 'WrongPass' + index },
+        headers: { 'x-forwarded-for': '203.0.113.' + index }
+      });
+    }
+    assert.equal(distributedAttempt.response.status, 429, 'Changing source IPs bypassed the username-level login spray defense.');
 
     // 4. Session fixation: an attacker-supplied cookie must not survive successful login.
     const fixedCookie = 'connect.sid=s%3Aattacker-fixed-session.fake';
