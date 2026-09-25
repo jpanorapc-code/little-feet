@@ -51,7 +51,7 @@ assert.match(page, /rgb\(196,181,253\)/);
 assert.match(page, /rgb\(244,114,182\)/);
 assert.match(page, /@keyframes ribbonDriftA/);
 assert.match(page, /@keyframes ribbonDriftC/);
-assert.match(page, /vector-effect="non-scaling-stroke"/);
+assert.match(page, /vector-effect:non-scaling-stroke/);
 assert.match(page, /body\.portal-active:has\(#wallpaperOverlay\.is-visible\)::before/);
 assert.doesNotMatch(page, /portal-aurora-lights/);
 assert.doesNotMatch(page, /standbyLightA/);
