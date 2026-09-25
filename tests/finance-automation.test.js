@@ -90,7 +90,7 @@ async function login(username,pin){
     assert.equal(rule.response.status,201);
 
     const firstRun=await request('/api/finance/recurring-runs',{method:'POST',cookie:principal,body:{force:true}});
-    assert.equal(firstRun.response.status,201);
+    assert.equal(firstRun.response.status,201,JSON.stringify(firstRun.data));
     assert.equal(firstRun.data.created.length,1);
     const invoice=firstRun.data.created[0];
     assert.equal(invoice.parentUsername,'alpha-parent');
