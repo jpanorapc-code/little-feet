@@ -4,7 +4,7 @@ const SHELL_ASSETS = [
   '/manifest.webmanifest',
   '/logo.png',
   '/logo-transparent.png',
-  '/backup.js?v=20260924-audio-cleanup',
+  '/backup.js?v=20260925-strengthen-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1'
 ];
