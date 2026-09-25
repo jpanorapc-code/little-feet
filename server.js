@@ -451,6 +451,17 @@ const sendPublicRootFile = (req, res) => {
 };
 app.get('/backup.js', sendPublicRootFile);
 app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
+app.get('/manifest.webmanifest', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('application/manifest+json');
+  res.sendFile('manifest.webmanifest', { root: __dirname });
+});
+app.get('/service-worker.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.type('application/javascript');
+  res.sendFile('service-worker.js', { root: __dirname });
+});
 app.get('/robots.txt', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.type('text/plain');
@@ -520,7 +531,7 @@ const db = {
   campusVisitors: [],
   visitorMeetings: [],
   registry: [],
-  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [], stickyNotes: [] },
+  moduleRecords: { finance: [], operations: [], care: [], engagement: [], dailyCare: [], portfolio: [], curriculum: [], supplies: [], stock: [], reports: [], safeguarding: [], absences: [], handovers: [], stickyNotes: [] },
   consentRecords: [],
   pickupLogs: [],
   reportReviews: [],
@@ -1320,11 +1331,14 @@ const parentPaymentFinancials = (record, asOf = dateKeyInSouthAfrica()) => {
   const balance = Math.max(0, cents(amountDue - paidAmount));
   const effectiveDueDate = parentPaymentDueDate(record);
   const overdue = balance > 0 && effectiveDueDate < asOf;
+  const daysPastDue = overdue
+    ? Math.max(1, Math.floor((Date.parse(asOf + 'T00:00:00Z') - Date.parse(effectiveDueDate + 'T00:00:00Z')) / 86400000))
+    : 0;
   return {
     amountDue, originalAmount: billingAmount(record.amountDue) || amountDue,
     arrangementAmount: billingAmount(record.arrangementAmount) || null,
     paidAmount, balance, arrears: overdue ? balance : 0, dueDate: validDateKey(record.dueDate),
-    effectiveDueDate, status: balance <= 0 ? 'paid' : overdue ? 'in_arrears' : paidAmount > 0 ? 'partially_paid' : 'awaiting_payment',
+    effectiveDueDate, daysPastDue, status: balance <= 0 ? 'paid' : overdue ? 'in_arrears' : paidAmount > 0 ? 'partially_paid' : 'awaiting_payment',
     arrangementActive: Boolean(validDateKey(record.arrangementDueDate) && effectiveDueDate === record.arrangementDueDate && effectiveDueDate >= asOf),
     arrangementNote: String(record.arrangementNote || '').trim()
   };
@@ -1340,6 +1354,20 @@ const parentPaymentSummary = records => (records || []).reduce((summary, record)
   else if (financials.status === 'in_arrears') summary.inArrears += 1;
   return summary;
 }, { count: 0, paid: 0, inArrears: 0, amountDue: 0, paidAmount: 0, balance: 0, arrears: 0 });
+const parentPaymentAgeing = records => {
+  const buckets = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0, totalOpen: 0 };
+  (records || []).forEach(record => {
+    const financials = parentPaymentFinancials(record);
+    if (financials.balance <= 0) return;
+    buckets.totalOpen = cents(buckets.totalOpen + financials.balance);
+    if (!financials.daysPastDue) buckets.current = cents(buckets.current + financials.balance);
+    else if (financials.daysPastDue <= 30) buckets.days1to30 = cents(buckets.days1to30 + financials.balance);
+    else if (financials.daysPastDue <= 60) buckets.days31to60 = cents(buckets.days31to60 + financials.balance);
+    else if (financials.daysPastDue <= 90) buckets.days61to90 = cents(buckets.days61to90 + financials.balance);
+    else buckets.days90plus = cents(buckets.days90plus + financials.balance);
+  });
+  return buckets;
+};
 const parentPaymentView = (record, actor) => {
   const financials = parentPaymentFinancials(record);
   const paymentHistory = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase()).map(event => ({ amount: billingAmount(event.amount) || 0, status: event.status, receivedAt: event.receivedAt, providerTransactionId: event.providerTransactionId || '' }));
@@ -1568,7 +1596,7 @@ app.get('/api/parent-payments', (req, res) => {
   let records = (db.parentPayments || []).filter(record => recordInSchool(record, actor));
   if (actor.role === 'parent') records = records.filter(record => normalizeUsername(record.parentUsername) === normalizeUsername(actor.username));
   const payments = records.map(record => parentPaymentView(record, actor));
-  res.json({ payments, summary: parentPaymentSummary(records), recalculatedAt: new Date().toISOString() });
+  res.json({ payments, summary: parentPaymentSummary(records), ageing: parentPaymentAgeing(records), recalculatedAt: new Date().toISOString() });
 });
 
 app.post('/api/parent-payments', (req, res) => {
@@ -1578,7 +1606,8 @@ app.post('/api/parent-payments', (req, res) => {
   if (result.error) return res.status(400).json({ message: result.error });
   if (!Array.isArray(db.parentPayments)) db.parentPayments = [];
   db.parentPayments.unshift(result.record);
-  res.status(201).json({ success: true, payment: parentPaymentView(result.record, actor), summary: parentPaymentSummary(db.parentPayments.filter(record => recordInSchool(record, actor))) });
+  const schoolRecords = db.parentPayments.filter(record => recordInSchool(record, actor));
+  res.status(201).json({ success: true, payment: parentPaymentView(result.record, actor), summary: parentPaymentSummary(schoolRecords), ageing: parentPaymentAgeing(schoolRecords) });
 });
 
 app.post('/api/parent-payments/:id/acknowledge', (req, res) => {
@@ -2836,7 +2865,45 @@ app.post('/api/modules/:module', (req, res) => {
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can save workspace records.' });
   const records = db.moduleRecords[req.params.module];
   if (!records) return res.status(404).json({ message: 'Unknown workspace.' });
-  const record = tagSchoolRecord(actor, { ...req.body, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() });
+
+  let payload = { ...req.body };
+  if (req.params.module === 'curriculum') {
+    const allowedFrameworks = new Set(['NCF Birth–4', 'CAPS Grade R']);
+    const allowedAreas = new Set([
+      'ELDA 1 · Well-being',
+      'ELDA 2 · Identity and Belonging',
+      'ELDA 3 · Communication',
+      'ELDA 4 · Exploring Mathematics',
+      'ELDA 5 · Creativity',
+      'ELDA 6 · Knowledge and Understanding of the World',
+      'Home Language',
+      'Mathematics',
+      'Life Skills'
+    ]);
+    const framework = String(req.body?.framework || '').trim();
+    const area = String(req.body?.area || '').trim();
+    const learnerName = String(req.body?.learnerName || '').trim().slice(0, 160);
+    const observation = String(req.body?.observation || '').trim().slice(0, 1200);
+    const evidenceReference = String(req.body?.evidenceReference || '').trim().slice(0, 240);
+    if (!allowedFrameworks.has(framework) || !allowedAreas.has(area) || !learnerName || !observation) {
+      return res.status(400).json({ message: 'Choose a supported NCF or Grade R framework area and enter an observation.' });
+    }
+    if (framework === 'NCF Birth–4' && !area.startsWith('ELDA ')) return res.status(400).json({ message: 'Choose an NCF ELDA for this observation.' });
+    if (framework === 'CAPS Grade R' && area.startsWith('ELDA ')) return res.status(400).json({ message: 'Choose a Grade R CAPS area for this observation.' });
+    payload = {
+      type: 'Framework observation',
+      frameworkKey: framework === 'NCF Birth–4' ? 'ncf_birth_to_four' : 'caps_grade_r',
+      framework,
+      area,
+      learnerName,
+      observation,
+      evidenceReference,
+      details: (learnerName + ' · ' + framework + ' · ' + area + ' · ' + observation).slice(0, 1800),
+      recordedBy: actor.name || actor.username
+    };
+  }
+
+  const record = tagSchoolRecord(actor, { ...payload, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() });
   records.unshift(record);
   res.json({ success: true, record });
 });
