@@ -210,7 +210,7 @@ assert.match(styles, /\.cinematic-paused-picture \{[\s\S]*z-index: 3/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-paused-picture \{[\s\S]*opacity: 1[\s\S]*visibility: visible/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-loading \{[\s\S]*display: none/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-copy,[\s\S]*\.cinematic-progress-shell/);
-assert.ok(pausedArtworkStat.size > 40000 && pausedArtworkStat.size < 150000, 'Paused artwork must stay compact while retaining useful detail.');
+assert.ok(pausedArtworkStat.size > 20000 && pausedArtworkStat.size < 80000, 'Paused artwork must stay compact while retaining useful detail.');
 assert.match(pausedArtwork.subarray(0, 32).toString('ascii'), /ftypavif/);
 assert.match(page, /id="cinematicDepthBackdrop"/);
 assert.match(page, /id="cinematicFish2dA"/);
