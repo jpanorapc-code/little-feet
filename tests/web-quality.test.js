@@ -13,6 +13,8 @@ const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8'
 const serviceWorker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 const mobilePwa = fs.readFileSync(path.join(root, 'assets', 'mobile-pwa.js'), 'utf8');
 const curriculum = fs.readFileSync(path.join(root, 'assets', 'curriculum-frameworks.js'), 'utf8');
+const auroraWallpaper = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-aurora-stars-4k.svg'), 'utf8');
+const starGlowMask = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-star-glow-mask-4k.svg'), 'utf8');
 
 assert.match(page, /<meta name="description" content="Little Feet is an early childhood development portal/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
@@ -41,10 +43,14 @@ assert.match(client, /modalReturnFocus\?\.isConnected/);
 assert.match(page, /id="wallpaperImage"[^>]*loading="lazy"[^>]*decoding="async"/);
 assert.match(page, /little-feet-aurora-stars-4k\.svg/);
 assert.match(page, /@keyframes portalGlowPulse/);
-assert.match(page, /18 glow dots are anchored to real stars/);
-assert.match(page, /circle at 94\.90% 29\.77%/);
-assert.match(page, /circle at 50\.23% 23\.33%/);
-assert.match(page, /circle at 78\.80% 57\.36%/);
+assert.match(page, /little-feet-star-glow-mask-4k\.svg/);
+const whiteStarCount = (auroraWallpaper.match(/fill="#ffffff"/g) || []).length;
+const trackedCoreCount = (starGlowMask.match(/class="tracked-star-core"/g) || []).length;
+const trackedHaloCount = (starGlowMask.match(/class="tracked-star-halo"/g) || []).length;
+assert.equal(whiteStarCount, 457, 'The current 4K wallpaper should expose the expected pure-white star count.');
+assert.equal(trackedCoreCount, whiteStarCount, 'Every white star must have one pulsating core glow.');
+assert.equal(trackedHaloCount, whiteStarCount, 'Every white star must have one matching halo glow.');
+assert.match(starGlowMask, /data-tracked-white-stars="457"/);
 assert.match(page, /animation:portalGlowPulse 5\.8s/);
 assert.match(page, /will-change:opacity/);
 assert.doesNotMatch(page, /portal-ribbons/);
