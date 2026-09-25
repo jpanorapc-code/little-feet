@@ -160,11 +160,10 @@
       if (smart) smart.textContent = translate('autoSmart', selected) || 'Auto (smart)';
     }
 
-    document.querySelectorAll('[data-portal-audio-mute] span').forEach(span => {
-      if (!/mute|unmute|demp|thul|modumo|mpfumawulo/i.test(span.textContent)) return;
-      if (!span.dataset.lfEnglish) span.dataset.lfEnglish = 'Mute Little Feet';
-      if (/unmute/i.test(span.textContent)) return;
-      span.textContent = translate('mute', selected) || span.dataset.lfEnglish;
+    document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
+      if (button.getAttribute('aria-pressed') === 'true') return;
+      const span = button.querySelector('span');
+      if (span) span.textContent = translate('mute', selected) || 'Mute Little Feet';
     });
     return selected;
   }
