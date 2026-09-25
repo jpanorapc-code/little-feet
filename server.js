@@ -732,6 +732,8 @@ const db = {
   payrollProfiles: [],
   payrollRuns: [],
   systemErrors: [],
+  schoolBilling: {},
+  schoolTerms: {},
   subscriptionBilling: {
     pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
     payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', branchCode: '', referencePrefix: 'LF' },
