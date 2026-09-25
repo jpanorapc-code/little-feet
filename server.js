@@ -1525,10 +1525,10 @@ const parentPaymentDueDate = record => {
 const parentPaymentFinancials = (record, asOf = dateKeyInSouthAfrica()) => {
   const originalEffectiveAmount = parentPaymentAmount(record);
   const creditTotal = cents((db.financeAdjustments || [])
-    .filter(adjustment => adjustment.type === 'credit' && String(adjustment.reference || '').toUpperCase() === String(record.reference || '').toUpperCase())
+    .filter(adjustment => adjustment.type === 'credit' && adjustment.schoolId === record.schoolId && String(adjustment.reference || '').toUpperCase() === String(record.reference || '').toUpperCase())
     .reduce((sum, adjustment) => sum + Number(adjustment.amount || 0), 0));
   const amountDue = Math.max(0, cents(originalEffectiveAmount - creditTotal));
-  const events = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase());
+  const events = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && event.schoolId === record.schoolId && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase());
   const paid = cents(events.filter(event => event.status === 'paid').reduce((sum, event) => sum + Number(event.amount || 0), 0));
   const refunded = cents(events.filter(event => event.status === 'refunded').reduce((sum, event) => sum + Number(event.amount || 0), 0));
   const paidAmount = Math.max(0, cents(paid - refunded));
@@ -1575,7 +1575,7 @@ const parentPaymentAgeing = records => {
 };
 const parentPaymentView = (record, actor) => {
   const financials = parentPaymentFinancials(record);
-  const paymentHistory = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase()).map(event => ({ amount: billingAmount(event.amount) || 0, status: event.status, receivedAt: event.receivedAt, providerTransactionId: event.providerTransactionId || '' }));
+  const paymentHistory = (db.paymentEvents || []).filter(event => event.targetType === 'parent_payment' && event.schoolId === record.schoolId && String(event.reference || '').toUpperCase() === String(record.reference || '').toUpperCase()).map(event => ({ amount: billingAmount(event.amount) || 0, status: event.status, receivedAt: event.receivedAt, providerTransactionId: event.providerTransactionId || '' }));
   return {
     id: record.id, reference: record.reference, parentUsername: record.parentUsername, parentName: record.parentName,
     learnerName: record.learnerName, description: record.description, createdAt: record.createdAt, createdBy: record.createdBy, parentSignature: record.parentSignature || '', parentSignedAt: record.parentSignedAt || '',
