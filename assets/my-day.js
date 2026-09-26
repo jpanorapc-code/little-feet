@@ -148,12 +148,13 @@
     list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
 
     const username = String(currentUser.username || '').toLowerCase();
-    const [tickets, broadcasts, tasks, leave, cover] = await Promise.all([
+    const [tickets, broadcasts, tasks, leave, cover, reviews] = await Promise.all([
       fetchJson('/api/tickets'),
       fetchJson('/api/broadcasts'),
       fetchJson('/api/staff/tasks'),
       fetchJson('/api/staff/leave'),
-      fetchJson('/api/staff/cover')
+      fetchJson('/api/staff/cover'),
+      fetchJson('/api/staff/performance-reviews')
     ]);
 
     const items = [];
@@ -188,6 +189,10 @@
       const assignedToMe = cover.filter(item => String(item.status || '') === 'Assigned' && String(item.coverTeacher || '').toLowerCase() === username);
       if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && needsCover.length) items.push({ tab:'staffWorkTab', title:`${needsCover.length} class cover request${needsCover.length === 1 ? '' : 's'} unassigned`, detail:'Assign teacher cover' });
       if (assignedToMe.length) items.push({ tab:'staffWorkTab', title:`${assignedToMe.length} cover assignment${assignedToMe.length === 1 ? '' : 's'} for you`, detail:'Review teacher cover' });
+    }
+    if (Array.isArray(reviews)) {
+      const sharedReviews = reviews.filter(item => String(item.status || '') === 'Shared' && String(item.username || '').toLowerCase() === username);
+      if (sharedReviews.length) items.push({ tab:'staffWorkTab', title:`${sharedReviews.length} performance review${sharedReviews.length === 1 ? '' : 's'} awaiting acknowledgement`, detail:'Review your KPI feedback' });
     }
     if (Array.isArray(broadcasts) && broadcasts.length) {
       items.push({ tab:'broadcastsTab', title:`${broadcasts.length} current safety alert${broadcasts.length === 1 ? '' : 's'}`, detail:'Review Safety Alerts' });
