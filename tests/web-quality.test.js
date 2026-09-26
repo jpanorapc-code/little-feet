@@ -129,7 +129,7 @@ assert.match(page, /@media \(max-width:360px\)/);
 assert.match(page, /@media \(max-width:900px\) and \(max-height:600px\) and \(orientation:landscape\)/);
 assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area-inset-right/);
 assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
-assert.match(page, /cinematic\.css\?v=20260926-cinematic-v12/);
+assert.match(page, /cinematic\.css\?v=20260926-cinematic-v13/);
 
 assert.match(page, /Little Feet™ School Portal/);
 assert.match(page, /Official site: <a href="https:\/\/littlefeet\.co\.za\//);
