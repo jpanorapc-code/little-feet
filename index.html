@@ -3698,6 +3698,16 @@
       }
     }
 
+
+    /* Sidebar follows the actually visible header edge while page scrolls. */
+    @media (min-width:960px) {
+      .app-sidebar {
+        top:var(--portal-sidebar-top, var(--portal-header-height, 68px)) !important;
+        bottom:0 !important;
+        height:auto !important;
+      }
+    }
+
   </style>
 </head>
 <body>
