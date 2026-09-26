@@ -3891,6 +3891,34 @@
       color:#f1fbfc;
     }
 
+
+    /* Clear login sound state indicator. */
+    .login-audio-compact .ui-icon {
+      width:1.28rem !important;
+      height:1.28rem !important;
+      flex:0 0 auto;
+      stroke-width:2.2;
+      color:#bffcf3;
+      filter:drop-shadow(0 0 5px rgba(94,234,212,.24));
+    }
+    .login-audio-compact.is-muted {
+      border-color:rgba(250,204,106,.58) !important;
+      background:linear-gradient(180deg, rgba(142,92,28,.62), rgba(89,53,20,.70)) !important;
+    }
+    .login-audio-compact.is-muted .ui-icon {
+      color:#ffd772;
+      filter:drop-shadow(0 0 5px rgba(255,199,77,.24));
+    }
+    .login-audio-compact.is-muted span {
+      color:#fff3c4;
+    }
+    @media (max-width:420px) {
+      .login-audio-compact .ui-icon {
+        width:1.4rem !important;
+        height:1.4rem !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -3899,6 +3927,7 @@
     <defs>
       <symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="3.2"/><path d="M5.2 20c.6-3.6 2.9-5.5 6.8-5.5s6.2 1.9 6.8 5.5"/></symbol>
       <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M4 10v4h3l4 3V7l-4 3H4Z"/><path d="M15 9.2c1.7 1.4 1.7 4.2 0 5.6M17.8 6.8c3 2.8 3 7.6 0 10.4"/></symbol>
+      <symbol id="icon-volume-off" viewBox="0 0 24 24"><path d="M4 10v4h3l4 3V7l-4 3H4Z"/><path d="m15 9 5 6M20 9l-5 6"/></symbol>
       <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.8"/><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
       <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 20.5V10Z"/><path d="M9 22v-7h6v7"/></symbol>
       <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.7" cy="10.7" r="6.2"/><path d="m16 16 5 5"/></symbol>
@@ -3988,7 +4017,7 @@
               <option value="nr">isiNdebele</option>
             </select>
           </label>
-          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound" data-unmute-label="Sound" onclick="togglePortalAudioMute()" aria-label="Toggle Little Feet sounds" title="Little Feet sounds"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span data-lf-i18n="soundShort">Sound</span></button>
+          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Sound On</span></button>
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
@@ -5187,7 +5216,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260926-layout-v2" defer></script>
+  <script src="backup.js?v=20260926-layout-v3" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
