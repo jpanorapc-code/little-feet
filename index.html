@@ -4499,6 +4499,21 @@
           </div>
           <form id="ticketForm">
             <div class="flex-form-row">
+              <div style="flex:1;">
+                <label for="ticketType">Request Type <span class="req">*</span></label>
+                <select id="ticketType" required onchange="toggleMeetingTicketFields()">
+                  <option value="Help request">Help request</option>
+                  <option value="Meeting request">Meeting request</option>
+                </select>
+              </div>
+              <div id="meetingTicketFields" class="meeting-ticket-fields hidden" style="flex:2;">
+                <label>Requested meeting</label>
+                <div class="flex-form-row">
+                  <input id="ticketMeetingDate" type="date" aria-label="Meeting date">
+                  <input id="ticketMeetingTime" type="time" aria-label="Meeting time">
+                  <input id="ticketMeetingLocation" type="text" maxlength="200" placeholder="Location / office / online">
+                </div>
+              </div>
               <div style="flex: 1;">
                 <label for="ticketDept">Department Destination <span class="req">*</span></label>
                 <select id="ticketDept" required>
