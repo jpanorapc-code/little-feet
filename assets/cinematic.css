@@ -51,11 +51,11 @@
   border-radius: 24px;
 }
 @media (min-width: 960px) {
-  #dashboardSection .cinematic-journey.is-active .cinematic-stage {
+  #dashboardSection > .app-sidebar ~ .container .cinematic-journey.is-active .cinematic-stage {
     left: 260px;
     width: calc(100vw - 260px);
   }
-  #dashboardSection.sidebar-collapsed .cinematic-journey.is-active .cinematic-stage {
+  #dashboardSection > .app-sidebar.is-collapsed ~ .container .cinematic-journey.is-active .cinematic-stage {
     left: 76px;
     width: calc(100vw - 76px);
   }
