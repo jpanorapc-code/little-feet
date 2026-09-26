@@ -21,8 +21,8 @@ const pausedArtworkStat = fs.statSync(pausedArtworkPath);
 
 assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
 assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
-assert.match(page, /href="\/assets\/cinematic\.css\?v=20260926-cinematic-v12"/);
-assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260925-cinematic-v45" defer/);
+assert.match(page, /href="\/assets\/cinematic\.css\?v=20260926-cinematic-v13"/);
+assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260926-cinematic-v46" defer/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
 assert.match(page, /id="littleFeetCinematicJourney"/);
 assert.match(page, /id="littleFeetCinematicCanvas"/);
@@ -356,7 +356,7 @@ assert.doesNotMatch(cinematic, /innerHTML\s*=/);
 assert.match(cinematicLoader, /dashboardSection/);
 assert.match(cinematicLoader, /dashboard\.classList\.contains\('hidden'\)/);
 assert.match(cinematicLoader, /MutationObserver/);
-assert.match(cinematicLoader, /import\('\/assets\/cinematic\.js\?v=20260925-cinematic-v45'\)/);
+assert.match(cinematicLoader, /import\('\/assets\/cinematic\.js\?v=20260926-cinematic-v46'\)/);
 assert.match(cinematicLoader, /cinematic-fallback/);
 assert.doesNotMatch(cinematicLoader, /fetch\(/);
 assert.doesNotMatch(cinematicLoader, /innerHTML\s*=/);
@@ -375,5 +375,18 @@ assert.match(styles, /@media \(max-width: 560px\)[\s\S]*height: auto !important[
 
 assert.match(styles, /\.cinematic-paused-picture img \{[\s\S]*image-rendering: auto/);
 assert.match(styles, /@media \(max-width: 560px\)[\s\S]*aspect-ratio: 16 \/ 9/);
+assert.match(page, /id="findSchoolMapButton"/);
+assert.match(page, /id="closeSchoolMapButton"/);
+assert.match(page, /onclick="closeSchoolProximityMap\(\)"/);
 assert.ok(page.indexOf('id="littleFeetCinematicJourney"') > page.indexOf('id="schoolMapContainer"'), 'Paused cinematic should be ordered at the end of Home content.');
+assert.match(page, /id="schoolPinCard"[\s\S]*<\/div>\s*<\/div>\s*<!-- Cinematic navigation comes after the practical Home content/);
+assert.match(backup, /function closeSchoolProximityMap\(\)/);
+assert.match(backup, /schoolMapRequestToken \+= 1/);
+assert.match(backup, /mapInstance\.remove\(\)/);
+assert.match(backup, /container\.classList\.add\('hidden'\)/);
+assert.match(cinematic, /const journeyRect = journey\.getBoundingClientRect\(\)/);
+assert.match(cinematic, /journeyTop = window\.scrollY \+ journeyRect\.top/);
+assert.doesNotMatch(cinematic, /journeyTop = journey\.offsetTop/);
+assert.doesNotMatch(cinematic, /const destination = journey\.offsetTop \+ journey\.offsetHeight/);
+assert.match(styles, /cinematic-journey\.is-active \.cinematic-stage \{[\s\S]*z-index: 20/);
 console.log('Cinematic navigation regression test passed.');
