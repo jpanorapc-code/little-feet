@@ -4013,6 +4013,41 @@
       }
     }
 
+
+    /* Keep the full academic-term wording visible on desktop header widths. */
+    @media (min-width:960px) {
+      .nav-quickbar {
+        align-items:flex-start !important;
+        gap:8px !important;
+      }
+      .nav-term-panel {
+        flex:0 1 410px !important;
+        min-width:300px !important;
+        max-width:430px !important;
+        align-self:flex-start !important;
+      }
+      .nav-term-panel strong {
+        white-space:normal !important;
+        overflow:visible !important;
+        text-overflow:clip !important;
+        line-height:1.2 !important;
+      }
+      .nav-quickbar .nav-shortcut {
+        align-self:flex-start !important;
+        margin-top:0 !important;
+      }
+    }
+    @media (min-width:960px) and (max-width:1280px) {
+      .nav-term-panel {
+        flex-basis:360px !important;
+        min-width:280px !important;
+        max-width:390px !important;
+      }
+      .nav-quickbar .nav-shortcut {
+        padding-inline:8px !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -4229,7 +4264,7 @@
       <div class="nav-quickbar" aria-label="Quick access">
         <span id="navLivePill" class="nav-live-pill" aria-live="polite">Checking school hours…</span>
         <div class="nav-term-panel" aria-label="Current academic term">
-          <strong id="currentTermText">Academic Term 3: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
+          <strong id="currentTermText">Academic Term 1: Active Session | Campus Hours: 07:00 - 17:30 SAST</strong>
           <button type="button" class="nav-term-edit role-admin hidden" onclick="editTermModal()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Edit</span></button>
           <span id="liveSyncTag" class="nav-term-status">Last synced: Just now</span>
         </div>
