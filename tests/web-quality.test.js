@@ -78,7 +78,7 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20260925-aurora-v1/);
+assert.match(page, /backup\.js\?v=20260926-map-cinematic-v1/);
 assert.doesNotMatch(page, /little-feet-wallpaper-no-moon-4k\.jpg/);
 assert.doesNotMatch(page, /campfire wallpaper/i);
 assert.match(client, /classList\.add\('has-custom-wallpaper'\)/);
