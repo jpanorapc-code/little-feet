@@ -89,7 +89,7 @@
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
         ${action('scheduleTab', 'Timetable', 'See timetable records and the day\'s scheduled learning activities.')}
-        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${action('maintenanceTab', 'Maintenance', 'Report issues, assign work orders and track repairs to completion.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
+        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${action('maintenanceTab', 'Maintenance', 'Report issues, assign work orders and track repairs to completion.')}\n        ${action('resourceBookingTab', 'Resource Booking', 'Reserve rooms, facilities, vehicles and equipment without double-booking.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
         ${action('chatTab', 'Messages', 'Open school conversations and follow up on communication that needs a response.')}
       </section>
 
@@ -148,7 +148,7 @@
     list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
 
     const username = String(currentUser.username || '').toLowerCase();
-    const [tickets, broadcasts, tasks, leave, cover, reviews, notices, maintenance] = await Promise.all([
+    const [tickets, broadcasts, tasks, leave, cover, reviews, notices, maintenance, bookings] = await Promise.all([
       fetchJson('/api/tickets'),
       fetchJson('/api/broadcasts'),
       fetchJson('/api/staff/tasks'),
@@ -156,7 +156,8 @@
       fetchJson('/api/staff/cover'),
       fetchJson('/api/staff/performance-reviews'),
       fetchJson('/api/staff/notices'),
-      fetchJson('/api/maintenance')
+      fetchJson('/api/maintenance'),
+      fetchJson('/api/resources/bookings')
     ]);
 
     const items = [];
@@ -206,6 +207,11 @@
       const unassigned = ['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) ? maintenance.filter(item => item.status !== 'Completed' && !item.assignedTo) : [];
       if (mine.length) items.push({ tab:'maintenanceTab', title:`${mine.length} maintenance work order${mine.length===1?'':'s'} assigned to you`, detail:'Open maintenance' });
       if (unassigned.length) items.push({ tab:'maintenanceTab', title:`${unassigned.length} unassigned maintenance issue${unassigned.length===1?'':'s'}`, detail:'Assign work orders' });
+    }
+    if (Array.isArray(bookings)) {
+      const today = new Date().toISOString().slice(0,10);
+      const mineToday = bookings.filter(item => item.date === today && String(item.bookedBy || '').toLowerCase() === username);
+      if (mineToday.length) items.push({ tab:'resourceBookingTab', title:`${mineToday.length} resource booking${mineToday.length===1?'':'s'} today`, detail:mineToday.map(x=>`${x.resource} ${x.startTime}`).join(' · ') });
     }
     if (Array.isArray(broadcasts) && broadcasts.length) {
       items.push({ tab:'broadcastsTab', title:`${broadcasts.length} current safety alert${broadcasts.length === 1 ? '' : 's'}`, detail:'Review Safety Alerts' });
