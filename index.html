@@ -741,9 +741,12 @@
     .sidebar-group-toggle::after { content:none; }
     [data-nav-group].is-collapsed .sidebar-links { display:none; }
     [data-nav-group].is-collapsed::before { opacity:0; }
-    .app-sidebar.is-collapsed { width:76px; padding-inline:8px; overflow-x:hidden; }
-    .app-sidebar.is-collapsed .sidebar-heading, .app-sidebar.is-collapsed .sidebar-group-toggle, .app-sidebar.is-collapsed .sidebar-links, .app-sidebar.is-collapsed .sidebar-signout, .app-sidebar.is-collapsed [data-nav-group]::before { opacity:0; pointer-events:none; }
-    .app-sidebar.is-collapsed::after { content:'☰'; position:absolute; top:18px; left:25px; color:#5eead4; font-size:1.25rem; }
+    /* A saved desktop collapse preference must never hide the mobile drawer. */
+    @media (min-width:960px) {
+      .app-sidebar.is-collapsed { width:76px; padding-inline:8px; overflow-x:hidden; }
+      .app-sidebar.is-collapsed .sidebar-heading, .app-sidebar.is-collapsed .sidebar-group-toggle, .app-sidebar.is-collapsed .sidebar-links, .app-sidebar.is-collapsed .sidebar-signout, .app-sidebar.is-collapsed [data-nav-group]::before { opacity:0; pointer-events:none; }
+      .app-sidebar.is-collapsed::after { content:'☰'; position:absolute; top:18px; left:25px; color:#5eead4; font-size:1.25rem; }
+    }
     .sidebar-links { list-style:none; display:grid; gap:4px; }
     .sidebar-links li { min-width:0; }
     .sidebar-links .nav-btn, .sidebar-signout {
@@ -2105,6 +2108,286 @@
       .nav-more-toggle { transform:none !important; }
     }
 
+
+    /* Final phone density repair: compact controls and tour copy without changing desktop. */
+    @media (max-width:640px) {
+      .container { padding:10px 9px; }
+      .card { padding:12px; margin-bottom:12px; border-radius:12px; }
+      .workspace-card,
+      .workspace-results-panel,
+      .store-item { padding:12px; }
+
+      .card-header-bar {
+        align-items:flex-start;
+        gap:8px;
+        margin-bottom:12px;
+        padding-bottom:9px;
+      }
+      .card-header-bar h2 {
+        width:auto;
+        max-width:100%;
+        font-size:1rem;
+        line-height:1.22;
+      }
+      .card-header-bar > .action-btn,
+      .card-header-bar > button,
+      .item-row > .action-btn,
+      .item-row > button {
+        width:auto;
+        max-width:100%;
+        align-self:flex-start;
+        justify-content:center;
+      }
+      .card-header-bar > div[style*="display:flex"],
+      .item-row > div[style*="display:flex"],
+      #parentPaymentsActions,
+      .chat-toolbar,
+      .portal-tour-actions {
+        display:flex !important;
+        flex-wrap:wrap;
+        width:100%;
+        gap:7px !important;
+        align-items:center !important;
+      }
+      .card-header-bar > div[style*="display:flex"] > button,
+      .item-row > div[style*="display:flex"] > button,
+      #parentPaymentsActions > button,
+      .chat-toolbar > button,
+      .portal-tour-actions > button {
+        width:auto;
+        max-width:100%;
+        min-width:0;
+        flex:0 1 auto;
+        margin:0;
+      }
+
+      .action-btn,
+      button.submit-btn {
+        min-height:40px;
+        padding:8px 10px;
+        font-size:.80rem;
+        line-height:1.15;
+        border-radius:9px;
+      }
+      form > .submit-btn,
+      .chat-compose .submit-btn,
+      #authSection .submit-btn {
+        width:100%;
+      }
+
+      .portal-tour { min-height:336px; }
+      .portal-tour-image { min-height:336px; }
+      .portal-tour-copy {
+        min-height:336px;
+        padding:17px 16px 54px;
+        gap:7px;
+      }
+      .portal-tour-kicker { font-size:.64rem; letter-spacing:.09em; }
+      .portal-tour h2 {
+        font-size:1.22rem;
+        line-height:1.14;
+      }
+      .portal-tour p {
+        font-size:.84rem;
+        line-height:1.42;
+      }
+      .portal-tour-fact {
+        padding:7px 9px;
+        font-size:.73rem;
+        line-height:1.38;
+      }
+      .portal-tour-actions { width:auto; }
+      .portal-tour-actions button {
+        width:auto;
+        min-height:38px;
+        padding:7px 10px;
+        font-size:.76rem;
+      }
+      .tour-controls { bottom:12px; }
+
+      #homeTab > .card .card-header-bar > div[style*="justify-content:flex-end"] {
+        width:auto;
+        flex:0 1 auto;
+        justify-content:flex-start !important;
+      }
+      #findSchoolMapButton,
+      #closeSchoolMapButton {
+        width:auto !important;
+        min-height:40px;
+        padding:8px 12px;
+        font-size:.80rem;
+      }
+      #schoolMapContainer {
+        height:clamp(360px,62vh,500px) !important;
+      }
+      #schoolPickerPanel { padding:10px !important; }
+
+      .item-row { padding:11px; }
+      .item-row p,
+      .card > p { line-height:1.42; }
+    }
+
+    @media (max-width:420px) {
+      .container { padding-inline:8px; }
+      .card,
+      .workspace-card { padding:11px; }
+      .action-btn,
+      button.submit-btn { min-height:40px; }
+      .portal-tour { min-height:328px; }
+      .portal-tour-image,
+      .portal-tour-copy { min-height:328px; }
+      .portal-tour h2 { font-size:1.16rem; }
+      .portal-tour p { font-size:.82rem; }
+      .portal-tour-fact { font-size:.71rem; }
+    }
+
+
+    /* Mobile Home shell: compact header, notices and welcome hero. */
+    @media (max-width:640px) {
+      #dashboardSection > nav {
+        padding:7px 9px 8px;
+        gap:6px;
+        grid-template-columns:minmax(0,1fr) auto;
+      }
+      .nav-brand { gap:7px; font-size:1rem; }
+      .nav-brand img { width:34px; height:34px; }
+      .nav-user-panel { gap:4px; }
+      .nav-user-panel .action-btn {
+        min-width:34px;
+        min-height:34px;
+        padding:6px !important;
+      }
+      .user-avatar { width:26px; height:26px; }
+
+      .nav-quickbar {
+        grid-column:1 / -1;
+        grid-row:2;
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:6px;
+        width:100%;
+        margin:0;
+      }
+      .nav-term-panel {
+        grid-column:1 / -1;
+        min-height:34px;
+        max-width:none;
+        padding:4px 7px;
+        border-radius:8px;
+      }
+      .nav-term-panel strong {
+        font-size:.66rem;
+        line-height:1.1;
+      }
+      .nav-term-panel .nav-term-edit {
+        min-height:30px;
+        padding:4px 8px;
+        font-size:.64rem;
+      }
+      .nav-quickbar .nav-shortcut {
+        width:100%;
+        min-width:0;
+        min-height:38px;
+        padding:6px 5px;
+        gap:4px;
+        font-size:.73rem;
+        line-height:1.05;
+        white-space:nowrap;
+      }
+      .nav-quickbar .nav-shortcut .ui-icon {
+        width:16px;
+        height:16px;
+      }
+      .nav-more-toggle {
+        grid-column:1 / -1;
+        grid-row:3;
+        width:100%;
+        min-height:38px;
+        padding:6px 9px;
+        font-size:.76rem;
+      }
+
+      #homeTab > .wellbeing-banner {
+        gap:8px;
+        padding:9px 10px;
+        margin-bottom:10px;
+        border-left-width:3px;
+        border-radius:10px;
+        align-items:flex-start;
+      }
+      #homeTab > .wellbeing-banner .tip-icon {
+        width:26px;
+        height:26px;
+        flex-basis:26px;
+        border-radius:8px;
+      }
+      #homeTab > .wellbeing-banner .tip-icon .ui-icon {
+        width:15px;
+        height:15px;
+      }
+      #homeTab > .wellbeing-banner p {
+        font-size:.80rem;
+        line-height:1.35;
+      }
+      #homeTab > #termsNotice p { font-size:.78rem; }
+      #homeTab > .wellbeing-banner > button:last-child {
+        flex:0 0 30px;
+        width:30px;
+        min-height:30px;
+        padding:2px;
+        font-size:1rem;
+      }
+
+      #homeTab > .portal-welcome-banner {
+        min-height:170px;
+        margin-bottom:12px;
+        padding:12px 13px;
+        background-size:cover,auto 100%;
+        background-position:center,right center;
+      }
+      #homeTab > .portal-welcome-banner .portal-welcome-copy {
+        max-width:72%;
+      }
+      #homeTab .role-home-panel.mascot-role-home .role-home-content {
+        max-width:100%;
+      }
+      #homeTab .portal-welcome-kicker {
+        margin-bottom:3px;
+        font-size:.60rem;
+        letter-spacing:.08em;
+      }
+      #homeTab .portal-welcome-banner h1 {
+        margin-bottom:4px;
+        font-size:1.14rem;
+        line-height:1.12;
+      }
+      #homeTab .portal-welcome-banner p {
+        font-size:.76rem;
+        line-height:1.34;
+      }
+
+      #homeTab > .card,
+      #homeTab > section {
+        margin-bottom:12px !important;
+      }
+      #homeTab .workspace-grid { gap:10px; }
+    }
+
+    @media (max-width:360px) {
+      .nav-quickbar {
+        grid-template-columns:repeat(3,minmax(0,1fr));
+      }
+      .nav-quickbar .nav-shortcut {
+        font-size:.68rem;
+        padding-inline:4px;
+      }
+      #homeTab > .portal-welcome-banner .portal-welcome-copy {
+        max-width:76%;
+      }
+      #homeTab .portal-welcome-banner h1 { font-size:1.08rem; }
+      #homeTab > .wellbeing-banner p { font-size:.77rem; }
+    }
+
   </style>
 </head>
 <body>
@@ -2471,8 +2754,6 @@
             </div>
           </div>
         </section>
-        </div>
-
       </div>
 
       <!-- 1. Activity Feed -->
