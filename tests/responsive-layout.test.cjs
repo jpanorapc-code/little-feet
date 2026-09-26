@@ -79,6 +79,20 @@ const server = http.createServer((req, res) => {
           const activeTourHeading = document.querySelector('.portal-tour-slide.is-active h2');
           if (activeTourCopy && activeTourCopy.scrollHeight > activeTourCopy.clientHeight + 2) errors.push('mobile portal tour copy is clipped');
           if (activeTourHeading && parseFloat(getComputedStyle(activeTourHeading).fontSize) > 22) errors.push('mobile portal tour heading is oversized');
+
+          const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
+          if (shortcuts.length >= 3) {
+            const tops = shortcuts.map(button => Math.round(button.getBoundingClientRect().top));
+            if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('mobile quick shortcuts wrap onto multiple rows');
+          }
+          if (header.getBoundingClientRect().height > 230) errors.push('mobile header is too tall');
+          const menuButton = document.getElementById('navMoreToggle');
+          if (menuButton && menuButton.getBoundingClientRect().height > 48) errors.push('mobile menu button is too tall');
+
+          const termsNotice = document.getElementById('termsNotice');
+          if (termsNotice && visible(termsNotice) && width <= 420 && termsNotice.getBoundingClientRect().height > 230) errors.push('mobile privacy notice is too tall');
+          const welcomeBanner = document.querySelector('#homeTab > .portal-welcome-banner');
+          if (welcomeBanner && visible(welcomeBanner) && welcomeBanner.getBoundingClientRect().height > 200) errors.push('mobile welcome hero is too tall');
         }
         if (width < 960) {
           dashboard.classList.add('sidebar-open');
