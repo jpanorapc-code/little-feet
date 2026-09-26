@@ -33,6 +33,8 @@ assert.match(page, /data-lf-i18n="rememberEmail"/);
 assert.match(page, /data-lf-i18n="loginHelp"/);
 assert.match(page, /data-lf-i18n="createAccount"/);
 assert.match(page, /class="action-btn btn-blue login-audio-compact"/);
+assert.match(page, /\.login-new-account \{[\s\S]*grid-template-columns:max-content minmax\(0,1fr\) !important/);
+assert.match(page, /\.login-new-account \.action-btn \{[\s\S]*width:100% !important/);
 assert.match(page, /#loginForm #loginUsername:-webkit-autofill/);
 assert.match(page, /#loginForm #loginPin:-webkit-autofill/);
 assert.match(page, /-webkit-text-fill-color:#f7fbff !important/);
