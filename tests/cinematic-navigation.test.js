@@ -371,7 +371,7 @@ assert.match(styles, /@media \(max-width: 560px\)[\s\S]*grid-template-columns: r
 assert.match(styles, /@media \(max-width: 360px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
 assert.match(styles, /@media \(max-height: 600px\) and \(orientation: landscape\)/);
 assert.match(styles, /is-user-paused #littleFeetCinematicCanvas[\s\S]*visibility: hidden/);
-assert.match(styles, /min-height: min\(520px, calc\(100dvh - 16px\)\)/);
+assert.match(styles, /@media \(max-width: 560px\)[\s\S]*height: auto !important[\s\S]*aspect-ratio: 16 \/ 9/);
 
 assert.match(styles, /\.cinematic-paused-picture img \{[\s\S]*image-rendering: auto/);
 assert.match(styles, /@media \(max-width: 560px\)[\s\S]*aspect-ratio: 16 \/ 9/);
