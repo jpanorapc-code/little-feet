@@ -668,7 +668,8 @@ function initCinematicJourney() {
   });
 
   document.getElementById('cinematicSkip')?.addEventListener('click', () => {
-    const destination = journey.offsetTop + journey.offsetHeight + 14;
+    refreshJourneyMetrics();
+    const destination = journeyTop + journey.offsetHeight + 14;
     window.scrollTo({ top: destination, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
   });
 
@@ -1368,7 +1369,8 @@ function initCinematicJourney() {
   let depthImageTravel = 0;
 
   const refreshJourneyMetrics = () => {
-    journeyTop = journey.offsetTop;
+    const journeyRect = journey.getBoundingClientRect();
+    journeyTop = window.scrollY + journeyRect.top;
     const totalTravel = Math.max(1, journey.offsetHeight - window.innerHeight);
     journeyExitHold = Math.min(window.innerHeight * 1.10, totalTravel * .22);
     journeyTravel = Math.max(1, totalTravel - journeyExitHold);
