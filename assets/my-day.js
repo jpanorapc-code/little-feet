@@ -89,7 +89,7 @@
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
         ${action('scheduleTab', 'Timetable', 'See timetable records and the day\'s scheduled learning activities.')}
-        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}
+        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}
         ${action('chatTab', 'Messages', 'Open school conversations and follow up on communication that needs a response.')}
       </section>
 
@@ -148,9 +148,12 @@
     list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
 
     const username = String(currentUser.username || '').toLowerCase();
-    const [tickets, broadcasts] = await Promise.all([
+    const [tickets, broadcasts, tasks, leave, cover] = await Promise.all([
       fetchJson('/api/tickets'),
-      fetchJson('/api/broadcasts')
+      fetchJson('/api/broadcasts'),
+      fetchJson('/api/staff/tasks'),
+      fetchJson('/api/staff/leave'),
+      fetchJson('/api/staff/cover')
     ]);
 
     const items = [];
@@ -168,6 +171,24 @@
       if (mine.length) items.push({ tab:'ticketsTab', title:`${mine.length} open ticket${mine.length === 1 ? '' : 's'} you are following`, detail:'Review status and responses' });
     }
 
+    if (Array.isArray(tasks)) {
+      const activeTasks = tasks.filter(item => String(item.status || '').toLowerCase() !== 'completed' && String(item.assignedTo || '').toLowerCase() === username);
+      const today = new Date().toISOString().slice(0, 10);
+      const overdue = activeTasks.filter(item => item.dueDate && item.dueDate < today);
+      const dueToday = activeTasks.filter(item => item.dueDate === today);
+      if (overdue.length) items.push({ tab:'staffWorkTab', title:`${overdue.length} overdue staff task${overdue.length === 1 ? '' : 's'}`, detail:'Open Staff Work' });
+      if (dueToday.length) items.push({ tab:'staffWorkTab', title:`${dueToday.length} task${dueToday.length === 1 ? '' : 's'} due today`, detail:'Open Staff Work' });
+    }
+    if (Array.isArray(leave)) {
+      const pendingLeave = leave.filter(item => String(item.status || '') === 'Pending');
+      if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && pendingLeave.length) items.push({ tab:'staffWorkTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
+    }
+    if (Array.isArray(cover)) {
+      const needsCover = cover.filter(item => String(item.status || '') === 'Needs Cover');
+      const assignedToMe = cover.filter(item => String(item.status || '') === 'Assigned' && String(item.coverTeacher || '').toLowerCase() === username);
+      if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && needsCover.length) items.push({ tab:'staffWorkTab', title:`${needsCover.length} class cover request${needsCover.length === 1 ? '' : 's'} unassigned`, detail:'Assign teacher cover' });
+      if (assignedToMe.length) items.push({ tab:'staffWorkTab', title:`${assignedToMe.length} cover assignment${assignedToMe.length === 1 ? '' : 's'} for you`, detail:'Review teacher cover' });
+    }
     if (Array.isArray(broadcasts) && broadcasts.length) {
       items.push({ tab:'broadcastsTab', title:`${broadcasts.length} current safety alert${broadcasts.length === 1 ? '' : 's'}`, detail:'Review Safety Alerts' });
     }
