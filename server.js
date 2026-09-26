@@ -752,6 +752,7 @@ const db = {
   staffLeave: [],
   teacherCover: [],
   performanceReviews: [],
+  staffNotices: [],
   broadcasts: [],
   campusVisitors: [],
   visitorMeetings: [],
@@ -989,7 +990,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2595,6 +2596,41 @@ app.get('/api/staff/kpi-monthly', (req, res) => {
   const rows = visible.map(account => ({ username: account.username, staffName: account.name || account.username, ...monthlyTaskKpi(actor, account.username, month) }));
   const ranked = rows.slice().sort((a,b) => b.completionRate - a.completionRate || b.completed - a.completed || a.staffName.localeCompare(b.staffName)).map((row,index)=>({ ...row, rank:index+1 }));
   res.json({ month, rows: ranked });
+});
+
+// Staff notice board with per-staff acknowledgement tracking.
+app.get('/api/staff/notices', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'School staff access is required.' });
+  const staff = tenantRecords(db.users, actor).filter(account => ['teacher', 'principal', 'admin'].includes(account.role) && !String(account.verificationStatus || '').toLowerCase().includes('pending'));
+  const rows = tenantRecords(db.staffNotices, actor).map(notice => {
+    const acknowledgedBy = Array.isArray(notice.acknowledgedBy) ? notice.acknowledgedBy : [];
+    const acknowledged = acknowledgedBy.some(entry => normalizeUsername(entry.username) === normalizeUsername(actor.username));
+    const eligible = staff.filter(account => notice.audience === 'All staff' || account.role === notice.audience);
+    return { ...notice, acknowledged, acknowledgedCount: eligible.filter(account => acknowledgedBy.some(entry => normalizeUsername(entry.username) === normalizeUsername(account.username))).length, audienceCount: eligible.length,
+      outstanding: ['admin','principal'].includes(actor.role) ? eligible.filter(account => !acknowledgedBy.some(entry => normalizeUsername(entry.username) === normalizeUsername(account.username))).map(account => ({ username: account.username, name: account.name || account.username })) : undefined };
+  });
+  res.json(rows);
+});
+app.post('/api/staff/notices', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor || !['admin','principal'].includes(actor.role)) return res.status(403).json({ message: 'Only school management can publish staff notices.' });
+  const title = boundedText(req.body?.title, 180), message = boundedText(req.body?.message, 5000);
+  if (!title || !message) return res.status(400).json({ message: 'Add a notice title and message.' });
+  const audience = ['All staff','teacher','principal','admin'].includes(req.body?.audience) ? req.body.audience : 'All staff';
+  const dueDate = boundedText(req.body?.dueDate, 30);
+  if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return res.status(400).json({ message: 'Choose a valid acknowledgement due date.' });
+  const item = tagSchoolRecord(actor, { id: crypto.randomUUID(), title, message, audience, required: req.body?.required !== false, dueDate, createdBy: actor.username, createdByName: actor.name || actor.username, acknowledgedBy: [], createdAt: new Date().toISOString() });
+  db.staffNotices.unshift(item); res.status(201).json({ success:true, item });
+});
+app.post('/api/staff/notices/:id/acknowledge', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  const item = actor && db.staffNotices.find(record => record.id === req.params.id && recordInSchool(record, actor));
+  if (!item) return res.status(404).json({ message: 'Staff notice not found.' });
+  if (item.audience !== 'All staff' && item.audience !== actor.role) return res.status(403).json({ message: 'This notice is not addressed to your role.' });
+  item.acknowledgedBy = Array.isArray(item.acknowledgedBy) ? item.acknowledgedBy : [];
+  if (!item.acknowledgedBy.some(entry => normalizeUsername(entry.username) === normalizeUsername(actor.username))) item.acknowledgedBy.push({ username: actor.username, name: actor.name || actor.username, acknowledgedAt: new Date().toISOString() });
+  res.json({ success:true, item });
 });
 
 // Management approvals centre aggregates existing workflows without duplicating their records.
