@@ -4130,6 +4130,113 @@
       border-color:rgba(0,180,216,.24) !important;
     }
 
+
+    /* Light mode surface palette: Deep Steel Teal #1B4965 with #00B4D8 accents. */
+    body.light-mode {
+      --bg-dark:#163E56;
+      --panel-bg:#1B4965;
+      --input-bg:#214F6B;
+      --bubble-bg:#214F6B;
+      --text-dark:#F7FBFF;
+      --text-muted:#C5D8E4;
+      --border-color:rgba(0,180,216,.32);
+      --input-text:#F7FBFF;
+    }
+
+    body.portal-active.light-mode {
+      background-color:#163E56 !important;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row,
+    body.light-mode .wellbeing-banner,
+    body.light-mode #termsNotice,
+    body.light-mode #runtimeErrorBanner,
+    body.light-mode #schoolPinCard,
+    body.light-mode #householdSwitcher,
+    body.light-mode [data-roles][style*="background: var(--panel-bg)"] {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,.018) 22%, rgba(255,255,255,0) 40%),
+        radial-gradient(circle at 12% 0%, rgba(0,180,216,.14), transparent 40%),
+        linear-gradient(145deg, rgba(27,73,101,.93), rgba(18,56,80,.88)) !important;
+      border-color:rgba(0,180,216,.34) !important;
+      box-shadow:
+        0 18px 40px rgba(3,18,30,.24),
+        inset 0 1px 0 rgba(255,255,255,.08),
+        inset 0 -1px 0 rgba(0,180,216,.055) !important;
+      color:#F7FBFF !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,0) 30%),
+        linear-gradient(145deg, rgba(31,80,108,.90), rgba(22,62,86,.86)) !important;
+    }
+
+    body.light-mode .card-header-bar h2,
+    body.light-mode .workspace-results-heading h3,
+    body.light-mode .guide-link-card h3,
+    body.light-mode .workspace-card h3,
+    body.light-mode .card h2,
+    body.light-mode .card h3 {
+      color:#F7FBFF !important;
+      text-shadow:0 1px 0 rgba(0,0,0,.16);
+    }
+
+    body.light-mode .workspace-card p,
+    body.light-mode .guide-link-card p,
+    body.light-mode .workspace-results-heading p,
+    body.light-mode .meta,
+    body.light-mode .field-help,
+    body.light-mode .login-device-note,
+    body.light-mode .card > p,
+    body.light-mode label,
+    body.light-mode .form-label {
+      color:#C5D8E4 !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box,
+    body.light-mode .profile-icon-choice,
+    body.light-mode .social-signin button {
+      color:#F7FBFF !important;
+      background:
+        linear-gradient(180deg, rgba(42,91,119,.94), rgba(30,71,97,.94)) !important;
+      border-color:rgba(0,180,216,.34) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.08),
+        inset 0 0 0 1px rgba(0,0,0,.08) !important;
+    }
+
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color:#AFC6D4 !important;
+    }
+
+    body.light-mode .wellbeing-banner p,
+    body.light-mode #termsNotice p {
+      color:#E7F3F8 !important;
+    }
+
+    body.light-mode footer {
+      background:
+        linear-gradient(180deg, rgba(27,73,101,.92), rgba(19,56,79,.92)) !important;
+      border-top-color:rgba(0,180,216,.30) !important;
+      color:#EAF7FB !important;
+    }
+
   </style>
 </head>
 <body>
