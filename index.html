@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
-  <link rel="stylesheet" href="/assets/cinematic.css?v=20260926-cinematic-v12">
+  <link rel="stylesheet" href="/assets/cinematic.css?v=20260926-cinematic-v13">
   <script src="/vendor/xlsx.js" defer></script>
   <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
@@ -1948,16 +1948,20 @@
         <div class="card" style="margin-bottom: 25px;">
           <div class="card-header-bar">
             <h2>📍 Nearby Schools &amp; Partners · 20 km</h2>
-            <button type="button" onclick="loadSchoolProximityMap()" class="action-btn btn-green">🌍 Find schools near me</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
+              <button id="findSchoolMapButton" type="button" onclick="loadSchoolProximityMap()" class="action-btn btn-green" aria-controls="schoolMapContainer" aria-expanded="false">🌍 Find schools near me</button>
+              <button id="closeSchoolMapButton" type="button" onclick="closeSchoolProximityMap()" class="action-btn btn-blue hidden" aria-controls="schoolMapContainer">✕ Close map</button>
+            </div>
           </div>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
             Click the button to detect your current location. The map will load live education locations within a 20Km radius. Pins are grouped for a clearer map; click a group to zoom in, or click a school pin for its coordinates, address, available contact details, and photo.
           </p>
-          <div id="schoolMapContainer" style="width: 100%; height: clamp(430px, 48vw, 560px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden;">
-            📍 Press "Detect My Location" to render interactive map pins.
+          <div id="schoolMapContainer" style="width: 100%; height: clamp(430px, 48vw, 560px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden; isolation:isolate; z-index:0; contain:paint;" aria-live="polite">
+            📍 Press "Find schools near me" to render interactive map pins.
           </div>
           <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
           <div id="schoolPinCard" class="hidden" aria-live="polite" style="margin-top:12px;padding:13px;"></div>
+        </div>
 
         <!-- Cinematic navigation comes after the practical Home content so daily work stays first. -->
         <section id="littleFeetCinematicJourney" class="cinematic-journey" aria-label="Cinematic Little Feet navigation">
@@ -2897,13 +2901,13 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260925-aurora-v1" defer></script>
+  <script src="backup.js?v=20260926-map-cinematic-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
-  <script src="/assets/cinematic-loader.js?v=20260925-cinematic-v45" defer></script>
+  <script src="/assets/cinematic-loader.js?v=20260926-cinematic-v46" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
