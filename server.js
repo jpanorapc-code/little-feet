@@ -16,9 +16,10 @@ const replicaMode = process.env.LF_REPLICA_MODE === '1';
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const loginUsernameAttempts = new Map();
-const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_LOGIN_ATTEMPTS = 5;
-const MAX_DISTRIBUTED_LOGIN_ATTEMPTS = 20;
+const LOGIN_COOLDOWN_MS = 10 * 60 * 1000;
+const LOGIN_ATTEMPT_WINDOW_MS = LOGIN_COOLDOWN_MS;
+const MAX_LOGIN_ATTEMPTS = 3;
+const MAX_DISTRIBUTED_LOGIN_ATTEMPTS = 3;
 const SCHOOL_SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
 const SCHOOL_SEARCH_CACHE_MAX_ENTRIES = 250;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
@@ -424,20 +425,62 @@ const safeHttpsUrl = value => {
   }
 };
 const loginAttemptKey = (req, username) => `${req.ip}:${normalizeUsername(username)}`;
+const loginAttemptExpiry = entry => Number(entry?.lockedUntil) || (Number(entry?.firstAttempt) + LOGIN_ATTEMPT_WINDOW_MS);
 const activeAttempt = (map, key) => {
   const entry = map.get(key);
-  if (!entry || Date.now() - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) { map.delete(key); return null; }
+  if (!entry || Date.now() >= loginAttemptExpiry(entry)) { map.delete(key); return null; }
   return entry;
 };
 const activeLoginAttempt = key => activeAttempt(loginAttempts, key);
 const activeUsernameAttempt = username => activeAttempt(loginUsernameAttempts, normalizeUsername(username));
+const loginLockoutRemainingSeconds = entry => Math.max(1, Math.ceil((Number(entry?.lockedUntil) - Date.now()) / 1000));
+const looksLikeEmailAddress = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+const accountSecurityEmail = account => {
+  const candidates = [account?.email, account?.username, ...(Array.isArray(account?.loginAliases) ? account.loginAliases : [])];
+  return candidates.map(value => String(value || '').trim()).find(looksLikeEmailAddress) || '';
+};
+const sendLoginLockoutEmail = async account => {
+  const to = accountSecurityEmail(account);
+  const from = String(process.env.LF_EMAIL_FROM || '').trim();
+  const apiKey = String(process.env.LF_EMAIL_API_KEY || '').trim();
+  if (!to || !from || !apiKey) return false;
+
+  const endpoint = safeHttpsUrl(process.env.LF_EMAIL_API_URL || 'https://api.resend.com/emails');
+  if (!endpoint) throw new Error('Invalid LF_EMAIL_API_URL');
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: 'Little Feet sign-in temporarily locked',
+      text: [
+        `Hello ${String(account?.name || 'Little Feet user').trim()},`,
+        '',
+        'Little Feet blocked sign-in attempts to your account for 10 minutes after three unsuccessful password or PIN attempts.',
+        `Lock started: ${new Date().toISOString()}`,
+        '',
+        'If this was you, wait 10 minutes before trying again.',
+        'If this was not you, contact your school administrator and change your password or PIN as soon as you can.',
+        '',
+        'Little Feet security'
+      ].join('\n')
+    })
+  });
+  if (!response.ok) throw new Error(`Email provider returned HTTP ${response.status}`);
+  return true;
+};
 
 const pruneLoginAttempts = (now = Date.now()) => {
   for (const [key, entry] of loginAttempts) {
-    if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginAttempts.delete(key);
+    if (!entry || now >= loginAttemptExpiry(entry)) loginAttempts.delete(key);
   }
   for (const [key, entry] of loginUsernameAttempts) {
-    if (!entry || now - entry.firstAttempt > LOGIN_ATTEMPT_WINDOW_MS) loginUsernameAttempts.delete(key);
+    if (!entry || now >= loginAttemptExpiry(entry)) loginUsernameAttempts.delete(key);
   }
   while (loginAttempts.size > 10000) loginAttempts.delete(loginAttempts.keys().next().value);
   while (loginUsernameAttempts.size > 10000) loginUsernameAttempts.delete(loginUsernameAttempts.keys().next().value);
@@ -1189,8 +1232,16 @@ app.post('/api/login', (req, res) => {
   const attemptKey = loginAttemptKey(req, attemptIdentity || '[invalid-username]');
   const previousAttempts = activeLoginAttempt(attemptKey);
   const previousUsernameAttempts = activeUsernameAttempt(attemptIdentity);
-  if (previousAttempts?.count >= MAX_LOGIN_ATTEMPTS || previousUsernameAttempts?.count >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS) {
-    return res.status(429).json({ message: 'Too many unsuccessful sign-in attempts. Please wait 15 minutes or contact your school administrator.' });
+  const activeLockout = [previousAttempts, previousUsernameAttempts]
+    .filter(entry => Number(entry?.lockedUntil) > Date.now())
+    .sort((left, right) => Number(right.lockedUntil) - Number(left.lockedUntil))[0];
+  if (activeLockout) {
+    const retryAfterSeconds = loginLockoutRemainingSeconds(activeLockout);
+    res.set('Retry-After', String(retryAfterSeconds));
+    return res.status(429).json({
+      message: 'Too many unsuccessful sign-in attempts. Please wait 10 minutes before trying again.',
+      retryAfterSeconds
+    });
   }
 
   const user = matchedAccount && validSecretLength(pin) && matchesPin(pin, matchedAccount.pinHash)
@@ -1208,9 +1259,39 @@ app.post('/api/login', (req, res) => {
       res.json({ user: safeUser });
     });
   } else {
-    loginAttempts.set(attemptKey, { count: (previousAttempts?.count || 0) + 1, firstAttempt: previousAttempts?.firstAttempt || Date.now() });
-    loginUsernameAttempts.set(attemptIdentity, { count: (previousUsernameAttempts?.count || 0) + 1, firstAttempt: previousUsernameAttempts?.firstAttempt || Date.now() });
+    const now = Date.now();
+    const nextSourceCount = (previousAttempts?.count || 0) + 1;
+    const nextUsernameCount = (previousUsernameAttempts?.count || 0) + 1;
+    const sourceLocked = nextSourceCount >= MAX_LOGIN_ATTEMPTS;
+    const usernameLocked = nextUsernameCount >= MAX_DISTRIBUTED_LOGIN_ATTEMPTS;
+    const lockedUntil = sourceLocked || usernameLocked ? now + LOGIN_COOLDOWN_MS : 0;
+
+    loginAttempts.set(attemptKey, {
+      count: nextSourceCount,
+      firstAttempt: previousAttempts?.firstAttempt || now,
+      ...(sourceLocked ? { lockedUntil } : {})
+    });
+    loginUsernameAttempts.set(attemptIdentity, {
+      count: nextUsernameCount,
+      firstAttempt: previousUsernameAttempts?.firstAttempt || now,
+      ...(usernameLocked ? { lockedUntil } : {})
+    });
     if (loginAttempts.size > 10000 || loginUsernameAttempts.size > 10000) pruneLoginAttempts();
+
+    if (sourceLocked || usernameLocked) {
+      if (matchedAccount && usernameLocked) {
+        void sendLoginLockoutEmail(matchedAccount).catch(error => {
+          console.error('Login lockout email failed:', redactSensitiveLogText(error.message));
+        });
+      }
+      const retryAfterSeconds = Math.ceil(LOGIN_COOLDOWN_MS / 1000);
+      res.set('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({
+        message: 'Too many unsuccessful sign-in attempts. Please wait 10 minutes before trying again.',
+        retryAfterSeconds
+      });
+    }
+
     res.status(401).json({ message: "Invalid Staff ID / Parent Email or PIN." });
   }
 });
