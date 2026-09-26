@@ -3,6 +3,7 @@
 
   const STAFF_ROLES = new Set(['teacher', 'principal', 'admin']);
   const STYLE_ID = 'littleFeetMyDayStyles';
+  let currentUser = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -32,6 +33,16 @@
       .my-day-action b{display:inline-block;margin-top:13px;color:#99f6e4;font-size:.78rem;}
       .my-day-section-title{margin:4px 0 12px;font-size:1rem;color:var(--text-dark);}
       .my-day-note{padding:14px 16px;border-left:3px solid var(--primary-color);border-radius:8px;background:rgba(13,148,136,.08);color:var(--text-muted);font-size:.84rem;line-height:1.45;}
+      .my-day-attention{margin-bottom:18px;padding:18px;border:1px solid rgba(94,234,212,.3);border-radius:14px;background:linear-gradient(145deg,rgba(13,148,136,.11),rgba(15,43,72,.72));}
+      .my-day-attention-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+      .my-day-attention-head h3{margin:0;font-size:1rem;}
+      .my-day-attention-count{min-width:32px;padding:5px 9px;border-radius:999px;background:var(--primary-color);color:#fff;text-align:center;font-size:.78rem;font-weight:800;}
+      .my-day-attention-list{display:grid;gap:8px;}
+      .my-day-attention-item{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:11px 12px;border:1px solid var(--border-color);border-radius:9px;background:rgba(7,17,30,.24);color:var(--text-dark);text-align:left;cursor:pointer;}
+      .my-day-attention-item:hover,.my-day-attention-item:focus-visible{border-color:rgba(94,234,212,.65);outline:none;}
+      .my-day-attention-item span{color:var(--text-muted);font-size:.8rem;}
+      .my-day-attention-empty{margin:0;color:var(--text-muted);font-size:.84rem;}
+      .my-day-attention-refresh{border:0;background:transparent;color:#99f6e4;cursor:pointer;font-weight:700;font-size:.78rem;}
       @media(max-width:600px){.my-day-hero{padding:19px 17px}.my-day-grid{grid-template-columns:1fr}.my-day-action{min-height:0}.my-day-hero::after{width:130px;height:130px;opacity:.12}}
       @media(prefers-reduced-motion:reduce){.my-day-action{transition:none}.my-day-action:hover,.my-day-action:focus-visible{transform:none}}
     `;
@@ -69,6 +80,11 @@
         <span class="my-day-date">${esc(today)}</span>
       </section>
 
+      <section class="my-day-attention" aria-labelledby="myDayAttentionHeading">
+        <div class="my-day-attention-head"><h3 id="myDayAttentionHeading">Needs my attention</h3><div><button type="button" class="my-day-attention-refresh" id="myDayAttentionRefresh">Refresh</button> <span class="my-day-attention-count" id="myDayAttentionCount">…</span></div></div>
+        <div class="my-day-attention-list" id="myDayAttentionList"><p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p></div>
+      </section>
+
       <h3 class="my-day-section-title">Start here</h3>
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
@@ -97,6 +113,8 @@
       const button = event.target.closest('[data-my-day-open]');
       if (button) open(button.dataset.myDayOpen);
     });
+    document.getElementById('myDayAttentionRefresh')?.addEventListener('click', loadAttention);
+    loadAttention();
   };
 
   const buildNav = () => {
@@ -116,12 +134,56 @@
     homeItem.insertAdjacentElement('afterend', item);
   };
 
+
+  const fetchJson = async url => {
+    const response = await fetch(url, { credentials:'same-origin', headers:{ Accept:'application/json' } });
+    if (!response.ok) return null;
+    return response.json();
+  };
+
+  const loadAttention = async () => {
+    const list = document.getElementById('myDayAttentionList');
+    const badge = document.getElementById('myDayAttentionCount');
+    if (!list || !badge || !currentUser) return;
+    list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
+
+    const username = String(currentUser.username || '').toLowerCase();
+    const [tickets, broadcasts] = await Promise.all([
+      fetchJson('/api/tickets'),
+      fetchJson('/api/broadcasts')
+    ]);
+
+    const items = [];
+    if (Array.isArray(tickets)) {
+      const assigned = tickets.filter(ticket =>
+        String(ticket.status || '').toLowerCase() !== 'completed' &&
+        String(ticket.assignedTo || '').toLowerCase() === username
+      );
+      const mine = tickets.filter(ticket =>
+        String(ticket.status || '').toLowerCase() !== 'completed' &&
+        String(ticket.createdBy || '').toLowerCase() === username &&
+        String(ticket.assignedTo || '').toLowerCase() !== username
+      );
+      if (assigned.length) items.push({ tab:'ticketsTab', title:`${assigned.length} support item${assigned.length === 1 ? '' : 's'} assigned to you`, detail:'Open your Support Desk queue' });
+      if (mine.length) items.push({ tab:'ticketsTab', title:`${mine.length} open ticket${mine.length === 1 ? '' : 's'} you are following`, detail:'Review status and responses' });
+    }
+
+    if (Array.isArray(broadcasts) && broadcasts.length) {
+      items.push({ tab:'broadcastsTab', title:`${broadcasts.length} current safety alert${broadcasts.length === 1 ? '' : 's'}`, detail:'Review Safety Alerts' });
+    }
+
+    badge.textContent = String(items.reduce((sum, item) => sum + (Number.parseInt(item.title, 10) || 0), 0));
+    list.innerHTML = items.length
+      ? items.map(item => `<button type="button" class="my-day-attention-item" data-my-day-open="${esc(item.tab)}"><strong>${esc(item.title)}</strong><span>${esc(item.detail)} →</span></button>`).join('')
+      : '<p class="my-day-attention-empty">Nothing from your connected Little Feet queues needs attention right now.</p>';
+  };
+
   const getSessionUser = async () => {
     try {
-      const response = await fetch('/api/session', { credentials:'same-origin', headers:{ Accept:'application/json' } });
+      const response = await fetch('/api/auth/session', { credentials:'same-origin', headers:{ Accept:'application/json' } });
       if (!response.ok) return null;
       const payload = await response.json();
-      return payload?.user || payload?.account || null;
+      return payload?.authenticated ? (payload.user || null) : null;
     } catch {
       return null;
     }
@@ -129,9 +191,10 @@
 
   const init = async () => {
     if (!document.getElementById('dashboardSection')) return;
-    const user = await getSessionUser();
+    const user = window.getLittleFeetCurrentUser?.() || await getSessionUser();
     const role = String(user?.role || '').toLowerCase();
     if (!user || !STAFF_ROLES.has(role)) return;
+    currentUser = user;
     addStyles();
     buildNav();
     buildTab(user);
