@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
-  <link rel="stylesheet" href="/assets/cinematic.css?v=20260926-cinematic-v13">
+  <link rel="stylesheet" href="/assets/cinematic.css?v=20260926-cinematic-v14">
   <script src="/vendor/xlsx.js" defer></script>
   <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
@@ -1641,6 +1641,143 @@
       .guide-records-table td { width:100% !important; padding:10px 12px; border:0; font-size:.90rem; }
       .guide-records-table td::before { content:attr(data-label); display:block; margin-bottom:4px; color:#5eead4; font-size:.69rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
     }
+
+    /* Portal panel sizing audit: keep every workspace aligned with the real sidebar
+       state, cap ultra-wide reading widths, and let controls wrap before they clip. */
+    :root {
+      --portal-content-max: 1480px;
+      --portal-panel-gap: clamp(14px, 1.35vw, 24px);
+    }
+    .container > .tab-content.active {
+      width:min(100%, var(--portal-content-max));
+      margin-inline:auto;
+    }
+    .tab-content > .card,
+    .tab-content > .workspace-grid,
+    .tab-content > .workspace-results-grid,
+    .tab-content > .store-grid,
+    .tab-content > .chat-shell,
+    .tab-content > section,
+    .tab-content > form {
+      min-width:0;
+      max-width:100%;
+    }
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell {
+      width:100%;
+      min-width:0;
+    }
+    .card { padding:clamp(16px, 1.5vw, 24px); }
+    .workspace-card { padding:clamp(14px, 1.2vw, 20px); }
+    .card-header-bar {
+      flex-wrap:wrap;
+      gap:12px;
+    }
+    .card-header-bar > *,
+    form,
+    fieldset,
+    .flex-form-row > * {
+      min-width:0;
+      max-width:100%;
+    }
+    label, .form-label { font-size:clamp(.84rem, .75vw, .9rem); }
+    input, select, textarea { max-width:100%; font-size:clamp(.9rem, .78vw, .98rem); }
+    .card h2 { font-size:clamp(1.08rem, 1.25vw, 1.32rem); }
+
+    /* The content offset follows the sidebar element itself instead of a second
+       dashboard flag, so expanded/collapsed states cannot cover the panels. */
+    @media (min-width:960px) {
+      #dashboardSection > .app-sidebar ~ .container {
+        width:calc(100% - 260px);
+        max-width:none;
+        margin-left:260px;
+        padding-inline:clamp(20px, 2.7vw, 46px);
+      }
+      #dashboardSection > .app-sidebar.is-collapsed ~ .container {
+        width:calc(100% - 76px);
+        margin-left:76px;
+      }
+      #dashboardSection > .app-sidebar ~ footer { margin-left:260px; }
+      #dashboardSection > .app-sidebar.is-collapsed ~ footer { margin-left:76px; }
+    }
+
+    /* Support Desk is intentionally fluid: three columns when there is room,
+       two or one before any field becomes cramped. */
+    #ticketsTab #ticketForm {
+      display:grid;
+      gap:14px;
+    }
+    #ticketsTab #ticketForm > .flex-form-row {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+      gap:14px;
+      align-items:start;
+    }
+    #ticketsTab #ticketForm input,
+    #ticketsTab #ticketForm select,
+    #ticketsTab #ticketForm textarea {
+      margin-bottom:0;
+    }
+    #ticketsTab #ticketMessage { min-height:132px; }
+    .ticket-queue-toolbar {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+    .ticket-queue-toolbar h2 { min-width:0; margin:0; }
+    #ticketDeptFilter {
+      width:min(100%, 280px) !important;
+      min-width:min(100%, 220px);
+      margin:0 !important;
+      padding:8px 10px !important;
+    }
+    #ticketList .item-row > div[style*="display: flex"],
+    #ticketList .item-row > div[style*="display:flex"],
+    #completedTicketList .item-row > div[style*="display: flex"],
+    #completedTicketList .item-row > div[style*="display:flex"] {
+      width:100%;
+      min-width:0;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    #ticketList .item-row > div[style*="display: flex"] > div:first-child,
+    #ticketList .item-row > div[style*="display:flex"] > div:first-child,
+    #completedTicketList .item-row > div[style*="display: flex"] > div:first-child,
+    #completedTicketList .item-row > div[style*="display:flex"] > div:first-child {
+      flex:1 1 320px;
+      min-width:0;
+    }
+
+    @media (max-width:959px) {
+      .container {
+        width:100%;
+        max-width:100%;
+        margin-left:0;
+        padding:clamp(14px, 3vw, 22px);
+      }
+      .container > .tab-content.active { width:100%; }
+    }
+    @media (max-width:640px) {
+      .card,
+      .workspace-card { padding:14px; }
+      #ticketsTab #ticketForm > .flex-form-row { grid-template-columns:minmax(0,1fr); }
+      .ticket-queue-toolbar { align-items:stretch; }
+      #ticketDeptFilter {
+        width:100% !important;
+        min-width:0;
+      }
+      #ticketList .item-row .action-btn,
+      #completedTicketList .item-row .action-btn {
+        width:100%;
+        justify-content:center;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2476,7 +2613,7 @@
         </div>
 
         <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div class="ticket-queue-toolbar">
             <h2>Help Request Queue</h2>
             <select id="ticketDeptFilter" onchange="loadTickets()" style="width: auto; margin-bottom: 0; padding: 5px; font-size: 0.8rem;">
               <option value="All">All Departments</option>
@@ -2907,7 +3044,7 @@
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
-  <script src="/assets/cinematic-loader.js?v=20260926-cinematic-v46" defer></script>
+  <script src="/assets/cinematic-loader.js?v=20260926-cinematic-v47" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
