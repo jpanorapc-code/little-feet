@@ -3919,6 +3919,77 @@
       }
     }
 
+
+    /* Login autofill must keep the portal glass theme instead of browser white. */
+    #loginForm #loginUsername:-webkit-autofill,
+    #loginForm #loginUsername:-webkit-autofill:hover,
+    #loginForm #loginUsername:-webkit-autofill:focus,
+    #loginForm #loginUsername:-webkit-autofill:active,
+    #loginForm #loginPin:-webkit-autofill,
+    #loginForm #loginPin:-webkit-autofill:hover,
+    #loginForm #loginPin:-webkit-autofill:focus,
+    #loginForm #loginPin:-webkit-autofill:active {
+      -webkit-text-fill-color:#f7fbff !important;
+      caret-color:#f7fbff !important;
+      -webkit-box-shadow:
+        0 0 0 1000px #0f304e inset,
+        inset 0 1px 0 rgba(255,255,255,.055),
+        inset 0 0 0 1px rgba(0,8,18,.16) !important;
+      box-shadow:
+        0 0 0 1000px #0f304e inset,
+        inset 0 1px 0 rgba(255,255,255,.055),
+        inset 0 0 0 1px rgba(0,8,18,.16) !important;
+      border-color:rgba(111,196,215,.28) !important;
+      background-color:#0f304e !important;
+      transition:background-color 99999s ease-out 0s;
+    }
+    #loginForm #loginUsername:-webkit-autofill:focus,
+    #loginForm #loginPin:-webkit-autofill:focus {
+      border-color:rgba(110,238,220,.76) !important;
+      -webkit-box-shadow:
+        0 0 0 1000px #0f304e inset,
+        0 0 0 3px rgba(34,190,173,.14),
+        0 0 20px rgba(46,194,187,.10) !important;
+      box-shadow:
+        0 0 0 1000px #0f304e inset,
+        0 0 0 3px rgba(34,190,173,.14),
+        0 0 20px rgba(46,194,187,.10) !important;
+    }
+    #loginForm #loginUsername:autofill,
+    #loginForm #loginPin:autofill {
+      color:#f7fbff !important;
+      caret-color:#f7fbff !important;
+      background:#0f304e !important;
+      border-color:rgba(111,196,215,.28) !important;
+    }
+
+    body.light-mode #loginForm #loginUsername:-webkit-autofill,
+    body.light-mode #loginForm #loginUsername:-webkit-autofill:hover,
+    body.light-mode #loginForm #loginUsername:-webkit-autofill:focus,
+    body.light-mode #loginForm #loginUsername:-webkit-autofill:active,
+    body.light-mode #loginForm #loginPin:-webkit-autofill,
+    body.light-mode #loginForm #loginPin:-webkit-autofill:hover,
+    body.light-mode #loginForm #loginPin:-webkit-autofill:focus,
+    body.light-mode #loginForm #loginPin:-webkit-autofill:active {
+      -webkit-text-fill-color:#092a3a !important;
+      caret-color:#092a3a !important;
+      -webkit-box-shadow:
+        0 0 0 1000px #abc5cd inset,
+        inset 0 1px 0 rgba(255,255,255,.24) !important;
+      box-shadow:
+        0 0 0 1000px #abc5cd inset,
+        inset 0 1px 0 rgba(255,255,255,.24) !important;
+      background-color:#abc5cd !important;
+      border-color:rgba(42,103,125,.36) !important;
+    }
+    body.light-mode #loginForm #loginUsername:autofill,
+    body.light-mode #loginForm #loginPin:autofill {
+      color:#092a3a !important;
+      caret-color:#092a3a !important;
+      background:#abc5cd !important;
+      border-color:rgba(42,103,125,.36) !important;
+    }
+
   </style>
 </head>
 <body>
