@@ -3709,8 +3709,15 @@
     }
 
   </style>
+  <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-ambient-v1">
 </head>
 <body>
+  <div class="ambient-background" aria-hidden="true">
+    <video id="ambientBackgroundVideo" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
+      <source src="/assets/video/little-feet-ambient-silent.mp4" type="video/mp4">
+    </video>
+  </div>
+  <button id="backgroundMotionToggle" class="background-motion-toggle" type="button" aria-controls="ambientBackgroundVideo" aria-pressed="false">Play background</button>
   <!-- Vector icon library: crisp at any screen density, including 4K displays. -->
   <svg id="lfIconSprite" aria-hidden="true" focusable="false" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
@@ -4023,7 +4030,7 @@
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
             Click the button to detect your current location. The map will load live education locations within a 20Km radius. Pins are grouped for a clearer map; click a group to zoom in, or click a school pin for its coordinates, address, available contact details, and photo.
           </p>
-          <div id="schoolMapContainer" style="width: 100%; height: clamp(430px, 48vw, 560px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden; isolation:isolate; z-index:0; contain:paint;" aria-live="polite">
+          <div id="schoolMapContainer" class="hidden" style="width: 100%; height: clamp(430px, 48vw, 560px); border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.9rem; position: relative; overflow: hidden; isolation:isolate; z-index:0; contain:paint;" aria-live="polite">
             📍 Press "Find schools near me" to render interactive map pins.
           </div>
           <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
@@ -4966,7 +4973,8 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260926-layout-v1" defer></script>
+  <script src="backup.js?v=20260926-layout-v2" defer></script>
+  <script src="/assets/ambient-background.js?v=20260926-ambient-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>

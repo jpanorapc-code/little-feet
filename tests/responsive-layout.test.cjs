@@ -70,6 +70,9 @@ const server = http.createServer((req, res) => {
           }
         }
         if (width <= 640) {
+          // Measure Home controls while Home is visible, not after the loop has
+          // switched to Guide (hidden elements have zero-sized rectangles).
+          tabs.forEach(t => t.classList.toggle('active', t.id === 'homeTab'));
           const mapButton = document.getElementById('findSchoolMapButton');
           const mapCard = mapButton?.closest('.card');
           if (mapButton && mapCard) {
@@ -130,9 +133,11 @@ const server = http.createServer((req, res) => {
             position: getComputedStyle(sidebar).position,
             viewport: innerHeight,
             expectedTop: visibleHeaderBottom
+            , headerTop: headerRect.top
           };
         });
         if (before.position !== 'fixed' || after.position !== 'fixed') failures.push(`${width}x${height}: desktop sidebar is not fixed`);
+        if (Math.abs(after.headerTop) > 1) failures.push(`${width}x${height}: header scrolls out of view`);
         if (Math.abs(after.top - after.expectedTop) > 1) failures.push(`${width}x${height}: desktop sidebar is not attached to the visible header edge`);
         if (Math.abs(after.bottom - after.viewport) > 1) failures.push(`${width}x${height}: desktop sidebar is not pinned to viewport bottom`);
         await page.evaluate(() => {

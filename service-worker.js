@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v16';
+const CACHE_NAME = 'little-feet-shell-v17';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -7,7 +7,10 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-aurora-stars-4k.svg',
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/images/little-feet-cinematic-paused-school.avif',
-  '/backup.js?v=20260926-layout-v1',
+  '/backup.js?v=20260926-layout-v2',
+  '/assets/ambient-background.css?v=20260926-ambient-v1',
+  '/assets/ambient-background.js?v=20260926-ambient-v1',
+  '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1',
