@@ -3760,6 +3760,137 @@
       }
     }
 
+
+    /* Login information runner: fixed to the login viewport only. */
+    .login-info-runner {
+      position:fixed;
+      z-index:12;
+      left:0;
+      right:0;
+      bottom:0;
+      min-height:calc(40px + env(safe-area-inset-bottom));
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      padding:8px 0 max(8px, env(safe-area-inset-bottom));
+      border-top:1px solid rgba(94,234,212,.24);
+      background:linear-gradient(180deg, rgba(7,24,42,.68), rgba(4,16,30,.84));
+      box-shadow:0 -10px 26px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter:blur(18px) saturate(118%);
+      -webkit-backdrop-filter:blur(18px) saturate(118%);
+      color:#d9f7f4;
+      pointer-events:none;
+    }
+    .login-info-runner::before,
+    .login-info-runner::after {
+      content:"";
+      position:absolute;
+      top:0;
+      bottom:0;
+      width:min(9vw,90px);
+      z-index:2;
+      pointer-events:none;
+    }
+    .login-info-runner::before {
+      left:0;
+      background:linear-gradient(90deg, rgba(4,16,30,.96), rgba(4,16,30,0));
+    }
+    .login-info-runner::after {
+      right:0;
+      background:linear-gradient(270deg, rgba(4,16,30,.96), rgba(4,16,30,0));
+    }
+    .login-info-runner-track {
+      display:flex;
+      align-items:center;
+      width:max-content;
+      min-width:max-content;
+      will-change:transform;
+      animation:loginInfoRunner 30s linear infinite;
+      transform:translate3d(0,0,0);
+    }
+    .login-info-runner-group {
+      display:flex;
+      align-items:center;
+      gap:clamp(14px,2vw,34px);
+      flex:0 0 auto;
+      padding-right:clamp(14px,2vw,34px);
+      white-space:nowrap;
+      font-size:clamp(.72rem,.25vw + .66rem,.9rem);
+      font-weight:700;
+      letter-spacing:.01em;
+      line-height:1.2;
+    }
+    .login-info-runner-group strong {
+      color:#7cf1df;
+      font-weight:800;
+    }
+    .login-info-runner-dot {
+      color:#3ad7c4;
+      opacity:.9;
+    }
+    @keyframes loginInfoRunner {
+      from { transform:translate3d(0,0,0); }
+      to { transform:translate3d(-50%,0,0); }
+    }
+    @media (max-width:640px) {
+      #authSection {
+        padding-bottom:max(76px, calc(58px + env(safe-area-inset-bottom))) !important;
+      }
+      .login-info-runner {
+        min-height:calc(42px + env(safe-area-inset-bottom));
+        padding-top:9px;
+        padding-bottom:max(9px, env(safe-area-inset-bottom));
+      }
+      .login-info-runner-track { animation-duration:24s; }
+      .login-info-runner-group {
+        gap:16px;
+        padding-right:16px;
+        font-size:.72rem;
+      }
+      .login-info-runner::before,
+      .login-info-runner::after { width:26px; }
+    }
+    @media (min-width:1600px) {
+      .login-info-runner-track { animation-duration:34s; }
+      .login-info-runner-group { font-size:.88rem; }
+    }
+    @media (max-width:900px) and (max-height:600px) and (orientation:landscape) {
+      #authSection {
+        padding-bottom:max(58px, calc(48px + env(safe-area-inset-bottom))) !important;
+      }
+      .login-info-runner {
+        min-height:calc(36px + env(safe-area-inset-bottom));
+        padding-top:6px;
+        padding-bottom:max(6px, env(safe-area-inset-bottom));
+      }
+      .login-info-runner-group { font-size:.68rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .login-info-runner-track {
+        width:100%;
+        min-width:0;
+        animation:none;
+        transform:none;
+        justify-content:center;
+      }
+      .login-info-runner-group:first-child {
+        display:block;
+        width:100%;
+        min-width:0;
+        padding:0 24px;
+        text-align:center;
+        white-space:normal;
+        line-height:1.35;
+      }
+      .login-info-runner-group[aria-hidden="true"] { display:none; }
+      .login-info-runner-dot { padding:0 5px; }
+    }
+    body.light-mode .login-info-runner {
+      background:linear-gradient(180deg, rgba(63,106,120,.72), rgba(42,82,96,.86));
+      border-top-color:rgba(88,214,205,.30);
+      color:#f1fbfc;
+    }
+
   </style>
 </head>
 <body>
@@ -3920,6 +4051,44 @@
         <div style="display:flex;gap:9px;flex-wrap:wrap;"><button class="submit-btn" style="margin:0;">Create account</button><button type="button" class="action-btn btn-blue" onclick="hideSignupForm()">Cancel</button></div>
       </form>
 
+    </div>
+    <div class="login-info-runner" role="region" aria-label="About Little Feet">
+      <div class="login-info-runner-track">
+        <div class="login-info-runner-group">
+          <strong>Little Feet</strong>
+          <span>is a secure ECD and school management portal</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+          <span>Learning &amp; development</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+          <span>Attendance &amp; daily care</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+          <span>Family communication</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+          <span>Finance &amp; school operations</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+          <span>Safeguarding, privacy &amp; support</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+          <span>One connected place for everyday school life</span>
+          <span class="login-info-runner-dot" aria-hidden="true">●</span>
+        </div>
+        <div class="login-info-runner-group" aria-hidden="true">
+          <strong>Little Feet</strong>
+          <span>is a secure ECD and school management portal</span>
+          <span class="login-info-runner-dot">●</span>
+          <span>Learning &amp; development</span>
+          <span class="login-info-runner-dot">●</span>
+          <span>Attendance &amp; daily care</span>
+          <span class="login-info-runner-dot">●</span>
+          <span>Family communication</span>
+          <span class="login-info-runner-dot">●</span>
+          <span>Finance &amp; school operations</span>
+          <span class="login-info-runner-dot">●</span>
+          <span>Safeguarding, privacy &amp; support</span>
+          <span class="login-info-runner-dot">●</span>
+          <span>One connected place for everyday school life</span>
+          <span class="login-info-runner-dot">●</span>
+        </div>
+      </div>
     </div>
   </div>
 
