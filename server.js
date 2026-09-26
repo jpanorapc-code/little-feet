@@ -2597,6 +2597,38 @@ app.get('/api/staff/kpi-monthly', (req, res) => {
   res.json({ month, rows: ranked });
 });
 
+// Management approvals centre aggregates existing workflows without duplicating their records.
+app.get('/api/approvals', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor || !['admin', 'principal'].includes(actor.role)) return res.status(403).json({ message: 'School management access is required.' });
+  const leave = tenantRecords(db.staffLeave, actor).filter(item => item.status === 'Pending').map(item => ({
+    id: item.id, type: 'Leave', title: `${item.staffName} · ${item.leaveType}`, detail: `${item.startDate} to ${item.endDate}`, createdAt: item.createdAt, actions: ['Approve', 'Reject']
+  }));
+  const meetings = tenantRecords(db.tickets, actor).filter(item => item.ticketType === 'Meeting request' && item.status !== 'Completed').map(item => ({
+    id: item.id, type: 'Meeting', title: item.subject, detail: [item.createdByName || item.createdBy, item.meetingDate, item.meetingTime, item.meetingLocation].filter(Boolean).join(' · '), createdAt: item.createdAt, actions: ['Approve', 'Reject']
+  }));
+  res.json([...leave, ...meetings].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))));
+});
+app.post('/api/approvals/:type/:id', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor || !['admin', 'principal'].includes(actor.role)) return res.status(403).json({ message: 'School management access is required.' });
+  const decision = boundedText(req.body?.decision, 20);
+  if (!['Approve', 'Reject'].includes(decision)) return res.status(400).json({ message: 'Choose Approve or Reject.' });
+  if (req.params.type === 'Leave') {
+    const item = db.staffLeave.find(record => record.id === req.params.id && recordInSchool(record, actor));
+    if (!item || item.status !== 'Pending') return res.status(404).json({ message: 'Pending leave request not found.' });
+    item.status = decision === 'Approve' ? 'Approved' : 'Rejected'; item.reviewedBy = actor.username; item.reviewedAt = new Date().toISOString();
+    return res.json({ success: true, item });
+  }
+  if (req.params.type === 'Meeting') {
+    const item = db.tickets.find(record => record.id === req.params.id && recordInSchool(record, actor) && record.ticketType === 'Meeting request' && record.status !== 'Completed');
+    if (!item) return res.status(404).json({ message: 'Meeting request not found.' });
+    item.meetingDecision = decision === 'Approve' ? 'Approved' : 'Rejected'; item.meetingDecisionBy = actor.username; item.meetingDecisionAt = new Date().toISOString(); item.status = 'Completed';
+    return res.json({ success: true, item });
+  }
+  res.status(400).json({ message: 'Unsupported approval type.' });
+});
+
 // Staff performance reviews / KPI
 const KPI_RATINGS = new Set([1, 2, 3, 4, 5]);
 app.get('/api/staff/performance-reviews', (req, res) => {
