@@ -754,6 +754,7 @@ const db = {
   performanceReviews: [],
   staffNotices: [],
   meetingMinutes: [],
+  maintenanceOrders: [],
   broadcasts: [],
   campusVisitors: [],
   visitorMeetings: [],
@@ -991,7 +992,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2597,6 +2598,29 @@ app.get('/api/staff/kpi-monthly', (req, res) => {
   const rows = visible.map(account => ({ username: account.username, staffName: account.name || account.username, ...monthlyTaskKpi(actor, account.username, month) }));
   const ranked = rows.slice().sort((a,b) => b.completionRate - a.completionRate || b.completed - a.completed || a.staffName.localeCompare(b.staffName)).map((row,index)=>({ ...row, rank:index+1 }));
   res.json({ month, rows: ranked });
+});
+
+// Maintenance & work orders
+const MAINTENANCE_STATUSES = new Set(['Open','In Progress','Completed']);
+app.get('/api/maintenance', (req,res) => {
+  const actor=requireSchoolStaff(req); if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const rows=tenantRecords(db.maintenanceOrders,actor);
+  res.json(['admin','principal'].includes(actor.role)?rows:rows.filter(x=>normalizeUsername(x.reportedBy)===normalizeUsername(actor.username)||normalizeUsername(x.assignedTo)===normalizeUsername(actor.username)));
+});
+app.post('/api/maintenance', (req,res) => {
+  const actor=requireSchoolStaff(req); if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const title=boundedText(req.body?.title,180),location=boundedText(req.body?.location,180);
+  if(!title||!location)return res.status(400).json({message:'Add an issue and location.'});
+  const item=tagSchoolRecord(actor,{id:crypto.randomUUID(),title,details:boundedText(req.body?.details,3000),location,category:boundedText(req.body?.category||'General',80),priority:boundedText(req.body?.priority||'Normal',30),status:'Open',reportedBy:actor.username,reportedByName:actor.name||actor.username,assignedTo:'',assignedToName:'',createdAt:new Date().toISOString()});
+  db.maintenanceOrders.unshift(item);res.status(201).json({success:true,item});
+});
+app.patch('/api/maintenance/:id', (req,res) => {
+  const actor=requireSchoolStaff(req);const item=actor&&db.maintenanceOrders.find(x=>x.id===req.params.id&&recordInSchool(x,actor));if(!item)return res.status(404).json({message:'Work order not found.'});
+  const manager=['admin','principal'].includes(actor.role),assigned=normalizeUsername(item.assignedTo)===normalizeUsername(actor.username);
+  if(!manager&&!assigned)return res.status(403).json({message:'Only management or the assigned staff member can update this work order.'});
+  if(req.body?.assignedTo!==undefined){if(!manager)return res.status(403).json({message:'Only management can assign work orders.'});const account=req.body.assignedTo?staffAccountInSchool(actor,req.body.assignedTo):null;if(req.body.assignedTo&&!account)return res.status(400).json({message:'Choose staff from this school.'});item.assignedTo=account?.username||'';item.assignedToName=account?.name||account?.username||'';}
+  if(req.body?.status!==undefined){const status=boundedText(req.body.status,30);if(!MAINTENANCE_STATUSES.has(status))return res.status(400).json({message:'Choose a valid work-order status.'});item.status=status;if(status==='Completed'){item.completedAt=new Date().toISOString();item.completionNotes=boundedText(req.body?.completionNotes,2000);}}
+  item.updatedAt=new Date().toISOString();res.json({success:true,item});
 });
 
 // Meeting minutes turn approved meeting tickets into accountable staff work.
