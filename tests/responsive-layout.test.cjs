@@ -5,6 +5,9 @@ const path = require('node:path');
 const http = require('node:http');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
+const backupSource = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+assert.match(backupSource, /--portal-sidebar-top/, 'Sidebar runtime offset variable must be maintained');
+assert.match(backupSource, /addEventListener\(['"]scroll['"],\s*queuePortalHeaderOffsetSync/, 'Sidebar/header offset must resync while the page scrolls');
 const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [959, 900], [960, 900], [1024, 768], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
 let browser;
 const server = http.createServer((req, res) => {
@@ -114,14 +117,28 @@ const server = http.createServer((req, res) => {
         });
         await page.evaluate(() => window.scrollTo(0, Math.max(0, document.documentElement.scrollHeight - innerHeight)));
         const after = await page.evaluate(() => {
+          const header = document.querySelector('#dashboardSection > nav');
+          const headerRect = header.getBoundingClientRect();
+          const headerHeight = Math.ceil(headerRect.height);
+          const visibleHeaderBottom = Math.max(0, Math.min(headerHeight, Math.ceil(headerRect.bottom)));
+          document.documentElement.style.setProperty('--portal-sidebar-top', `${visibleHeaderBottom}px`);
           const sidebar = document.getElementById('mainNavigation');
           const rect = sidebar.getBoundingClientRect();
-          return { top: rect.top, bottom: rect.bottom, position: getComputedStyle(sidebar).position, viewport: innerHeight };
+          return {
+            top: rect.top,
+            bottom: rect.bottom,
+            position: getComputedStyle(sidebar).position,
+            viewport: innerHeight,
+            expectedTop: visibleHeaderBottom
+          };
         });
         if (before.position !== 'fixed' || after.position !== 'fixed') failures.push(`${width}x${height}: desktop sidebar is not fixed`);
-        if (Math.abs(after.top - before.top) > 1) failures.push(`${width}x${height}: desktop sidebar moved while page scrolled`);
+        if (Math.abs(after.top - after.expectedTop) > 1) failures.push(`${width}x${height}: desktop sidebar is not attached to the visible header edge`);
         if (Math.abs(after.bottom - after.viewport) > 1) failures.push(`${width}x${height}: desktop sidebar is not pinned to viewport bottom`);
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => {
+          window.scrollTo(0, 0);
+          document.documentElement.style.removeProperty('--portal-sidebar-top');
+        });
       }
     }
   }
