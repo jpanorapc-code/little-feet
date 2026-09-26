@@ -105,6 +105,24 @@ const server = http.createServer((req, res) => {
       }, { width, collapsed });
       failures.push(...result.errors.map(message => `${width}x${height}, collapsed=${collapsed}: ${message}`));
       checks += result.count;
+
+      if (width >= 960 && !collapsed) {
+        const before = await page.evaluate(() => {
+          const sidebar = document.getElementById('mainNavigation');
+          const rect = sidebar.getBoundingClientRect();
+          return { top: rect.top, bottom: rect.bottom, position: getComputedStyle(sidebar).position };
+        });
+        await page.evaluate(() => window.scrollTo(0, Math.max(0, document.documentElement.scrollHeight - innerHeight)));
+        const after = await page.evaluate(() => {
+          const sidebar = document.getElementById('mainNavigation');
+          const rect = sidebar.getBoundingClientRect();
+          return { top: rect.top, bottom: rect.bottom, position: getComputedStyle(sidebar).position, viewport: innerHeight };
+        });
+        if (before.position !== 'fixed' || after.position !== 'fixed') failures.push(`${width}x${height}: desktop sidebar is not fixed`);
+        if (Math.abs(after.top - before.top) > 1) failures.push(`${width}x${height}: desktop sidebar moved while page scrolled`);
+        if (Math.abs(after.bottom - after.viewport) > 1) failures.push(`${width}x${height}: desktop sidebar is not pinned to viewport bottom`);
+        await page.evaluate(() => window.scrollTo(0, 0));
+      }
     }
   }
   assert.deepEqual(failures, [], `${failures.length} responsive failures:\n${failures.slice(0, 30).join('\n')}`);
