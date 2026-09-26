@@ -380,9 +380,12 @@ function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
     const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
     const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
-    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
+    const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
+    button.classList.toggle('is-muted', portalAudioMuted);
     button.setAttribute('aria-pressed', String(portalAudioMuted));
-    button.title = portalAudioMuted ? 'Turn Little Feet sound back on' : 'Mute all Little Feet sound';
+    button.setAttribute('aria-label', portalAudioMuted ? 'Sound muted. Turn Little Feet sound on' : 'Sound on. Mute Little Feet sound');
+    button.title = portalAudioMuted ? 'Sound muted — click to turn sound on' : 'Sound on — click to mute';
   });
 }
 
