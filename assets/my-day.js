@@ -89,7 +89,7 @@
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
         ${action('scheduleTab', 'Timetable', 'See timetable records and the day\'s scheduled learning activities.')}
-        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
+        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
         ${action('chatTab', 'Messages', 'Open school conversations and follow up on communication that needs a response.')}
       </section>
 
