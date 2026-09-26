@@ -4013,6 +4013,123 @@
       }
     }
 
+
+    /* Light mode accent palette: Bioluminescent Teal #00B4D8. */
+    body.light-mode {
+      --primary-color:#00B4D8;
+      --primary-hover:#0098B8;
+      --lf-bioluminescent-teal:#00B4D8;
+      --lf-bioluminescent-teal-rgb:0,180,216;
+    }
+
+    body.light-mode .action-btn,
+    body.light-mode button.submit-btn,
+    body.light-mode .nav-shortcut,
+    body.light-mode .nav-term-edit,
+    body.light-mode .sidebar-links .nav-btn.active {
+      background:
+        linear-gradient(180deg, rgba(0,180,216,.94), rgba(0,145,180,.86)) !important;
+      border-color:rgba(0,180,216,.72) !important;
+      color:#ffffff !important;
+      box-shadow:
+        0 9px 20px rgba(0,126,158,.22),
+        0 0 18px rgba(0,180,216,.13),
+        inset 0 1px 0 rgba(255,255,255,.28) !important;
+    }
+
+    body.light-mode .action-btn:hover,
+    body.light-mode button.submit-btn:hover,
+    body.light-mode .nav-shortcut:hover,
+    body.light-mode .nav-term-edit:hover,
+    body.light-mode .sidebar-links .nav-btn:hover {
+      background:
+        linear-gradient(180deg, #16C4E4, #00A4C8) !important;
+      border-color:rgba(0,180,216,.90) !important;
+      box-shadow:
+        0 11px 24px rgba(0,126,158,.25),
+        0 0 22px rgba(0,180,216,.18),
+        inset 0 1px 0 rgba(255,255,255,.30) !important;
+    }
+
+    body.light-mode .guide-open,
+    body.light-mode .portal-welcome-kicker,
+    body.light-mode .sidebar-group-toggle,
+    body.light-mode .app-sidebar [data-nav-group] .sidebar-heading,
+    body.light-mode .sidebar-links .nav-btn .ui-icon,
+    body.light-mode .card-header-bar .ui-icon,
+    body.light-mode .workspace-results-heading .ui-icon {
+      color:#00B4D8 !important;
+    }
+
+    body.light-mode .professional-icon,
+    body.light-mode .workspace-results-icon,
+    body.light-mode .badge-tag,
+    body.light-mode .profile-icon-choice.is-selected {
+      background:
+        linear-gradient(180deg, rgba(0,180,216,.22), rgba(0,180,216,.10)) !important;
+      border-color:rgba(0,180,216,.42) !important;
+      color:#007E9A !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.22),
+        0 0 14px rgba(0,180,216,.10) !important;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row,
+    body.light-mode .wellbeing-banner,
+    body.light-mode #termsNotice,
+    body.light-mode #runtimeErrorBanner,
+    body.light-mode #schoolPinCard,
+    body.light-mode #householdSwitcher,
+    body.light-mode [data-roles][style*="background: var(--panel-bg)"] {
+      border-color:rgba(0,180,216,.26) !important;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.05) 22%, rgba(255,255,255,0) 36%),
+        radial-gradient(circle at 10% 0%, rgba(0,180,216,.10), transparent 40%),
+        linear-gradient(145deg, rgba(174,205,214,.44), rgba(134,173,185,.31)) !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box,
+    body.light-mode .profile-icon-choice,
+    body.light-mode .social-signin button {
+      border-color:rgba(0,180,216,.30) !important;
+    }
+
+    body.light-mode input:focus,
+    body.light-mode select:focus,
+    body.light-mode textarea:focus {
+      border-color:#00B4D8 !important;
+      box-shadow:
+        0 0 0 3px rgba(0,180,216,.15),
+        inset 0 1px 0 rgba(255,255,255,.28) !important;
+      outline:none !important;
+    }
+
+    body.light-mode #dashboardSection > nav {
+      border-bottom-color:rgba(0,180,216,.34) !important;
+      box-shadow:
+        0 12px 28px rgba(22,64,80,.20),
+        0 0 18px rgba(0,180,216,.06),
+        inset 0 1px 0 rgba(255,255,255,.05) !important;
+    }
+
+    body.light-mode .app-sidebar {
+      border-right-color:rgba(0,180,216,.28) !important;
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] {
+      border-color:rgba(0,180,216,.24) !important;
+    }
+
   </style>
 </head>
 <body>
