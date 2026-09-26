@@ -3708,7 +3708,8 @@
       }
     }
 
-  </style>
+  .staff-work-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.staff-work-card{padding:18px;border:1px solid var(--border-color);border-radius:12px;background:var(--panel-bg)}.staff-work-card h3{margin-top:0}.staff-work-card form{display:grid;gap:8px;margin-bottom:16px}.staff-work-card form input,.staff-work-card form select,.staff-work-card form textarea{width:100%}.staff-work-list{display:grid;gap:8px}.staff-work-list article{display:grid;gap:7px;padding:11px;border:1px solid var(--border-color);border-radius:9px}.staff-work-list article span{color:var(--text-muted);font-size:.8rem}.staff-work-list article div{display:flex;gap:7px;flex-wrap:wrap}
+</style>
 </head>
 <body>
   <!-- Vector icon library: crisp at any screen density, including 4K displays. -->
@@ -4900,7 +4901,12 @@
       </datalist>
 
       <!-- 11. User Guide -->
-      <div id="guideTab" class="tab-content">
+      <div id="staffWorkTab" class="tab-content" data-roles="teacher,principal,admin">
+            <h2>Staff Work</h2>
+            <p class="section-intro">Tasks, leave and teacher cover in one working area. Items that need attention also feed into My Day.</p>
+            <div id="staffWorkContent"><p>Loading staff work…</p></div>
+          </div>
+          <div id="guideTab" class="tab-content">
         <div class="card">
           <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
           <p class="guide-intro">A quick guide to using Little Feet safely and effectively. Features shown may vary by your school role.</p>
@@ -4967,7 +4973,7 @@
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
   <script src="backup.js?v=20260926-layout-v1" defer></script>
-  <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>\n  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
+  <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>\n  <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>\n  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
