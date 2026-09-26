@@ -2241,6 +2241,153 @@
       .portal-tour-fact { font-size:.71rem; }
     }
 
+
+    /* Mobile Home shell: compact header, notices and welcome hero. */
+    @media (max-width:640px) {
+      #dashboardSection > nav {
+        padding:7px 9px 8px;
+        gap:6px;
+        grid-template-columns:minmax(0,1fr) auto;
+      }
+      .nav-brand { gap:7px; font-size:1rem; }
+      .nav-brand img { width:34px; height:34px; }
+      .nav-user-panel { gap:4px; }
+      .nav-user-panel .action-btn {
+        min-width:34px;
+        min-height:34px;
+        padding:6px !important;
+      }
+      .user-avatar { width:26px; height:26px; }
+
+      .nav-quickbar {
+        grid-column:1 / -1;
+        grid-row:2;
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:6px;
+        width:100%;
+        margin:0;
+      }
+      .nav-term-panel {
+        grid-column:1 / -1;
+        min-height:34px;
+        max-width:none;
+        padding:4px 7px;
+        border-radius:8px;
+      }
+      .nav-term-panel strong {
+        font-size:.66rem;
+        line-height:1.1;
+      }
+      .nav-term-panel .nav-term-edit {
+        min-height:30px;
+        padding:4px 8px;
+        font-size:.64rem;
+      }
+      .nav-quickbar .nav-shortcut {
+        width:100%;
+        min-width:0;
+        min-height:38px;
+        padding:6px 5px;
+        gap:4px;
+        font-size:.73rem;
+        line-height:1.05;
+        white-space:nowrap;
+      }
+      .nav-quickbar .nav-shortcut .ui-icon {
+        width:16px;
+        height:16px;
+      }
+      .nav-more-toggle {
+        grid-column:1 / -1;
+        grid-row:3;
+        width:100%;
+        min-height:38px;
+        padding:6px 9px;
+        font-size:.76rem;
+      }
+
+      #homeTab > .wellbeing-banner {
+        gap:8px;
+        padding:9px 10px;
+        margin-bottom:10px;
+        border-left-width:3px;
+        border-radius:10px;
+        align-items:flex-start;
+      }
+      #homeTab > .wellbeing-banner .tip-icon {
+        width:26px;
+        height:26px;
+        flex-basis:26px;
+        border-radius:8px;
+      }
+      #homeTab > .wellbeing-banner .tip-icon .ui-icon {
+        width:15px;
+        height:15px;
+      }
+      #homeTab > .wellbeing-banner p {
+        font-size:.80rem;
+        line-height:1.35;
+      }
+      #homeTab > #termsNotice p { font-size:.78rem; }
+      #homeTab > .wellbeing-banner > button:last-child {
+        flex:0 0 30px;
+        width:30px;
+        min-height:30px;
+        padding:2px;
+        font-size:1rem;
+      }
+
+      #homeTab > .portal-welcome-banner {
+        min-height:170px;
+        margin-bottom:12px;
+        padding:12px 13px;
+        background-size:cover,auto 100%;
+        background-position:center,right center;
+      }
+      #homeTab > .portal-welcome-banner .portal-welcome-copy {
+        max-width:72%;
+      }
+      #homeTab .role-home-panel.mascot-role-home .role-home-content {
+        max-width:100%;
+      }
+      #homeTab .portal-welcome-kicker {
+        margin-bottom:3px;
+        font-size:.60rem;
+        letter-spacing:.08em;
+      }
+      #homeTab .portal-welcome-banner h1 {
+        margin-bottom:4px;
+        font-size:1.14rem;
+        line-height:1.12;
+      }
+      #homeTab .portal-welcome-banner p {
+        font-size:.76rem;
+        line-height:1.34;
+      }
+
+      #homeTab > .card,
+      #homeTab > section {
+        margin-bottom:12px !important;
+      }
+      #homeTab .workspace-grid { gap:10px; }
+    }
+
+    @media (max-width:360px) {
+      .nav-quickbar {
+        grid-template-columns:repeat(3,minmax(0,1fr));
+      }
+      .nav-quickbar .nav-shortcut {
+        font-size:.68rem;
+        padding-inline:4px;
+      }
+      #homeTab > .portal-welcome-banner .portal-welcome-copy {
+        max-width:76%;
+      }
+      #homeTab .portal-welcome-banner h1 { font-size:1.08rem; }
+      #homeTab > .wellbeing-banner p { font-size:.77rem; }
+    }
+
   </style>
 </head>
 <body>
