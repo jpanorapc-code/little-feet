@@ -755,6 +755,7 @@ const db = {
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
+  resourceBookings: [],
   broadcasts: [],
   campusVisitors: [],
   visitorMeetings: [],
@@ -992,7 +993,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2598,6 +2599,26 @@ app.get('/api/staff/kpi-monthly', (req, res) => {
   const rows = visible.map(account => ({ username: account.username, staffName: account.name || account.username, ...monthlyTaskKpi(actor, account.username, month) }));
   const ranked = rows.slice().sort((a,b) => b.completionRate - a.completionRate || b.completed - a.completed || a.staffName.localeCompare(b.staffName)).map((row,index)=>({ ...row, rank:index+1 }));
   res.json({ month, rows: ranked });
+});
+
+// School resource booking with collision prevention.
+app.get('/api/resources/bookings', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  res.json(tenantRecords(db.resourceBookings,actor).filter(x=>x.status!=='Cancelled'));
+});
+app.post('/api/resources/bookings', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const resource=boundedText(req.body?.resource,160),date=boundedText(req.body?.date,30),startTime=boundedText(req.body?.startTime,10),endTime=boundedText(req.body?.endTime,10),purpose=boundedText(req.body?.purpose,500);
+  if(!resource||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)||endTime<=startTime)return res.status(400).json({message:'Choose a resource, valid date and a start time before the end time.'});
+  const conflict=tenantRecords(db.resourceBookings,actor).find(x=>x.status!=='Cancelled'&&normalizeComparableText(x.resource)===normalizeComparableText(resource)&&x.date===date&&startTime<x.endTime&&endTime>x.startTime);
+  if(conflict)return res.status(409).json({message:`${resource} is already booked from ${conflict.startTime} to ${conflict.endTime}.`,conflict:{id:conflict.id,startTime:conflict.startTime,endTime:conflict.endTime,bookedByName:conflict.bookedByName}});
+  const item=tagSchoolRecord(actor,{id:crypto.randomUUID(),resource,date,startTime,endTime,purpose,resourceType:boundedText(req.body?.resourceType||'Other',60),bookedBy:actor.username,bookedByName:actor.name||actor.username,status:'Booked',createdAt:new Date().toISOString()});
+  db.resourceBookings.unshift(item);res.status(201).json({success:true,item});
+});
+app.patch('/api/resources/bookings/:id', (req,res) => {
+  const actor=requireSchoolStaff(req);const item=actor&&db.resourceBookings.find(x=>x.id===req.params.id&&recordInSchool(x,actor));if(!item)return res.status(404).json({message:'Booking not found.'});
+  if(!['admin','principal'].includes(actor.role)&&normalizeUsername(item.bookedBy)!==normalizeUsername(actor.username))return res.status(403).json({message:'You can only cancel your own booking.'});
+  if(req.body?.status!=='Cancelled')return res.status(400).json({message:'Bookings can only be cancelled here.'});item.status='Cancelled';item.cancelledBy=actor.username;item.cancelledAt=new Date().toISOString();res.json({success:true,item});
 });
 
 // Maintenance & work orders
