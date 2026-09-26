@@ -89,7 +89,7 @@
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
         ${action('scheduleTab', 'Timetable', 'See timetable records and the day\'s scheduled learning activities.')}
-        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}
+        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
         ${action('chatTab', 'Messages', 'Open school conversations and follow up on communication that needs a response.')}
       </section>
 
@@ -182,7 +182,7 @@
     }
     if (Array.isArray(leave)) {
       const pendingLeave = leave.filter(item => String(item.status || '') === 'Pending');
-      if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && pendingLeave.length) items.push({ tab:'staffWorkTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
+      if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && pendingLeave.length) items.push({ tab:'approvalsTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
     }
     if (Array.isArray(cover)) {
       const needsCover = cover.filter(item => String(item.status || '') === 'Needs Cover');
