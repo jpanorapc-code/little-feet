@@ -1,6 +1,6 @@
 (() => {
-  const PRIVACY_VERSION = 'POPIA-2026-09-v3';
-  const TERMS_VERSION = 'TOS-ZA-2026-09-v3';
+  const PRIVACY_VERSION = 'POPIA-2026-09-v4';
+  const TERMS_VERSION = 'TOS-ZA-2026-09-v4';
   const IP_VERSION = 'IP-ZA-2026-09-v1';
 
   const section = (title, body) =>
@@ -13,7 +13,9 @@
       '<p class="meta" style="margin:0 0 14px;">Version ' + PRIVACY_VERSION + ' · South Africa · Protection of Personal Information Act 4 of 2013 (POPIA)</p>',
       section('1. Who is responsible for personal information',
         '<p>The school or education provider using Little Feet will ordinarily decide why and how learner, guardian and staff records are processed and will therefore usually act as the <strong>responsible party</strong> for those school records. Little Feet may act as an <strong>operator</strong> when it processes those records on the school’s instructions, and may separately act as a responsible party for its own account, service, security and billing administration. The exact legal allocation depends on the applicable contract and facts.</p><p style="margin-top:8px;">Each responsible party must make the required Information Officer or Deputy Information Officer details available to data subjects. Platform support requests can be raised through the Little Feet Support Desk.</p>'),
-      section('2. Information that may be processed',
+      section('2. Little Feet service contact',
+        '<p>Official website: <a href="https://littlefeet.co.za/" target="_blank" rel="noopener">littlefeet.co.za</a><br>Official email: <a href="mailto:Christiaan@littleFeet.co.za">Christiaan@littleFeet.co.za</a><br>Telephone: <a href="tel:+27629432244">062 943 2244</a></p><p style="margin-top:8px;">Information Officer and PAIA details must reflect the actual registered responsible party and must not be represented as registered until that registration has been completed and verified.</p>'),
+      section('4. Information that may be processed',
         bullets([
           'Account and identity information such as names, usernames, roles, contact details and school relationships.',
           'Learner and education records such as attendance, class placement, development observations, portfolios, reports and school applications.',
@@ -30,17 +32,17 @@
           'Take reasonable steps to keep information accurate and up to date.',
           'Retain records only for as long as required by the original purpose, an applicable legal obligation, an authorised school retention schedule or another lawful reason; thereafter securely delete, destroy or de-identify them.'
         ])),
-      section('4. Children and special personal information',
+      section('5. Children and special personal information',
         '<p>Children’s information and special personal information receive additional protection under POPIA. A responsible party must establish the applicable competent-person consent, legal duty, statutory permission or other authorisation permitted by POPIA before processing such information. In child-related care, protection and well-being matters, schools must also apply applicable South African child-protection duties, including the best-interests principle in the Children’s Act 38 of 2005. Little Feet features do not remove the school’s duty to decide whether processing is lawful, proportionate and in the child’s best interests.</p>'),
-      section('5. Consent',
+      section('6. Consent',
         '<p>Where consent is used, it must be voluntary, specific and informed and recorded for the relevant purpose. Consent for authenticated internal class updates is kept separate from optional external marketing or media consent. Withdrawal applies prospectively where consent is the applicable justification, but does not automatically require deletion where another law requires retention.</p>'),
-      section('6. Sharing, operators and contracts',
+      section('7. Sharing, operators and contracts',
         '<p>Information may be made available only to authorised school users, approved family users, contracted operators or service providers, or other recipients where the responsible party has a lawful reason. Operators handling personal information must be subject to appropriate confidentiality, security and processing obligations. Little Feet does not treat school-held personal information as a product for sale.</p>'),
-      section('7. Cross-border processing',
+      section('8. Cross-border processing',
         '<p>Personal information may be transferred outside South Africa only where the requirements of POPIA section 72 are satisfied, for example where the recipient is subject to an adequate level of protection, an appropriate binding agreement, consent or another permitted ground.</p>'),
-      section('8. Security and security compromises',
+      section('9. Security and security compromises',
         '<p>Little Feet uses role-based access, tenant isolation, secure sessions, encrypted storage for selected sensitive fields, audit controls and security testing. No system can guarantee absolute security. Where there are reasonable grounds to believe personal information has been accessed or acquired by an unauthorised person, the responsible party must follow POPIA section 22 and applicable Information Regulator requirements, including notification to the Regulator and affected data subjects where required by law.</p>'),
-      section('9. Data-subject rights',
+      section('10. Data-subject rights',
         bullets([
           'Ask whether a responsible party holds personal information about you and request access where permitted.',
           'Request correction or deletion of inaccurate, irrelevant, excessive, out-of-date, incomplete, misleading or unlawfully obtained information, subject to lawful retention duties.',
@@ -48,11 +50,11 @@
           'Complain to the school’s Information Officer and, where appropriate, lodge a complaint with the Information Regulator.',
           'Request information about the purpose and categories of processing. PAIA may also provide a route to request access to records.'
         ])),
-      section('10. PAIA and records access',
+      section('11. PAIA and records access',
         '<p>The Promotion of Access to Information Act 2 of 2000 (PAIA) applies to access to records held by public and private bodies. A private body must maintain the section 51 PAIA manual required by law and make it available in the required manner. The applicable manual should identify the responsible private body, Information Officer details, categories of records and the prescribed request process. Little Feet must not invent those legal identity details; they must match the actual provider and registered Information Officer.</p>'),
-      section('11. Direct marketing and automated decisions',
+      section('12. Direct marketing and automated decisions',
         '<p>Unsolicited electronic direct marketing must comply with POPIA and other applicable South African consumer and electronic-communications rules. Little Feet must not be used to make a solely automated admission, disciplinary, safeguarding or developmental decision that has legal or substantial effects on a person without the protections required by law.</p>'),
-      section('12. Information Regulator',
+      section('13. Information Regulator',
         '<p>The South African Information Regulator is the independent regulator responsible for POPIA and PAIA. Current complaint forms, PAIA forms and contact channels are available at <a href="https://inforegulator.org.za/" target="_blank" rel="noopener">inforegulator.org.za</a>.</p>'),
       '<p class="meta" style="margin-top:14px;">This platform notice supports compliance but does not replace the school’s own privacy notice, the responsible party’s section 51 PAIA manual, retention schedule, operator agreements, Information Officer duties, security incident process or professional legal review.</p>',
       '</div>'
@@ -66,7 +68,7 @@
       section('1. Service identity, acceptance and authority',
         '<p><strong>Little Feet™</strong> is the service and brand used for this portal, and <strong>littlefeet.co.za</strong> is its official website. Little Feet is a private service and does not claim to be a government department, regulator or official government system.</p><p style="margin-top:8px;">By creating or using an account you confirm that you are authorised to use Little Feet for the relevant school, family or educational purpose and agree to these Terms together with the applicable Privacy & POPIA Notice. Electronic acceptance and records are handled subject to applicable South African law, including the Electronic Communications and Transactions Act 25 of 2002 (ECTA).</p>'),
       section('2. Supplier information and electronic transactions',
-        '<p>Where a paid agreement is concluded electronically through Little Feet, the supplier must make the disclosures required by ECTA section 43 available before the transaction is concluded, including the supplier’s legal identity and status, registration details where applicable, contact and physical or legal-service address, service description, total price and charges, payment method, agreement terms, transaction-record access, cancellation or refund terms, privacy and security information, and any applicable minimum duration or dispute-resolution process.</p><p style="margin-top:8px;">Viewing a plan, creating a payment request or browsing the portal does not by itself create a paid school subscription. Binding school commercial terms are those accepted in the applicable quotation, order form or service agreement.</p>'),
+        '<p><strong>Current Little Feet service contact:</strong><br>Official website: <a href="https://littlefeet.co.za/" target="_blank" rel="noopener">littlefeet.co.za</a><br>Official email: <a href="mailto:Christiaan@littleFeet.co.za">Christiaan@littleFeet.co.za</a><br>Telephone: <a href="tel:+27629432244">062 943 2244</a></p><p style="margin-top:8px;">Where a paid agreement is concluded electronically through Little Feet, the supplier must make the disclosures required by ECTA section 43 available before the transaction is concluded, including the supplier’s legal identity and status, registration details where applicable, contact and physical or legal-service address, service description, total price and charges, payment method, agreement terms, transaction-record access, cancellation or refund terms, privacy and security information, and any applicable minimum duration or dispute-resolution process.</p><p style="margin-top:8px;">Little Feet does not publish a company registration number, registered office or Information Officer registration detail unless that detail actually exists and has been verified. Viewing a plan, creating a payment request or browsing the portal does not by itself create a paid school subscription. Binding school commercial terms are those accepted in the applicable quotation, order form or service agreement.</p>'),
       section('3. Permitted use and cybersecurity',
         bullets([
           'Use the service only for legitimate school, education, childcare, family-account or authorised administrative purposes.',
@@ -125,7 +127,7 @@
       section('4. School and user content',
         '<p>Schools and users retain the rights they lawfully hold in their own uploaded material. They are responsible for ensuring that uploads, photographs, documents, learning resources and other content are authorised. Little Feet receives only the limited service licence described in the Terms of Service and does not acquire ownership merely because content is stored in the portal.</p>'),
       section('5. Reporting copyright or brand misuse',
-        '<p>Use the Support Desk to report suspected infringement or unauthorised use. A useful report should identify the protected work or mark, identify the material or location complained of, explain the basis of the claim, provide contact details for the reporter and state that the report is made in good faith. Little Feet may request supporting documents before taking action.</p>'),
+        '<p>Use the Support Desk or <a href="mailto:Christiaan@littleFeet.co.za">Christiaan@littleFeet.co.za</a> to report suspected infringement or unauthorised use. A useful report should identify the protected work or mark, identify the material or location complained of, explain the basis of the claim, provide contact details for the reporter and state that the report is made in good faith. Little Feet may request supporting documents before taking action.</p>'),
       section('6. Review, restriction and preservation',
         '<p>Where reasonably necessary, Little Feet may temporarily restrict access to disputed material while a report is reviewed, preserve relevant audit or evidentiary records, request a response from the uploader or school, and remove or restore material according to the facts, applicable contract and law. This reporting process does not replace any statutory ECTA procedure, court remedy or other legal process that may apply.</p>'),
       section('7. False or abusive reports',
