@@ -3391,6 +3391,268 @@
       color: #173f50 !important;
     }
 
+
+    /* Clear glass surface system — visual only, zero geometry changes. */
+    :root {
+      --lf-glass-edge: rgba(146, 233, 237, .34);
+      --lf-glass-edge-soft: rgba(112, 197, 215, .22);
+      --lf-glass-shadow: rgba(0, 7, 19, .30);
+      --lf-glass-dark-a: rgba(10, 40, 62, .38);
+      --lf-glass-dark-b: rgba(5, 25, 42, .27);
+      --lf-glass-teal: rgba(24, 181, 168, .30);
+    }
+
+    #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, rgba(12, 47, 68, .52), rgba(5, 24, 40, .38)) !important;
+      border-bottom-color: rgba(119, 222, 226, .32) !important;
+      box-shadow:
+        0 14px 34px rgba(0, 5, 16, .26),
+        inset 0 1px 0 rgba(255, 255, 255, .08),
+        inset 0 -1px 0 rgba(226, 193, 116, .07) !important;
+      backdrop-filter: blur(22px) saturate(122%);
+      -webkit-backdrop-filter: blur(22px) saturate(122%);
+    }
+
+    .app-sidebar {
+      background:
+        linear-gradient(180deg, rgba(10, 45, 67, .48), rgba(4, 24, 41, .34)) !important;
+      border-right-color: rgba(111, 210, 220, .26) !important;
+      box-shadow:
+        12px 0 34px rgba(0, 5, 16, .24),
+        inset -1px 0 0 rgba(226, 193, 116, .05) !important;
+      backdrop-filter: blur(24px) saturate(118%);
+      -webkit-backdrop-filter: blur(24px) saturate(118%);
+    }
+
+    .app-sidebar [data-nav-group],
+    .nav-term-panel,
+    .form-template-bar,
+    .chat-toolbar {
+      background:
+        linear-gradient(180deg, rgba(28, 75, 101, .34), rgba(8, 38, 62, .24)) !important;
+      border-color: rgba(116, 209, 220, .25) !important;
+      box-shadow:
+        0 10px 24px rgba(0, 7, 18, .15),
+        inset 0 1px 0 rgba(255, 255, 255, .075) !important;
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell,
+    .guide-link-card,
+    .modal-card,
+    .item-row,
+    .wellbeing-banner,
+    #termsNotice,
+    #runtimeErrorBanner,
+    #schoolPinCard,
+    #householdSwitcher,
+    [data-roles][style*="background: var(--panel-bg)"] {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .085) 0%, rgba(255, 255, 255, .025) 20%, rgba(255, 255, 255, 0) 36%),
+        radial-gradient(circle at 10% 0%, rgba(62, 208, 198, .10), transparent 38%),
+        linear-gradient(145deg, var(--lf-glass-dark-a), var(--lf-glass-dark-b)) !important;
+      border-color: var(--lf-glass-edge-soft) !important;
+      box-shadow:
+        0 20px 46px var(--lf-glass-shadow),
+        0 0 0 1px rgba(228, 194, 115, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .11),
+        inset 0 -1px 0 rgba(89, 211, 211, .045) !important;
+      backdrop-filter: blur(20px) saturate(118%);
+      -webkit-backdrop-filter: blur(20px) saturate(118%);
+    }
+
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .guide-link-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 28%),
+        linear-gradient(145deg, rgba(19, 65, 88, .34), rgba(7, 34, 55, .24)) !important;
+      border-color: rgba(118, 205, 217, .24) !important;
+      box-shadow:
+        0 13px 30px rgba(0, 7, 18, .19),
+        inset 0 1px 0 rgba(255, 255, 255, .085) !important;
+    }
+
+    input,
+    select,
+    textarea,
+    .chat-box,
+    .profile-icon-choice,
+    .social-signin button {
+      background:
+        linear-gradient(180deg, rgba(34, 81, 105, .34), rgba(12, 47, 72, .24)) !important;
+      border-color: rgba(120, 202, 217, .27) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .075),
+        inset 0 0 0 1px rgba(0, 8, 18, .10) !important;
+      backdrop-filter: blur(14px) saturate(114%);
+      -webkit-backdrop-filter: blur(14px) saturate(114%);
+    }
+
+    .action-btn,
+    button.submit-btn,
+    .nav-shortcut,
+    .nav-more-toggle,
+    .nav-term-edit,
+    .sidebar-links .nav-btn.active {
+      background:
+        linear-gradient(180deg, rgba(56, 214, 196, .50), rgba(15, 140, 151, .38)) !important;
+      border-color: rgba(164, 244, 233, .42) !important;
+      box-shadow:
+        0 9px 20px rgba(0, 7, 18, .22),
+        0 0 0 1px rgba(228, 193, 113, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .24),
+        inset 0 -1px 0 rgba(0, 24, 36, .14) !important;
+      backdrop-filter: blur(16px) saturate(122%);
+      -webkit-backdrop-filter: blur(16px) saturate(122%);
+    }
+
+    .action-btn:hover,
+    button.submit-btn:hover,
+    .nav-shortcut:hover,
+    .nav-more-toggle:hover,
+    .nav-term-edit:hover,
+    .sidebar-links .nav-btn:hover {
+      background:
+        linear-gradient(180deg, rgba(69, 225, 207, .58), rgba(18, 154, 164, .44)) !important;
+      border-color: rgba(184, 252, 241, .54) !important;
+      box-shadow:
+        0 11px 24px rgba(0, 7, 18, .25),
+        0 0 18px rgba(62, 201, 190, .11),
+        inset 0 1px 0 rgba(255, 255, 255, .28) !important;
+    }
+
+    .btn-red {
+      background:
+        linear-gradient(180deg, rgba(239, 101, 112, .58), rgba(182, 50, 75, .44)) !important;
+      border-color: rgba(255, 205, 211, .35) !important;
+    }
+
+    .btn-green {
+      background:
+        linear-gradient(180deg, rgba(42, 195, 154, .58), rgba(14, 126, 121, .44)) !important;
+      border-color: rgba(178, 247, 220, .35) !important;
+    }
+
+    .badge-tag,
+    .professional-icon,
+    .workspace-results-icon {
+      background:
+        linear-gradient(180deg, rgba(62, 205, 190, .28), rgba(16, 105, 130, .18)) !important;
+      border-color: rgba(136, 228, 220, .30) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .10),
+        0 4px 12px rgba(0, 7, 18, .10) !important;
+      backdrop-filter: blur(12px) saturate(116%);
+      -webkit-backdrop-filter: blur(12px) saturate(116%);
+    }
+
+    body.light-mode {
+      --bg-dark: #89aeba;
+      --panel-bg: rgba(158, 193, 203, .34);
+      --input-bg: rgba(176, 207, 215, .34);
+      --bubble-bg: rgba(154, 189, 199, .34);
+    }
+
+    body.portal-active.light-mode::before {
+      opacity: .34 !important;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row,
+    body.light-mode .wellbeing-banner,
+    body.light-mode #termsNotice,
+    body.light-mode #runtimeErrorBanner,
+    body.light-mode #schoolPinCard,
+    body.light-mode #householdSwitcher,
+    body.light-mode [data-roles][style*="background: var(--panel-bg)"] {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, .06) 22%, rgba(255, 255, 255, 0) 36%),
+        radial-gradient(circle at 10% 0%, rgba(35, 154, 157, .09), transparent 40%),
+        linear-gradient(145deg, rgba(178, 207, 214, .42), rgba(137, 174, 186, .30)) !important;
+      border-color: rgba(45, 112, 134, .31) !important;
+      box-shadow:
+        0 18px 40px rgba(27, 67, 83, .16),
+        0 0 0 1px rgba(184, 145, 67, .018),
+        inset 0 1px 0 rgba(255, 255, 255, .32),
+        inset 0 -1px 0 rgba(17, 91, 116, .06) !important;
+      backdrop-filter: blur(21px) saturate(110%);
+      -webkit-backdrop-filter: blur(21px) saturate(110%);
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 28%),
+        linear-gradient(145deg, rgba(188, 214, 220, .40), rgba(150, 184, 194, .28)) !important;
+      border-color: rgba(47, 111, 132, .29) !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box,
+    body.light-mode .profile-icon-choice,
+    body.light-mode .social-signin button {
+      background:
+        linear-gradient(180deg, rgba(197, 220, 225, .44), rgba(162, 195, 204, .32)) !important;
+      border-color: rgba(47, 108, 129, .34) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .30),
+        inset 0 0 0 1px rgba(18, 74, 94, .035) !important;
+      backdrop-filter: blur(15px) saturate(108%);
+      -webkit-backdrop-filter: blur(15px) saturate(108%);
+    }
+
+    body.light-mode .app-sidebar {
+      background:
+        linear-gradient(180deg, rgba(10, 48, 70, .54), rgba(5, 27, 45, .42)) !important;
+      border-right-color: rgba(94, 184, 199, .28) !important;
+      backdrop-filter: blur(24px) saturate(116%);
+      -webkit-backdrop-filter: blur(24px) saturate(116%);
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(28, 78, 105, .38), rgba(10, 47, 75, .28)) !important;
+      border-color: rgba(106, 199, 211, .25) !important;
+      backdrop-filter: blur(18px) saturate(114%);
+      -webkit-backdrop-filter: blur(18px) saturate(114%);
+    }
+
+    body.light-mode #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, rgba(21, 64, 86, .56), rgba(9, 42, 62, .44)) !important;
+      border-bottom-color: rgba(91, 193, 198, .34) !important;
+      backdrop-filter: blur(22px) saturate(118%);
+      -webkit-backdrop-filter: blur(22px) saturate(118%);
+    }
+
+    body.light-mode footer {
+      background:
+        linear-gradient(180deg, rgba(115, 153, 164, .42), rgba(89, 128, 140, .32)) !important;
+      border-top-color: rgba(40, 99, 119, .28) !important;
+      backdrop-filter: blur(18px) saturate(108%);
+      -webkit-backdrop-filter: blur(18px) saturate(108%);
+    }
+
   </style>
 </head>
 <body>
