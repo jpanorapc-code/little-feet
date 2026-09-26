@@ -20,7 +20,7 @@
     started = true;
     observer?.disconnect();
     requestAnimationFrame(() => {
-      import('/assets/cinematic.js?v=20260925-cinematic-v45')
+      import('/assets/cinematic.js?v=20260926-cinematic-v46')
         .catch(error => showFallback('3D could not load · cinematic controls remain available', error));
     });
   };

@@ -78,7 +78,7 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20260925-aurora-v1/);
+assert.match(page, /backup\.js\?v=20260926-map-cinematic-v1/);
 assert.doesNotMatch(page, /little-feet-wallpaper-no-moon-4k\.jpg/);
 assert.doesNotMatch(page, /campfire wallpaper/i);
 assert.match(client, /classList\.add\('has-custom-wallpaper'\)/);
@@ -129,7 +129,7 @@ assert.match(page, /@media \(max-width:360px\)/);
 assert.match(page, /@media \(max-width:900px\) and \(max-height:600px\) and \(orientation:landscape\)/);
 assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area-inset-right/);
 assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
-assert.match(page, /cinematic\.css\?v=20260926-cinematic-v12/);
+assert.match(page, /cinematic\.css\?v=20260926-cinematic-v13/);
 
 assert.match(page, /Little Feet™ School Portal/);
 assert.match(page, /Official site: <a href="https:\/\/littlefeet\.co\.za\//);
