@@ -1,7 +1,10 @@
-const CACHE_NAME = 'little-feet-shell-v17';
+const CACHE_NAME = 'little-feet-shell-v18-blue-video';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
+  '/assets/ambient-background.css?v=20260926-blue-v1',
+  '/assets/ambient-background.js?v=20260926-blue-v1',
+  '/assets/video/little-feet-ambient-poster.jpg',
   '/logo.png',
   '/logo-transparent.png',
   '/assets/4k/little-feet-aurora-stars-4k.svg',

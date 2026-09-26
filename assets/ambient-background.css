@@ -1,0 +1,72 @@
+/* Presentation only: keep the established layout and interaction rules. */
+body.light-mode {
+  --lf-blue:#0059b3; --lf-blue-rgb:0,89,179; --lf-blue-deep:#003366;
+  --primary-color:#0059b3; --primary-hover:#0066cc;
+  --bg-dark:#0059b3; --panel-bg:#0059b3; --input-bg:#004080;
+  --bubble-bg:#004080; --input-text:#f7fbff; --text-dark:#f7fbff; --text-muted:#d8eaff;
+}
+body:not(.light-mode) {
+  --lf-blue:#08287F; --lf-blue-rgb:8,40,127; --lf-blue-deep:#061d5b;
+  --primary-color:#08287F; --primary-hover:#123c9c;
+  --dark-navy:#08287F; --bg-dark:#08287F; --panel-bg:#08287F;
+  --input-bg:#061d5b; --bubble-bg:#061d5b; --text-muted:#d8eaff;
+}
+body.light-mode, body:not(.light-mode) { background-color:var(--lf-blue) !important; }
+body.portal-active::before, body.portal-active::after,
+#authSection::before, #authSection::after { content:none !important; }
+.ambient-background { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; background:url('/assets/video/little-feet-ambient-poster.jpg') center/cover; }
+.ambient-background video { width:100%; height:100%; object-fit:cover; object-position:center; }
+.ambient-background::after { content:""; position:absolute; inset:0; background:rgba(var(--lf-blue-rgb),.35); }
+body:not(.light-mode) .ambient-background::after { background:rgba(var(--lf-blue-rgb),.56); }
+#dashboardSection { z-index:1; }
+/* :is keeps specificity above the existing theme guards without changing geometry. */
+body:is(.light-mode,:not(.light-mode)) #dashboardSection > nav,
+body:is(.light-mode,:not(.light-mode)) .app-sidebar,
+body:is(.light-mode,:not(.light-mode)) .app-sidebar [data-nav-group],
+body:is(.light-mode,:not(.light-mode)) .card,
+body:is(.light-mode,:not(.light-mode)) .workspace-card,
+body:is(.light-mode,:not(.light-mode)) .workspace-results-panel,
+body:is(.light-mode,:not(.light-mode)) .store-item,
+body:is(.light-mode,:not(.light-mode)) .chat-shell,
+body:is(.light-mode,:not(.light-mode)) .guide-link-card,
+body:is(.light-mode,:not(.light-mode)) .modal-card,
+body:is(.light-mode,:not(.light-mode)) .item-row,
+body:is(.light-mode,:not(.light-mode)) .wellbeing-banner,
+body:is(.light-mode,:not(.light-mode)) #termsNotice,
+body:is(.light-mode,:not(.light-mode)) #runtimeErrorBanner,
+body:is(.light-mode,:not(.light-mode)) #schoolPinCard,
+body:is(.light-mode,:not(.light-mode)) #householdSwitcher,
+body:is(.light-mode,:not(.light-mode)) [data-roles][style*="background: var(--panel-bg)"],
+body:is(.light-mode,:not(.light-mode)) footer {
+  background:linear-gradient(145deg,rgba(var(--lf-blue-rgb),.96),var(--lf-blue-deep)) !important;
+  color:#f7fbff !important; border-color:rgba(157,207,255,.4) !important;
+}
+body:is(.light-mode,:not(.light-mode)) input,
+body:is(.light-mode,:not(.light-mode)) select,
+body:is(.light-mode,:not(.light-mode)) textarea,
+body:is(.light-mode,:not(.light-mode)) .chat-box,
+body:is(.light-mode,:not(.light-mode)) .profile-icon-choice,
+body:is(.light-mode,:not(.light-mode)) .social-signin button {
+  background:var(--lf-blue-deep) !important; color:#f7fbff !important;
+}
+body:is(.light-mode,:not(.light-mode)) .nav-shortcut,
+body:is(.light-mode,:not(.light-mode)) .nav-term-edit,
+body:is(.light-mode,:not(.light-mode)) .action-btn.btn-blue,
+body:is(.light-mode,:not(.light-mode)) button.submit-btn,
+body:is(.light-mode,:not(.light-mode)) .sidebar-links .nav-btn.active {
+  background:linear-gradient(180deg,var(--primary-hover),var(--lf-blue)) !important; color:white !important;
+}
+body:is(.light-mode,:not(.light-mode)) .portal-welcome-banner {
+  background-image:linear-gradient(90deg,var(--lf-blue-deep),rgba(var(--lf-blue-rgb),.85) 44%,rgba(var(--lf-blue-rgb),.15)),url('/assets/4k/admin-mascot-dashboard-4k.jpg') !important;
+}
+.background-motion-toggle { position:fixed; bottom:max(12px,env(safe-area-inset-bottom)); right:12px; z-index:12; width:auto; min-height:44px; padding:8px 12px; border:1px solid #a9d3ff; border-radius:12px; background:var(--lf-blue-deep); color:white; font:600 12px system-ui; cursor:pointer; box-shadow:0 3px 12px #001a3355; }
+.background-motion-toggle:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+@media (prefers-reduced-motion:reduce) { .ambient-background video { visibility:hidden; } }
+/* Keep login and footer text legible over the moving blue backdrop. */
+body:is(.light-mode,:not(.light-mode)) #authSection > .auth-card {
+  background:linear-gradient(145deg,rgba(var(--lf-blue-rgb),.94),var(--lf-blue-deep)) !important;
+}
+body:is(.light-mode,:not(.light-mode)) footer a,
+body:is(.light-mode,:not(.light-mode)) footer p,
+body:is(.light-mode,:not(.light-mode)) footer button,
+body:is(.light-mode,:not(.light-mode)) footer span { color:#e3f0ff !important; }
