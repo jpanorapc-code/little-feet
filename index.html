@@ -4237,6 +4237,126 @@
       color:#EAF7FB !important;
     }
 
+
+    /* Dark mode palette: Deep Sapphire #070738. Light mode remains untouched. */
+    body:not(.light-mode) {
+      --primary-color:#070738;
+      --primary-hover:#12125A;
+      --dark-navy:#070738;
+      --bg-dark:#03031F;
+      --panel-bg:#070738;
+      --input-bg:#0B0B45;
+      --bubble-bg:#0B0B45;
+      --border-color:rgba(117,126,255,.30);
+      --text-dark:#F7F8FF;
+      --text-muted:#BCC2E2;
+      --input-text:#F7F8FF;
+      --lf-glass-dark-a:rgba(7,7,56,.80);
+      --lf-glass-dark-b:rgba(4,4,35,.72);
+    }
+
+    body:not(.light-mode) #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, rgba(13,13,74,.96), rgba(7,7,56,.96)) !important;
+      border-bottom-color:rgba(117,126,255,.32) !important;
+      box-shadow:
+        0 12px 28px rgba(0,0,20,.30),
+        inset 0 1px 0 rgba(255,255,255,.05) !important;
+    }
+
+    body:not(.light-mode) .app-sidebar {
+      background:
+        linear-gradient(180deg, rgba(9,9,67,.94), rgba(4,4,35,.96)) !important;
+      border-right-color:rgba(117,126,255,.26) !important;
+      box-shadow:
+        10px 0 30px rgba(0,0,18,.28),
+        inset -1px 0 0 rgba(255,255,255,.04) !important;
+    }
+
+    body:not(.light-mode) .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(16,16,82,.88), rgba(7,7,56,.92)) !important;
+      border-color:rgba(117,126,255,.24) !important;
+    }
+
+    body:not(.light-mode) .card,
+    body:not(.light-mode) .workspace-card,
+    body:not(.light-mode) .workspace-results-panel,
+    body:not(.light-mode) .store-item,
+    body:not(.light-mode) .chat-shell,
+    body:not(.light-mode) .guide-link-card,
+    body:not(.light-mode) .modal-card,
+    body:not(.light-mode) .item-row,
+    body:not(.light-mode) .wellbeing-banner,
+    body:not(.light-mode) #termsNotice,
+    body:not(.light-mode) #runtimeErrorBanner,
+    body:not(.light-mode) #schoolPinCard,
+    body:not(.light-mode) #householdSwitcher,
+    body:not(.light-mode) [data-roles][style*="background: var(--panel-bg)"] {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,0) 30%),
+        radial-gradient(circle at 12% 0%, rgba(67,67,180,.12), transparent 40%),
+        linear-gradient(145deg, rgba(7,7,56,.90), rgba(4,4,35,.84)) !important;
+      border-color:rgba(117,126,255,.28) !important;
+      box-shadow:
+        0 18px 40px rgba(0,0,18,.28),
+        inset 0 1px 0 rgba(255,255,255,.055) !important;
+    }
+
+    body:not(.light-mode) input,
+    body:not(.light-mode) select,
+    body:not(.light-mode) textarea,
+    body:not(.light-mode) .chat-box,
+    body:not(.light-mode) .profile-icon-choice,
+    body:not(.light-mode) .social-signin button {
+      color:#F7F8FF !important;
+      background:
+        linear-gradient(180deg, rgba(18,18,88,.94), rgba(9,9,60,.94)) !important;
+      border-color:rgba(117,126,255,.30) !important;
+    }
+
+    body:not(.light-mode) .action-btn,
+    body:not(.light-mode) button.submit-btn,
+    body:not(.light-mode) .nav-shortcut,
+    body:not(.light-mode) .nav-term-edit,
+    body:not(.light-mode) .sidebar-links .nav-btn.active {
+      background:
+        linear-gradient(180deg, #12125A, #070738) !important;
+      border-color:rgba(151,158,255,.46) !important;
+      color:#FFFFFF !important;
+      box-shadow:
+        0 8px 18px rgba(0,0,30,.28),
+        inset 0 1px 0 rgba(255,255,255,.10) !important;
+    }
+
+    body:not(.light-mode) .action-btn:hover,
+    body:not(.light-mode) button.submit-btn:hover,
+    body:not(.light-mode) .nav-shortcut:hover,
+    body:not(.light-mode) .nav-term-edit:hover,
+    body:not(.light-mode) .sidebar-links .nav-btn:hover {
+      background:
+        linear-gradient(180deg, #1B1B70, #0D0D4B) !important;
+      border-color:rgba(173,179,255,.62) !important;
+    }
+
+    body:not(.light-mode) .guide-open,
+    body:not(.light-mode) .portal-welcome-kicker,
+    body:not(.light-mode) .sidebar-group-toggle,
+    body:not(.light-mode) .app-sidebar [data-nav-group] .sidebar-heading,
+    body:not(.light-mode) .sidebar-links .nav-btn .ui-icon,
+    body:not(.light-mode) .card-header-bar .ui-icon,
+    body:not(.light-mode) .workspace-results-heading .ui-icon {
+      color:#AEB6FF !important;
+    }
+
+    body:not(.light-mode) input:focus,
+    body:not(.light-mode) select:focus,
+    body:not(.light-mode) textarea:focus {
+      border-color:#8B94FF !important;
+      box-shadow:0 0 0 3px rgba(117,126,255,.16) !important;
+      outline:none !important;
+    }
+
   </style>
 </head>
 <body>
