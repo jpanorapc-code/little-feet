@@ -3711,6 +3711,7 @@
   .staff-work-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.staff-work-card{padding:18px;border:1px solid var(--border-color);border-radius:12px;background:var(--panel-bg)}.staff-work-card h3{margin-top:0}.staff-work-card form{display:grid;gap:8px;margin-bottom:16px}.staff-work-card form input,.staff-work-card form select,.staff-work-card form textarea{width:100%}.staff-work-list{display:grid;gap:8px}.staff-work-list article{display:grid;gap:7px;padding:11px;border:1px solid var(--border-color);border-radius:9px}.staff-work-list article span{color:var(--text-muted);font-size:.8rem}.staff-work-list article div{display:flex;gap:7px;flex-wrap:wrap}
 .staff-kpi-dashboard{grid-column:1/-1}.staff-kpi-scoreboard{display:grid;gap:9px;margin:14px 0}.staff-kpi-scoreboard article{display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,2fr);gap:8px 16px;align-items:center}.staff-kpi-scoreboard article span{font-size:.82rem;color:var(--text-muted)}.staff-kpi-bar{grid-column:1/-1;height:8px;border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden}.staff-kpi-bar i{display:block;height:100%;background:currentColor;border-radius:inherit}.staff-kpi-graph{display:flex;align-items:end;gap:10px;min-height:210px;padding:16px 8px 4px;overflow-x:auto}.staff-kpi-graph>div{display:grid;grid-template-rows:auto 150px auto;gap:5px;min-width:72px;text-align:center;font-size:.72rem}.staff-kpi-graph b{display:flex;align-items:end;justify-content:center;height:150px;border-bottom:1px solid var(--border-color)}.staff-kpi-graph b i{display:block;width:34px;min-height:3px;border-radius:6px 6px 0 0;background:currentColor}.staff-kpi-graph em{font-style:normal;font-weight:800}
 .approval-item{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border-color)}.approval-item>div:first-child{min-width:0}.approval-item strong{margin-left:8px}.approval-actions{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:640px){.approval-item{align-items:stretch;flex-direction:column}.approval-actions .action-btn{flex:1}}
+.staff-notice{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--border-color)}.staff-notice h3{margin:8px 0 5px}.staff-notice p{white-space:pre-wrap}.staff-notice .badge-tag+.badge-tag{margin-left:6px}@media(max-width:640px){.staff-notice{align-items:stretch;flex-direction:column}.staff-notice>.action-btn{width:100%}}
 </style>
 </head>
 <body>
@@ -4930,6 +4931,12 @@
               <div id="approvalsList">Loading approvals…</div>
             </div>
           </div>
+          <div id="staffNoticesTab" class="tab-content" data-roles="teacher,principal,admin">
+            <div class="card staff-notice-manager"><div class="card-header-bar"><h2>Publish Staff Notice</h2></div>
+              <form id="staffNoticeForm"><input name="title" maxlength="180" placeholder="Notice title" required><textarea name="message" maxlength="5000" placeholder="Message for staff" required></textarea><div class="flex-form-row"><select name="audience"><option>All staff</option><option value="teacher">Teachers</option><option value="principal">Principals</option><option value="admin">Administrators</option></select><input name="dueDate" type="date"><label><input name="required" type="checkbox" checked> Require acknowledgement</label></div><button class="submit-btn">Publish notice</button></form>
+            </div>
+            <div class="card"><div class="card-header-bar"><h2>Staff Notice Board</h2><button type="button" class="action-btn" onclick="refreshStaffNotices()">Refresh</button></div><div id="staffNoticeList">Loading notices…</div></div>
+          </div>
           <div id="guideTab" class="tab-content">
         <div class="card">
           <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
@@ -4997,7 +5004,7 @@
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
   <script src="backup.js?v=20260926-layout-v1" defer></script>
-  <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>\n  <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>\n  <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>\n  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
+  <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>\n  <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>\n  <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>\n  <script src="/assets/staff-notices.js?v=20260926-staff-notices-v1" defer></script>\n  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
