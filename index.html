@@ -3668,6 +3668,36 @@
       }
     }
 
+
+    /* Attached sidebar scroll polish — preserve pinning, remove detached white rail. */
+    @media (min-width:960px) {
+      .app-sidebar {
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        overscroll-behavior-y:contain;
+        scrollbar-width:thin;
+        scrollbar-color:rgba(96, 218, 211, .42) transparent;
+        scrollbar-gutter:auto;
+      }
+      .app-sidebar::-webkit-scrollbar {
+        width:7px;
+      }
+      .app-sidebar::-webkit-scrollbar-track {
+        background:transparent;
+      }
+      .app-sidebar::-webkit-scrollbar-thumb {
+        background:linear-gradient(180deg, rgba(105, 232, 220, .48), rgba(29, 137, 151, .44));
+        border:2px solid transparent;
+        border-radius:999px;
+        background-clip:padding-box;
+      }
+      .app-sidebar::-webkit-scrollbar-thumb:hover {
+        background:linear-gradient(180deg, rgba(130, 245, 233, .62), rgba(34, 155, 168, .56));
+        border:2px solid transparent;
+        background-clip:padding-box;
+      }
+    }
+
   </style>
 </head>
 <body>
