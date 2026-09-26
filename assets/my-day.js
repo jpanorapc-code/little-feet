@@ -219,6 +219,7 @@
     addStyles();
     buildNav();
     buildTab(user);
+    loadAttention();
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once:true });
