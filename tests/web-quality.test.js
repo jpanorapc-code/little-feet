@@ -38,7 +38,7 @@ assert.match(page, /--panel-bg:#1B4965/);
 assert.match(page, /body:not\(\.light-mode\)[\s\S]*--primary-color:#070738/);
 assert.match(page, /body:not\(\.light-mode\)[\s\S]*--panel-bg:#070738/);
 assert.match(page, /linear-gradient\(180deg, #12125A, #070738\)/);
-assert.match(page, /body:not\(\.light-mode\) \.app-sidebar[\s\S]*rgba\(7,7,56,\.96\)/);
+assert.match(page, /body:not\(\.light-mode\) \.app-sidebar[\s\S]*rgba\(9,9,67,\.94\)[\s\S]*rgba\(4,4,35,\.96\)/);
 assert.match(page, /body\.light-mode[\s\S]*--bg-dark:#163E56/);
 assert.match(page, /linear-gradient\(145deg, rgba\(27,73,101,\.93\), rgba\(18,56,80,\.88\)\)/);
 assert.match(page, /body\.light-mode input,[\s\S]*color:#F7FBFF !important/);
