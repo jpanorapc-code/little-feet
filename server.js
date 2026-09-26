@@ -753,6 +753,7 @@ const db = {
   teacherCover: [],
   performanceReviews: [],
   staffNotices: [],
+  meetingMinutes: [],
   broadcasts: [],
   campusVisitors: [],
   visitorMeetings: [],
@@ -990,7 +991,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2596,6 +2597,38 @@ app.get('/api/staff/kpi-monthly', (req, res) => {
   const rows = visible.map(account => ({ username: account.username, staffName: account.name || account.username, ...monthlyTaskKpi(actor, account.username, month) }));
   const ranked = rows.slice().sort((a,b) => b.completionRate - a.completionRate || b.completed - a.completed || a.staffName.localeCompare(b.staffName)).map((row,index)=>({ ...row, rank:index+1 }));
   res.json({ month, rows: ranked });
+});
+
+// Meeting minutes turn approved meeting tickets into accountable staff work.
+app.get('/api/staff/meetings', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'School staff access is required.' });
+  const tickets = tenantRecords(db.tickets, actor).filter(item => item.ticketType === 'Meeting request' && item.meetingDecision === 'Approved');
+  const minutes = tenantRecords(db.meetingMinutes, actor);
+  res.json(tickets.map(ticket => ({ ...ticket, minutes: minutes.find(item => item.ticketId === ticket.id) || null })));
+});
+app.post('/api/staff/meetings/:id/minutes', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor || !['admin','principal'].includes(actor.role)) return res.status(403).json({ message: 'Only school management can record meeting minutes.' });
+  const ticket = db.tickets.find(item => item.id === req.params.id && recordInSchool(item, actor) && item.ticketType === 'Meeting request' && item.meetingDecision === 'Approved');
+  if (!ticket) return res.status(404).json({ message: 'Approved meeting request not found.' });
+  if (db.meetingMinutes.some(item => item.ticketId === ticket.id && recordInSchool(item, actor))) return res.status(409).json({ message: 'Minutes have already been recorded for this meeting.' });
+  const summary = boundedText(req.body?.summary, 5000);
+  if (!summary) return res.status(400).json({ message: 'Add meeting minutes before saving.' });
+  const actions = Array.isArray(req.body?.actions) ? req.body.actions.slice(0, 30) : [];
+  const createdTasks = [];
+  for (const action of actions) {
+    const title = boundedText(action?.title, 180);
+    if (!title) continue;
+    const assignee = staffAccountInSchool(actor, action?.assignedTo);
+    if (!assignee) return res.status(400).json({ message: 'Every action item must be assigned to staff from this school.' });
+    const dueDate = boundedText(action?.dueDate, 30);
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return res.status(400).json({ message: 'Choose a valid action-item due date.' });
+    createdTasks.push(tagSchoolRecord(actor, { id: crypto.randomUUID(), title, details: `Meeting action · ${ticket.subject}`, priority: boundedText(action?.priority || 'Normal', 30), dueDate, status:'Open', assignedTo:assignee.username, assignedToName:assignee.name || assignee.username, createdBy:actor.username, sourceType:'Meeting', sourceId:ticket.id, createdAt:new Date().toISOString() }));
+  }
+  const item = tagSchoolRecord(actor, { id:crypto.randomUUID(), ticketId:ticket.id, subject:ticket.subject, summary, attendees:boundedText(req.body?.attendees, 2000), decisions:boundedText(req.body?.decisions, 4000), actionTaskIds:createdTasks.map(task=>task.id), recordedBy:actor.username, recordedByName:actor.name || actor.username, createdAt:new Date().toISOString() });
+  db.staffTasks.unshift(...createdTasks); db.meetingMinutes.unshift(item); ticket.minutesRecordedAt=item.createdAt; ticket.minutesId=item.id;
+  res.status(201).json({ success:true, item, createdTasks });
 });
 
 // Staff notice board with per-staff acknowledgement tracking.
