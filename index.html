@@ -4393,6 +4393,16 @@
       background-image: none !important;
       border-color: var(--border-color) !important;
     }
+
+    #authSection .login-background-compact{white-space:nowrap;min-height:42px}
+    #authSection .login-card-actions{flex-wrap:wrap}
+    .lf-notification-stack{position:fixed;right:18px;top:92px;z-index:9990;display:grid;gap:10px;width:min(390px,calc(100vw - 28px));pointer-events:none}
+    .lf-notification-popup{pointer-events:auto;background:var(--panel-bg);border:1px solid var(--border-color);border-left:4px solid #2dd4bf;border-radius:13px;padding:13px;box-shadow:0 18px 45px rgba(0,0,0,.32)}
+    .lf-notification-popup header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.lf-notification-popup p{margin:7px 0;font-size:.86rem}.lf-notification-popup .actions{display:flex;gap:8px;justify-content:flex-end}
+    .email-inbox-toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:14px 0}.email-inbox-list{display:grid;gap:9px}
+    .email-inbox-item{border:1px solid var(--border-color);border-radius:12px;padding:13px;background:rgba(2,15,29,.16)}.email-inbox-item.is-unread{border-left:4px solid #5eead4}.email-inbox-item.is-pinned{box-shadow:inset 0 0 0 1px rgba(94,234,212,.35)}
+    .email-inbox-item header{display:flex;justify-content:space-between;gap:10px}.email-inbox-item .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    @media(max-width:640px){#authSection .login-card-actions{display:grid;grid-template-columns:1fr 1fr}.lf-notification-stack{top:72px;right:14px}.email-inbox-item header{flex-direction:column}}
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
@@ -4403,7 +4413,6 @@
       <source src="/assets/video/little-feet-ambient-silent.mp4" type="video/mp4">
     </video>
   </div>
-  <button id="backgroundMotionToggle" class="background-motion-toggle" type="button" aria-controls="ambientBackgroundVideo" aria-pressed="false">Play background</button>
   <!-- Vector icon library: crisp at any screen density, including 4K displays. -->
   <svg id="lfIconSprite" aria-hidden="true" focusable="false" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
@@ -4500,6 +4509,7 @@
             </select>
           </label>
           <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Sound On</span></button>
+          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="ambientBackgroundVideo" aria-pressed="false">Play background</button>
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
@@ -4681,7 +4691,7 @@
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('qualificationsTab', this)">Training &amp; Qualifications</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('kpiHistoryTab', this)">KPI History &amp; Trends</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('staffDevelopmentTab', this)">Staff Development</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('emailIntegrationTab', this)">Email Integration</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('emailIntegrationTab', this)">Emails</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('notesTab', this)">Sticky Notes</button></li>
         <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Messages</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
