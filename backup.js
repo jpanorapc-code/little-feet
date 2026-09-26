@@ -490,7 +490,8 @@ function setupFormTemplates() {
   addFormTemplates(document.getElementById('ticketForm'), 'support request', [
     { label: 'Fee or payment question', department: 'Finance', priority: 'Normal', subject: 'Request for account assistance', message: 'Please review the account and advise on the next steps.' },
     { label: 'Medical information update', department: 'Medical', priority: 'High', subject: 'Learner medical information update', message: 'Please contact me to confirm the correct process for updating this learner’s medical information.' },
-    { label: 'General school query', department: 'Admin', priority: 'Normal', subject: 'School administration query', message: 'Please provide guidance or arrange a suitable time to discuss this request.' }
+    { label: 'General school query', department: 'Admin', priority: 'Normal', subject: 'School administration query', message: 'Please provide guidance or arrange a suitable time to discuss this request.' },
+    { label: 'Request a meeting', department: 'Principal & School Leadership', priority: 'Medium', subject: 'Meeting request', message: 'I would like to arrange a meeting to discuss the following matter: [add details].' }
   ], template => { document.getElementById('ticketDept').value = template.department; document.getElementById('ticketPriority').value = template.priority; document.getElementById('ticketSubject').value = template.subject; document.getElementById('ticketMessage').value = template.message; });
 
   addFormTemplates(document.getElementById('broadcastForm'), 'alert', [
@@ -1046,6 +1047,7 @@ function setupSession() {
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
   window.setTimeout(() => window.restoreDashboardDrafts?.(), 120);
+  document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
   startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
@@ -2554,12 +2556,14 @@ async function loadTickets(checkForNew = false) {
               <div>
                 <span class="badge-tag">${escapeWorkspaceText(t.department)}</span> 
                 <span class="badge-tag urgent">${escapeWorkspaceText(t.priority)} Priority</span>
+                ${t.ticketType === 'Meeting request' ? '<span class="badge-tag">Meeting request</span>' : ''}
                 <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
               ${currentUser?.role === 'admin' && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeURIComponent(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
+            ${t.ticketType === 'Meeting request' ? `<p class="meta" style="margin-top:6px;"><strong>Requested meeting:</strong> ${escapeWorkspaceText(t.meetingDate || 'Date not set')} ${escapeWorkspaceText(t.meetingTime || '')}${t.meetingLocation ? ' · ' + escapeWorkspaceText(t.meetingLocation) : ''}</p>` : ''}
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
@@ -2604,6 +2608,16 @@ async function deleteTicket(id) {
   loadTickets();
 }
 
+function toggleMeetingTicketFields() {
+  const isMeeting = document.getElementById('ticketType')?.value === 'Meeting request';
+  const fields = document.getElementById('meetingTicketFields');
+  fields?.classList.toggle('hidden', !isMeeting);
+  ['ticketMeetingDate','ticketMeetingTime'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.required = isMeeting;
+  });
+}
+
 const ticketForm = document.getElementById('ticketForm');
 if (ticketForm) {
   ticketForm.addEventListener('submit', async (e) => {
@@ -2612,6 +2626,10 @@ if (ticketForm) {
       id: Date.now().toString(),
       department: document.getElementById('ticketDept').value,
       priority: document.getElementById('ticketPriority').value,
+      ticketType: document.getElementById('ticketType')?.value || 'Help request',
+      meetingDate: document.getElementById('ticketMeetingDate')?.value || '',
+      meetingTime: document.getElementById('ticketMeetingTime')?.value || '',
+      meetingLocation: document.getElementById('ticketMeetingLocation')?.value || '',
       subject: document.getElementById('ticketSubject').value,
       message: document.getElementById('ticketMessage').value,
       createdBy: currentUser?.username,
