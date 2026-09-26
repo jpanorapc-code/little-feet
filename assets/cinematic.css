@@ -20,6 +20,7 @@
 }
 .cinematic-journey.is-active .cinematic-stage {
   position: fixed;
+  z-index: 20;
   top: 0;
   bottom: auto;
   height: 100vh;
