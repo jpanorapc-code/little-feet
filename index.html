@@ -3653,6 +3653,21 @@
       -webkit-backdrop-filter: blur(18px) saturate(108%);
     }
 
+
+    /* Desktop sidebar scroll lock — behavior only, no visual/layout redesign. */
+    @media (min-width:960px) {
+      #dashboardSection > nav {
+        position:sticky !important;
+        top:0 !important;
+      }
+      .app-sidebar {
+        position:fixed !important;
+        top:var(--portal-header-height, 68px) !important;
+        bottom:0 !important;
+        height:auto !important;
+      }
+    }
+
   </style>
 </head>
 <body>
