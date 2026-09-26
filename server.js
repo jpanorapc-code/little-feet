@@ -2575,6 +2575,28 @@ app.get('/api/analytics/:studentName', (req, res) => {
 
 // Attendance
 
+// Monthly KPI is calculated from completed staff tasks, not subjective manager ratings.
+const monthKey = value => /^\d{4}-\d{2}$/.test(String(value || '')) ? String(value) : new Date().toISOString().slice(0, 7);
+const monthlyTaskKpi = (actor, username, month) => {
+  const key = monthKey(month);
+  const tasks = tenantRecords(db.staffTasks, actor).filter(item => normalizeUsername(item.assignedTo) === normalizeUsername(username) && String(item.createdAt || '').slice(0, 7) === key);
+  const completed = tasks.filter(item => item.status === 'Completed').length;
+  const total = tasks.length;
+  const completionRate = total ? Math.round((completed / total) * 100) : 0;
+  const band = completionRate < 50 ? 'Below average' : completionRate < 80 ? 'Average' : 'Above average';
+  return { month: key, total, completed, outstanding: total - completed, completionRate, band };
+};
+app.get('/api/staff/kpi-monthly', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'School staff access is required.' });
+  const month = monthKey(req.query.month);
+  const schoolStaff = tenantRecords(db.users, actor).filter(account => ['teacher', 'principal', 'admin'].includes(account.role));
+  const visible = ['admin', 'principal'].includes(actor.role) ? schoolStaff : schoolStaff.filter(account => normalizeUsername(account.username) === normalizeUsername(actor.username));
+  const rows = visible.map(account => ({ username: account.username, staffName: account.name || account.username, ...monthlyTaskKpi(actor, account.username, month) }));
+  const ranked = rows.slice().sort((a,b) => b.completionRate - a.completionRate || b.completed - a.completed || a.staffName.localeCompare(b.staffName)).map((row,index)=>({ ...row, rank:index+1 }));
+  res.json({ month, rows: ranked });
+});
+
 // Staff performance reviews / KPI
 const KPI_RATINGS = new Set([1, 2, 3, 4, 5]);
 app.get('/api/staff/performance-reviews', (req, res) => {
@@ -2599,7 +2621,7 @@ app.post('/api/staff/performance-reviews', (req, res) => {
   const averageRating = Number((criteria.reduce((sum, entry) => sum + entry.rating, 0) / criteria.length).toFixed(2));
   const item = tagSchoolRecord(actor, {
     id: crypto.randomUUID(), username: employee.username, staffName: employee.name || employee.username,
-    reviewPeriod: boundedText(req.body?.reviewPeriod, 120), reviewDate: boundedText(req.body?.reviewDate, 30) || new Date().toISOString().slice(0, 10),
+    reviewPeriod: monthKey(req.body?.reviewPeriod), reviewDate: boundedText(req.body?.reviewDate, 30) || new Date().toISOString().slice(0, 10),
     criteria, averageRating, strengths: boundedText(req.body?.strengths, 2500), development: boundedText(req.body?.development, 2500),
     goals: boundedText(req.body?.goals, 2500), managerComment: boundedText(req.body?.managerComment, 2500),
     employeeComment: '', status: 'Draft', reviewedBy: actor.username, reviewedByName: actor.name || actor.username, createdAt: new Date().toISOString()
