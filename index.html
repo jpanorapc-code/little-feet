@@ -741,9 +741,12 @@
     .sidebar-group-toggle::after { content:none; }
     [data-nav-group].is-collapsed .sidebar-links { display:none; }
     [data-nav-group].is-collapsed::before { opacity:0; }
-    .app-sidebar.is-collapsed { width:76px; padding-inline:8px; overflow-x:hidden; }
-    .app-sidebar.is-collapsed .sidebar-heading, .app-sidebar.is-collapsed .sidebar-group-toggle, .app-sidebar.is-collapsed .sidebar-links, .app-sidebar.is-collapsed .sidebar-signout, .app-sidebar.is-collapsed [data-nav-group]::before { opacity:0; pointer-events:none; }
-    .app-sidebar.is-collapsed::after { content:'☰'; position:absolute; top:18px; left:25px; color:#5eead4; font-size:1.25rem; }
+    /* A saved desktop collapse preference must never hide the mobile drawer. */
+    @media (min-width:960px) {
+      .app-sidebar.is-collapsed { width:76px; padding-inline:8px; overflow-x:hidden; }
+      .app-sidebar.is-collapsed .sidebar-heading, .app-sidebar.is-collapsed .sidebar-group-toggle, .app-sidebar.is-collapsed .sidebar-links, .app-sidebar.is-collapsed .sidebar-signout, .app-sidebar.is-collapsed [data-nav-group]::before { opacity:0; pointer-events:none; }
+      .app-sidebar.is-collapsed::after { content:'☰'; position:absolute; top:18px; left:25px; color:#5eead4; font-size:1.25rem; }
+    }
     .sidebar-links { list-style:none; display:grid; gap:4px; }
     .sidebar-links li { min-width:0; }
     .sidebar-links .nav-btn, .sidebar-signout {
@@ -2105,6 +2108,1289 @@
       .nav-more-toggle { transform:none !important; }
     }
 
+
+    /* Final phone density repair: compact controls and tour copy without changing desktop. */
+    @media (max-width:640px) {
+      .container { padding:10px 9px; }
+      .card { padding:12px; margin-bottom:12px; border-radius:12px; }
+      .workspace-card,
+      .workspace-results-panel,
+      .store-item { padding:12px; }
+
+      .card-header-bar {
+        align-items:flex-start;
+        gap:8px;
+        margin-bottom:12px;
+        padding-bottom:9px;
+      }
+      .card-header-bar h2 {
+        width:auto;
+        max-width:100%;
+        font-size:1rem;
+        line-height:1.22;
+      }
+      .card-header-bar > .action-btn,
+      .card-header-bar > button,
+      .item-row > .action-btn,
+      .item-row > button {
+        width:auto;
+        max-width:100%;
+        align-self:flex-start;
+        justify-content:center;
+      }
+      .card-header-bar > div[style*="display:flex"],
+      .item-row > div[style*="display:flex"],
+      #parentPaymentsActions,
+      .chat-toolbar,
+      .portal-tour-actions {
+        display:flex !important;
+        flex-wrap:wrap;
+        width:100%;
+        gap:7px !important;
+        align-items:center !important;
+      }
+      .card-header-bar > div[style*="display:flex"] > button,
+      .item-row > div[style*="display:flex"] > button,
+      #parentPaymentsActions > button,
+      .chat-toolbar > button,
+      .portal-tour-actions > button {
+        width:auto;
+        max-width:100%;
+        min-width:0;
+        flex:0 1 auto;
+        margin:0;
+      }
+
+      .action-btn,
+      button.submit-btn {
+        min-height:40px;
+        padding:8px 10px;
+        font-size:.80rem;
+        line-height:1.15;
+        border-radius:9px;
+      }
+      form > .submit-btn,
+      .chat-compose .submit-btn,
+      #authSection .submit-btn {
+        width:100%;
+      }
+
+      .portal-tour { min-height:336px; }
+      .portal-tour-image { min-height:336px; }
+      .portal-tour-copy {
+        min-height:336px;
+        padding:17px 16px 54px;
+        gap:7px;
+      }
+      .portal-tour-kicker { font-size:.64rem; letter-spacing:.09em; }
+      .portal-tour h2 {
+        font-size:1.22rem;
+        line-height:1.14;
+      }
+      .portal-tour p {
+        font-size:.84rem;
+        line-height:1.42;
+      }
+      .portal-tour-fact {
+        padding:7px 9px;
+        font-size:.73rem;
+        line-height:1.38;
+      }
+      .portal-tour-actions { width:auto; }
+      .portal-tour-actions button {
+        width:auto;
+        min-height:38px;
+        padding:7px 10px;
+        font-size:.76rem;
+      }
+      .tour-controls { bottom:12px; }
+
+      #homeTab > .card .card-header-bar > div[style*="justify-content:flex-end"] {
+        width:auto;
+        flex:0 1 auto;
+        justify-content:flex-start !important;
+      }
+      #findSchoolMapButton,
+      #closeSchoolMapButton {
+        width:auto !important;
+        min-height:40px;
+        padding:8px 12px;
+        font-size:.80rem;
+      }
+      #schoolMapContainer {
+        height:clamp(360px,62vh,500px) !important;
+      }
+      #schoolPickerPanel { padding:10px !important; }
+
+      .item-row { padding:11px; }
+      .item-row p,
+      .card > p { line-height:1.42; }
+    }
+
+    @media (max-width:420px) {
+      .container { padding-inline:8px; }
+      .card,
+      .workspace-card { padding:11px; }
+      .action-btn,
+      button.submit-btn { min-height:40px; }
+      .portal-tour { min-height:328px; }
+      .portal-tour-image,
+      .portal-tour-copy { min-height:328px; }
+      .portal-tour h2 { font-size:1.16rem; }
+      .portal-tour p { font-size:.82rem; }
+      .portal-tour-fact { font-size:.71rem; }
+    }
+
+
+    /* Mobile Home shell: compact header, notices and welcome hero. */
+    @media (max-width:640px) {
+      #dashboardSection > nav {
+        padding:7px 9px 8px;
+        gap:6px;
+        grid-template-columns:minmax(0,1fr) auto;
+      }
+      .nav-brand { gap:7px; font-size:1rem; }
+      .nav-brand img { width:34px; height:34px; }
+      .nav-user-panel { gap:4px; }
+      .nav-user-panel .action-btn {
+        min-width:34px;
+        min-height:34px;
+        padding:6px !important;
+      }
+      .user-avatar { width:26px; height:26px; }
+
+      .nav-quickbar {
+        grid-column:1 / -1;
+        grid-row:2;
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:6px;
+        width:100%;
+        margin:0;
+      }
+      .nav-term-panel {
+        grid-column:1 / -1;
+        min-height:34px;
+        max-width:none;
+        padding:4px 7px;
+        border-radius:8px;
+      }
+      .nav-term-panel strong {
+        font-size:.66rem;
+        line-height:1.1;
+      }
+      .nav-term-panel .nav-term-edit {
+        min-height:30px;
+        padding:4px 8px;
+        font-size:.64rem;
+      }
+      .nav-quickbar .nav-shortcut {
+        width:100%;
+        min-width:0;
+        min-height:38px;
+        padding:6px 5px;
+        gap:4px;
+        font-size:.73rem;
+        line-height:1.05;
+        white-space:nowrap;
+      }
+      .nav-quickbar .nav-shortcut .ui-icon {
+        width:16px;
+        height:16px;
+      }
+      .nav-more-toggle {
+        grid-column:1 / -1;
+        grid-row:3;
+        width:100%;
+        min-height:38px;
+        padding:6px 9px;
+        font-size:.76rem;
+      }
+
+      #homeTab > .wellbeing-banner {
+        gap:8px;
+        padding:9px 10px;
+        margin-bottom:10px;
+        border-left-width:3px;
+        border-radius:10px;
+        align-items:flex-start;
+      }
+      #homeTab > .wellbeing-banner .tip-icon {
+        width:26px;
+        height:26px;
+        flex-basis:26px;
+        border-radius:8px;
+      }
+      #homeTab > .wellbeing-banner .tip-icon .ui-icon {
+        width:15px;
+        height:15px;
+      }
+      #homeTab > .wellbeing-banner p {
+        font-size:.80rem;
+        line-height:1.35;
+      }
+      #homeTab > #termsNotice p { font-size:.78rem; }
+      #homeTab > .wellbeing-banner > button:last-child {
+        flex:0 0 30px;
+        width:30px;
+        min-height:30px;
+        padding:2px;
+        font-size:1rem;
+      }
+
+      #homeTab > .portal-welcome-banner {
+        min-height:170px;
+        margin-bottom:12px;
+        padding:12px 13px;
+        background-size:cover,auto 100%;
+        background-position:center,right center;
+      }
+      #homeTab > .portal-welcome-banner .portal-welcome-copy {
+        max-width:72%;
+      }
+      #homeTab .role-home-panel.mascot-role-home .role-home-content {
+        max-width:100%;
+      }
+      #homeTab .portal-welcome-kicker {
+        margin-bottom:3px;
+        font-size:.60rem;
+        letter-spacing:.08em;
+      }
+      #homeTab .portal-welcome-banner h1 {
+        margin-bottom:4px;
+        font-size:1.14rem;
+        line-height:1.12;
+      }
+      #homeTab .portal-welcome-banner p {
+        font-size:.76rem;
+        line-height:1.34;
+      }
+
+      #homeTab > .card,
+      #homeTab > section {
+        margin-bottom:12px !important;
+      }
+      #homeTab .workspace-grid { gap:10px; }
+    }
+
+    @media (max-width:360px) {
+      .nav-quickbar {
+        grid-template-columns:repeat(3,minmax(0,1fr));
+      }
+      .nav-quickbar .nav-shortcut {
+        font-size:.68rem;
+        padding-inline:4px;
+      }
+      #homeTab > .portal-welcome-banner .portal-welcome-copy {
+        max-width:76%;
+      }
+      #homeTab .portal-welcome-banner h1 { font-size:1.08rem; }
+      #homeTab > .wellbeing-banner p { font-size:.77rem; }
+    }
+
+
+    /* Premium surface skin v2 — visual-only.
+       No sizing, spacing, display, positioning, responsive or sidebar geometry changes. */
+    :root {
+      --lf-premium-edge: rgba(118, 230, 236, .24);
+      --lf-premium-edge-strong: rgba(94, 234, 212, .40);
+      --lf-premium-shadow: rgba(0, 8, 20, .34);
+      --lf-premium-teal: #20bfae;
+      --lf-premium-cyan: #49cfe0;
+    }
+
+    #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, rgba(11, 31, 49, .99), rgba(5, 20, 34, .99)) !important;
+      border-bottom-color: rgba(91, 213, 224, .26) !important;
+      box-shadow:
+        0 12px 30px rgba(0, 8, 20, .34),
+        inset 0 -1px 0 rgba(133, 230, 236, .07) !important;
+    }
+
+    .app-sidebar {
+      background:
+        radial-gradient(circle at 18% 8%, rgba(34, 197, 178, .10), transparent 34%),
+        linear-gradient(180deg, rgba(8, 29, 47, .99), rgba(4, 17, 30, .995)) !important;
+      border-right-color: rgba(103, 208, 222, .18) !important;
+      box-shadow:
+        10px 0 32px rgba(0, 7, 18, .30),
+        inset -1px 0 0 rgba(123, 226, 232, .05) !important;
+    }
+
+    .app-sidebar [data-nav-group] {
+      background:
+        radial-gradient(circle at 8% 0%, rgba(47, 193, 183, .10), transparent 40%),
+        linear-gradient(180deg, rgba(17, 52, 79, .94), rgba(9, 35, 58, .96)) !important;
+      border-color: rgba(104, 196, 214, .16) !important;
+      box-shadow:
+        0 10px 24px rgba(0, 8, 20, .16),
+        inset 0 1px 0 rgba(255, 255, 255, .045),
+        inset 0 -1px 0 rgba(69, 190, 198, .04) !important;
+    }
+
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell,
+    .guide-link-card,
+    .modal-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, 0) 24%),
+        radial-gradient(circle at 8% 0%, rgba(41, 198, 184, .13), transparent 34%),
+        radial-gradient(circle at 96% 100%, rgba(56, 163, 210, .075), transparent 42%),
+        linear-gradient(145deg, rgba(14, 46, 72, .98), rgba(7, 29, 49, .985)) !important;
+      border-color: var(--lf-premium-edge) !important;
+      box-shadow:
+        0 20px 44px var(--lf-premium-shadow),
+        inset 0 1px 0 rgba(255, 255, 255, .075),
+        inset 0 -1px 0 rgba(62, 200, 202, .04) !important;
+      backdrop-filter: blur(12px) saturate(106%);
+      -webkit-backdrop-filter: blur(12px) saturate(106%);
+    }
+
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .guide-link-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, 0) 26%),
+        radial-gradient(circle at 14% 0%, rgba(44, 194, 180, .09), transparent 36%),
+        linear-gradient(145deg, rgba(17, 54, 82, .92), rgba(9, 35, 58, .95)) !important;
+      border-color: rgba(103, 199, 216, .20) !important;
+      box-shadow:
+        0 12px 28px rgba(0, 8, 20, .20),
+        inset 0 1px 0 rgba(255, 255, 255, .055),
+        inset 0 -1px 0 rgba(52, 184, 194, .035) !important;
+    }
+
+    .card-header-bar {
+      border-bottom-color: rgba(102, 202, 215, .16) !important;
+    }
+
+    input,
+    select,
+    textarea,
+    .chat-box {
+      background:
+        linear-gradient(180deg, rgba(23, 57, 84, .95), rgba(13, 41, 66, .97)) !important;
+      border-color: rgba(100, 191, 211, .22) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .035),
+        inset 0 0 0 1px rgba(1, 10, 22, .12) !important;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: rgba(84, 222, 211, .64) !important;
+      box-shadow:
+        0 0 0 3px rgba(45, 212, 191, .12),
+        0 0 18px rgba(45, 212, 191, .07),
+        inset 0 1px 0 rgba(255, 255, 255, .045) !important;
+    }
+
+    .action-btn,
+    button.submit-btn,
+    .nav-shortcut,
+    .nav-more-toggle,
+    .nav-term-edit {
+      background:
+        linear-gradient(180deg, #24bfae 0%, #129b99 48%, #0b788b 100%) !important;
+      border-color: rgba(143, 239, 226, .34) !important;
+      box-shadow:
+        0 8px 18px rgba(0, 12, 24, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .20),
+        inset 0 -1px 0 rgba(0, 26, 38, .18) !important;
+      text-shadow: 0 1px 1px rgba(0, 18, 27, .34);
+    }
+
+    .action-btn:hover,
+    button.submit-btn:hover,
+    .nav-shortcut:hover,
+    .nav-more-toggle:hover,
+    .nav-term-edit:hover {
+      background:
+        linear-gradient(180deg, #2bc9b7 0%, #17a7a2 48%, #0d8192 100%) !important;
+      border-color: rgba(159, 248, 235, .46) !important;
+      box-shadow:
+        0 10px 22px rgba(0, 12, 24, .28),
+        0 0 16px rgba(42, 199, 186, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .24) !important;
+    }
+
+    .btn-red {
+      background:
+        linear-gradient(180deg, #ef5c66 0%, #d83d52 50%, #b82f49 100%) !important;
+      border-color: rgba(255, 190, 196, .28) !important;
+    }
+
+    .btn-green {
+      background:
+        linear-gradient(180deg, #22bd91 0%, #139a82 50%, #0e7f7d 100%) !important;
+      border-color: rgba(158, 242, 213, .30) !important;
+    }
+
+    .sidebar-links .nav-btn:hover,
+    .sidebar-links .nav-btn.active {
+      background:
+        linear-gradient(180deg, rgba(32, 181, 169, .96), rgba(12, 128, 143, .98)) !important;
+      border-color: rgba(142, 237, 226, .48) !important;
+      box-shadow:
+        0 8px 18px rgba(0, 16, 27, .22),
+        inset 0 1px 0 rgba(255, 255, 255, .16) !important;
+    }
+
+    .badge-tag,
+    .professional-icon,
+    .workspace-results-icon {
+      border-color: rgba(113, 215, 220, .25) !important;
+      background:
+        linear-gradient(180deg, rgba(45, 186, 174, .18), rgba(20, 113, 130, .12)) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .055),
+        0 4px 12px rgba(0, 10, 20, .10) !important;
+    }
+
+    body.light-mode {
+      --bg-dark: #c9e2eb;
+      --panel-bg: #d6eaf1;
+      --input-bg: #dceef3;
+      --border-color: #87b6c6;
+      --text-dark: #102f43;
+      --text-muted: #456779;
+      --input-text: #102f43;
+      --bubble-bg: #c7e2ea;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 26%),
+        radial-gradient(circle at 10% 0%, rgba(22, 151, 157, .12), transparent 36%),
+        radial-gradient(circle at 96% 100%, rgba(42, 132, 178, .08), transparent 40%),
+        linear-gradient(145deg, rgba(216, 238, 245, .98), rgba(190, 222, 233, .97)) !important;
+      border-color: rgba(49, 129, 153, .25) !important;
+      box-shadow:
+        0 18px 38px rgba(29, 84, 104, .15),
+        inset 0 1px 0 rgba(255, 255, 255, .56),
+        inset 0 -1px 0 rgba(18, 111, 137, .055) !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .18), rgba(255, 255, 255, 0) 26%),
+        linear-gradient(145deg, rgba(225, 243, 248, .98), rgba(202, 229, 237, .98)) !important;
+      border-color: rgba(54, 135, 158, .22) !important;
+      box-shadow:
+        0 10px 24px rgba(35, 90, 109, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .52) !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box {
+      background:
+        linear-gradient(180deg, rgba(224, 241, 247, .98), rgba(207, 231, 239, .98)) !important;
+      border-color: rgba(57, 134, 156, .24) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .48),
+        inset 0 0 0 1px rgba(24, 99, 121, .035) !important;
+    }
+
+    body.light-mode .app-sidebar {
+      background:
+        radial-gradient(circle at 18% 8%, rgba(30, 159, 158, .10), transparent 34%),
+        linear-gradient(180deg, rgba(202, 230, 239, .98), rgba(180, 216, 228, .99)) !important;
+      border-right-color: rgba(45, 120, 143, .20) !important;
+      box-shadow:
+        10px 0 28px rgba(36, 91, 110, .12),
+        inset -1px 0 0 rgba(255, 255, 255, .28) !important;
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(218, 239, 245, .96), rgba(193, 225, 235, .97)) !important;
+      border-color: rgba(53, 132, 154, .18) !important;
+      box-shadow:
+        0 8px 18px rgba(35, 91, 108, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .42) !important;
+    }
+
+    body.light-mode #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, rgba(24, 72, 91, .98), rgba(17, 54, 73, .99)) !important;
+      border-bottom-color: rgba(81, 184, 193, .30) !important;
+    }
+
+
+    /* Royal pristine palette — colour/material only, zero geometry changes. */
+    :root {
+      --lf-royal-midnight: #071a2f;
+      --lf-royal-sapphire: #0b3157;
+      --lf-royal-teal: #0b8f8c;
+      --lf-royal-jade: #20b6a5;
+      --lf-royal-cyan: #5ad6e4;
+      --lf-royal-gold: #d8b76a;
+      --lf-royal-gold-soft: rgba(216, 183, 106, .30);
+    }
+
+    #dashboardSection > nav {
+      background:
+        radial-gradient(circle at 28% -80%, rgba(62, 162, 184, .16), transparent 42%),
+        linear-gradient(180deg, #081f35 0%, #06172a 100%) !important;
+      border-bottom-color: rgba(109, 217, 223, .28) !important;
+      box-shadow:
+        0 14px 34px rgba(0, 6, 18, .38),
+        inset 0 -1px 0 rgba(216, 183, 106, .08) !important;
+    }
+
+    .app-sidebar {
+      background:
+        radial-gradient(circle at 20% 5%, rgba(31, 182, 170, .12), transparent 34%),
+        linear-gradient(180deg, #0a2741 0%, #071b30 48%, #051425 100%) !important;
+      border-right-color: rgba(98, 196, 211, .20) !important;
+      box-shadow:
+        12px 0 34px rgba(0, 6, 18, .34),
+        inset -1px 0 0 rgba(216, 183, 106, .055) !important;
+    }
+
+    .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(17, 59, 91, .96), rgba(9, 39, 66, .98)) !important;
+      border-color: rgba(104, 204, 216, .19) !important;
+      box-shadow:
+        0 12px 26px rgba(0, 8, 22, .18),
+        inset 0 1px 0 rgba(255, 255, 255, .05),
+        inset 0 -1px 0 rgba(216, 183, 106, .04) !important;
+    }
+
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell,
+    .guide-link-card,
+    .modal-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .052), rgba(255, 255, 255, 0) 22%),
+        radial-gradient(circle at 12% -6%, rgba(54, 190, 185, .15), transparent 34%),
+        radial-gradient(circle at 100% 100%, rgba(37, 111, 174, .12), transparent 46%),
+        linear-gradient(145deg, #123f61 0%, #0c304f 52%, #082540 100%) !important;
+      border-color: rgba(104, 205, 217, .26) !important;
+      box-shadow:
+        0 22px 50px rgba(0, 7, 20, .34),
+        0 0 0 1px rgba(216, 183, 106, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .085),
+        inset 0 -1px 0 rgba(20, 141, 151, .055) !important;
+    }
+
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .guide-link-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .042), rgba(255, 255, 255, 0) 24%),
+        radial-gradient(circle at 10% 0%, rgba(40, 174, 168, .11), transparent 36%),
+        linear-gradient(145deg, #164b6f 0%, #103b5e 52%, #0b304f 100%) !important;
+      border-color: rgba(109, 198, 214, .23) !important;
+      box-shadow:
+        0 14px 32px rgba(0, 8, 21, .22),
+        inset 0 1px 0 rgba(255, 255, 255, .065),
+        inset 0 -1px 0 rgba(216, 183, 106, .03) !important;
+    }
+
+    .card-header-bar,
+    .workspace-results-heading {
+      border-bottom-color: rgba(109, 205, 216, .18) !important;
+    }
+
+    .card-header-bar h2,
+    .workspace-card h3,
+    .guide-link-card h3,
+    .workspace-results-heading h3 {
+      text-shadow: 0 1px 1px rgba(0, 8, 16, .30);
+    }
+
+    .portal-welcome-kicker,
+    .guide-open,
+    .workspace-card h3::first-letter,
+    .guide-link-card h3::first-letter {
+      color: #79eadc !important;
+    }
+
+    .badge-tag,
+    .professional-icon,
+    .workspace-results-icon {
+      background:
+        linear-gradient(180deg, rgba(46, 190, 177, .22), rgba(13, 102, 125, .16)) !important;
+      border-color: rgba(119, 222, 217, .27) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .075),
+        0 4px 12px rgba(0, 9, 20, .12) !important;
+    }
+
+    .badge-tag.info,
+    .portal-welcome-kicker::before {
+      box-shadow:
+        0 0 0 1px rgba(216, 183, 106, .10),
+        0 0 14px rgba(216, 183, 106, .14) !important;
+    }
+
+    input,
+    select,
+    textarea,
+    .chat-box {
+      background:
+        linear-gradient(180deg, #173f5e 0%, #102f4c 100%) !important;
+      border-color: rgba(104, 190, 210, .24) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .045),
+        inset 0 0 0 1px rgba(0, 8, 18, .14) !important;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: rgba(103, 232, 216, .70) !important;
+      box-shadow:
+        0 0 0 3px rgba(32, 182, 165, .13),
+        0 0 20px rgba(48, 181, 183, .09),
+        inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+    }
+
+    .action-btn,
+    button.submit-btn,
+    .nav-shortcut,
+    .nav-more-toggle,
+    .nav-term-edit {
+      background:
+        linear-gradient(180deg, #28bcae 0%, #148f98 46%, #0b6c86 100%) !important;
+      border-color: rgba(142, 238, 226, .38) !important;
+      box-shadow:
+        0 9px 20px rgba(0, 9, 22, .27),
+        0 0 0 1px rgba(216, 183, 106, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .22),
+        inset 0 -1px 0 rgba(0, 21, 35, .18) !important;
+    }
+
+    .action-btn:hover,
+    button.submit-btn:hover,
+    .nav-shortcut:hover,
+    .nav-more-toggle:hover,
+    .nav-term-edit:hover {
+      background:
+        linear-gradient(180deg, #31c9b9 0%, #19a0a3 46%, #0d7892 100%) !important;
+      border-color: rgba(166, 249, 237, .50) !important;
+      box-shadow:
+        0 11px 24px rgba(0, 9, 22, .30),
+        0 0 18px rgba(47, 191, 182, .11),
+        inset 0 1px 0 rgba(255, 255, 255, .27) !important;
+    }
+
+    .sidebar-links .nav-btn:hover,
+    .sidebar-links .nav-btn.active {
+      background:
+        linear-gradient(180deg, #1ab2a8 0%, #0c7f92 100%) !important;
+      border-color: rgba(149, 239, 228, .50) !important;
+      box-shadow:
+        0 9px 20px rgba(0, 11, 24, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .18),
+        inset 0 -1px 0 rgba(216, 183, 106, .035) !important;
+    }
+
+    body.light-mode {
+      --bg-dark: #bddbe5;
+      --panel-bg: #cce6ee;
+      --input-bg: #d5ebf1;
+      --border-color: #79aebf;
+      --text-dark: #0c2c42;
+      --text-muted: #3f6274;
+      --input-text: #0b2b40;
+      --bubble-bg: #bedde6;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .26), rgba(255, 255, 255, 0) 22%),
+        radial-gradient(circle at 10% 0%, rgba(19, 137, 143, .13), transparent 36%),
+        radial-gradient(circle at 96% 100%, rgba(31, 102, 159, .09), transparent 42%),
+        linear-gradient(145deg, #d8edf3 0%, #c4e1e9 56%, #b7d8e3 100%) !important;
+      border-color: rgba(45, 119, 145, .27) !important;
+      box-shadow:
+        0 20px 42px rgba(31, 82, 102, .16),
+        0 0 0 1px rgba(216, 183, 106, .03),
+        inset 0 1px 0 rgba(255, 255, 255, .60),
+        inset 0 -1px 0 rgba(18, 103, 130, .06) !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 24%),
+        linear-gradient(145deg, #deeff4 0%, #cde6ed 54%, #bfdde6 100%) !important;
+      border-color: rgba(48, 122, 147, .24) !important;
+      box-shadow:
+        0 12px 26px rgba(33, 83, 101, .13),
+        inset 0 1px 0 rgba(255, 255, 255, .56) !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box {
+      background:
+        linear-gradient(180deg, #dceef3 0%, #cbe3eb 100%) !important;
+      border-color: rgba(48, 121, 145, .26) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .52),
+        inset 0 0 0 1px rgba(19, 91, 112, .04) !important;
+    }
+
+    body.light-mode .app-sidebar {
+      background:
+        radial-gradient(circle at 18% 5%, rgba(20, 143, 145, .11), transparent 34%),
+        linear-gradient(180deg, #c7e2ea 0%, #b6d8e2 54%, #a9cfdb 100%) !important;
+      border-right-color: rgba(44, 113, 136, .22) !important;
+      box-shadow:
+        10px 0 28px rgba(34, 83, 101, .13),
+        inset -1px 0 0 rgba(255, 255, 255, .30) !important;
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, #d6eaf0 0%, #c2dee7 100%) !important;
+      border-color: rgba(49, 121, 143, .20) !important;
+      box-shadow:
+        0 8px 18px rgba(34, 82, 99, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .46) !important;
+    }
+
+    body.light-mode #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, #194e68 0%, #123c55 100%) !important;
+      border-bottom-color: rgba(88, 190, 194, .30) !important;
+      box-shadow:
+        0 12px 28px rgba(25, 65, 82, .18),
+        inset 0 -1px 0 rgba(216, 183, 106, .065) !important;
+    }
+
+
+    /* Pristine royal contrast v2 — material/colour only. No layout geometry changes. */
+    :root {
+      --bg-dark: #04101d;
+      --panel-bg: #0b2b47;
+      --input-bg: #0c2943;
+      --text-dark: #f7fbff;
+      --text-muted: #b8cbd8;
+      --border-color: #2b617b;
+      --bubble-bg: #123957;
+    }
+
+    body.portal-active {
+      background-color: #030b15;
+    }
+
+    #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, rgba(16, 52, 77, .995) 0%, rgba(5, 24, 41, .995) 100%) !important;
+      border-bottom-color: rgba(101, 219, 221, .34) !important;
+      box-shadow:
+        0 14px 34px rgba(0, 4, 14, .40),
+        inset 0 1px 0 rgba(255, 255, 255, .045),
+        inset 0 -1px 0 rgba(224, 190, 110, .09) !important;
+    }
+
+    .app-sidebar {
+      background:
+        radial-gradient(circle at 14% 4%, rgba(39, 190, 174, .14), transparent 34%),
+        linear-gradient(180deg, #0b2d49 0%, #071d33 52%, #041522 100%) !important;
+      border-right-color: rgba(98, 205, 214, .24) !important;
+      box-shadow:
+        12px 0 36px rgba(0, 5, 16, .38),
+        inset -1px 0 0 rgba(230, 196, 121, .06) !important;
+    }
+
+    .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(22, 67, 98, .97) 0%, rgba(10, 43, 70, .98) 100%) !important;
+      border-color: rgba(111, 207, 218, .23) !important;
+      box-shadow:
+        0 12px 28px rgba(0, 8, 20, .20),
+        inset 0 1px 0 rgba(255, 255, 255, .06),
+        inset 0 -1px 0 rgba(229, 194, 116, .04) !important;
+    }
+
+    .sidebar-heading {
+      color: #a8becd !important;
+    }
+
+    .app-sidebar [data-nav-group] .sidebar-heading,
+    .sidebar-group-toggle {
+      color: #78eadb !important;
+      text-shadow: 0 1px 1px rgba(0, 10, 18, .32);
+    }
+
+    .sidebar-links .nav-btn {
+      color: #e2edf4 !important;
+      text-shadow: 0 1px 1px rgba(0, 9, 16, .28);
+    }
+
+    .sidebar-links .nav-btn .ui-icon {
+      color: #8cefe1 !important;
+    }
+
+    .sidebar-links .nav-btn:hover,
+    .sidebar-links .nav-btn.active {
+      color: #ffffff !important;
+      background:
+        linear-gradient(180deg, #1ab7aa 0%, #0c8795 54%, #086c83 100%) !important;
+      border-color: rgba(157, 245, 233, .58) !important;
+      box-shadow:
+        0 10px 22px rgba(0, 12, 25, .28),
+        0 0 16px rgba(45, 199, 186, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .20),
+        inset 0 -1px 0 rgba(229, 194, 116, .045) !important;
+    }
+
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell,
+    .guide-link-card,
+    .modal-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .065) 0%, rgba(255, 255, 255, .015) 18%, rgba(255, 255, 255, 0) 34%),
+        radial-gradient(circle at 10% -8%, rgba(56, 200, 190, .18), transparent 34%),
+        radial-gradient(circle at 100% 110%, rgba(34, 102, 170, .16), transparent 44%),
+        linear-gradient(145deg, #123f60 0%, #0d3352 46%, #082540 100%) !important;
+      border-color: rgba(111, 207, 220, .30) !important;
+      box-shadow:
+        0 24px 52px rgba(0, 5, 17, .38),
+        0 0 0 1px rgba(228, 193, 113, .035),
+        inset 0 1px 0 rgba(255, 255, 255, .10),
+        inset 0 -1px 0 rgba(35, 172, 181, .055) !important;
+    }
+
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .guide-link-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .052) 0%, rgba(255, 255, 255, 0) 25%),
+        radial-gradient(circle at 12% 0%, rgba(48, 190, 180, .13), transparent 36%),
+        linear-gradient(145deg, #174d70 0%, #103b5d 50%, #0b2f4d 100%) !important;
+      border-color: rgba(114, 201, 216, .27) !important;
+      box-shadow:
+        0 15px 34px rgba(0, 7, 19, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .075),
+        inset 0 -1px 0 rgba(227, 193, 115, .03) !important;
+    }
+
+    .card-header-bar {
+      border-bottom-color: rgba(118, 209, 219, .22) !important;
+    }
+
+    .card-header-bar h2,
+    .workspace-results-heading h3,
+    .guide-link-card h3 {
+      color: #f5fbff !important;
+      text-shadow: 0 1px 1px rgba(0, 8, 16, .34);
+    }
+
+    .workspace-card h3 {
+      color: #7cebdd !important;
+      text-shadow: 0 1px 1px rgba(0, 8, 16, .28);
+    }
+
+    .workspace-card p,
+    .guide-link-card p,
+    .workspace-results-heading p,
+    .meta,
+    .field-help,
+    .login-device-note {
+      color: #b9cedb !important;
+    }
+
+    .guide-open,
+    .portal-welcome-kicker {
+      color: #7af0df !important;
+    }
+
+    input,
+    select,
+    textarea,
+    .chat-box,
+    .profile-icon-choice {
+      color: #f7fbff !important;
+      background:
+        linear-gradient(180deg, #16405f 0%, #0f304e 100%) !important;
+      border-color: rgba(111, 196, 215, .28) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .055),
+        inset 0 0 0 1px rgba(0, 8, 18, .16) !important;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: #91abba !important;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus,
+    .profile-icon-choice:focus-visible {
+      border-color: rgba(110, 238, 220, .76) !important;
+      box-shadow:
+        0 0 0 3px rgba(34, 190, 173, .14),
+        0 0 20px rgba(46, 194, 187, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .06) !important;
+    }
+
+    .action-btn,
+    button.submit-btn,
+    .nav-shortcut,
+    .nav-more-toggle,
+    .nav-term-edit {
+      color: #ffffff !important;
+      background:
+        linear-gradient(180deg, #2bc2b3 0%, #15989c 46%, #0b7188 100%) !important;
+      border-color: rgba(159, 244, 231, .44) !important;
+      box-shadow:
+        0 10px 22px rgba(0, 7, 20, .30),
+        0 0 0 1px rgba(228, 193, 113, .035),
+        inset 0 1px 0 rgba(255, 255, 255, .26),
+        inset 0 -1px 0 rgba(0, 24, 36, .20) !important;
+      text-shadow: 0 1px 1px rgba(0, 14, 24, .40);
+    }
+
+    .action-btn:hover,
+    button.submit-btn:hover,
+    .nav-shortcut:hover,
+    .nav-more-toggle:hover,
+    .nav-term-edit:hover {
+      background:
+        linear-gradient(180deg, #35cdbd 0%, #1aa5a7 46%, #0d7e94 100%) !important;
+      border-color: rgba(178, 251, 240, .56) !important;
+      box-shadow:
+        0 12px 26px rgba(0, 7, 20, .33),
+        0 0 19px rgba(50, 199, 187, .13),
+        inset 0 1px 0 rgba(255, 255, 255, .30) !important;
+    }
+
+    .btn-red {
+      background:
+        linear-gradient(180deg, #ef6570 0%, #d6455a 50%, #b6324b 100%) !important;
+      border-color: rgba(255, 204, 209, .34) !important;
+    }
+
+    .btn-green {
+      background:
+        linear-gradient(180deg, #2ac39a 0%, #169c83 50%, #0e7e79 100%) !important;
+      border-color: rgba(177, 246, 219, .36) !important;
+    }
+
+    .badge-tag,
+    .professional-icon,
+    .workspace-results-icon {
+      color: #ecfffb !important;
+      background:
+        linear-gradient(180deg, rgba(44, 191, 178, .30), rgba(14, 105, 130, .22)) !important;
+      border-color: rgba(127, 226, 220, .34) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .10),
+        0 4px 12px rgba(0, 8, 20, .14) !important;
+    }
+
+    body.light-mode {
+      --bg-dark: #b7d2dc;
+      --panel-bg: #c9e0e7;
+      --input-bg: #d5e7ec;
+      --text-dark: #082438;
+      --text-muted: #31566a;
+      --border-color: #6e9fb2;
+      --input-text: #082438;
+      --bubble-bg: #c1dbe4;
+    }
+
+    body.portal-active.light-mode {
+      background-color: #afcbd5 !important;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .30) 0%, rgba(255, 255, 255, .08) 20%, rgba(255, 255, 255, 0) 34%),
+        radial-gradient(circle at 10% -6%, rgba(22, 149, 153, .14), transparent 36%),
+        radial-gradient(circle at 100% 110%, rgba(32, 101, 153, .09), transparent 44%),
+        linear-gradient(145deg, #d3e7ec 0%, #c1dbe3 52%, #b5d1dc 100%) !important;
+      border-color: rgba(47, 119, 144, .32) !important;
+      box-shadow:
+        0 20px 42px rgba(26, 71, 90, .17),
+        0 0 0 1px rgba(184, 145, 67, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .68),
+        inset 0 -1px 0 rgba(21, 104, 129, .075) !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 24%),
+        linear-gradient(145deg, #dcebf0 0%, #c9dfe6 55%, #bdd5de 100%) !important;
+      border-color: rgba(48, 120, 145, .30) !important;
+      box-shadow:
+        0 12px 26px rgba(29, 77, 96, .14),
+        inset 0 1px 0 rgba(255, 255, 255, .64) !important;
+    }
+
+    body.light-mode .card-header-bar h2,
+    body.light-mode .workspace-results-heading h3,
+    body.light-mode .guide-link-card h3,
+    body.light-mode .workspace-card h3 {
+      color: #0a3148 !important;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, .30);
+    }
+
+    body.light-mode .workspace-card p,
+    body.light-mode .guide-link-card p,
+    body.light-mode .workspace-results-heading p,
+    body.light-mode .meta,
+    body.light-mode .field-help,
+    body.light-mode .login-device-note {
+      color: #31586c !important;
+    }
+
+    body.light-mode .guide-open,
+    body.light-mode .portal-welcome-kicker {
+      color: #087f7e !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box,
+    body.light-mode .profile-icon-choice {
+      color: #082438 !important;
+      background:
+        linear-gradient(180deg, #dcebf0 0%, #c9e0e7 100%) !important;
+      border-color: rgba(49, 119, 143, .34) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .66),
+        inset 0 0 0 1px rgba(17, 82, 103, .045) !important;
+    }
+
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #5b7888 !important;
+    }
+
+    body.light-mode .app-sidebar {
+      background:
+        radial-gradient(circle at 18% 4%, rgba(43, 188, 175, .14), transparent 34%),
+        linear-gradient(180deg, #103955 0%, #0b2b47 52%, #071f35 100%) !important;
+      border-right-color: rgba(83, 171, 189, .28) !important;
+      box-shadow:
+        10px 0 30px rgba(21, 62, 80, .20),
+        inset -1px 0 0 rgba(228, 193, 113, .06) !important;
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(24, 74, 104, .96), rgba(12, 50, 80, .98)) !important;
+      border-color: rgba(100, 196, 210, .24) !important;
+      box-shadow:
+        0 9px 20px rgba(9, 36, 54, .18),
+        inset 0 1px 0 rgba(255, 255, 255, .065) !important;
+    }
+
+    body.light-mode .sidebar-heading {
+      color: #b7ccd8 !important;
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] .sidebar-heading,
+    body.light-mode .sidebar-group-toggle {
+      color: #80ecde !important;
+    }
+
+    body.light-mode .sidebar-links .nav-btn {
+      color: #e8f3f7 !important;
+    }
+
+    body.light-mode .sidebar-links .nav-btn .ui-icon {
+      color: #8feadd !important;
+    }
+
+    body.light-mode #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, #173f58 0%, #0e3048 100%) !important;
+      border-bottom-color: rgba(89, 189, 196, .36) !important;
+      box-shadow:
+        0 12px 28px rgba(23, 62, 80, .21),
+        inset 0 1px 0 rgba(255, 255, 255, .05),
+        inset 0 -1px 0 rgba(228, 193, 113, .07) !important;
+    }
+
+
+    /* Eye-comfort light mode — visual tone only, no geometry changes. */
+    body.light-mode {
+      --bg-dark: #89aeba;
+      --panel-bg: #a9c7d0;
+      --input-bg: #b8cfd6;
+      --text-dark: #0a2b3b;
+      --text-muted: #36586a;
+      --border-color: #5f8fa1;
+      --input-text: #092a3a;
+      --bubble-bg: #9fbdc7;
+    }
+
+    body.portal-active.light-mode {
+      background-color: #86aab6 !important;
+    }
+
+    body.portal-active.light-mode::before {
+      opacity: .20 !important;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12) 0%, rgba(255,255,255,.035) 20%, rgba(255,255,255,0) 34%),
+        radial-gradient(circle at 10% -8%, rgba(17,132,139,.11), transparent 36%),
+        radial-gradient(circle at 100% 110%, rgba(29,91,137,.07), transparent 44%),
+        linear-gradient(145deg, #abc8d1 0%, #9dbdc7 52%, #91b2be 100%) !important;
+      border-color: rgba(39,103,126,.34) !important;
+      box-shadow:
+        0 18px 38px rgba(27,67,83,.18),
+        inset 0 1px 0 rgba(255,255,255,.26),
+        inset 0 -1px 0 rgba(17,91,116,.08) !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 26%),
+        linear-gradient(145deg, #b1cbd3 0%, #a3c1ca 54%, #98b8c2 100%) !important;
+      border-color: rgba(42,106,129,.31) !important;
+      box-shadow:
+        0 10px 22px rgba(27,69,86,.14),
+        inset 0 1px 0 rgba(255,255,255,.23) !important;
+    }
+
+    body.light-mode .card-header-bar h2,
+    body.light-mode .workspace-results-heading h3,
+    body.light-mode .guide-link-card h3,
+    body.light-mode .workspace-card h3 {
+      color: #082b3d !important;
+      text-shadow: 0 1px 0 rgba(255,255,255,.18);
+    }
+
+    body.light-mode .workspace-card p,
+    body.light-mode .guide-link-card p,
+    body.light-mode .workspace-results-heading p,
+    body.light-mode .meta,
+    body.light-mode .field-help,
+    body.light-mode .login-device-note,
+    body.light-mode .card > p {
+      color: #345668 !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box,
+    body.light-mode .profile-icon-choice {
+      color: #092a3a !important;
+      background:
+        linear-gradient(180deg, #b8d0d7 0%, #abc5cd 100%) !important;
+      border-color: rgba(42,103,125,.36) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.24),
+        inset 0 0 0 1px rgba(18,74,94,.05) !important;
+    }
+
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #587684 !important;
+    }
+
+    body.light-mode .wellbeing-banner,
+    body.light-mode #termsNotice,
+    body.light-mode #runtimeErrorBanner {
+      background:
+        linear-gradient(145deg, #a8c5cf 0%, #99b9c4 100%) !important;
+      border-color: rgba(41,103,124,.34) !important;
+      box-shadow:
+        0 12px 24px rgba(28,68,84,.14),
+        inset 0 1px 0 rgba(255,255,255,.20) !important;
+    }
+
+    body.light-mode .wellbeing-banner p,
+    body.light-mode #termsNotice p {
+      color: #0d3446 !important;
+    }
+
+    body.light-mode .profile-icon-choice,
+    body.light-mode .social-signin button {
+      background:
+        linear-gradient(180deg, #b6cfd7 0%, #a7c3cc 100%) !important;
+      border-color: rgba(43,104,126,.34) !important;
+      color: #0a2b3b !important;
+    }
+
+    body.light-mode footer {
+      background:
+        linear-gradient(180deg, #8dabb6 0%, #7e9eaa 100%) !important;
+      border-top-color: rgba(39,96,117,.30) !important;
+      color: #173f50 !important;
+    }
+
   </style>
 </head>
 <body>
@@ -2471,8 +3757,6 @@
             </div>
           </div>
         </section>
-        </div>
-
       </div>
 
       <!-- 1. Activity Feed -->
