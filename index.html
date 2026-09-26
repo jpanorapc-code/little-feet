@@ -2637,6 +2637,270 @@
       border-bottom-color: rgba(81, 184, 193, .30) !important;
     }
 
+
+    /* Royal pristine palette — colour/material only, zero geometry changes. */
+    :root {
+      --lf-royal-midnight: #071a2f;
+      --lf-royal-sapphire: #0b3157;
+      --lf-royal-teal: #0b8f8c;
+      --lf-royal-jade: #20b6a5;
+      --lf-royal-cyan: #5ad6e4;
+      --lf-royal-gold: #d8b76a;
+      --lf-royal-gold-soft: rgba(216, 183, 106, .30);
+    }
+
+    #dashboardSection > nav {
+      background:
+        radial-gradient(circle at 28% -80%, rgba(62, 162, 184, .16), transparent 42%),
+        linear-gradient(180deg, #081f35 0%, #06172a 100%) !important;
+      border-bottom-color: rgba(109, 217, 223, .28) !important;
+      box-shadow:
+        0 14px 34px rgba(0, 6, 18, .38),
+        inset 0 -1px 0 rgba(216, 183, 106, .08) !important;
+    }
+
+    .app-sidebar {
+      background:
+        radial-gradient(circle at 20% 5%, rgba(31, 182, 170, .12), transparent 34%),
+        linear-gradient(180deg, #0a2741 0%, #071b30 48%, #051425 100%) !important;
+      border-right-color: rgba(98, 196, 211, .20) !important;
+      box-shadow:
+        12px 0 34px rgba(0, 6, 18, .34),
+        inset -1px 0 0 rgba(216, 183, 106, .055) !important;
+    }
+
+    .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, rgba(17, 59, 91, .96), rgba(9, 39, 66, .98)) !important;
+      border-color: rgba(104, 204, 216, .19) !important;
+      box-shadow:
+        0 12px 26px rgba(0, 8, 22, .18),
+        inset 0 1px 0 rgba(255, 255, 255, .05),
+        inset 0 -1px 0 rgba(216, 183, 106, .04) !important;
+    }
+
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell,
+    .guide-link-card,
+    .modal-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .052), rgba(255, 255, 255, 0) 22%),
+        radial-gradient(circle at 12% -6%, rgba(54, 190, 185, .15), transparent 34%),
+        radial-gradient(circle at 100% 100%, rgba(37, 111, 174, .12), transparent 46%),
+        linear-gradient(145deg, #123f61 0%, #0c304f 52%, #082540 100%) !important;
+      border-color: rgba(104, 205, 217, .26) !important;
+      box-shadow:
+        0 22px 50px rgba(0, 7, 20, .34),
+        0 0 0 1px rgba(216, 183, 106, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .085),
+        inset 0 -1px 0 rgba(20, 141, 151, .055) !important;
+    }
+
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .guide-link-card,
+    .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .042), rgba(255, 255, 255, 0) 24%),
+        radial-gradient(circle at 10% 0%, rgba(40, 174, 168, .11), transparent 36%),
+        linear-gradient(145deg, #164b6f 0%, #103b5e 52%, #0b304f 100%) !important;
+      border-color: rgba(109, 198, 214, .23) !important;
+      box-shadow:
+        0 14px 32px rgba(0, 8, 21, .22),
+        inset 0 1px 0 rgba(255, 255, 255, .065),
+        inset 0 -1px 0 rgba(216, 183, 106, .03) !important;
+    }
+
+    .card-header-bar,
+    .workspace-results-heading {
+      border-bottom-color: rgba(109, 205, 216, .18) !important;
+    }
+
+    .card-header-bar h2,
+    .workspace-card h3,
+    .guide-link-card h3,
+    .workspace-results-heading h3 {
+      text-shadow: 0 1px 1px rgba(0, 8, 16, .30);
+    }
+
+    .portal-welcome-kicker,
+    .guide-open,
+    .workspace-card h3::first-letter,
+    .guide-link-card h3::first-letter {
+      color: #79eadc !important;
+    }
+
+    .badge-tag,
+    .professional-icon,
+    .workspace-results-icon {
+      background:
+        linear-gradient(180deg, rgba(46, 190, 177, .22), rgba(13, 102, 125, .16)) !important;
+      border-color: rgba(119, 222, 217, .27) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .075),
+        0 4px 12px rgba(0, 9, 20, .12) !important;
+    }
+
+    .badge-tag.info,
+    .portal-welcome-kicker::before {
+      box-shadow:
+        0 0 0 1px rgba(216, 183, 106, .10),
+        0 0 14px rgba(216, 183, 106, .14) !important;
+    }
+
+    input,
+    select,
+    textarea,
+    .chat-box {
+      background:
+        linear-gradient(180deg, #173f5e 0%, #102f4c 100%) !important;
+      border-color: rgba(104, 190, 210, .24) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .045),
+        inset 0 0 0 1px rgba(0, 8, 18, .14) !important;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: rgba(103, 232, 216, .70) !important;
+      box-shadow:
+        0 0 0 3px rgba(32, 182, 165, .13),
+        0 0 20px rgba(48, 181, 183, .09),
+        inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+    }
+
+    .action-btn,
+    button.submit-btn,
+    .nav-shortcut,
+    .nav-more-toggle,
+    .nav-term-edit {
+      background:
+        linear-gradient(180deg, #28bcae 0%, #148f98 46%, #0b6c86 100%) !important;
+      border-color: rgba(142, 238, 226, .38) !important;
+      box-shadow:
+        0 9px 20px rgba(0, 9, 22, .27),
+        0 0 0 1px rgba(216, 183, 106, .025),
+        inset 0 1px 0 rgba(255, 255, 255, .22),
+        inset 0 -1px 0 rgba(0, 21, 35, .18) !important;
+    }
+
+    .action-btn:hover,
+    button.submit-btn:hover,
+    .nav-shortcut:hover,
+    .nav-more-toggle:hover,
+    .nav-term-edit:hover {
+      background:
+        linear-gradient(180deg, #31c9b9 0%, #19a0a3 46%, #0d7892 100%) !important;
+      border-color: rgba(166, 249, 237, .50) !important;
+      box-shadow:
+        0 11px 24px rgba(0, 9, 22, .30),
+        0 0 18px rgba(47, 191, 182, .11),
+        inset 0 1px 0 rgba(255, 255, 255, .27) !important;
+    }
+
+    .sidebar-links .nav-btn:hover,
+    .sidebar-links .nav-btn.active {
+      background:
+        linear-gradient(180deg, #1ab2a8 0%, #0c7f92 100%) !important;
+      border-color: rgba(149, 239, 228, .50) !important;
+      box-shadow:
+        0 9px 20px rgba(0, 11, 24, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .18),
+        inset 0 -1px 0 rgba(216, 183, 106, .035) !important;
+    }
+
+    body.light-mode {
+      --bg-dark: #bddbe5;
+      --panel-bg: #cce6ee;
+      --input-bg: #d5ebf1;
+      --border-color: #79aebf;
+      --text-dark: #0c2c42;
+      --text-muted: #3f6274;
+      --input-text: #0b2b40;
+      --bubble-bg: #bedde6;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .26), rgba(255, 255, 255, 0) 22%),
+        radial-gradient(circle at 10% 0%, rgba(19, 137, 143, .13), transparent 36%),
+        radial-gradient(circle at 96% 100%, rgba(31, 102, 159, .09), transparent 42%),
+        linear-gradient(145deg, #d8edf3 0%, #c4e1e9 56%, #b7d8e3 100%) !important;
+      border-color: rgba(45, 119, 145, .27) !important;
+      box-shadow:
+        0 20px 42px rgba(31, 82, 102, .16),
+        0 0 0 1px rgba(216, 183, 106, .03),
+        inset 0 1px 0 rgba(255, 255, 255, .60),
+        inset 0 -1px 0 rgba(18, 103, 130, .06) !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 24%),
+        linear-gradient(145deg, #deeff4 0%, #cde6ed 54%, #bfdde6 100%) !important;
+      border-color: rgba(48, 122, 147, .24) !important;
+      box-shadow:
+        0 12px 26px rgba(33, 83, 101, .13),
+        inset 0 1px 0 rgba(255, 255, 255, .56) !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box {
+      background:
+        linear-gradient(180deg, #dceef3 0%, #cbe3eb 100%) !important;
+      border-color: rgba(48, 121, 145, .26) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .52),
+        inset 0 0 0 1px rgba(19, 91, 112, .04) !important;
+    }
+
+    body.light-mode .app-sidebar {
+      background:
+        radial-gradient(circle at 18% 5%, rgba(20, 143, 145, .11), transparent 34%),
+        linear-gradient(180deg, #c7e2ea 0%, #b6d8e2 54%, #a9cfdb 100%) !important;
+      border-right-color: rgba(44, 113, 136, .22) !important;
+      box-shadow:
+        10px 0 28px rgba(34, 83, 101, .13),
+        inset -1px 0 0 rgba(255, 255, 255, .30) !important;
+    }
+
+    body.light-mode .app-sidebar [data-nav-group] {
+      background:
+        linear-gradient(180deg, #d6eaf0 0%, #c2dee7 100%) !important;
+      border-color: rgba(49, 121, 143, .20) !important;
+      box-shadow:
+        0 8px 18px rgba(34, 82, 99, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .46) !important;
+    }
+
+    body.light-mode #dashboardSection > nav {
+      background:
+        linear-gradient(180deg, #194e68 0%, #123c55 100%) !important;
+      border-bottom-color: rgba(88, 190, 194, .30) !important;
+      box-shadow:
+        0 12px 28px rgba(25, 65, 82, .18),
+        inset 0 -1px 0 rgba(216, 183, 106, .065) !important;
+    }
+
   </style>
 </head>
 <body>
