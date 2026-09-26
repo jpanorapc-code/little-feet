@@ -66,6 +66,18 @@
     width: 100vw;
   }
 }
+
+@media (min-width: 1920px) and (min-height: 900px) {
+  #dashboardSection > .app-sidebar ~ .container .cinematic-journey.is-active .cinematic-stage {
+    left: 280px;
+    width: calc(100vw - 280px);
+  }
+  #dashboardSection > .app-sidebar.is-collapsed ~ .container .cinematic-journey.is-active .cinematic-stage {
+    left: 76px;
+    width: calc(100vw - 76px);
+  }
+}
+
 .cinematic-stage {
   --surface-air-opacity: 1;
   --depth-dim: 0;
