@@ -32,8 +32,10 @@
   const showInboxPopup=item=>{
     if(item.read||emailInboxSeen.has(item.id))return;emailInboxSeen.add(item.id);
     let stack=document.getElementById('lfNotificationStack');if(!stack){stack=document.createElement('aside');stack.id='lfNotificationStack';stack.className='lf-notification-stack';stack.setAttribute('aria-live','polite');document.body.appendChild(stack);}
-    const card=document.createElement('article');card.className='lf-notification-popup';card.dataset.id=item.id;card.innerHTML=`<header><strong>${esc(item.title)}</strong><span class="badge-tag">${esc(item.type)}</span></header><p>${esc(item.message)}</p><div class="actions"><button class="action-btn" data-popup-pin>Pin</button><button class="action-btn" data-popup-close>Close</button></div>`;
-    card.querySelector('[data-popup-close]').onclick=()=>card.remove();card.querySelector('[data-popup-pin]').onclick=async()=>{await json('/api/email/inbox/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({pinned:true})});card.remove();await email();};stack.prepend(card);
+    const card=document.createElement('article');card.className='lf-notification-popup'+(item.pinned?' is-pinned':'');card.dataset.id=item.id;card.innerHTML=`<header><strong>${esc(item.title)}</strong><span class="badge-tag">${esc(item.type)}</span></header><p>${esc(item.message)}</p><div class="actions"><button class="action-btn" data-popup-pin>${item.pinned?'Unpin':'Pin'}</button><button class="action-btn" data-popup-close>Close</button></div>`;
+    card.querySelector('[data-popup-close]').onclick=()=>card.remove();
+    card.querySelector('[data-popup-pin]').onclick=async()=>{const next=!item.pinned;await json('/api/email/inbox/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({pinned:next})});item.pinned=next;card.classList.toggle('is-pinned',next);card.querySelector('[data-popup-pin]').textContent=next?'Unpin':'Pin';await email();};
+    stack.prepend(card);
   };
   async function email(){
     const host=document.getElementById('emailIntegrationContent');if(!host)return;
