@@ -1,0 +1,9 @@
+(function(){
+'use strict';
+let user=null;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=async(url,opt={})=>{const r=await fetch(url,{credentials:'same-origin',...opt,headers:{Accept:'application/json',...(opt.body?{'Content-Type':'application/json'}:{}),...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||'Request failed.');return d;};
+const load=async()=>{const root=document.getElementById('approvalsList');if(!root)return;try{const rows=await api('/api/approvals');const count=document.getElementById('approvalsCount');if(count)count.textContent=String(rows.length);root.innerHTML=rows.length?rows.map(x=>`<article class="approval-item"><div><span class="badge-tag">${esc(x.type)}</span><strong>${esc(x.title)}</strong><p class="meta">${esc(x.detail)}</p></div><div class="approval-actions"><button data-approval="${esc(x.type)}|${esc(x.id)}|Approve" class="action-btn">Approve</button><button data-approval="${esc(x.type)}|${esc(x.id)}|Reject" class="action-btn btn-red">Reject</button></div></article>`).join(''):'<p class="meta">Nothing is waiting for approval. You are caught up.</p>';root.querySelectorAll('[data-approval]').forEach(b=>b.addEventListener('click',async()=>{const[type,id,decision]=b.dataset.approval.split('|');b.disabled=true;try{await api('/api/approvals/'+encodeURIComponent(type)+'/'+encodeURIComponent(id),{method:'POST',body:JSON.stringify({decision})});await load();window.refreshStaffWork?.();}catch(e){alert(e.message);b.disabled=false;}}));}catch(e){root.innerHTML='<p>'+esc(e.message)+'</p>';}};
+const init=async()=>{user=window.getLittleFeetCurrentUser?.();if(!user||!['admin','principal'].includes(user.role))return;await load();};
+window.refreshApprovals=load;document.addEventListener('littlefeet:session-ready',init);window.addEventListener('load',()=>setTimeout(init,300));
+})();
