@@ -4,6 +4,7 @@ let parentPaymentData = null;
 let bookRegisterData = null;
 const errorLog = [];
 let mapInstance = null;
+let schoolMapRequestToken = 0;
 let nearbySchoolRecords = [];
 let alertLocation = null;
 let accountsCache = [];
@@ -1599,6 +1600,13 @@ function editTermModal() {
 // Interactive 20Km Radius School Finder Map using live OpenStreetMap data.
 async function loadSchoolProximityMap() {
   const container = document.getElementById('schoolMapContainer');
+  const findButton = document.getElementById('findSchoolMapButton');
+  const closeButton = document.getElementById('closeSchoolMapButton');
+  if (!container) return;
+  const requestToken = ++schoolMapRequestToken;
+  container.classList.remove('hidden');
+  closeButton?.classList.remove('hidden');
+  findButton?.setAttribute('aria-expanded', 'true');
   if (!navigator.geolocation) {
     alert('Geolocation is not supported by your browser.');
     return;
@@ -1606,6 +1614,7 @@ async function loadSchoolProximityMap() {
 
   container.innerHTML = '📍 Requesting location permission and searching live school data…';
   navigator.geolocation.getCurrentPosition(async (position) => {
+    if (requestToken !== schoolMapRequestToken) return;
     const userLat = position.coords.latitude;
     const userLng = position.coords.longitude;
     const userPos = [userLat, userLng];
@@ -1684,6 +1693,7 @@ async function loadSchoolProximityMap() {
         usingCachedResults = true;
       }
 
+      if (requestToken !== schoolMapRequestToken || !mapInstance) return;
       const seenSchools = new Set();
       const nearbySchools = payload.elements.map((place) => {
         const tags = place.tags || {};
@@ -1754,11 +1764,39 @@ async function loadSchoolProximityMap() {
       logAppError('ERR_MAP_SCHOOLS', 'Unable to load live nearby school data.');
     }
 
-    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 300);
+    setTimeout(() => {
+      if (requestToken === schoolMapRequestToken && mapInstance) mapInstance.invalidateSize();
+    }, 300);
   }, () => {
+    if (requestToken !== schoolMapRequestToken) return;
     logAppError('ERR_MAP_GEO', 'Unable to retrieve device location for map search.');
+    container.textContent = 'Unable to detect your location. Enable browser location access, then try again.';
     alert('Unable to detect your location. Please enable browser location access.');
   });
+}
+
+function closeSchoolProximityMap() {
+  schoolMapRequestToken += 1;
+  if (mapInstance) {
+    mapInstance.remove();
+    mapInstance = null;
+  }
+  nearbySchoolRecords = [];
+  hideSchoolPinCard();
+
+  const container = document.getElementById('schoolMapContainer');
+  if (container) {
+    container.innerHTML = '📍 Press "Find schools near me" to render interactive map pins.';
+    container.classList.add('hidden');
+  }
+
+  const panel = document.getElementById('schoolPickerPanel');
+  const picker = document.getElementById('nearbySchoolPicker');
+  panel?.classList.add('hidden');
+  if (picker) picker.innerHTML = '';
+
+  document.getElementById('closeSchoolMapButton')?.classList.add('hidden');
+  document.getElementById('findSchoolMapButton')?.setAttribute('aria-expanded', 'false');
 }
 
 function renderNearbySchoolPicker() {
