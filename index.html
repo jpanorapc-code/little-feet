@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Little Feet","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/"}</script>
-  <link rel="stylesheet" href="/assets/cinematic.css?v=20260925-cinematic-v11">
+  <link rel="stylesheet" href="/assets/cinematic.css?v=20260926-cinematic-v12">
   <script src="/vendor/xlsx.js" defer></script>
   <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
@@ -247,7 +247,7 @@
       animation:portalGlowPulse 5.8s ease-in-out infinite alternate;
       will-change:opacity;
     }
-    #authSection > .auth-card { position:relative; z-index:1; width:min(100%,480px) !important; max-width:480px !important; margin:0; padding:18px; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
+    #authSection > .auth-card { position:relative; z-index:1; width:min(100%,520px) !important; max-width:520px !important; margin:0; padding:18px; background-color:var(--panel-bg); border:1px solid var(--border-color); border-top:5px solid var(--primary-color); box-shadow:0 24px 64px rgba(0,0,0,.42); }
     .brand-header { position:relative; isolation:isolate; text-align:center; margin-bottom:24px; padding-top:10px; overflow:hidden; }
     .mascot-stage { position:relative; display:grid; place-items:center; min-height:180px; margin-bottom:4px; }
     .mascot-stage::before { content:""; position:absolute; z-index:0; width:164px; height:164px; border:2px solid rgba(94,234,212,.70); border-radius:20px; background:transparent; box-shadow:0 0 22px rgba(45,212,191,.34); }
@@ -519,6 +519,34 @@
     .login-legal { margin-top:9px; padding-top:8px; }
     .login-legal-links { font-size:.66rem; }
     .login-legal p { display:none; }
+    /* Login readability pass: larger type and a non-overlapping control map. */
+    .login-card-tools { display:grid; grid-template-columns:minmax(0,1fr); align-items:stretch; gap:8px; margin-bottom:8px; }
+    .login-secure-label { font-size:.76rem; line-height:1.25; letter-spacing:.07em; white-space:normal; }
+    .login-card-actions { display:grid; grid-template-columns:minmax(0,1fr) 82px; align-items:center; gap:8px; width:100%; margin:0; }
+    .login-language-pill { height:40px; border-radius:10px; }
+    #loginLanguagePreference { min-width:0; height:38px; min-height:38px; padding:7px 28px 7px 30px; font-size:.82rem; }
+    .login-audio-compact { position:relative; width:82px !important; min-width:82px !important; min-height:40px !important; height:40px; padding:0 10px !important; gap:6px; font-size:.76rem; }
+    .login-audio-compact span { position:static; width:auto; height:auto; padding:0; margin:0; overflow:visible; clip:auto; white-space:nowrap; border:0; }
+    .login-access-note { margin:0 0 13px; padding-bottom:11px; font-size:.79rem; line-height:1.42; }
+    #loginForm label { font-size:.86rem; line-height:1.3; margin-bottom:5px; }
+    #loginForm input { min-height:44px; font-size:.95rem; }
+    .login-utility-row { grid-template-columns:minmax(0,1fr) minmax(170px,220px); gap:12px; margin:4px 0 11px; }
+    .login-remember label { font-size:.80rem; white-space:normal; }
+    .login-help-inline { max-width:220px; font-size:.74rem; line-height:1.35; }
+    #loginForm > .submit-btn { min-height:46px; font-size:.94rem; }
+    .login-divider { margin:11px auto 8px; font-size:.69rem; }
+    .social-signin button { min-height:42px; font-size:.82rem; }
+    .login-new-account p { font-size:.78rem; }
+    .login-new-account .action-btn { min-height:40px; font-size:.80rem; }
+    .login-legal-links { font-size:.73rem; }
+    @media (max-width:540px) {
+      #authSection > .auth-card { width:min(100%,500px) !important; padding:16px !important; }
+      .login-card-actions { grid-template-columns:minmax(0,1fr) 76px; }
+      .login-audio-compact { width:76px !important; min-width:76px !important; }
+      .login-utility-row { grid-template-columns:minmax(0,1fr); gap:5px; }
+      .login-help-inline { max-width:none; text-align:left; }
+    }
+
     @media (max-width:420px) {
       .login-card-tools { grid-template-columns:minmax(0,1fr); align-items:stretch; }
       .login-secure-label { white-space:normal; }
@@ -693,8 +721,10 @@
        without turning the header into a scrolling row of tabs. */
     html, body { max-width:100%; overflow-x:hidden; }
     #dashboardSection { min-height:100vh; }
+    #dashboardSection > nav { position:sticky; top:0; z-index:30; }
     .app-sidebar {
-      position:fixed; z-index:15; top:68px; left:0; bottom:0; width:260px;
+      position:fixed; z-index:15; top:68px; left:0; bottom:auto; width:260px;
+      height:calc(100dvh - 68px);
       overflow-y:auto; overscroll-behavior:contain; padding:18px 12px 24px;
       isolation:isolate; background:#07111e; border-right:1px solid var(--border-color);
       box-shadow:6px 0 20px rgba(0,0,0,.16);
@@ -739,7 +769,7 @@
       #dashboardSection.sidebar-collapsed footer { margin-left:76px; }
     }
     @media (max-width: 959px) {
-      .app-sidebar { top:var(--mobile-header-height, 0px); width:min(86vw, 300px); transform:translateX(-105%); transition:transform .22s ease; padding-top:12px; }
+      .app-sidebar { top:var(--mobile-header-height, 0px); width:min(86vw, 300px); height:calc(100dvh - var(--mobile-header-height, 0px)); transform:translateX(-105%); transition:transform .22s ease; padding-top:12px; }
       #dashboardSection.sidebar-open .app-sidebar { transform:translateX(0); }
       #dashboardSection.sidebar-open::after { content:""; position:fixed; inset:0; z-index:14; background:rgba(2,8,23,.58); }
       .nav-more-toggle { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:7px 10px; border:1px solid rgba(45,212,191,.5); border-radius:8px; background:var(--primary-color); color:#fff; font:700 .78rem inherit; cursor:pointer; }
@@ -1579,6 +1609,38 @@
     .legal-inline-link:focus-visible {
       color:var(--text-light);
     }
+
+    /* Home/readability pass: cap long reading lines and keep content comfortably sized. */
+    #homeTab > .portal-welcome-banner,
+    #homeTab > .card,
+    #homeTab > .portal-tour,
+    #homeTab > .cinematic-journey { width:min(100%,1440px); margin-left:auto; margin-right:auto; }
+    #guideTab > .card { width:min(100%,1280px); margin-left:auto; margin-right:auto; }
+    #guideTab .card-header-bar h2 { font-size:clamp(1.2rem,2vw,1.5rem); }
+    #guideTab .card-header-bar h3 { font-size:1.08rem; }
+    .guide-intro, .guide-records-lead { color:var(--text-muted); font-size:.96rem; line-height:1.55; }
+    .guide-intro { margin-bottom:18px; }
+    .guide-records-lead { margin:0 0 14px; }
+    .guide-records-table-wrap { width:100%; overflow:auto; border:1px solid rgba(148,163,184,.16); border-radius:10px; }
+    .guide-records-table { width:100%; border-collapse:collapse; table-layout:fixed; text-align:left; font-size:.91rem; line-height:1.5; }
+    .guide-records-table th, .guide-records-table td { padding:13px 14px; vertical-align:top; overflow-wrap:normal; word-break:normal; }
+    .guide-records-table th { color:#e2e8f0; font-size:.82rem; letter-spacing:.01em; background:rgba(2,8,23,.16); }
+    .guide-records-table th:nth-child(1), .guide-records-table td:nth-child(1) { width:16%; }
+    .guide-records-table th:nth-child(2), .guide-records-table td:nth-child(2) { width:25%; }
+    .guide-records-table th:nth-child(3), .guide-records-table td:nth-child(3) { width:59%; }
+    .guide-records-table .guide-records-alt { background:rgba(45,212,191,.06); }
+    .guide-records-note { margin:12px 0 0 !important; font-size:.82rem; line-height:1.5; }
+    #guideTab .guide-link-card { font-size:.92rem; }
+    #guideTab .guide-link-card p { font-size:.90rem; line-height:1.55; }
+    @media (max-width:760px) {
+      .guide-records-table-wrap { overflow:visible; border:0; }
+      .guide-records-table, .guide-records-table tbody, .guide-records-table tr, .guide-records-table td { display:block; width:100%; }
+      .guide-records-table thead { display:none; }
+      .guide-records-table tr { margin:0 0 12px; border:1px solid var(--border-color); border-radius:10px; overflow:hidden; background:rgba(7,28,47,.52); }
+      .guide-records-table tr.guide-records-alt { background:rgba(13,148,136,.08); }
+      .guide-records-table td { width:100% !important; padding:10px 12px; border:0; font-size:.90rem; }
+      .guide-records-table td::before { content:attr(data-label); display:block; margin-bottom:4px; color:#5eead4; font-size:.69rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    }
   </style>
 </head>
 <body>
@@ -1844,49 +1906,6 @@
         <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-heart-star"></use></svg></span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
         <aside id="termsNotice" class="wellbeing-banner" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg></span><p><strong>Privacy and terms notice:</strong> By using this portal you confirm that you are authorised to access the information shown and agree to use it only for school purposes. The school’s approved privacy notice, terms, retention rules, and consent process apply.</p><button type="button" onclick="dismissTermsNotice()" aria-label="Acknowledge privacy and terms notice" title="Acknowledge">×</button></aside>
         <aside id="runtimeErrorBanner" class="wellbeing-banner runtime-error-banner hidden" aria-live="assertive"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><p><strong>We detected a technical issue.</strong> Your Support Desk ticket is prepared; add any useful notes before you send it.</p><button type="button" class="action-btn btn-red" onclick="openRuntimeErrorSupport()">Open Support Desk</button><button type="button" onclick="dismissRuntimeErrorBanner()" aria-label="Dismiss technical issue notice" title="Dismiss">×</button></aside>
-        <section id="littleFeetCinematicJourney" class="cinematic-journey" aria-label="Cinematic Little Feet navigation">
-          <div id="littleFeetCinematicStage" class="cinematic-stage">
-            <picture class="cinematic-depth-picture" aria-hidden="true">
-              <source media="(min-width: 2200px) and (min-height: 1200px)" srcset="/assets/images/little-feet-ocean-depth-4k.webp">
-              <img id="cinematicDepthBackdrop" class="cinematic-depth-image"
-                src="/assets/images/little-feet-ocean-depth-1080.webp"
-                alt="" decoding="async" fetchpriority="high">
-            </picture>
-            <picture class="cinematic-paused-picture" aria-hidden="true">
-              <img src="/assets/images/little-feet-cinematic-paused-school.avif"
-                alt="" loading="lazy" decoding="async">
-            </picture>
-            <div class="cinematic-surface-air" aria-hidden="true"></div>
-            <div class="cinematic-water-surface" aria-hidden="true"></div>
-            <div class="cinematic-water-current" aria-hidden="true"></div>
-            <div class="cinematic-life-2d cinematic-fish-2d cinematic-fish-2d-a" id="cinematicFish2dA" aria-hidden="true"></div>
-            <div class="cinematic-life-2d cinematic-fish-2d cinematic-fish-2d-b" id="cinematicFish2dB" aria-hidden="true"></div>
-            <div class="cinematic-life-2d cinematic-jelly-2d cinematic-jelly-2d-a" id="cinematicJelly2dA" aria-hidden="true"></div>
-            <div class="cinematic-life-2d cinematic-jelly-2d cinematic-jelly-2d-b" id="cinematicJelly2dB" aria-hidden="true"></div>
-            <div class="cinematic-life-2d cinematic-manta-2d" id="cinematicManta2d" aria-hidden="true"></div>
-            <canvas id="littleFeetCinematicCanvas" aria-hidden="true"></canvas>
-            <div class="cinematic-loading" aria-live="polite">Preparing the Little Feet ocean…</div>
-            <div class="cinematic-ui">
-              <div class="cinematic-copy">
-                <span id="cinematicKicker" class="cinematic-kicker">Little Feet · cinematic home</span>
-                <h2 id="cinematicTitle">Surface</h2>
-                <p id="cinematicCopy">Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.</p>
-                <button id="cinematicOpenCurrent" type="button" class="cinematic-skip" style="margin-top:14px;">Open School Feed</button>
-              </div>
-              <div id="cinematicDepthMeter" class="cinematic-depth-meter" aria-label="Cinematic destinations"></div>
-              <div class="cinematic-footer">
-                <div class="cinematic-progress-shell" aria-hidden="true">
-                  <div class="cinematic-progress-label"><span>Scroll to dive</span><span id="cinematicDepthLabel">Surface</span></div>
-                  <div class="cinematic-progress-track"><div id="cinematicProgressBar" class="cinematic-progress-bar"></div></div>
-                </div>
-                <div class="cinematic-footer-actions">
-                  <button id="cinematicPause" type="button" class="cinematic-skip" aria-pressed="false">Pause cinematic</button>
-                  <button id="cinematicSkip" type="button" class="cinematic-skip">Skip cinematic</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
         <section class="portal-welcome-banner" aria-label="Welcome to Little Feet">
           <div class="portal-welcome-copy">
             <section id="roleHomePanel" class="role-home-panel" aria-live="polite"></section>
@@ -1939,6 +1958,51 @@
           </div>
           <div id="schoolPickerPanel" class="hidden" style="margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><label for="nearbySchoolPicker">Available schools in this area</label><div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="nearbySchoolPicker" style="flex:1 1 260px;margin-bottom:0;"></select><button type="button" class="action-btn btn-blue" onclick="openSelectedSchoolDetail()">View school details</button></div></div>
           <div id="schoolPinCard" class="hidden" aria-live="polite" style="margin-top:12px;padding:13px;"></div>
+
+        <!-- Cinematic navigation comes after the practical Home content so daily work stays first. -->
+        <section id="littleFeetCinematicJourney" class="cinematic-journey" aria-label="Cinematic Little Feet navigation">
+          <div id="littleFeetCinematicStage" class="cinematic-stage">
+            <picture class="cinematic-depth-picture" aria-hidden="true">
+              <source media="(min-width: 2200px) and (min-height: 1200px)" srcset="/assets/images/little-feet-ocean-depth-4k.webp">
+              <img id="cinematicDepthBackdrop" class="cinematic-depth-image"
+                src="/assets/images/little-feet-ocean-depth-1080.webp"
+                alt="" decoding="async" fetchpriority="high">
+            </picture>
+            <picture class="cinematic-paused-picture" aria-hidden="true">
+              <img src="/assets/images/little-feet-cinematic-paused-school.avif"
+                alt="" loading="lazy" decoding="async">
+            </picture>
+            <div class="cinematic-surface-air" aria-hidden="true"></div>
+            <div class="cinematic-water-surface" aria-hidden="true"></div>
+            <div class="cinematic-water-current" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-fish-2d cinematic-fish-2d-a" id="cinematicFish2dA" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-fish-2d cinematic-fish-2d-b" id="cinematicFish2dB" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-jelly-2d cinematic-jelly-2d-a" id="cinematicJelly2dA" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-jelly-2d cinematic-jelly-2d-b" id="cinematicJelly2dB" aria-hidden="true"></div>
+            <div class="cinematic-life-2d cinematic-manta-2d" id="cinematicManta2d" aria-hidden="true"></div>
+            <canvas id="littleFeetCinematicCanvas" aria-hidden="true"></canvas>
+            <div class="cinematic-loading" aria-live="polite">Preparing the Little Feet ocean…</div>
+            <div class="cinematic-ui">
+              <div class="cinematic-copy">
+                <span id="cinematicKicker" class="cinematic-kicker">Little Feet · cinematic home</span>
+                <h2 id="cinematicTitle">Surface</h2>
+                <p id="cinematicCopy">Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.</p>
+                <button id="cinematicOpenCurrent" type="button" class="cinematic-skip" style="margin-top:14px;">Open School Feed</button>
+              </div>
+              <div id="cinematicDepthMeter" class="cinematic-depth-meter" aria-label="Cinematic destinations"></div>
+              <div class="cinematic-footer">
+                <div class="cinematic-progress-shell" aria-hidden="true">
+                  <div class="cinematic-progress-label"><span>Scroll to dive</span><span id="cinematicDepthLabel">Surface</span></div>
+                  <div class="cinematic-progress-track"><div id="cinematicProgressBar" class="cinematic-progress-bar"></div></div>
+                </div>
+                <div class="cinematic-footer-actions">
+                  <button id="cinematicPause" type="button" class="cinematic-skip" aria-pressed="false">Pause cinematic</button>
+                  <button id="cinematicSkip" type="button" class="cinematic-skip">Skip cinematic</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         </div>
 
       </div>
@@ -2770,20 +2834,20 @@
       <div id="guideTab" class="tab-content">
         <div class="card">
           <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
-          <p style="color:var(--text-muted);margin-bottom:18px;">A quick guide to using Little Feet safely and effectively. Features shown may vary by your school role.</p>
+          <p class="guide-intro">A quick guide to using Little Feet safely and effectively. Features shown may vary by your school role.</p>
           <section class="workspace-card" style="margin-bottom:18px;">
             <div class="card-header-bar"><h3>Age groups, school types &amp; records</h3><span class="badge-tag info">SOUTH AFRICA GUIDE</span></div>
-            <p style="color:var(--text-muted);margin:0 0 12px;">Age ranges are practical guidance, not a reason to refuse a learner. Use the learner’s exact grade and the school’s admission policy where they differ.</p>
-            <div style="overflow:auto;"><table style="width:100%;min-width:850px;border-collapse:collapse;text-align:left;font-size:.8rem;">
+            <p class="guide-records-lead">Age ranges are practical guidance, not a reason to refuse a learner. Use the learner’s exact grade and the school’s admission policy where they differ.</p>
+            <div class="guide-records-table-wrap"><table class="guide-records-table">
               <thead><tr><th style="padding:9px;">Institution / phase</th><th style="padding:9px;">Typical age / grades</th><th style="padding:9px;">Little Feet records to prepare</th></tr></thead>
               <tbody>
-                <tr><td style="padding:9px;"><strong>Day care / ECD</strong><br>NCF Birth–4</td><td style="padding:9px;">Birth–11 months · baby<br>12–23 months · 1-year-olds<br>24–35 months · 2-year-olds<br>36–47 months · 3-year-olds<br>48–59 months · 4-year-olds<br>60–71 months · 5-year-olds / transition</td><td style="padding:9px;">Guardian and emergency contacts, authorised pickup, nutrition and care routines, health/allergy and medication information where lawfully required, consent choices, attendance and age-appropriate developmental observations. Confirm separately when a 5-year-old is in Grade R.</td></tr>
-                <tr style="background:rgba(45,212,191,.06);"><td style="padding:9px;"><strong>Grade R</strong><br>Foundation Phase</td><td style="padding:9px;">Public-school admission: age 4 turning 5 by 30 June of the admission year<br>Many learners are 5–6 during Grade R</td><td style="padding:9px;">Grade R placement, guardian contacts, attendance, consent, pickup controls, Foundation observations and reports. Public-school admission commonly requires the official birth certificate and immunisation record.</td></tr>
-                <tr><td style="padding:9px;"><strong>Primary school</strong></td><td style="padding:9px;">Typically Grades R–7 · about 5–13<br>Foundation R–3 · Intermediate 4–6 · Grade 7 begins Senior Phase</td><td style="padding:9px;">Grade/class, guardian and emergency contacts, attendance, timetable, learning evidence, assessments, reports and consent. For learners transferring schools, keep the transfer card or previous school report where applicable.</td></tr>
-                <tr style="background:rgba(45,212,191,.06);"><td style="padding:9px;"><strong>Secondary / high school</strong></td><td style="padding:9px;">Typically Grades 8–12 · about 14–18<br>Senior 8–9 · FET 10–12</td><td style="padding:9px;">Grade, timetable/subjects, attendance, assessment evidence, reports, guardian/emergency contacts and applicable transfer/previous-report information.</td></tr>
+                <tr><td data-label="Institution / phase"><strong>Day care / ECD</strong><br>NCF Birth–4</td><td data-label="Typical age / grades">Birth–11 months · baby<br>12–23 months · 1-year-olds<br>24–35 months · 2-year-olds<br>36–47 months · 3-year-olds<br>48–59 months · 4-year-olds<br>60–71 months · 5-year-olds / transition</td><td data-label="Little Feet records to prepare">Guardian and emergency contacts, authorised pickup, nutrition and care routines, health/allergy and medication information where lawfully required, consent choices, attendance and age-appropriate developmental observations. Confirm separately when a 5-year-old is in Grade R.</td></tr>
+                <tr class="guide-records-alt"><td data-label="Institution / phase"><strong>Grade R</strong><br>Foundation Phase</td><td data-label="Typical age / grades">Public-school admission: age 4 turning 5 by 30 June of the admission year<br>Many learners are 5–6 during Grade R</td><td data-label="Little Feet records to prepare">Grade R placement, guardian contacts, attendance, consent, pickup controls, Foundation observations and reports. Public-school admission commonly requires the official birth certificate and immunisation record.</td></tr>
+                <tr><td data-label="Institution / phase"><strong>Primary school</strong></td><td data-label="Typical age / grades">Typically Grades R–7 · about 5–13<br>Foundation R–3 · Intermediate 4–6 · Grade 7 begins Senior Phase</td><td data-label="Little Feet records to prepare">Grade/class, guardian and emergency contacts, attendance, timetable, learning evidence, assessments, reports and consent. For learners transferring schools, keep the transfer card or previous school report where applicable.</td></tr>
+                <tr class="guide-records-alt"><td data-label="Institution / phase"><strong>Secondary / high school</strong></td><td data-label="Typical age / grades">Typically Grades 8–12 · about 14–18<br>Senior 8–9 · FET 10–12</td><td data-label="Little Feet records to prepare">Grade, timetable/subjects, attendance, assessment evidence, reports, guardian/emergency contacts and applicable transfer/previous-report information.</td></tr>
               </tbody>
             </table></div>
-            <p class="meta" style="margin:10px 0 0;">For public-school admission, DBE guidance lists a birth certificate and immunisation card, plus a transfer card or last report for a learner who attended another school. Additional immigration documents can apply to non-South-African citizens. Little Feet should record the school’s verification status, not replace official documents or government systems.</p>
+            <p class="meta guide-records-note">For public-school admission, DBE guidance lists a birth certificate and immunisation card, plus a transfer card or last report for a learner who attended another school. Additional immigration documents can apply to non-South-African citizens. Little Feet should record the school’s verification status, not replace official documents or government systems.</p>
           </section>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;font-size:.86rem;line-height:1.55;">
             <button type="button" class="guide-link-card" onclick="openGuideWorkspace('feedTab')"><h3 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><span>Feed &amp; Communication</span></h3><p>Use <strong>Feed</strong> to view school updates. Staff can publish notices and attach approved photos. Keep messages clear, child-safe, and audience-specific.</p><span class="guide-open">Open Feed →</span></button>

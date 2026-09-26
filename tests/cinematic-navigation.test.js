@@ -298,7 +298,7 @@ assert.match(cinematic, /pausedScrollProgress/);
 assert.match(cinematic, /journey\.classList\.remove\('is-active', 'is-after'\)/);
 assert.match(cinematic, /window\.scrollTo\(\{ top: journeyTop \+ journeyTravel \* resumeProgress, behavior: 'auto' \}\)/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \{[\s\S]*height: auto !important/);
-assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-stage \{[\s\S]*position: relative !important/);
+assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-stage \{[\s\S]*position: relative !important[\s\S]*width: min\(100%, 1360px\) !important[\s\S]*aspect-ratio: 16 \/ 9/);
 assert.match(cinematic, /paused-by-user/);
 assert.match(cinematic, /activePenguinCallSource\.stop/);
 assert.match(cinematic, /smoothProgress = damp\(smoothProgress, scrollProgress, 5\.0, dt\)/);
@@ -373,4 +373,7 @@ assert.match(styles, /@media \(max-height: 600px\) and \(orientation: landscape\
 assert.match(styles, /is-user-paused #littleFeetCinematicCanvas[\s\S]*visibility: hidden/);
 assert.match(styles, /min-height: min\(520px, calc\(100dvh - 16px\)\)/);
 
+assert.match(styles, /\.cinematic-paused-picture img \{[\s\S]*image-rendering: auto/);
+assert.match(styles, /@media \(max-width: 560px\)[\s\S]*aspect-ratio: 16 \/ 9/);
+assert.ok(page.indexOf('id="littleFeetCinematicJourney"') > page.indexOf('id="schoolMapContainer"'), 'Paused cinematic should be ordered at the end of Home content.');
 console.log('Cinematic navigation regression test passed.');

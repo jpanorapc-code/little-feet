@@ -42,9 +42,11 @@
 .cinematic-journey.is-user-paused .cinematic-stage {
   position: relative !important;
   inset: auto !important;
-  width: 100% !important;
-  height: min(100dvh, 860px);
-  min-height: 520px;
+  width: min(100%, 1360px) !important;
+  height: auto !important;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
   border-radius: 24px;
 }
 @media (min-width: 960px) {
@@ -116,6 +118,8 @@
   height: 100%;
   object-fit: cover;
   object-position: center center;
+  image-rendering: auto;
+  transform: translateZ(0);
 }
 .cinematic-journey.is-user-paused .cinematic-paused-picture {
   opacity: 1;
@@ -884,8 +888,10 @@
 
 @media (max-width: 560px) {
   .cinematic-journey.is-user-paused .cinematic-stage {
-    height: min(100dvh, 760px);
-    min-height: min(520px, calc(100dvh - 16px));
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
   }
   .cinematic-ui {
     gap: 10px;
@@ -920,8 +926,10 @@
 
 @media (max-height: 600px) and (orientation: landscape) {
   .cinematic-journey.is-user-paused .cinematic-stage {
-    height: calc(100dvh - 12px);
+    width: min(100%, 1120px) !important;
+    height: auto !important;
     min-height: 0;
+    aspect-ratio: 16 / 9;
   }
   .cinematic-ui {
     gap: 6px;
