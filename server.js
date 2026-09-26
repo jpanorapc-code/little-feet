@@ -754,6 +754,7 @@ const db = {
   performanceReviews: [],
   staffQualifications: [],
   staffDevelopmentPlans: [],
+  emailInbox: [],
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
@@ -996,7 +997,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2640,6 +2641,53 @@ app.patch('/api/staff/development-plans/:id', (req,res) => {
   const own=normalizeUsername(item.username)===normalizeUsername(actor.username),manager=['admin','principal'].includes(actor.role);if(!own&&!manager)return res.status(403).json({message:'You cannot update this plan.'});
   const status=boundedText(req.body?.status||item.status,30);if(!['Active','Completed','Paused'].includes(status))return res.status(400).json({message:'Choose a valid plan status.'});
   item.status=status;item.staffComment=boundedText(req.body?.staffComment??item.staffComment,1500);item.updatedAt=new Date().toISOString();res.json({success:true,item});
+});
+
+// Little Feet Email Integration inbox: a separate delivery surface for portal events.
+const emailInboxVisibleTo = (item, actor) => item && recordInSchool(item, actor) && normalizeUsername(item.username) === normalizeUsername(actor.username);
+const addEmailInboxItem = (actor, data) => {
+  if (!actor) return null;
+  const item = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), username: actor.username, type: boundedText(data.type || 'Notification', 40),
+    title: boundedText(data.title || 'Little Feet notification', 200), message: boundedText(data.message, 4000),
+    sourceId: boundedText(data.sourceId, 160), sourceTab: boundedText(data.sourceTab, 80),
+    read: false, pinned: false, createdAt: new Date().toISOString()
+  });
+  db.emailInbox.unshift(item); return item;
+};
+const buildEmailInbox = actor => {
+  const existing = tenantRecords(db.emailInbox, actor).filter(item => emailInboxVisibleTo(item, actor));
+  const known = new Set(existing.map(item => item.type + ':' + item.sourceId));
+  const add = (type, sourceId, title, message, sourceTab) => {
+    const key=type+':'+sourceId;if(!sourceId||known.has(key))return;
+    const item=addEmailInboxItem(actor,{type,sourceId,title,message,sourceTab});if(item){existing.push(item);known.add(key);}
+  };
+  tenantRecords(db.tickets, actor).filter(t=>normalizeUsername(t.createdBy)===normalizeUsername(actor.username)||normalizeUsername(t.assignedTo)===normalizeUsername(actor.username))
+    .forEach(t=>add('Ticket',t.id,t.subject,t.feedback||t.message||'Support ticket update','ticketsTab'));
+  tenantRecords(db.staffNotices, actor).filter(n=>n.audience==='All staff'||n.audience===actor.role)
+    .forEach(n=>add('Notice',n.id,n.title,n.message,'staffNoticesTab'));
+  tenantRecords(db.directMessages, actor).filter(m=>normalizeUsername(m.recipient)===normalizeUsername(actor.username))
+    .forEach(m=>add('Message',m.id,'Message from '+(m.sender||'Little Feet'),m.message,'chatTab'));
+  tenantRecords(db.broadcasts, actor).forEach(b=>add('Alert',b.id,b.bcPriority||'School alert',b.bcMessage,'broadcastsTab'));
+  return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+};
+app.get('/api/email/inbox',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view your Little Feet email inbox.'});
+  res.json(buildEmailInbox(actor));
+});
+app.patch('/api/email/inbox/:id',(req,res)=>{
+  const actor=getSessionAccount(req),item=actor&&db.emailInbox.find(x=>x.id===req.params.id&&emailInboxVisibleTo(x,actor));
+  if(!item)return res.status(404).json({message:'Inbox item not found.'});
+  if(typeof req.body?.read==='boolean')item.read=req.body.read;if(typeof req.body?.pinned==='boolean')item.pinned=req.body.pinned;
+  item.updatedAt=new Date().toISOString();res.json({success:true,item});
+});
+app.delete('/api/email/inbox/:id',(req,res)=>{
+  const actor=getSessionAccount(req),item=actor&&db.emailInbox.find(x=>x.id===req.params.id&&emailInboxVisibleTo(x,actor));
+  if(!item)return res.status(404).json({message:'Inbox item not found.'});db.emailInbox=db.emailInbox.filter(x=>x!==item);res.json({success:true});
+});
+app.delete('/api/email/inbox',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to manage your Little Feet email inbox.'});
+  const before=db.emailInbox.length;db.emailInbox=db.emailInbox.filter(x=>!emailInboxVisibleTo(x,actor));res.json({success:true,deleted:before-db.emailInbox.length});
 });
 
 // Email is a delivery channel, separate from in-app notifications.
