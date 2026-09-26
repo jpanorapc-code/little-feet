@@ -751,6 +751,7 @@ const db = {
   staffTasks: [],
   staffLeave: [],
   teacherCover: [],
+  performanceReviews: [],
   broadcasts: [],
   campusVisitors: [],
   visitorMeetings: [],
@@ -988,7 +989,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2573,6 +2574,58 @@ app.get('/api/analytics/:studentName', (req, res) => {
 });
 
 // Attendance
+
+// Staff performance reviews / KPI
+const KPI_RATINGS = new Set([1, 2, 3, 4, 5]);
+app.get('/api/staff/performance-reviews', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'School staff access is required.' });
+  const records = tenantRecords(db.performanceReviews, actor);
+  if (['admin', 'principal'].includes(actor.role)) return res.json(records);
+  res.json(records.filter(item => normalizeUsername(item.username) === normalizeUsername(actor.username)));
+});
+app.post('/api/staff/performance-reviews', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor || !['admin', 'principal'].includes(actor.role)) return res.status(403).json({ message: 'Only school management can create performance reviews.' });
+  const employee = staffAccountInSchool(actor, req.body?.username);
+  if (!employee) return res.status(400).json({ message: 'Choose a staff member from this school.' });
+  const criteriaInput = Array.isArray(req.body?.criteria) ? req.body.criteria : [];
+  const criteria = criteriaInput.slice(0, 20).map(entry => ({
+    name: boundedText(entry?.name, 120),
+    rating: Number(entry?.rating),
+    comment: boundedText(entry?.comment, 1000)
+  })).filter(entry => entry.name && KPI_RATINGS.has(entry.rating));
+  if (!criteria.length) return res.status(400).json({ message: 'Add at least one KPI with a rating from 1 to 5.' });
+  const averageRating = Number((criteria.reduce((sum, entry) => sum + entry.rating, 0) / criteria.length).toFixed(2));
+  const item = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), username: employee.username, staffName: employee.name || employee.username,
+    reviewPeriod: boundedText(req.body?.reviewPeriod, 120), reviewDate: boundedText(req.body?.reviewDate, 30) || new Date().toISOString().slice(0, 10),
+    criteria, averageRating, strengths: boundedText(req.body?.strengths, 2500), development: boundedText(req.body?.development, 2500),
+    goals: boundedText(req.body?.goals, 2500), managerComment: boundedText(req.body?.managerComment, 2500),
+    employeeComment: '', status: 'Draft', reviewedBy: actor.username, reviewedByName: actor.name || actor.username, createdAt: new Date().toISOString()
+  });
+  db.performanceReviews.unshift(item);
+  res.status(201).json({ success: true, item });
+});
+app.patch('/api/staff/performance-reviews/:id', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  const item = actor && db.performanceReviews.find(record => record.id === req.params.id && recordInSchool(record, actor));
+  if (!item) return res.status(404).json({ message: 'Performance review not found.' });
+  const isEmployee = normalizeUsername(item.username) === normalizeUsername(actor.username);
+  const isManager = ['admin', 'principal'].includes(actor.role);
+  if (!isEmployee && !isManager) return res.status(403).json({ message: 'You cannot update this performance review.' });
+  if (isEmployee) {
+    item.employeeComment = boundedText(req.body?.employeeComment, 2500);
+    if (req.body?.acknowledged === true) { item.status = 'Acknowledged'; item.acknowledgedAt = new Date().toISOString(); }
+  } else {
+    const nextStatus = boundedText(req.body?.status || item.status, 30);
+    if (!['Draft', 'Shared', 'Acknowledged'].includes(nextStatus)) return res.status(400).json({ message: 'Choose a valid review status.' });
+    item.status = nextStatus;
+    if (nextStatus === 'Shared' && !item.sharedAt) item.sharedAt = new Date().toISOString();
+  }
+  item.updatedAt = new Date().toISOString();
+  res.json({ success: true, item });
+});
 
 // Staff workplace: tasks, leave and teacher cover
 const WORK_TASK_STATUSES = new Set(['Open', 'In Progress', 'Completed']);
