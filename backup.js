@@ -4273,6 +4273,15 @@ async function saveStickyNote(event) {
   playDingSound();
 }
 
+function bindStickyNoteForm() {
+  const form = document.getElementById('stickyNoteForm');
+  if (!form || form.dataset.stickySubmitBound === 'true') return;
+  form.addEventListener('submit', saveStickyNote);
+  form.dataset.stickySubmitBound = 'true';
+}
+
+bindStickyNoteForm();
+
 async function loadStickyNotes() {
   const board = document.getElementById('stickyNotesRecords');
   const canUseStickyNotes = ['teacher', 'principal', 'admin'].includes(currentUser?.role);
