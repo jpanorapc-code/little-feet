@@ -3268,6 +3268,129 @@
         inset 0 -1px 0 rgba(228, 193, 113, .07) !important;
     }
 
+
+    /* Eye-comfort light mode — visual tone only, no geometry changes. */
+    body.light-mode {
+      --bg-dark: #89aeba;
+      --panel-bg: #a9c7d0;
+      --input-bg: #b8cfd6;
+      --text-dark: #0a2b3b;
+      --text-muted: #36586a;
+      --border-color: #5f8fa1;
+      --input-text: #092a3a;
+      --bubble-bg: #9fbdc7;
+    }
+
+    body.portal-active.light-mode {
+      background-color: #86aab6 !important;
+    }
+
+    body.portal-active.light-mode::before {
+      opacity: .20 !important;
+    }
+
+    body.light-mode .card,
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .chat-shell,
+    body.light-mode .guide-link-card,
+    body.light-mode .modal-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12) 0%, rgba(255,255,255,.035) 20%, rgba(255,255,255,0) 34%),
+        radial-gradient(circle at 10% -8%, rgba(17,132,139,.11), transparent 36%),
+        radial-gradient(circle at 100% 110%, rgba(29,91,137,.07), transparent 44%),
+        linear-gradient(145deg, #abc8d1 0%, #9dbdc7 52%, #91b2be 100%) !important;
+      border-color: rgba(39,103,126,.34) !important;
+      box-shadow:
+        0 18px 38px rgba(27,67,83,.18),
+        inset 0 1px 0 rgba(255,255,255,.26),
+        inset 0 -1px 0 rgba(17,91,116,.08) !important;
+    }
+
+    body.light-mode .workspace-card,
+    body.light-mode .workspace-results-panel,
+    body.light-mode .store-item,
+    body.light-mode .guide-link-card,
+    body.light-mode .item-row {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 26%),
+        linear-gradient(145deg, #b1cbd3 0%, #a3c1ca 54%, #98b8c2 100%) !important;
+      border-color: rgba(42,106,129,.31) !important;
+      box-shadow:
+        0 10px 22px rgba(27,69,86,.14),
+        inset 0 1px 0 rgba(255,255,255,.23) !important;
+    }
+
+    body.light-mode .card-header-bar h2,
+    body.light-mode .workspace-results-heading h3,
+    body.light-mode .guide-link-card h3,
+    body.light-mode .workspace-card h3 {
+      color: #082b3d !important;
+      text-shadow: 0 1px 0 rgba(255,255,255,.18);
+    }
+
+    body.light-mode .workspace-card p,
+    body.light-mode .guide-link-card p,
+    body.light-mode .workspace-results-heading p,
+    body.light-mode .meta,
+    body.light-mode .field-help,
+    body.light-mode .login-device-note,
+    body.light-mode .card > p {
+      color: #345668 !important;
+    }
+
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea,
+    body.light-mode .chat-box,
+    body.light-mode .profile-icon-choice {
+      color: #092a3a !important;
+      background:
+        linear-gradient(180deg, #b8d0d7 0%, #abc5cd 100%) !important;
+      border-color: rgba(42,103,125,.36) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.24),
+        inset 0 0 0 1px rgba(18,74,94,.05) !important;
+    }
+
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #587684 !important;
+    }
+
+    body.light-mode .wellbeing-banner,
+    body.light-mode #termsNotice,
+    body.light-mode #runtimeErrorBanner {
+      background:
+        linear-gradient(145deg, #a8c5cf 0%, #99b9c4 100%) !important;
+      border-color: rgba(41,103,124,.34) !important;
+      box-shadow:
+        0 12px 24px rgba(28,68,84,.14),
+        inset 0 1px 0 rgba(255,255,255,.20) !important;
+    }
+
+    body.light-mode .wellbeing-banner p,
+    body.light-mode #termsNotice p {
+      color: #0d3446 !important;
+    }
+
+    body.light-mode .profile-icon-choice,
+    body.light-mode .social-signin button {
+      background:
+        linear-gradient(180deg, #b6cfd7 0%, #a7c3cc 100%) !important;
+      border-color: rgba(43,104,126,.34) !important;
+      color: #0a2b3b !important;
+    }
+
+    body.light-mode footer {
+      background:
+        linear-gradient(180deg, #8dabb6 0%, #7e9eaa 100%) !important;
+      border-top-color: rgba(39,96,117,.30) !important;
+      color: #173f50 !important;
+    }
+
   </style>
 </head>
 <body>
