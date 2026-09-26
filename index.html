@@ -3712,6 +3712,7 @@
 .staff-kpi-dashboard{grid-column:1/-1}.staff-kpi-scoreboard{display:grid;gap:9px;margin:14px 0}.staff-kpi-scoreboard article{display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,2fr);gap:8px 16px;align-items:center}.staff-kpi-scoreboard article span{font-size:.82rem;color:var(--text-muted)}.staff-kpi-bar{grid-column:1/-1;height:8px;border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden}.staff-kpi-bar i{display:block;height:100%;background:currentColor;border-radius:inherit}.staff-kpi-graph{display:flex;align-items:end;gap:10px;min-height:210px;padding:16px 8px 4px;overflow-x:auto}.staff-kpi-graph>div{display:grid;grid-template-rows:auto 150px auto;gap:5px;min-width:72px;text-align:center;font-size:.72rem}.staff-kpi-graph b{display:flex;align-items:end;justify-content:center;height:150px;border-bottom:1px solid var(--border-color)}.staff-kpi-graph b i{display:block;width:34px;min-height:3px;border-radius:6px 6px 0 0;background:currentColor}.staff-kpi-graph em{font-style:normal;font-weight:800}
 .approval-item{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border-color)}.approval-item>div:first-child{min-width:0}.approval-item strong{margin-left:8px}.approval-actions{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:640px){.approval-item{align-items:stretch;flex-direction:column}.approval-actions .action-btn{flex:1}}
 .staff-notice{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--border-color)}.staff-notice h3{margin:8px 0 5px}.staff-notice p{white-space:pre-wrap}.staff-notice .badge-tag+.badge-tag{margin-left:6px}@media(max-width:640px){.staff-notice{align-items:stretch;flex-direction:column}.staff-notice>.action-btn{width:100%}}
+.meeting-record{padding:16px 0;border-bottom:1px solid var(--border-color)}.meeting-record form{display:grid;gap:10px;margin-top:12px}.meeting-action-row{display:grid;grid-template-columns:2fr 1.3fr 1fr .8fr auto;gap:8px;align-items:center;margin:8px 0}.meeting-minutes{margin-top:10px;padding:12px;border:1px solid var(--border-color);border-radius:12px}.meeting-minutes p{white-space:pre-wrap}@media(max-width:760px){.meeting-action-row{grid-template-columns:1fr}.meeting-action-row button{width:100%}}
 </style>
 </head>
 <body>
@@ -4937,6 +4938,7 @@
             </div>
             <div class="card"><div class="card-header-bar"><h2>Staff Notice Board</h2><button type="button" class="action-btn" onclick="refreshStaffNotices()">Refresh</button></div><div id="staffNoticeList">Loading notices…</div></div>
           </div>
+          <div id="meetingMinutesTab" class="tab-content" data-roles="teacher,principal,admin"><div class="card"><div class="card-header-bar"><h2>Meetings & Minutes</h2><button type="button" class="action-btn" onclick="refreshMeetingMinutes()">Refresh</button></div><p class="section-intro">Approved meeting requests live here. Management records minutes and turns action items directly into Staff Tasks.</p><div id="meetingMinutesList">Loading meetings…</div></div></div>
           <div id="guideTab" class="tab-content">
         <div class="card">
           <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
@@ -5004,7 +5006,7 @@
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
   <script src="backup.js?v=20260926-layout-v1" defer></script>
-  <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>\n  <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>\n  <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>\n  <script src="/assets/staff-notices.js?v=20260926-staff-notices-v1" defer></script>\n  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
+  <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>\n  <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>\n  <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>\n  <script src="/assets/staff-notices.js?v=20260926-staff-notices-v1" defer></script>\n  <script src="/assets/meeting-minutes.js?v=20260926-meeting-minutes-v1" defer></script>\n  <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
