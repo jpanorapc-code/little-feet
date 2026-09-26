@@ -380,9 +380,12 @@ function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
     const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
     const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
-    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
+    const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
+    button.classList.toggle('is-muted', portalAudioMuted);
     button.setAttribute('aria-pressed', String(portalAudioMuted));
-    button.title = portalAudioMuted ? 'Turn Little Feet sound back on' : 'Mute all Little Feet sound';
+    button.setAttribute('aria-label', portalAudioMuted ? 'Sound muted. Turn Little Feet sound on' : 'Sound on. Mute Little Feet sound');
+    button.title = portalAudioMuted ? 'Sound muted — click to turn sound on' : 'Sound on — click to mute';
   });
 }
 
@@ -1143,11 +1146,14 @@ function syncMobileHeaderOffset() {
   const dashboard = document.getElementById('dashboardSection');
   const header = dashboard?.querySelector('nav');
   if (!dashboard || dashboard.classList.contains('hidden') || !header) return;
-  const height = Math.ceil(header.getBoundingClientRect().height);
+  const rect = header.getBoundingClientRect();
+  const height = Math.ceil(rect.height);
   if (!Number.isFinite(height) || height < 1) return;
   const value = `${height}px`;
+  const visibleHeaderBottom = Math.max(0, Math.min(height, Math.ceil(rect.bottom)));
   document.documentElement.style.setProperty('--mobile-header-height', value);
   document.documentElement.style.setProperty('--portal-header-height', value);
+  document.documentElement.style.setProperty('--portal-sidebar-top', `${visibleHeaderBottom}px`);
 }
 
 function observePortalHeaderSize() {
@@ -1158,7 +1164,17 @@ function observePortalHeaderSize() {
   portalHeaderResizeObserver.observe(header);
 }
 
-window.addEventListener('resize', syncMobileHeaderOffset);
+let portalHeaderScrollFrame = 0;
+function queuePortalHeaderOffsetSync() {
+  if (portalHeaderScrollFrame) return;
+  portalHeaderScrollFrame = requestAnimationFrame(() => {
+    portalHeaderScrollFrame = 0;
+    syncMobileHeaderOffset();
+  });
+}
+
+window.addEventListener('resize', queuePortalHeaderOffsetSync);
+window.addEventListener('scroll', queuePortalHeaderOffsetSync, { passive: true });
 requestAnimationFrame(() => {
   observePortalHeaderSize();
   syncMobileHeaderOffset();
