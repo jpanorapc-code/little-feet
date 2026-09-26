@@ -89,7 +89,7 @@
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
         ${action('scheduleTab', 'Timetable', 'See timetable records and the day\'s scheduled learning activities.')}
-        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${action('maintenanceTab', 'Maintenance', 'Report issues, assign work orders and track repairs to completion.')}\n        ${action('resourceBookingTab', 'Resource Booking', 'Reserve rooms, facilities, vehicles and equipment without double-booking.')}\n        ${action('purchaseRequestsTab', 'Purchase Requests', 'Request supplies and equipment, then track approval and fulfilment.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
+        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${action('maintenanceTab', 'Maintenance', 'Report issues, assign work orders and track repairs to completion.')}\n        ${action('resourceBookingTab', 'Resource Booking', 'Reserve rooms, facilities, vehicles and equipment without double-booking.')}\n        ${action('purchaseRequestsTab', 'Purchase Requests', 'Request supplies and equipment, then track approval and fulfilment.')}\n        ${action('qualificationsTab', 'Training & Qualifications', 'Track certificates, renewals and staff compliance expiries.')}\n        ${action('kpiHistoryTab', 'KPI History', 'Review your monthly task-performance trend over time.')}\n        ${action('staffDevelopmentTab', 'Staff Development', 'Follow development goals created from performance feedback.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
         ${action('chatTab', 'Messages', 'Open school conversations and follow up on communication that needs a response.')}
       </section>
 
@@ -148,7 +148,7 @@
     list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
 
     const username = String(currentUser.username || '').toLowerCase();
-    const [tickets, broadcasts, tasks, leave, cover, reviews, notices, maintenance, bookings, purchases] = await Promise.all([
+    const [tickets, broadcasts, tasks, leave, cover, reviews, notices, maintenance, bookings, purchases, qualifications] = await Promise.all([
       fetchJson('/api/tickets'),
       fetchJson('/api/broadcasts'),
       fetchJson('/api/staff/tasks'),
@@ -158,10 +158,17 @@
       fetchJson('/api/staff/notices'),
       fetchJson('/api/maintenance'),
       fetchJson('/api/resources/bookings'),
-      fetchJson('/api/purchase-requests')
+      fetchJson('/api/purchase-requests'),
+      fetchJson('/api/staff/qualifications')
     ]);
 
     const items = [];
+    if (Array.isArray(qualifications)) {
+      const expired = qualifications.filter(x => x.status === 'Expired');
+      const expiring = qualifications.filter(x => x.status === 'Expiring soon');
+      if (expired.length) items.push({ tab:'qualificationsTab', title:`${expired.length} qualification${expired.length===1?'':'s'} expired`, detail:'Review staff compliance' });
+      if (expiring.length) items.push({ tab:'qualificationsTab', title:`${expiring.length} qualification${expiring.length===1?'':'s'} expiring within 30 days`, detail:'Plan renewals' });
+    }
     if (Array.isArray(tickets)) {
       const assigned = tickets.filter(ticket =>
         String(ticket.status || '').toLowerCase() !== 'completed' &&
