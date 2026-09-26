@@ -756,6 +756,7 @@ const db = {
   meetingMinutes: [],
   maintenanceOrders: [],
   resourceBookings: [],
+  purchaseRequests: [],
   broadcasts: [],
   campusVisitors: [],
   visitorMeetings: [],
@@ -993,7 +994,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2601,6 +2602,27 @@ app.get('/api/staff/kpi-monthly', (req, res) => {
   res.json({ month, rows: ranked });
 });
 
+// Staff purchase requests feed management approvals and finance fulfilment.
+app.get('/api/purchase-requests', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const rows=tenantRecords(db.purchaseRequests,actor);
+  res.json(['admin','principal'].includes(actor.role)?rows:rows.filter(x=>normalizeUsername(x.requestedBy)===normalizeUsername(actor.username)));
+});
+app.post('/api/purchase-requests', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const itemName=boundedText(req.body?.itemName,180),reason=boundedText(req.body?.reason,2000),quantity=Math.max(1,Math.min(9999,Number(req.body?.quantity)||1)),estimatedUnitCost=Number(req.body?.estimatedUnitCost||0);
+  if(!itemName||!reason||!Number.isFinite(estimatedUnitCost)||estimatedUnitCost<0)return res.status(400).json({message:'Add an item, reason, quantity and valid estimated cost.'});
+  const item=tagSchoolRecord(actor,{id:crypto.randomUUID(),itemName,reason,quantity,estimatedUnitCost:Number(estimatedUnitCost.toFixed(2)),estimatedTotal:Number((quantity*estimatedUnitCost).toFixed(2)),supplier:boundedText(req.body?.supplier,180),category:boundedText(req.body?.category||'General',80),requestedBy:actor.username,requestedByName:actor.name||actor.username,status:'Pending',financeStatus:'Awaiting approval',createdAt:new Date().toISOString()});
+  db.purchaseRequests.unshift(item);res.status(201).json({success:true,item});
+});
+app.patch('/api/purchase-requests/:id/finance', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor||!['admin','principal'].includes(actor.role))return res.status(403).json({message:'Management access is required for purchase fulfilment.'});
+  const item=db.purchaseRequests.find(x=>x.id===req.params.id&&recordInSchool(x,actor));if(!item)return res.status(404).json({message:'Purchase request not found.'});
+  if(item.status!=='Approved')return res.status(409).json({message:'The purchase request must be approved first.'});
+  const status=boundedText(req.body?.financeStatus,40);if(!['Approved for purchase','Ordered','Received'].includes(status))return res.status(400).json({message:'Choose a valid finance fulfilment status.'});
+  item.financeStatus=status;item.financeUpdatedBy=actor.username;item.financeUpdatedAt=new Date().toISOString();res.json({success:true,item});
+});
+
 // School resource booking with collision prevention.
 app.get('/api/resources/bookings', (req,res) => {
   const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
@@ -2721,7 +2743,8 @@ app.get('/api/approvals', (req, res) => {
   const meetings = tenantRecords(db.tickets, actor).filter(item => item.ticketType === 'Meeting request' && item.status !== 'Completed').map(item => ({
     id: item.id, type: 'Meeting', title: item.subject, detail: [item.createdByName || item.createdBy, item.meetingDate, item.meetingTime, item.meetingLocation].filter(Boolean).join(' · '), createdAt: item.createdAt, actions: ['Approve', 'Reject']
   }));
-  res.json([...leave, ...meetings].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))));
+  const purchases = tenantRecords(db.purchaseRequests, actor).filter(item => item.status === 'Pending').map(item => ({ id:item.id, type:'Purchase', title:`${item.itemName} × ${item.quantity}`, detail:`${item.requestedByName} · Estimated R${item.estimatedTotal.toFixed(2)} · ${item.reason}`, createdAt:item.createdAt, actions:['Approve','Reject'] }));
+  res.json([...leave, ...meetings, ...purchases].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))));
 });
 app.post('/api/approvals/:type/:id', (req, res) => {
   const actor = requireSchoolStaff(req);
@@ -2733,6 +2756,12 @@ app.post('/api/approvals/:type/:id', (req, res) => {
     if (!item || item.status !== 'Pending') return res.status(404).json({ message: 'Pending leave request not found.' });
     item.status = decision === 'Approve' ? 'Approved' : 'Rejected'; item.reviewedBy = actor.username; item.reviewedAt = new Date().toISOString();
     return res.json({ success: true, item });
+  }
+  if (req.params.type === 'Purchase') {
+    const item=db.purchaseRequests.find(record=>record.id===req.params.id&&recordInSchool(record,actor));
+    if(!item||item.status!=='Pending')return res.status(404).json({message:'Pending purchase request not found.'});
+    item.status=decision==='Approve'?'Approved':'Rejected';item.financeStatus=decision==='Approve'?'Approved for purchase':'Rejected';item.reviewedBy=actor.username;item.reviewedAt=new Date().toISOString();
+    return res.json({success:true,item});
   }
   if (req.params.type === 'Meeting') {
     const item = db.tickets.find(record => record.id === req.params.id && recordInSchool(record, actor) && record.ticketType === 'Meeting request' && record.status !== 'Completed');
