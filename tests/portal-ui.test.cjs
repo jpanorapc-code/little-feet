@@ -65,9 +65,22 @@ async function main() {
     const navigationResponse = await page.goto(origin, { waitUntil: 'networkidle' });
     assert.equal(navigationResponse.status(), 200, (await page.content()).slice(0, 1200));
     if (role === 'admin') {
+      await page.locator('.login-audio-compact span').evaluate(el => { el.textContent = 'Mute Little Feet'; });
+      const desktopToolsFit = await page.evaluate(() => {
+        const card = document.querySelector('.auth-card').getBoundingClientRect();
+        const language = document.querySelector('.login-language-pill').getBoundingClientRect();
+        const audio = document.querySelector('.login-audio-compact').getBoundingClientRect();
+        return audio.right <= card.right + 1 && audio.left >= language.right - 1;
+      });
+      assert.ok(desktopToolsFit, 'Desktop login language and sound controls must not overlap or escape the card');
       await page.setViewportSize({width:390,height:844});
-      const fits = await page.locator('.login-audio-compact').evaluate(el => el.getBoundingClientRect().right <= document.querySelector('.auth-card').getBoundingClientRect().right);
-      assert.ok(fits, 'Mobile Sound button must fit inside login card');
+      const mobileToolsFit = await page.evaluate(() => {
+        const card = document.querySelector('.auth-card').getBoundingClientRect();
+        const language = document.querySelector('.login-language-pill').getBoundingClientRect();
+        const audio = document.querySelector('.login-audio-compact').getBoundingClientRect();
+        return audio.right <= card.right + 1 && audio.left >= language.right - 1;
+      });
+      assert.ok(mobileToolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
       await page.screenshot({ path:path.join(root,'tmp','mobile-login-video.png') });
       await page.setViewportSize({width:1440,height:1000});
     }
