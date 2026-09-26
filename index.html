@@ -3990,6 +3990,29 @@
       border-color:rgba(42,103,125,.36) !important;
     }
 
+
+    /* Use the full login signup row instead of a floating small button. */
+    .login-new-account {
+      grid-template-columns:max-content minmax(0,1fr) !important;
+      align-items:center !important;
+      gap:12px !important;
+    }
+    .login-new-account .action-btn {
+      width:100% !important;
+      max-width:none !important;
+      margin:0 !important;
+      justify-content:center !important;
+    }
+    @media (max-width:420px) {
+      .login-new-account {
+        grid-template-columns:minmax(0,1fr) !important;
+        align-items:stretch !important;
+      }
+      .login-new-account .action-btn {
+        width:100% !important;
+      }
+    }
+
   </style>
 </head>
 <body>
