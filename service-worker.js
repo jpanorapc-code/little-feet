@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v18';
+const CACHE_NAME = 'little-feet-shell-v17';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
