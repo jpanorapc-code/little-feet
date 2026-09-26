@@ -27,14 +27,35 @@
     }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
 
+  let emailInboxSeen=new Set();
+  const inboxButtons=item=>`<div class="actions"><button class="action-btn" data-inbox-action="read" data-id="${esc(item.id)}">${item.read?'Mark unread':'Mark read'}</button><button class="action-btn" data-inbox-action="pin" data-id="${esc(item.id)}">${item.pinned?'Unpin':'Pin'}</button><button class="action-btn" data-inbox-action="open" data-tab="${esc(item.sourceTab||'')}">Open</button><button class="action-btn" data-inbox-action="delete" data-id="${esc(item.id)}">Delete</button></div>`;
+  const showInboxPopup=item=>{
+    if(item.read||emailInboxSeen.has(item.id))return;emailInboxSeen.add(item.id);
+    let stack=document.getElementById('lfNotificationStack');if(!stack){stack=document.createElement('aside');stack.id='lfNotificationStack';stack.className='lf-notification-stack';stack.setAttribute('aria-live','polite');document.body.appendChild(stack);}
+    const card=document.createElement('article');card.className='lf-notification-popup'+(item.pinned?' is-pinned':'');card.dataset.id=item.id;card.innerHTML=`<header><strong>${esc(item.title)}</strong><span class="badge-tag">${esc(item.type)}</span></header><p>${esc(item.message)}</p><div class="actions"><button class="action-btn" data-popup-pin>${item.pinned?'Unpin':'Pin'}</button><button class="action-btn" data-popup-close>Close</button></div>`;
+    card.querySelector('[data-popup-close]').onclick=()=>card.remove();
+    card.querySelector('[data-popup-pin]').onclick=async()=>{const next=!item.pinned;await json('/api/email/inbox/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({pinned:next})});item.pinned=next;card.classList.toggle('is-pinned',next);card.querySelector('[data-popup-pin]').textContent=next?'Unpin':'Pin';await email();};
+    stack.prepend(card);
+  };
   async function email(){
     const host=document.getElementById('emailIntegrationContent');if(!host)return;
-    try{const d=await json('/api/email/status');host.innerHTML=`<div class="workspace-grid"><div class="workspace-card"><h3>Email delivery</h3><p><strong>Provider:</strong> ${d.configured?'Configured':'Not configured'}</p><p><strong>Account email:</strong> ${esc(d.address||'No valid email')}</p><p><strong>Verification:</strong> ${d.verified?'Verified':'Not verified'}</p><p class="meta">Email is a separate delivery channel from Little Feet in-app notifications. Security lockout alerts use the same protected server-side provider configuration.</p></div><div class="workspace-card"><h3>Verify account email</h3><button id="requestEmailCode" class="action-btn" type="button">Send verification code</button><form id="confirmEmailForm" style="margin-top:12px"><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="submit-btn">Verify email</button></form></div></div>`;
+    try{const [d,inbox]=await Promise.all([json('/api/email/status'),json('/api/email/inbox')]);
+      host.innerHTML=`<div class="workspace-grid"><div class="workspace-card"><h3>Connect Little Feet Email</h3><p><strong>Email channel:</strong> ${d.configured?'Available':'Provider not configured'}</p><p><strong>Connected account:</strong> ${esc(d.address||'No valid email')}</p><p><strong>Verification:</strong> ${d.verified?'Verified':'Not verified'}</p><p class="meta">Verify your account email to connect it to Little Feet's separate email delivery channel. Provider credentials remain server-side.</p><button id="requestEmailCode" class="action-btn" type="button">Send verification code</button><form id="confirmEmailForm" style="margin-top:12px"><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="submit-btn">Connect & verify email</button></form></div><div class="workspace-card"><h3>What arrives here</h3><p>Little Feet notifications, tickets assigned to or created by you, direct messages, staff notices and school alerts appear here separately from the normal portal workspaces.</p><p class="meta">Deleting an inbox copy does not delete the original ticket, message, notice or safety record.</p></div></div><div class="email-inbox-toolbar"><h3>Little Feet Email Inbox</h3><button id="deleteAllInbox" class="action-btn" type="button">Delete all</button></div><div class="email-inbox-list">${inbox.length?inbox.map(item=>`<article class="email-inbox-item ${item.read?'':'is-unread'} ${item.pinned?'is-pinned':''}"><header><div><span class="badge-tag">${esc(item.type)}</span> <strong>${esc(item.title)}</strong></div><span class="meta">${new Date(item.createdAt).toLocaleString()}</span></header><p>${esc(item.message)}</p>${inboxButtons(item)}</article>`).join(''):'<p class="meta">No Little Feet email notifications yet.</p>'}</div>`;
+      inbox.forEach(showInboxPopup);
       document.getElementById('requestEmailCode')?.addEventListener('click',async()=>{try{await json('/api/email/verification/request',{method:'POST',body:'{}'});alert('Verification code sent. It expires in 10 minutes.');}catch(e){alert(e.message);}});
       document.getElementById('confirmEmailForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/email/verification/confirm',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await email();}catch(err){alert(err.message);}});
+      host.querySelectorAll('[data-inbox-action]').forEach(btn=>btn.addEventListener('click',async()=>{
+        const action=btn.dataset.inboxAction,id=btn.dataset.id;if(action==='open'){if(btn.dataset.tab)window.switchTab?.(btn.dataset.tab);return;}
+        if(action==='delete'){if(!confirm('Delete this inbox item?'))return;await json('/api/email/inbox/'+encodeURIComponent(id),{method:'DELETE'});}
+        else {const item=inbox.find(x=>x.id===id);await json('/api/email/inbox/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(action==='read'?{read:!item.read}:{pinned:!item.pinned})});}
+        await email();
+      }));
+      document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all Little Feet Email inbox items? Original tickets, messages and notices will stay in their workspaces.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
     }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
-  const load=()=>{qualifications();kpiHistory();development();email();};
+  let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(()=>{if(user()?.username)email();},30000);};
+
+  const load=()=>{qualifications();kpiHistory();development();email();startEmailPoll();};
   document.addEventListener('littlefeet:session-ready',load);
   if(user()?.username)load();
   window.refreshStaffQualifications=qualifications;window.refreshKpiHistory=kpiHistory;window.refreshStaffDevelopment=development;window.refreshEmailIntegration=email;

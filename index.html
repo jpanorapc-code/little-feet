@@ -4393,6 +4393,21 @@
       background-image: none !important;
       border-color: var(--border-color) !important;
     }
+
+    #authSection .login-card-actions{display:grid;grid-template-columns:minmax(150px,1fr) 42px 128px;align-items:center;gap:8px;width:100%;margin-left:0}
+    #authSection .login-language-pill{width:100%;height:40px}
+    #authSection #loginLanguagePreference{height:38px;min-height:38px;font-size:.78rem}
+    #authSection .login-audio-compact{width:42px!important;min-width:42px!important;height:40px;min-height:40px!important;border-radius:9px}
+    #authSection .login-background-compact{width:128px!important;min-width:128px!important;height:40px;min-height:40px!important;margin:0!important;padding:0 12px!important;white-space:nowrap;border:1px solid rgba(94,234,212,.34);background:rgba(13,148,136,.16);color:#dffcf8;font-size:.72rem}
+    #authSection .login-background-compact:hover{background:rgba(13,148,136,.28);border-color:rgba(94,234,212,.58)}
+    .lf-notification-stack{position:fixed;right:18px;top:92px;z-index:9990;display:grid;gap:10px;width:min(390px,calc(100vw - 28px));pointer-events:none}
+    .lf-notification-popup{pointer-events:auto;background:linear-gradient(145deg,var(--panel-bg),rgba(15,43,72,.96));color:var(--text-dark);border:1px solid rgba(94,234,212,.36);border-left:4px solid var(--primary-color);border-radius:13px;padding:14px;box-shadow:0 18px 45px rgba(0,0,0,.32)}
+    .lf-notification-popup header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.lf-notification-popup p{margin:8px 0 10px;color:var(--text-muted);font-size:.84rem;line-height:1.45}.lf-notification-popup .actions{display:flex;gap:8px;justify-content:flex-end}.lf-notification-popup .action-btn{min-height:34px;margin:0;padding:6px 12px;border:1px solid rgba(94,234,212,.28);background:rgba(13,148,136,.14);color:#dffcf8}.lf-notification-popup .action-btn:hover{background:rgba(13,148,136,.26)}
+    .lf-notification-popup.is-pinned{border-left-color:#fbbf24;box-shadow:0 18px 45px rgba(0,0,0,.32),inset 0 0 0 1px rgba(251,191,36,.16)}
+    .email-inbox-toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:14px 0}.email-inbox-list{display:grid;gap:9px}
+    .email-inbox-item{border:1px solid var(--border-color);border-radius:12px;padding:13px;background:rgba(2,15,29,.16)}.email-inbox-item.is-unread{border-left:4px solid #5eead4}.email-inbox-item.is-pinned{box-shadow:inset 0 0 0 1px rgba(94,234,212,.35)}
+    .email-inbox-item header{display:flex;justify-content:space-between;gap:10px}.email-inbox-item .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    @media(max-width:640px){#authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 42px}#authSection .login-background-compact{grid-column:1/-1;width:100%!important;min-width:0!important}.lf-notification-stack{top:72px;right:14px}.email-inbox-item header{flex-direction:column}}
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
@@ -4403,7 +4418,6 @@
       <source src="/assets/video/little-feet-ambient-silent.mp4" type="video/mp4">
     </video>
   </div>
-  <button id="backgroundMotionToggle" class="background-motion-toggle" type="button" aria-controls="ambientBackgroundVideo" aria-pressed="false">Play background</button>
   <!-- Vector icon library: crisp at any screen density, including 4K displays. -->
   <svg id="lfIconSprite" aria-hidden="true" focusable="false" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
@@ -4500,6 +4514,7 @@
             </select>
           </label>
           <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Sound On</span></button>
+          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="ambientBackgroundVideo" aria-pressed="false">Play background</button>
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
@@ -4671,27 +4686,47 @@
         <ul class="sidebar-links">
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('attendanceTab', this)">Daily Attendance</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('schoolDayTab', this)">School Day Hub</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('maintenanceTab', this)">Maintenance &amp; Work Orders</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('resourceBookingTab', this)">Resource Booking</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('registryTab', this)">Daily Register</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('operationsTab', this)">School Operations</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-user"></use></svg><span>Staff &amp; Management</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
+        <ul class="sidebar-links">
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('staffWorkTab', this)">Staff Work</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('approvalsTab', this)">Approvals Centre</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('staffNoticesTab', this)">Staff Notice Board</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('meetingMinutesTab', this)">Meetings &amp; Minutes</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('maintenanceTab', this)">Maintenance &amp; Work Orders</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('resourceBookingTab', this)">Resource Booking</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('purchaseRequestsTab', this)">Purchase Requests</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('qualificationsTab', this)">Training &amp; Qualifications</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('kpiHistoryTab', this)">KPI History &amp; Trends</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('staffDevelopmentTab', this)">Staff Development</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('emailIntegrationTab', this)">Email Integration</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('notesTab', this)">Sticky Notes</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-finance"></use></svg><span>Purchasing &amp; Resources</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
+        <ul class="sidebar-links">
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('purchaseRequestsTab', this)">Purchase Requests</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-help"></use></svg><span>Communication</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
+        <ul class="sidebar-links">
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('emailIntegrationTab', this)">Emails</button></li>
         <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Messages</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('notesTab', this)">Sticky Notes</button></li>
+        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg><span>Administration</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
+        <ul class="sidebar-links">
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('registryTab', this)">Daily Register</button></li>
         <li data-roles="admin"><button type="button" class="nav-btn" onclick="switchTab('accountsTab', this)">Account Management</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('learnerCodesTab', this)">Learner Code Forms</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('dataImportTab', this)">Import School Data</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('operationsTab', this)">School Operations</button></li>
-        <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('settingsTab', this)">Settings</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('wallpaperTab', this)"><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg><span>Wallpaper Mode</span></button></li>
