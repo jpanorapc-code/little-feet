@@ -54,7 +54,7 @@
         '<p>Unsolicited electronic direct marketing must comply with POPIA and other applicable South African consumer and electronic-communications rules. Little Feet must not be used to make a solely automated admission, disciplinary, safeguarding or developmental decision that has legal or substantial effects on a person without the protections required by law.</p>'),
       section('12. Information Regulator',
         '<p>The South African Information Regulator is the independent regulator responsible for POPIA and PAIA. Current complaint forms, PAIA forms and contact channels are available at <a href="https://inforegulator.org.za/" target="_blank" rel="noopener">inforegulator.org.za</a>.</p>'),
-      '<p class="meta" style="margin-top:14px;">This platform notice supports compliance but does not replace the responsible party’s own privacy notice, section 51 PAIA manual, retention schedule, operator agreements, Information Officer duties, security incident process or professional legal review.</p>',
+      '<p class="meta" style="margin-top:14px;">This platform notice supports compliance but does not replace the school’s own privacy notice, the responsible party’s section 51 PAIA manual, retention schedule, operator agreements, Information Officer duties, security incident process or professional legal review.</p>',
       '</div>'
     ].join('');
   }
