@@ -100,6 +100,22 @@ const server = http.createServer((req, res) => {
           const welcomeBanner = document.querySelector('#homeTab > .portal-welcome-banner');
           if (welcomeBanner && visible(welcomeBanner) && welcomeBanner.getBoundingClientRect().height > 200) errors.push('mobile welcome hero is too tall');
         }
+        if (width >= 960) {
+          const term = document.getElementById('currentTermText');
+          const termPanel = term?.closest('.nav-term-panel');
+          const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
+          if (term && termPanel) {
+            const style = getComputedStyle(term);
+            if (style.whiteSpace === 'nowrap') errors.push('desktop academic term is forced onto one clipped line');
+            if (term.scrollWidth > term.clientWidth + 2) errors.push('desktop academic term text overflows horizontally');
+            if (term.getBoundingClientRect().bottom > termPanel.getBoundingClientRect().bottom + 2) errors.push('desktop academic term text escapes its panel');
+          }
+          if (termPanel && shortcuts.length) {
+            const panelTop = Math.round(termPanel.getBoundingClientRect().top);
+            const shortcutTops = shortcuts.map(button => Math.round(button.getBoundingClientRect().top));
+            if (shortcutTops.some(top => Math.abs(top - panelTop) > 3)) errors.push('desktop quick shortcuts are not lifted to the term panel top edge');
+          }
+        }
         if (width < 960) {
           dashboard.classList.add('sidebar-open');
           const navButton = sidebar.querySelector('.nav-btn');
