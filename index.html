@@ -2699,7 +2699,7 @@
       <div id="notesTab" class="tab-content role-teacher role-admin">
         <div class="card"><div class="card-header-bar"><h2 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Staff Sticky Notes</span></h2><span class="badge-tag info">STAFF ONLY</span></div>
           <p style="color:var(--text-muted);margin:0 0 14px;">Keep quick internal reminders, handovers and follow-ups in one place. Do not include medical, safeguarding or other sensitive learner information here.</p>
-          <form class="sticky-note-form" onsubmit="saveStickyNote(event)">
+          <form id="stickyNoteForm" class="sticky-note-form">
             <label>Note title<input name="noteTitle" maxlength="90" required placeholder="e.g. Call parent after 15:00"></label>
             <label>Reminder<textarea name="details" rows="4" maxlength="600" required placeholder="Add the task, owner or follow-up detail"></textarea></label>
             <label>Colour<select name="colour"><option value="yellow">Sunshine</option><option value="teal">Teal</option><option value="blue">Blue</option><option value="rose">Rose</option></select></label>
@@ -2901,7 +2901,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260926-map-cinematic-v1" defer></script>
+  <script src="backup.js?v=20260926-sticky-runtime-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
