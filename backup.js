@@ -1143,11 +1143,14 @@ function syncMobileHeaderOffset() {
   const dashboard = document.getElementById('dashboardSection');
   const header = dashboard?.querySelector('nav');
   if (!dashboard || dashboard.classList.contains('hidden') || !header) return;
-  const height = Math.ceil(header.getBoundingClientRect().height);
+  const rect = header.getBoundingClientRect();
+  const height = Math.ceil(rect.height);
   if (!Number.isFinite(height) || height < 1) return;
   const value = `${height}px`;
+  const visibleHeaderBottom = Math.max(0, Math.min(height, Math.ceil(rect.bottom)));
   document.documentElement.style.setProperty('--mobile-header-height', value);
   document.documentElement.style.setProperty('--portal-header-height', value);
+  document.documentElement.style.setProperty('--portal-sidebar-top', `${visibleHeaderBottom}px`);
 }
 
 function observePortalHeaderSize() {
@@ -1158,7 +1161,17 @@ function observePortalHeaderSize() {
   portalHeaderResizeObserver.observe(header);
 }
 
-window.addEventListener('resize', syncMobileHeaderOffset);
+let portalHeaderScrollFrame = 0;
+function queuePortalHeaderOffsetSync() {
+  if (portalHeaderScrollFrame) return;
+  portalHeaderScrollFrame = requestAnimationFrame(() => {
+    portalHeaderScrollFrame = 0;
+    syncMobileHeaderOffset();
+  });
+}
+
+window.addEventListener('resize', queuePortalHeaderOffsetSync);
+window.addEventListener('scroll', queuePortalHeaderOffsetSync, { passive: true });
 requestAnimationFrame(() => {
   observePortalHeaderSize();
   syncMobileHeaderOffset();
