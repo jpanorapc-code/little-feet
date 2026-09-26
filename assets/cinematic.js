@@ -1435,18 +1435,27 @@ function initCinematicJourney() {
     calculateScroll();
   };
 
+  let visibleStageSyncFrame = 0;
+  const scheduleVisibleStageSync = () => {
+    if (visibleStageSyncFrame) return;
+    visibleStageSyncFrame = requestAnimationFrame(() => {
+      visibleStageSyncFrame = 0;
+      syncVisibleStage();
+    });
+  };
+
   window.addEventListener('scroll', calculateScroll, { passive: true });
-  window.addEventListener('resize', syncVisibleStage, { passive: true });
-  window.visualViewport?.addEventListener('resize', syncVisibleStage, { passive: true });
+  window.addEventListener('resize', scheduleVisibleStageSync, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleVisibleStageSync, { passive: true });
 
   const resizeObserver = typeof ResizeObserver === 'function'
-    ? new ResizeObserver(() => syncVisibleStage())
+    ? new ResizeObserver(() => scheduleVisibleStageSync())
     : null;
   resizeObserver?.observe(stage);
 
   const dashboardObserver = dashboard && typeof MutationObserver === 'function'
     ? new MutationObserver(() => {
-        if (!dashboard.classList.contains('hidden')) requestAnimationFrame(syncVisibleStage);
+        if (!dashboard.classList.contains('hidden')) scheduleVisibleStageSync();
       })
     : null;
   dashboardObserver?.observe(dashboard, { attributes: true, attributeFilter: ['class'] });

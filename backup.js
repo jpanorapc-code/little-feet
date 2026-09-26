@@ -1137,14 +1137,32 @@ function switchUser() {
   setTimeout(() => usernameInput?.focus(), 0);
 }
 
+let portalHeaderResizeObserver = null;
+
 function syncMobileHeaderOffset() {
   const dashboard = document.getElementById('dashboardSection');
   const header = dashboard?.querySelector('nav');
   if (!dashboard || dashboard.classList.contains('hidden') || !header) return;
-  document.documentElement.style.setProperty('--mobile-header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+  const height = Math.ceil(header.getBoundingClientRect().height);
+  if (!Number.isFinite(height) || height < 1) return;
+  const value = `${height}px`;
+  document.documentElement.style.setProperty('--mobile-header-height', value);
+  document.documentElement.style.setProperty('--portal-header-height', value);
+}
+
+function observePortalHeaderSize() {
+  const header = document.querySelector('#dashboardSection > nav');
+  if (!header || typeof ResizeObserver !== 'function') return;
+  portalHeaderResizeObserver?.disconnect();
+  portalHeaderResizeObserver = new ResizeObserver(() => requestAnimationFrame(syncMobileHeaderOffset));
+  portalHeaderResizeObserver.observe(header);
 }
 
 window.addEventListener('resize', syncMobileHeaderOffset);
+requestAnimationFrame(() => {
+  observePortalHeaderSize();
+  syncMobileHeaderOffset();
+});
 
 function switchTab(tabId, btn) {
   window.saveDashboardDrafts?.();
