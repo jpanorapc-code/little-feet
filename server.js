@@ -752,6 +752,8 @@ const db = {
   staffLeave: [],
   teacherCover: [],
   performanceReviews: [],
+  staffQualifications: [],
+  staffDevelopmentPlans: [],
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
@@ -994,7 +996,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -2576,6 +2578,95 @@ app.get('/api/analytics/:studentName', (req, res) => {
   const worst = studentWorksheets.reduce((worstItem, item) => Number(item.grade) < Number(worstItem.grade) ? item : worstItem);
   const hasPremiumDetail = requester.role !== 'parent' || parentSubscriptionActive(requester);
   res.json({ totalAssessments: scores.length, averageScore, latestScore: Number(latest.grade), baselineScore: Number(first.grade), pointChange, percentageChange, trend: pointChange > 0 ? 'Improved' : pointChange < 0 ? 'Declined' : 'Maintained', best: hasPremiumDetail ? { title: best.title || 'Assessment', score: Number(best.grade) } : null, worst: hasPremiumDetail ? { title: worst.title || 'Assessment', score: Number(worst.grade) } : null, subscription: requester.role === 'parent' ? (hasPremiumDetail ? 'plus' : 'basic') : (requester.subscription || 'school'), detailedInsights: hasPremiumDetail });
+});
+
+// Staff qualifications, compliance, development and KPI history.
+const validIsoDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && !Number.isNaN(Date.parse(String(value) + 'T00:00:00Z'));
+const qualificationStatus = item => {
+  if (!item.expiryDate) return 'No expiry';
+  const today = new Date(); today.setUTCHours(0,0,0,0);
+  const expiry = new Date(item.expiryDate + 'T00:00:00Z');
+  const days = Math.ceil((expiry - today) / 86400000);
+  return days < 0 ? 'Expired' : days <= 30 ? 'Expiring soon' : 'Valid';
+};
+app.get('/api/staff/qualifications', (req,res) => {
+  const actor=requireSchoolStaff(req); if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const rows=tenantRecords(db.staffQualifications,actor).map(item=>({...item,status:qualificationStatus(item)}));
+  res.json(['admin','principal'].includes(actor.role)?rows:rows.filter(x=>normalizeUsername(x.username)===normalizeUsername(actor.username)));
+});
+app.post('/api/staff/qualifications', (req,res) => {
+  const actor=requireSchoolStaff(req); if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const target=staffAccountInSchool(actor,req.body?.username||actor.username);
+  if(!target)return res.status(400).json({message:'Choose a staff member from this school.'});
+  if(actor.role==='teacher'&&normalizeUsername(target.username)!==normalizeUsername(actor.username))return res.status(403).json({message:'Staff can add qualifications only to their own record.'});
+  const name=boundedText(req.body?.name,180),issuingBody=boundedText(req.body?.issuingBody,180),obtainedDate=boundedText(req.body?.obtainedDate,10),expiryDate=boundedText(req.body?.expiryDate,10);
+  if(!name||!issuingBody||!validIsoDate(obtainedDate)||(expiryDate&&(!validIsoDate(expiryDate)||expiryDate<obtainedDate)))return res.status(400).json({message:'Add a qualification, issuing body and valid dates. Expiry cannot be before the obtained date.'});
+  const item=tagSchoolRecord(actor,{id:crypto.randomUUID(),username:target.username,staffName:target.name||target.username,name,issuingBody,obtainedDate,expiryDate,reference:boundedText(req.body?.reference,300),createdBy:actor.username,createdAt:new Date().toISOString()});
+  db.staffQualifications.unshift(item);res.status(201).json({success:true,item:{...item,status:qualificationStatus(item)}});
+});
+app.patch('/api/staff/qualifications/:id', (req,res) => {
+  const actor=requireSchoolStaff(req); const item=actor&&db.staffQualifications.find(x=>x.id===req.params.id&&recordInSchool(x,actor));
+  if(!item)return res.status(404).json({message:'Qualification not found.'});
+  const own=normalizeUsername(item.username)===normalizeUsername(actor.username),manager=['admin','principal'].includes(actor.role);
+  if(!own&&!manager)return res.status(403).json({message:'You cannot update this qualification.'});
+  const expiry=boundedText(req.body?.expiryDate??item.expiryDate,10),reference=boundedText(req.body?.reference??item.reference,300);
+  if(expiry&&(!validIsoDate(expiry)||expiry<item.obtainedDate))return res.status(400).json({message:'Choose a valid expiry date after the obtained date.'});
+  item.expiryDate=expiry;item.reference=reference;item.updatedAt=new Date().toISOString();res.json({success:true,item:{...item,status:qualificationStatus(item)}});
+});
+app.get('/api/staff/kpi-history', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const requested=boundedText(req.query.username||actor.username,160),target=staffAccountInSchool(actor,requested);
+  if(!target)return res.status(404).json({message:'Staff member not found.'});
+  if(!['admin','principal'].includes(actor.role)&&normalizeUsername(target.username)!==normalizeUsername(actor.username))return res.status(403).json({message:'You can view only your own KPI history.'});
+  const count=Math.max(1,Math.min(24,Number(req.query.months)||12)),rows=[];const now=new Date();
+  for(let i=count-1;i>=0;i--){const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-i,1));rows.push(monthlyTaskKpi(actor,target.username,d.toISOString().slice(0,7)));}
+  res.json({username:target.username,staffName:target.name||target.username,rows});
+});
+app.get('/api/staff/development-plans', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const rows=tenantRecords(db.staffDevelopmentPlans,actor);res.json(['admin','principal'].includes(actor.role)?rows:rows.filter(x=>normalizeUsername(x.username)===normalizeUsername(actor.username)));
+});
+app.post('/api/staff/development-plans', (req,res) => {
+  const actor=requireSchoolStaff(req);if(!actor||!['admin','principal'].includes(actor.role))return res.status(403).json({message:'Management access is required.'});
+  const target=staffAccountInSchool(actor,req.body?.username),goal=boundedText(req.body?.goal,1000);
+  if(!target||!goal)return res.status(400).json({message:'Choose a staff member and add a development goal.'});
+  const targetDate=boundedText(req.body?.targetDate,10);if(targetDate&&!validIsoDate(targetDate))return res.status(400).json({message:'Choose a valid target date.'});
+  const item=tagSchoolRecord(actor,{id:crypto.randomUUID(),username:target.username,staffName:target.name||target.username,goal,actions:boundedText(req.body?.actions,2000),targetDate,status:'Active',reviewId:boundedText(req.body?.reviewId,100),createdBy:actor.username,createdAt:new Date().toISOString()});
+  db.staffDevelopmentPlans.unshift(item);res.status(201).json({success:true,item});
+});
+app.patch('/api/staff/development-plans/:id', (req,res) => {
+  const actor=requireSchoolStaff(req),item=actor&&db.staffDevelopmentPlans.find(x=>x.id===req.params.id&&recordInSchool(x,actor));
+  if(!item)return res.status(404).json({message:'Development plan not found.'});
+  const own=normalizeUsername(item.username)===normalizeUsername(actor.username),manager=['admin','principal'].includes(actor.role);if(!own&&!manager)return res.status(403).json({message:'You cannot update this plan.'});
+  const status=boundedText(req.body?.status||item.status,30);if(!['Active','Completed','Paused'].includes(status))return res.status(400).json({message:'Choose a valid plan status.'});
+  item.status=status;item.staffComment=boundedText(req.body?.staffComment??item.staffComment,1500);item.updatedAt=new Date().toISOString();res.json({success:true,item});
+});
+
+// Email is a delivery channel, separate from in-app notifications.
+const emailVerificationTokens = new Map();
+const sendLittleFeetEmail = async ({to,subject,text}) => {
+  const from=String(process.env.LF_EMAIL_FROM||'').trim(),apiKey=String(process.env.LF_EMAIL_API_KEY||'').trim();
+  if(!looksLikeEmailAddress(to)||!from||!apiKey)return false;
+  const endpoint=safeHttpsUrl(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails');if(!endpoint)throw new Error('Invalid LF_EMAIL_API_URL');
+  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({from,to:[to],subject,text})});
+  if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);return true;
+};
+app.get('/api/email/status',(req,res)=>{
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const address=accountSecurityEmail(actor);res.json({configured:Boolean(process.env.LF_EMAIL_FROM&&process.env.LF_EMAIL_API_KEY),address,verified:Boolean(actor.emailVerifiedAt),verifiedAt:actor.emailVerifiedAt||null});
+});
+app.post('/api/email/verification/request',async(req,res,next)=>{
+  try{const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
+    const code=String(crypto.randomInt(100000,1000000)),hash=crypto.createHash('sha256').update(code).digest('hex');emailVerificationTokens.set(normalizeUsername(actor.username),{hash,expiresAt:Date.now()+10*60*1000});
+    const sent=await sendLittleFeetEmail({to,subject:'Verify your Little Feet email',text:`Your Little Feet verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`});
+    if(!sent){emailVerificationTokens.delete(normalizeUsername(actor.username));return res.status(503).json({message:'Email delivery is not configured yet.'});}res.json({success:true,expiresInSeconds:600});
+  }catch(error){next(error);}
+});
+app.post('/api/email/verification/confirm',(req,res)=>{
+  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
+  if(!entry||entry.expiresAt<Date.now()){emailVerificationTokens.delete(key);return res.status(400).json({message:'Verification code expired. Request a new one.'});}
+  const hash=crypto.createHash('sha256').update(code).digest('hex');if(code.length!==6||hash!==entry.hash)return res.status(400).json({message:'Verification code is incorrect.'});
+  actor.emailVerifiedAt=new Date().toISOString();emailVerificationTokens.delete(key);res.json({success:true,verifiedAt:actor.emailVerifiedAt});
 });
 
 // Attendance
