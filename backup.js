@@ -1043,7 +1043,7 @@ function setupSession() {
   requestAnimationFrame(syncMobileHeaderOffset);
   loadAllData();
   window.setTimeout(() => window.restoreDashboardDrafts?.(), 120);
-  startReleaseNotesMonitor();
+  document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));\n  startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
   if (ticketMonitorId) clearInterval(ticketMonitorId);
