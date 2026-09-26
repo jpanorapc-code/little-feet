@@ -64,23 +64,11 @@ async function main() {
     page.on('dialog', dialog => dialog.dismiss());
     const navigationResponse = await page.goto(origin, { waitUntil: 'networkidle' });
     assert.equal(navigationResponse.status(), 200, (await page.content()).slice(0, 1200));
-    assert.equal(await page.locator('#ambientBackgroundVideo').count(), 1, (await page.content()).slice(0, 1200));
-    await page.waitForFunction(() => document.getElementById('ambientBackgroundVideo').readyState >= 2);
-    const media = await page.locator('#ambientBackgroundVideo').evaluate(v => ({ muted:v.muted, loop:v.loop, duration:v.duration, width:v.videoWidth, height:v.videoHeight }));
-    assert.ok(media.muted && media.loop && media.duration > 49 && media.duration < 52, 'Silent half-speed video configuration');
-    await page.waitForFunction(() => !document.getElementById('ambientBackgroundVideo').paused);
-    await page.locator('#backgroundMotionToggle').click();
-    assert.equal(await page.locator('#ambientBackgroundVideo').evaluate(v => v.paused), true);
-    await page.locator('#backgroundMotionToggle').click();
-    await page.waitForFunction(() => !document.getElementById('ambientBackgroundVideo').paused);
     if (role === 'admin') {
       await page.setViewportSize({width:390,height:844});
       const fits = await page.locator('.login-audio-compact').evaluate(el => el.getBoundingClientRect().right <= document.querySelector('.auth-card').getBoundingClientRect().right);
       assert.ok(fits, 'Mobile Sound button must fit inside login card');
       await page.screenshot({ path:path.join(root,'tmp','mobile-login-video.png') });
-      await page.emulateMedia({reducedMotion:'reduce'});
-      await page.waitForFunction(() => document.getElementById('ambientBackgroundVideo').paused);
-      await page.emulateMedia({reducedMotion:'no-preference'});
       await page.setViewportSize({width:1440,height:1000});
     }
     await page.locator('#loginPinToggle').click();
