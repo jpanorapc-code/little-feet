@@ -66,6 +66,20 @@ const server = http.createServer((req, res) => {
             if (!fits(control)) errors.push(`${tab.id}: clipped ${control.id || control.className || control.tagName}`);
           }
         }
+        if (width <= 640) {
+          const mapButton = document.getElementById('findSchoolMapButton');
+          const mapCard = mapButton?.closest('.card');
+          if (mapButton && mapCard) {
+            const buttonRect = mapButton.getBoundingClientRect();
+            const cardRect = mapCard.getBoundingClientRect();
+            if (buttonRect.width >= cardRect.width - 24) errors.push('mobile school map button is oversized');
+            if (buttonRect.height > 48) errors.push('mobile school map button is too tall');
+          }
+          const activeTourCopy = document.querySelector('.portal-tour-slide.is-active .portal-tour-copy');
+          const activeTourHeading = document.querySelector('.portal-tour-slide.is-active h2');
+          if (activeTourCopy && activeTourCopy.scrollHeight > activeTourCopy.clientHeight + 2) errors.push('mobile portal tour copy is clipped');
+          if (activeTourHeading && parseFloat(getComputedStyle(activeTourHeading).fontSize) > 22) errors.push('mobile portal tour heading is oversized');
+        }
         if (width < 960) {
           dashboard.classList.add('sidebar-open');
           const navButton = sidebar.querySelector('.nav-btn');
