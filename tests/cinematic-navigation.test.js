@@ -15,7 +15,7 @@ const swimAction = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'penguin
 const compactRigEncoded = fs.readFileSync(path.join(root, 'assets', 'models', 'penguin-swim-rig-v2.json.gz.b64'), 'utf8').trim();
 const compactRig = JSON.parse(zlib.gunzipSync(Buffer.from(compactRigEncoded, 'base64')).toString('utf8'));
 const thirdPartyAssets = fs.readFileSync(path.join(root, 'THIRD_PARTY_ASSETS.md'), 'utf8');
-const pausedArtworkPath = path.join(root, 'assets', '4k', 'tour-school-admin-4k.jpg');
+const pausedArtworkPath = path.join(root, 'assets', '4k', 'cinematic-admin-assistant.png');
 const pausedArtwork = fs.readFileSync(pausedArtworkPath);
 const pausedArtworkStat = fs.statSync(pausedArtworkPath);
 
@@ -212,14 +212,14 @@ assert.match(cinematic, /cinematic-fish-sprite/);
 assert.match(cinematic, /fishSchoolLayouts/);
 assert.match(page, /id="cinematicPause"/);
 assert.match(page, /class="cinematic-paused-picture"/);
-assert.match(page, /tour-school-admin-4k\.jpg/);
+assert.match(page, /cinematic-admin-assistant\.png/);
 assert.match(styles, /\.cinematic-paused-picture \{[\s\S]*z-index: 3/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-paused-picture \{[\s\S]*opacity: 1[\s\S]*visibility: visible/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-loading \{[\s\S]*display: none/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-copy,[\s\S]*\.cinematic-progress-shell/);
-assert.ok(pausedArtworkStat.size > 500000, 'Paused artwork must use the full-quality 4K source.');
-assert.equal(pausedArtwork[0], 0xff);
-assert.equal(pausedArtwork[1], 0xd8);
+assert.ok(pausedArtworkStat.size > 500000, 'Paused artwork must use the provided high-quality source.');
+assert.equal(pausedArtwork[0], 0x89);
+assert.equal(pausedArtwork[1], 0x50);
 assert.match(page, /id="cinematicDepthBackdrop"/);
 assert.match(page, /id="cinematicFish2dA"/);
 assert.match(page, /id="cinematicFish2dB"/);

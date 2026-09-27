@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v19-glass-polish';
+const CACHE_NAME = 'little-feet-shell-v20-platform-tour';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -9,8 +9,8 @@ const SHELL_ASSETS = [
   '/logo-transparent.png',
   '/assets/4k/little-feet-aurora-stars-4k.svg',
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
-  '/assets/4k/tour-school-admin-4k.jpg',
-  '/backup.js?v=20260926-layout-v3',
+  '/assets/4k/cinematic-admin-assistant.png',
+  '/backup.js?v=20260927-sticky-note-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1',
