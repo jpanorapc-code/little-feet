@@ -280,10 +280,29 @@ const rawRequest = async (route) => {
     const parentSubscription = await request('/api/parent-subscription/orders', { method: 'POST', cookie: alphaParentLogin.cookie, body: {} });
     assert.equal(parentSubscription.response.status, 201);
     assert.equal(parentSubscription.data.order.amount, 29);
-    const subscriptionPayment = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'parent-subscription-1', reference: parentSubscription.data.order.reference, status: 'paid', amount: 29, bankReference: 'PLUS-BANK-001' } });
-    assert.equal(subscriptionPayment.response.status, 201);
+    assert.equal((await request('/api/auth/session', { cookie: alphaParentLogin.cookie })).data.user.subscription, 'basic');
+    const webhookBody = JSON.stringify({ eventId: 'parent-subscription-1', reference: parentSubscription.data.order.reference, status: 'paid', amount: 29, transactionId: 'PLUS-GATEWAY-001', provider: 'test-gateway' });
+    const webhookSignature = crypto.createHmac('sha256', 'test-webhook-secret').update(webhookBody).digest('hex');
+    const subscriptionPayment = await fetch(`http://127.0.0.1:${port}/api/payments/webhook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-little-feet-signature': webhookSignature },
+      body: webhookBody
+    });
+    assert.equal(subscriptionPayment.status, 201);
     const refreshedParentSession = await request('/api/auth/session', { cookie: alphaParentLogin.cookie });
     assert.equal(refreshedParentSession.data.user.subscription, 'plus');
+    assert.match(refreshedParentSession.data.user.parentSubscriptionGrantedUntil, /^\d{4}-\d{2}-\d{2}$/);
+    const activeParentSubscription = await request('/api/parent-subscription', { cookie: alphaParentLogin.cookie });
+    assert.equal(activeParentSubscription.data.active, true);
+    const repeatedProviderBody = JSON.stringify({ eventId: 'parent-subscription-repeated-provider-id', reference: parentSubscription.data.order.reference, status: 'paid', amount: 29, transactionId: 'PLUS-GATEWAY-001', provider: 'test-gateway' });
+    const repeatedProviderSignature = crypto.createHmac('sha256', 'test-webhook-secret').update(repeatedProviderBody).digest('hex');
+    const repeatedSubscriptionPayment = await fetch(`http://127.0.0.1:${port}/api/payments/webhook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-little-feet-signature': repeatedProviderSignature },
+      body: repeatedProviderBody
+    });
+    assert.equal(repeatedSubscriptionPayment.status, 200);
+    assert.equal((await repeatedSubscriptionPayment.json()).duplicate, true);
 
     const issuedBook = await request('/api/book-register', { method: 'POST', cookie: alphaLogin.cookie, body: { bookTitle: 'Mathematics Grade 4', bookCode: 'MATH-001', bookPrice: 250, learnerName: 'Alpha Learner', className: 'Grade 4A', parentUsername: 'alpha-parent', issueCondition: 'New, no markings', adminSignature: 'Alpha Administrator' } });
     assert.equal(issuedBook.response.status, 201);
@@ -308,6 +327,9 @@ const rawRequest = async (route) => {
     assert.equal(subscriptionOrder.data.order.monthlyTotal, 550);
     const reconciliation = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'bank-statement-line-1', reference: subscriptionOrder.data.order.reference, status: 'paid', amount: 550, bankReference: 'BANK-001' } });
     assert.equal(reconciliation.response.status, 201);
+    const activatedSchoolBilling = await request('/api/subscription-billing', { cookie: alphaLogin.cookie });
+    assert.equal(activatedSchoolBilling.data.orders.find(order => order.id === subscriptionOrder.data.order.id).paymentStatus, 'paid');
+    assert.match(activatedSchoolBilling.data.orders.find(order => order.id === subscriptionOrder.data.order.id).activeUntil, /^\d{4}-\d{2}-\d{2}$/);
     const duplicateReconciliation = await request('/api/payments/reconcile', { method: 'POST', cookie: alphaLogin.cookie, body: { eventId: 'bank-statement-line-1', reference: subscriptionOrder.data.order.reference, status: 'paid', amount: 550, bankReference: 'BANK-001' } });
     assert.equal(duplicateReconciliation.response.status, 200);
     assert.equal(duplicateReconciliation.data.duplicate, true);

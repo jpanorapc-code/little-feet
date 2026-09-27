@@ -785,6 +785,7 @@ const db = {
   staffDevelopmentPlans: [],
   emailInbox: [],
   emailDismissals: [],
+  accountMigrations: {},
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
@@ -1260,6 +1261,51 @@ function ensureBootstrapAdministrator() {
     createdAt: new Date().toISOString()
   });
 }
+function applyOwnerAccountMigration() {
+  if (process.env.LF_OWNER_RESET_ALL_ACCOUNTS !== '1') return false;
+  const migrationId = String(process.env.LF_OWNER_ACCOUNT_RESET_ID || '').trim().slice(0, 120);
+  const username = String(process.env.LF_OWNER_ADMIN_USERNAME || '').trim().slice(0, 160);
+  const pin = String(process.env.LF_OWNER_ADMIN_PIN || '');
+  const name = String(process.env.LF_OWNER_ADMIN_NAME || '').trim().slice(0, 160);
+  if (!migrationId || !username || !name || pin.length < 4 || pin.length > 128) {
+    throw new Error('LF_OWNER_RESET_ALL_ACCOUNTS requires a reset ID, owner username, owner name, and a 4-128 character owner PIN/password.');
+  }
+  if (!db.accountMigrations || typeof db.accountMigrations !== 'object' || Array.isArray(db.accountMigrations)) db.accountMigrations = {};
+  if (db.accountMigrations[migrationId]) return false;
+
+  const anchor = db.users.find(account => account.role === 'admin') || db.users[0];
+  const requestedSchoolName = String(process.env.LF_OWNER_SCHOOL_NAME || '').trim().slice(0, 160);
+  const anchorSchool = anchor && db.schools.find(school => school.id === accountSchoolId(anchor));
+  const school = anchorSchool || db.schools.find(item => schoolKey(item.name) === schoolKey(requestedSchoolName))
+    || ensureSchool(requestedSchoolName || anchor?.schoolName || 'Little Feet');
+  const removedUsernames = new Set(db.users.map(account => normalizeUsername(account.username)).filter(value => value && value !== normalizeUsername(username)));
+  const removedStaffFiles = (db.fileRecords || []).filter(file => file.entityType === 'staff'
+    && removedUsernames.has(normalizeUsername(file.recordId)) && file.accessState !== 'deleted');
+  const filesBySchool = new Map();
+  removedStaffFiles.forEach(file => {
+    const schoolId = String(file.schoolId || 'unassigned');
+    if (!filesBySchool.has(schoolId)) filesBySchool.set(schoolId, []);
+    filesBySchool.get(schoolId).push(file);
+  });
+  filesBySchool.forEach((files, schoolId) => queueStorageCleanup(schoolId, files, `owner-account-reset:${migrationId}`));
+  const deletedAt = new Date().toISOString();
+  removedStaffFiles.forEach(file => { file.accessState = 'deleted'; file.deletedAt = deletedAt; file.deletedBy = username; });
+
+  db.users = [{
+    username,
+    pinHash: hashPin(pin),
+    name,
+    role: 'admin',
+    schoolId: school.id,
+    schoolName: requestedSchoolName || school.name,
+    schoolStoreUrl: '',
+    verificationStatus: 'Active',
+    createdAt: new Date().toISOString()
+  }];
+  db.accountMigrations[migrationId] = { appliedAt: new Date().toISOString(), ownerUsername: username, removedAccounts: removedUsernames.size };
+  console.log(`Applied owner account reset ${migrationId}; removed ${removedUsernames.size} previous account(s).`);
+  return true;
+}
 function scheduleReplicaSnapshot() {
   if (replicaMode || replicaSnapshotTimer) return;
   replicaSnapshotTimer = setTimeout(() => {
@@ -1277,6 +1323,7 @@ async function initialisePersistence() {
   else openStateDatabase();
   const restoredFromDatabase = await loadDatabaseState();
   if (!restoredFromDatabase) loadReplicaSnapshot();
+  const ownerAccountResetApplied = applyOwnerAccountMigration();
   ensureBootstrapAdministrator();
   migrateSchoolTenancy();
   migrateSensitiveStoredFields();
@@ -1284,6 +1331,7 @@ async function initialisePersistence() {
   syncCurrentReleaseNotes();
   await retryPendingStorageCleanup();
   await saveDatabaseState();
+  if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
   writeReplicaSnapshot();
 }
 
@@ -1693,6 +1741,14 @@ const parentSubscriptionActive = account => {
   return Boolean(grantedUntil && grantedUntil >= dateKeyInSouthAfrica());
 };
 const validDateKey = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value).trim() : '';
+const extendSubscriptionDate = (currentEndDate, fromTimestamp = new Date().toISOString()) => {
+  const today = validDateKey(String(fromTimestamp || '').slice(0, 10)) || dateKeyInSouthAfrica();
+  const current = validDateKey(currentEndDate);
+  const base = current && current >= today ? current : today;
+  const expiry = new Date(`${base}T12:00:00.000Z`);
+  expiry.setUTCDate(expiry.getUTCDate() + 30);
+  return expiry.toISOString().slice(0, 10);
+};
 const cents = value => Math.round(Number(value || 0) * 100) / 100;
 const parentPaymentAmount = record => billingAmount(record.arrangementAmount) > 0 ? billingAmount(record.arrangementAmount) : (billingAmount(record.amountDue) || 0);
 const parentPaymentDueDate = record => {
@@ -1793,6 +1849,10 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
   const expectedAmount = expectedPaymentAmount(target);
   const normalStatus = canonicalPaymentStatus(status);
   if (!paymentStatuses.has(normalStatus)) return { error: 'Payment status is not supported.' };
+  const settledEvent = db.paymentEvents.find(event => event.status === 'paid'
+    && event.targetType === target.type && event.schoolId === target.schoolId
+    && String(event.reference || '').toUpperCase() === String(target.record.reference || '').toUpperCase());
+  if (normalStatus === 'paid' && settledEvent) return { duplicate: true, event: settledEvent, target: target.record };
   if (numericAmount === null || numericAmount <= 0) return { error: 'Payment amount must be greater than zero.' };
   if (target.type === 'parent_payment') {
     const current = parentPaymentFinancials(target.record);
@@ -1808,6 +1868,7 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
     schoolId: target.schoolId, targetType: target.type, receivedAt: timestamp
   };
   target.record.paymentStatus = normalStatus;
+  if (target.type === 'subscription') target.record.status = normalStatus;
   target.record.paymentUpdatedAt = timestamp;
   if (normalStatus === 'paid') target.record.paidAt = timestamp;
   if (normalStatus === 'refunded') target.record.refundedAt = timestamp;
@@ -1815,9 +1876,22 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
     const parent = findAccountByUsername(target.record.parentUsername);
     if (parent && normalStatus === 'paid') {
       parent.parentSubscriptionStatus = 'paid'; parent.subscription = 'plus'; parent.parentSubscriptionPaidAt = timestamp;
-      parent.parentSubscriptionGrantedUntil = target.record.grantedUntil || '';
+      parent.parentSubscriptionGrantedUntil = extendSubscriptionDate(parent.parentSubscriptionGrantedUntil, timestamp);
+      target.record.grantedUntil = parent.parentSubscriptionGrantedUntil;
     } else if (parent && normalStatus === 'refunded') {
       parent.parentSubscriptionStatus = 'basic'; parent.subscription = 'basic'; parent.parentSubscriptionGrantedUntil = '';
+    }
+  } else if (target.type === 'subscription') {
+    const school = db.schools.find(entry => entry.id === target.schoolId);
+    if (school && normalStatus === 'paid') {
+      school.subscriptionStatus = 'active';
+      school.subscriptionPlanCode = target.record.planCode || '';
+      school.subscriptionActivatedAt = timestamp;
+      school.subscriptionActiveUntil = extendSubscriptionDate(school.subscriptionActiveUntil, timestamp);
+      target.record.activeUntil = school.subscriptionActiveUntil;
+    } else if (school && normalStatus === 'refunded') {
+      school.subscriptionStatus = 'refunded';
+      school.subscriptionActiveUntil = '';
     }
   }
   db.paymentEvents.unshift(event);
@@ -1835,11 +1909,18 @@ app.get('/api/subscription-billing', (req, res) => {
   if (!['teacher', 'principal', 'district', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
   const billing = subscriptionBillingState(actor);
   const isAdmin = actor.role === 'admin';
+  const school = db.schools.find(entry => entry.id === accountSchoolId(actor));
   const { accountNumberEncrypted, payMePayloadEncrypted, ...adminPayment } = billing.payment;
   res.json({
     pricing: publicBillingPricing(billing, isAdmin),
     plans: schoolSubscriptionPlans.map(plan => ({ ...plan })),
     paymentConfigured: billingPaymentConfigured(billing.payment),
+    subscription: school ? {
+      active: school.subscriptionStatus === 'active' && (!validDateKey(school.subscriptionActiveUntil) || school.subscriptionActiveUntil >= dateKeyInSouthAfrica()),
+      status: school.subscriptionStatus || 'trial',
+      planCode: school.subscriptionPlanCode || '',
+      activeUntil: validDateKey(school.subscriptionActiveUntil)
+    } : { active: false, status: 'unverified', planCode: '', activeUntil: '' },
     payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted), capitecPayMeConfigured: Boolean(decryptField(payMePayloadEncrypted)) } : undefined,
     orders: billing.orders.filter(order => !order.schoolId || order.schoolId === accountSchoolId(actor)).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
   });
@@ -1932,7 +2013,7 @@ app.post('/api/subscription-billing/orders', (req, res) => {
     baseMonthly: requestedPlan ? requestedPlan.monthlyPrice : billing.pricing.baseMonthly, bundleCapacity: requestedPlan ? 0 : requestedBundle, bundlePrice: requestedPlan ? 0 : bundle.sellingPrice,
     monthlyTotal, lateFeeAccepted: Boolean(req.body?.lateFeeAccepted), lateFee: Boolean(req.body?.lateFeeAccepted) && billing.pricing.lateFeeEnabled ? billing.pricing.lateFee : 0,
     profitMargin: requestedPlan ? 0 : Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
-    status: 'awaiting payment', createdAt: new Date().toISOString()
+    status: 'awaiting_payment', paymentStatus: 'awaiting_payment', createdAt: new Date().toISOString()
   };
   billing.orders.unshift(order);
   res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
@@ -2028,7 +2109,7 @@ app.post('/api/parent-subscription/orders', (req, res) => {
   const children = Math.max(1, Math.min(4, (actor.linkedLearners || []).length));
   const amount = children * 29;
   const reference = `${billing.payment.referencePrefix}-PLUS-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, parentUsername: actor.username, parentName: actor.name || actor.username, children, amount, paymentStatus: 'awaiting_payment', grantedUntil: String(req.body?.grantedUntil || '').trim(), createdAt: new Date().toISOString() });
+  const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, parentUsername: actor.username, parentName: actor.name || actor.username, children, amount, paymentStatus: 'awaiting_payment', termDays: 30, createdAt: new Date().toISOString() });
   if (!Array.isArray(db.parentSubscriptions)) db.parentSubscriptions = [];
   db.parentSubscriptions.unshift(order);
   res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
