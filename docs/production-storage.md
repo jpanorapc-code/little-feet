@@ -29,3 +29,9 @@ Upload is acknowledged only after the object and its database metadata are durab
 7. Run the authenticated file-integrity endpoint for every school. Resolve every missing object or size mismatch before reopening writes.
 
 Database-only or bucket-only restores are incomplete. R2 lifecycle rules must not delete active Little Feet objects. Retention and legal deletion rules should be applied through Little Feet so metadata and bytes remain consistent.
+
+## Isolated recovery rehearsal
+
+`npm run recovery:rehearse` creates an encrypted coordinated recovery set in a separate private R2 bucket. It takes a repeatable PostgreSQL snapshot while holding short-lived shared locks, copies every active private object plus an R2 probe, restores the database into a generated isolated PostgreSQL schema, restores objects under an isolated recovery prefix, verifies row counts and object hashes, and removes the isolated restore targets. The encrypted recovery set and signed-by-hash manifest remain in the recovery bucket.
+
+Required one-off environment settings are `LF_BACKUP_R2_BUCKET`, `LF_BACKUP_ENCRYPTION_KEY`, and `LF_RECOVERY_CONFIRM=PRODUCTION-ISOLATED-RESTORE`. The R2 credential must have read access to the live bucket and write access to the separate recovery bucket. Optional `LF_BACKUP_R2_ACCESS_KEY_ID` and `LF_BACKUP_R2_SECRET_ACCESS_KEY` allow a dedicated recovery credential. Do not add `LF_BACKUP_REHEARSAL_ID` to the web service until a real rehearsal has completed successfully.

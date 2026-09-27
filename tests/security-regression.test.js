@@ -10,7 +10,8 @@ const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const requiredServerPatterns = [
   /req\.session\.destroy\(/,
   /crypto\.timingSafeEqual\(/,
-  /offsiteBackup:\s*false/,
+  /offsiteBackup:\s*Boolean\(process\.env\.LF_BACKUP_R2_BUCKET && process\.env\.LF_BACKUP_REHEARSAL_ID\)/,
+  /monitoring:\s*Boolean\(process\.env\.LF_MONITORING_DSN \|\| process\.env\.LF_MONITORING_PROVIDER\)/,
   /app\.disable\(['"]x-powered-by['"]\)/,
   /Content-Security-Policy/,
   /Cross-origin state changes are not allowed/,
