@@ -49,7 +49,7 @@ const renderRepoSlugAvailable = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(RENDER
 const RENDER_DEPLOY_METADATA_FILE = path.join(__dirname, '.render-deploy-release.json');
 let renderDeployReleaseNote = null;
 let renderDeployReleasePromise = null;
-const releaseVersionForUpdateLines = updateLineCount => Number(updateLineCount) <= 8 ? '8.2.9' : '9.0';
+const cleanReleaseVersion = value => /^\d+\.\d+(?:\.\d+)?$/.test(String(value || '').trim()) ? String(value).trim() : '1.0';
 const readBuiltRenderDeployReleaseNote = () => {
   if (!renderDeployAvailable) return null;
   try {
@@ -59,15 +59,15 @@ const readBuiltRenderDeployReleaseNote = () => {
     const updateLineCount = Math.max(1, Number(built?.updateLineCount) || 1);
     return {
       id: `render-${RENDER_DEPLOY_SHA}`,
-      version: releaseVersionForUpdateLines(updateLineCount),
+      version: cleanReleaseVersion(built?.version),
       title: boundedText(built?.title || `Deploy ${RENDER_DEPLOY_SHA.slice(0, 7)}`, 240),
-      summary: boundedText(built?.summary || 'Pulled from the deployed Git commit during the Render build.', 600),
+      summary: boundedText(built?.summary || 'The latest Little Feet improvements are now live.', 600),
       publishedAt: Number.isNaN(Date.parse(built?.publishedAt || '')) ? new Date().toISOString() : built.publishedAt,
       source: 'Render',
       commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
       updateLineCount,
       changeLines: null,
-      releaseType: updateLineCount <= 8 ? 'patch' : 'update'
+      releaseType: boundedText(built?.releaseType || 'update', 40)
     };
   } catch {
     return null;
@@ -75,9 +75,9 @@ const readBuiltRenderDeployReleaseNote = () => {
 };
 const renderDeployFallbackNote = () => renderDeployAvailable ? {
   id: `render-${RENDER_DEPLOY_SHA}`,
-  version: '8.2',
-  title: `Live Render deployment · ${RENDER_DEPLOY_SHA.slice(0, 7)}`,
-  summary: 'Render identified the live commit, but its pushed title could not be resolved yet.',
+  version: '1.0',
+  title: 'Production foundation',
+  summary: 'The latest Little Feet improvements are now live.',
   publishedAt: new Date().toISOString(),
   source: 'Render',
   commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
@@ -112,9 +112,9 @@ const resolveRenderDeployReleaseNote = async () => {
       const releaseType = updateLineCount <= 8 ? 'patch' : 'update';
       renderDeployReleaseNote = {
         id: `render-${RENDER_DEPLOY_SHA}`,
-        version: releaseVersionForUpdateLines(updateLineCount),
+        version: '1.0',
         title,
-        summary: messageLines.slice(1, 4).join(' · ') || 'Pulled from the live Render deployment using the pushed commit title.',
+        summary: messageLines.slice(1, 4).join(' · ') || 'The latest Little Feet improvements are now live.',
         publishedAt: commit?.commit?.committer?.date || commit?.commit?.author?.date || new Date().toISOString(),
         source: 'Render',
         commitSha: RENDER_DEPLOY_SHA.slice(0, 7),
@@ -135,34 +135,9 @@ const resolveRenderDeployReleaseNote = async () => {
 };
 const CURRENT_RELEASE_NOTES = Object.freeze([
   Object.freeze({
-    id: '2026-09-10-capitec-payme', version: '3.2', title: 'Free Capitec Pay Me option',
-    summary: 'Added an encrypted Capitec Pay Me QR option alongside bank transfer for donations, parent subscriptions, school plans, and school-store payments.',
-    publishedAt: '2026-09-10T15:15:00.000+02:00'
-  }),
-  Object.freeze({
-    id: '2026-09-10-payments-books', version: '3.1', title: 'Payments, arrears and book returns',
-    summary: 'Added Capitec bank-transfer instructions and fixed-price school plan payments, parent arrears and arrangements, paid Plus access, finance exports, and signed book issue and return reports.',
-    publishedAt: '2026-09-10T05:30:00.000+02:00'
-  }),
-  Object.freeze({
-    id: '2026-09-10-media-imports', version: '3.0', title: 'Audio, timetable and data-import improvements',
-    summary: 'Added remembered sound controls, login and wallpaper music, the secret Easter-egg loop, custom wallpaper uploads, proper time pickers, large spreadsheet imports, and cleaner chat diagnostics.',
-    publishedAt: '2026-09-10T04:30:00.000+02:00'
-  }),
-  Object.freeze({
-    id: '2026-09-09-production-ready', version: '2.9', title: 'Secure production foundation',
-    summary: 'Added PostgreSQL persistence, durable sessions, encrypted sensitive fields, administrator super-view, live diagnostics, tenant isolation, and capacity testing for large schools.',
-    publishedAt: '2026-09-09T18:00:00.000+02:00'
-  }),
-  Object.freeze({
-    id: '2026-08-safeguarding', version: '2.8', title: 'Safeguarding and family records',
-    summary: 'Added consent, pickup audit, staff verification, parent report review, and digital signing controls.',
-    publishedAt: '2026-08-28T08:00:00.000Z'
-  }),
-  Object.freeze({
-    id: '2026-08-workflows', version: '2.7', title: 'Daily classroom workflows',
-    summary: 'Added care logging, progress records, stock intake, and spreadsheet templates.',
-    publishedAt: '2026-08-27T08:00:00.000Z'
+    id: 'little-feet-1.0-baseline', version: '1.0', title: 'Production foundation',
+    summary: 'Secure accounts, automatic subscription activation, private file storage, reliable imports, and performance improvements are now live.',
+    publishedAt: '2026-09-27T15:00:00.000+02:00'
   })
 ]);
 if (!fieldEncryptionConfigured) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
@@ -1012,11 +987,7 @@ function applySavedState(saved) {
 }
 
 function syncCurrentReleaseNotes() {
-  const notesById = new Map((Array.isArray(db.releaseNotes) ? db.releaseNotes : [])
-    .filter(note => note && note.id)
-    .map(note => [String(note.id), note]));
-  CURRENT_RELEASE_NOTES.forEach(note => notesById.set(note.id, { ...note }));
-  db.releaseNotes = [...notesById.values()].sort((first, second) => {
+  db.releaseNotes = CURRENT_RELEASE_NOTES.map(note => ({ ...note })).sort((first, second) => {
     const dateDifference = Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || '');
     return Number.isFinite(dateDifference) && dateDifference !== 0
       ? dateDifference

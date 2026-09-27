@@ -12,22 +12,36 @@ function git(args) {
 try {
   const envSha = String(process.env.RENDER_GIT_COMMIT || '').trim().toLowerCase();
   const headSha = /^[0-9a-f]{40}$/.test(envSha) ? envSha : git(['rev-parse', 'HEAD']).toLowerCase();
+  const baselinePath = path.join(root, '.littlefeet-release-baseline');
+  const baselineParts = String(fs.readFileSync(baselinePath, 'utf8')).trim().split('.').map(Number);
+  if (baselineParts.length !== 3 || baselineParts.some(part => !Number.isInteger(part) || part < 0)) throw new Error('Invalid release baseline version.');
+  let commitsSinceBaseline = 0;
+  try {
+    const baselineCommit = git(['log', '-1', '--format=%H', '--', '.littlefeet-release-baseline']);
+    if (baselineCommit) commitsSinceBaseline = Math.max(0, Number(git(['rev-list', '--count', `${baselineCommit}..${headSha}`])) || 0);
+  } catch {}
   const rawMessage = git(['show', '-s', '--format=%B', headSha]);
   const publishedAt = git(['show', '-s', '--format=%cI', headSha]);
   const messageLines = rawMessage.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const updateLineCount = Math.max(1, messageLines.length);
-  const releaseType = updateLineCount <= 8 ? 'patch' : 'update';
-  const version = updateLineCount <= 8 ? '8.2.9' : '9.0';
+  const releaseType = commitsSinceBaseline ? 'update' : 'baseline';
+  const version = commitsSinceBaseline
+    ? `${baselineParts[0]}.${baselineParts[1]}.${baselineParts[2] + commitsSinceBaseline}`
+    : `${baselineParts[0]}.${baselineParts[1]}`;
+  const isBaseline = commitsSinceBaseline === 0;
 
   const payload = {
     id: 'render-' + headSha,
     version,
-    title: String(messageLines[0] || ('Deploy ' + headSha.slice(0, 7))).slice(0, 240),
-    summary: messageLines.slice(1, 4).join(' · ') || 'Pulled from the deployed Git commit during the Render build.',
+    title: String(isBaseline ? 'Production foundation' : (messageLines[0] || 'Little Feet update')).slice(0, 240),
+    summary: isBaseline
+      ? 'Secure accounts, automatic subscription activation, private file storage, reliable imports, and performance improvements are now live.'
+      : (messageLines.slice(1, 4).join(' · ') || 'The latest Little Feet improvements are now live.'),
     publishedAt,
     source: 'Render',
     commitSha: headSha.slice(0, 7),
     fullCommitSha: headSha,
+    commitsSinceBaseline,
     updateLineCount,
     releaseType
   };
