@@ -20,6 +20,8 @@ fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'ser
 fs.copyFileSync(path.join(root, 'finance-automation-server.js'), path.join(temporaryDirectory, 'finance-automation-server.js'));
 fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory, 'auth-crypto.js'));
 fs.copyFileSync(path.join(root, 'backup.js'), path.join(temporaryDirectory, 'backup.js'));
+fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'storage'), { recursive: true });
+fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temporaryDirectory, 'lib', 'storage', 'object-storage.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({
   schools,
   users: [

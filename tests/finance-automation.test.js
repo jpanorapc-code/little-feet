@@ -15,6 +15,8 @@ const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).t
 for (const file of ['server.js','finance-automation-server.js','auth-crypto.js','backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(tmp, file));
 }
+fs.mkdirSync(path.join(tmp, 'lib', 'storage'), { recursive: true });
+fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(tmp, 'lib', 'storage', 'object-storage.js'));
 
 const billing = prefix => ({
   pricing:{baseMonthly:500,bundles:{5:{costPrice:0,sellingPrice:50},20:{costPrice:0,sellingPrice:150},100:{costPrice:0,sellingPrice:500}},lateFeeEnabled:false,lateFee:0},

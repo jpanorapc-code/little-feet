@@ -8,6 +8,7 @@ const { Pool } = require('pg');
 const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
+const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
@@ -351,6 +352,34 @@ const decodeImageDataUrl = (value, allowedMimeTypes = Object.keys(MEDIA_SIGNATUR
   const bytes = Buffer.from(match[2], 'base64');
   if (!bytes.length || bytes.length > maxBytes || !MEDIA_SIGNATURES[match[1]](bytes)) return null;
   return { mimeType: match[1], bytes };
+};
+const FILE_TYPE_RULES = Object.freeze({
+  'image/png': { extension: 'png', maxBytes: MAX_MEDIA_BYTES, validate: MEDIA_SIGNATURES['image/png'] },
+  'image/jpeg': { extension: 'jpg', maxBytes: MAX_MEDIA_BYTES, validate: MEDIA_SIGNATURES['image/jpeg'] },
+  'image/gif': { extension: 'gif', maxBytes: MAX_MEDIA_BYTES, validate: MEDIA_SIGNATURES['image/gif'] },
+  'image/webp': { extension: 'webp', maxBytes: MAX_MEDIA_BYTES, validate: MEDIA_SIGNATURES['image/webp'] },
+  'application/pdf': { extension: 'pdf', maxBytes: MAX_MEDIA_BYTES, validate: bytes => bytes.length >= 5 && bytes.subarray(0, 5).toString('ascii') === '%PDF-' },
+  'text/plain': { extension: 'txt', maxBytes: 2 * 1024 * 1024, validate: bytes => !bytes.includes(0) },
+  'text/csv': { extension: 'csv', maxBytes: 2 * 1024 * 1024, validate: bytes => !bytes.includes(0) }
+});
+const safeOriginalFilename = (value, extension) => {
+  const leaf = String(value || `upload.${extension}`).split(/[\\/]/).pop().normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, '_').replace(/^\.+/, '').slice(0, 180);
+  const safeLeaf = leaf || `upload.${extension}`;
+  return path.extname(safeLeaf) ? safeLeaf : `${safeLeaf}.${extension}`;
+};
+const decodeSupportedFileDataUrl = (value, suppliedName = '') => {
+  if (typeof value !== 'string') return null;
+  const match = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(value);
+  const rule = match && FILE_TYPE_RULES[match[1].toLowerCase()];
+  if (!rule || match[2].length % 4 !== 0) return null;
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > rule.maxBytes || !rule.validate(bytes)) return null;
+  const filename = safeOriginalFilename(suppliedName, rule.extension);
+  const suppliedExtension = path.extname(filename).slice(1).toLowerCase();
+  const compatibleExtensions = rule.extension === 'jpg' ? new Set(['jpg', 'jpeg']) : new Set([rule.extension]);
+  if (suppliedExtension && !compatibleExtensions.has(suppliedExtension)) return null;
+  return { mimeType: match[1].toLowerCase(), bytes, extension: rule.extension, filename };
 };
 const validPostMediaData = value => Boolean(decodeImageDataUrl(value, ['image/png', 'image/jpeg', 'image/webp']));
 const validWorksheetMediaData = value => Boolean(decodeImageDataUrl(value));
@@ -755,6 +784,7 @@ const db = {
   staffQualifications: [],
   staffDevelopmentPlans: [],
   emailInbox: [],
+  emailDismissals: [],
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
@@ -773,6 +803,9 @@ const db = {
   groupMessages: {},
   directMessages: [],
   importAudit: [],
+  importJobs: [],
+  fileRecords: [],
+  storageCleanupJobs: [],
   students: [],
   learnerAccessCodes: [],
   donations: [],
@@ -810,6 +843,7 @@ let postgresPool = null;
 let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 let replicaSnapshotVersion = '';
+const objectStorage = createObjectStorage({ rootDir: __dirname });
 
 class PostgresSessionStore extends session.Store {
   constructor() {
@@ -997,7 +1031,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -1039,6 +1073,14 @@ function removeLegacyDemoRecords() {
   delete db.groupMessages.general;
   delete db.groupMessages.toddlers;
   db.directMessages = db.directMessages.filter(message => !demoUsernames.has(normalizeUsername(message.sender)) && !demoUsernames.has(normalizeUsername(message.recipient)));
+  const obsoleteStickyErrorTickets = new Set(db.tickets.filter(ticket =>
+    ticket.subject === 'Automatic error report: WEB_RUNTIME_ERROR'
+    && /saveStickyNote is not defined/i.test(String(ticket.message || ticket.feedback || ''))
+  ).map(ticket => ticket.id));
+  if (obsoleteStickyErrorTickets.size) {
+    db.tickets = db.tickets.filter(ticket => !obsoleteStickyErrorTickets.has(ticket.id));
+    db.emailInbox = (db.emailInbox || []).filter(item => !(item.type === 'Ticket' && obsoleteStickyErrorTickets.has(item.sourceId)));
+  }
 }
 
 async function loadDatabaseState() {
@@ -1149,6 +1191,34 @@ async function saveDatabaseState() {
     throw error;
   }
 }
+const queueStorageCleanup = (schoolId, files, reason) => {
+  const objectKeys = [...new Set((files || []).map(file => file?.objectKey).filter(Boolean))];
+  if (!objectKeys.length) return null;
+  const job = { id: crypto.randomUUID(), targetSchoolId: schoolId, reason, pendingKeys: objectKeys, failedKeys: [], status: 'pending', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  db.storageCleanupJobs.unshift(job);
+  return job;
+};
+const runStorageCleanupJob = async job => {
+  if (!job || !objectStorage.configured) return false;
+  const failed = [];
+  for (const key of job.pendingKeys || []) {
+    try { await objectStorage.delete({ key }); } catch { failed.push(key); }
+  }
+  job.pendingKeys = failed;
+  job.failedKeys = failed;
+  job.status = failed.length ? 'retry_required' : 'completed';
+  job.updatedAt = new Date().toISOString();
+  if (!failed.length) {
+    const completedForSchool = db.storageCleanupJobs.filter(item => item.status === 'completed' && item.targetSchoolId === job.targetSchoolId);
+    const expiredIds = new Set(completedForSchool.slice(100).map(item => item.id));
+    if (expiredIds.size) db.storageCleanupJobs = db.storageCleanupJobs.filter(item => !expiredIds.has(item.id));
+  }
+  return !failed.length;
+};
+const retryPendingStorageCleanup = async () => {
+  if (!objectStorage.configured) return;
+  for (const job of db.storageCleanupJobs.filter(item => item.status !== 'completed').slice(0, 25)) await runStorageCleanupJob(job);
+};
 function loadReplicaSnapshot() {
   try {
     if (!fs.existsSync(replicaFile)) return;
@@ -1212,6 +1282,7 @@ async function initialisePersistence() {
   migrateSensitiveStoredFields();
   ensureAllLearnersHaveAccessCodes();
   syncCurrentReleaseNotes();
+  await retryPendingStorageCleanup();
   await saveDatabaseState();
   writeReplicaSnapshot();
 }
@@ -1347,7 +1418,9 @@ const runtimeReadiness = () => {
     fieldEncryption: fieldEncryptionConfigured,
     sessionSecret: sessionSecretConfigured,
     secureCookies: isProduction,
-    bootstrapAccount: db.users.some(account => account.role === 'admin')
+    bootstrapAccount: db.users.some(account => account.role === 'admin'),
+    privateObjectStorage: objectStorage.configured,
+    storageCleanupHealthy: !(db.storageCleanupJobs || []).some(job => job.status === 'retry_required')
   };
   return { checks, ready: Object.values(checks).every(Boolean) };
 };
@@ -1377,12 +1450,16 @@ app.get('/api/production-readiness', (req, res) => {
     emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
     smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
     monitoring: Boolean(process.env.LF_MONITORING_DSN),
+    privateObjectStorage: objectStorage.configured,
+    objectStorageProvider: objectStorage.kind,
     offsiteBackup: false
   };
   const missingActions = [];
   if (!readiness.checks.database) missingActions.push('Connect a persistent PostgreSQL DATABASE_URL.');
   if (!readiness.checks.fieldEncryption) missingActions.push('Set LF_FIELD_ENCRYPTION_KEY.');
   if (!readiness.checks.sessionSecret) missingActions.push('Set a strong SESSION_SECRET.');
+  if (!readiness.checks.privateObjectStorage) missingActions.push('Configure the private Cloudflare R2 bucket and server-side credentials.');
+  if (!readiness.checks.storageCleanupHealthy) missingActions.push('Resolve pending private-object cleanup jobs.');
   if (!integrations.paymentDestination) missingActions.push('Configure a bank-transfer destination or HTTPS payment link.');
   if (!integrations.monitoring) missingActions.push('Configure error and uptime monitoring.');
   if (!integrations.offsiteBackup) missingActions.push('Configure an offsite backup target and test a restore.');
@@ -1506,6 +1583,7 @@ app.get('/api/system-diagnostics', (req, res) => {
       accounts: db.users.filter(account => accountSchoolId(account) === schoolId).length,
       learners: schoolCount(db.students), attendance: schoolCount(db.attendance),
       messages: schoolCount(db.directMessages), payments: schoolCount(db.paymentLedger),
+      activeFiles: schoolCount(db.fileRecords?.filter(file => file.accessState === 'active')),
       openErrors: (db.systemErrors || []).filter(entry => entry.status === 'open' && (!entry.schoolId || entry.schoolId === schoolId)).length
     },
     persistence: postgresPool ? 'record-based-postgresql' : replicaMode ? 'read-only-replica' : 'local-sqlite',
@@ -2029,8 +2107,9 @@ app.post('/api/book-register', (req, res) => {
 app.post('/api/book-register/import', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Only a principal or administrator can import the book register.' });
-  const rows = Array.isArray(req.body?.rows) ? req.body.rows.slice(0, 2000) : [];
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
   if (!rows.length) return res.status(400).json({ message: 'Add at least one checklist row to import.' });
+  if (rows.length > 2000) return res.status(400).json({ message: 'Import up to 2,000 book-register records per file.' });
   const imported = [], rejected = [];
   rows.forEach((row, index) => {
     const result = createBookRecordFromImport(row, actor);
@@ -2222,16 +2301,29 @@ app.put('/api/accounts/:username', (req, res) => {
   account.assignedClasses = account.role === 'teacher' ? normaliseAssignedClasses(assignedClasses).slice(0, 30) : [];
   res.json({ success: true, account: safeAccount(account) });
 });
-app.delete('/api/accounts/:username', (req, res) => {
+app.delete('/api/accounts/:username', async (req, res, next) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const target = findAccountByUsername(req.params.username);
   if (!target || !isSameSchool(actor, target)) return res.status(404).json({ message: 'Account not found.' });
   if (target.role === 'admin' && db.users.filter(account => account.role === 'admin' && isSameSchool(actor, account)).length <= 1) return res.status(400).json({ message: 'Create another administrator before removing the final administrator account.' });
-  const previousLength = db.users.length;
-  db.users = db.users.filter(account => account !== target);
-  if (db.users.length === previousLength) return res.status(404).json({ message: 'Account not found.' });
-  res.json({ success: true });
+  try {
+    const staffFiles = (db.fileRecords || []).filter(file => file.schoolId === accountSchoolId(actor)
+      && file.entityType === 'staff' && normalizeUsername(file.recordId) === normalizeUsername(target.username)
+      && file.accessState !== 'deleted');
+    const cleanupJob = queueStorageCleanup(accountSchoolId(actor), staffFiles, 'staff-account-deletion');
+    if (cleanupJob) await saveDatabaseState();
+    db.users = db.users.filter(account => account !== target);
+    staffFiles.forEach(file => { file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); file.deletedBy = actor.username; });
+    await saveDatabaseState();
+    if (cleanupJob) {
+      const cleaned = await runStorageCleanupJob(cleanupJob);
+      await saveDatabaseState();
+      if (!cleaned) return res.status(503).json({ message: 'The account was deleted, but its private-file cleanup requires an automatic retry.', cleanupJobId: cleanupJob.id });
+    }
+    req.persistenceCommitted = true;
+    res.json({ success: true });
+  } catch (error) { next(error); }
 });
 app.post('/api/accounts/:username/approve', (req, res) => {
   const actor = requireAdmin(req);
@@ -2405,13 +2497,200 @@ app.post('/api/term', (req, res) => {
   res.json({ term: db.schoolTerms[accountSchoolId(actor)] || db.term });
 });
 
+const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet']);
+const fileContentPath = file => `/api/files/${encodeURIComponent(file.id)}/content`;
+const publicFileMetadata = file => ({
+  id: file.id, entityType: file.entityType, recordId: file.recordId, purpose: file.purpose,
+  originalFilename: file.originalFilename, contentType: file.contentType, size: file.size,
+  sha256: file.sha256, uploadedBy: file.uploadedBy, createdAt: file.createdAt,
+  updatedAt: file.updatedAt || file.createdAt, accessState: file.accessState,
+  contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
+});
+const relatedRecordForFile = (file, actor) => {
+  if (!recordInSchool(file, actor)) return null;
+  if (file.entityType === 'learner') return db.students.find(item => item.id === file.recordId && recordInSchool(item, actor));
+  if (file.entityType === 'staff') return db.users.find(item => normalizeUsername(item.username) === normalizeUsername(file.recordId) && isSameSchool(item, actor));
+  if (file.entityType === 'school') return db.schools.find(item => item.id === file.recordId && item.id === accountSchoolId(actor));
+  if (file.entityType === 'post') return db.posts.find(item => item.id === file.recordId && recordInSchool(item, actor));
+  if (file.entityType === 'worksheet') return learnerRecordsVisibleTo(db.worksheets, actor).find(item => item.id === file.recordId);
+  return null;
+};
+const canManageFile = (file, actor) => Boolean(actor && recordInSchool(file, actor)
+  && (['admin', 'principal'].includes(actor.role) || normalizeUsername(file.uploadedBy) === normalizeUsername(actor.username)));
+const createStoredFile = async (actor, { entityType, recordId, purpose, originalFilename, dataUrl }) => {
+  if (!objectStorage.configured) {
+    const error = new Error('Private file storage is not configured. Ask an administrator to configure Cloudflare R2.');
+    error.status = 503;
+    throw error;
+  }
+  if (!FILE_ENTITY_TYPES.has(entityType)) {
+    const error = new Error('Choose a supported file relationship.'); error.status = 400; throw error;
+  }
+  const decoded = decodeSupportedFileDataUrl(dataUrl, originalFilename);
+  if (!decoded) {
+    const error = new Error('Unsupported or invalid file. Allowed: PNG, JPEG, GIF, WebP, PDF up to 5 MB; TXT or CSV up to 2 MB.');
+    error.status = 400;
+    throw error;
+  }
+  const id = crypto.randomUUID();
+  const key = objectKeyFor({ schoolId: accountSchoolId(actor), entityType, recordId, extension: decoded.extension });
+  const sha256 = crypto.createHash('sha256').update(decoded.bytes).digest('hex');
+  const result = await objectStorage.put({
+    key, body: decoded.bytes, contentType: decoded.mimeType,
+    metadata: { fileid: id, tenant: crypto.createHash('sha256').update(accountSchoolId(actor)).digest('hex') }
+  });
+  const record = tagSchoolRecord(actor, {
+    id, entityType, recordId: boundedText(recordId, 180), purpose: boundedText(purpose || 'attachment', 80),
+    storageProvider: objectStorage.kind, objectKey: key, originalFilename: decoded.filename,
+    contentType: decoded.mimeType, size: decoded.bytes.length, sha256, etag: boundedText(result.etag, 180),
+    uploadedBy: actor.username, createdAt: new Date().toISOString(), accessState: 'active'
+  });
+  db.fileRecords.unshift(record);
+  return record;
+};
+const rollbackStoredFile = async file => {
+  db.fileRecords = db.fileRecords.filter(item => item !== file);
+  await objectStorage.delete({ key: file.objectKey }).catch(() => {});
+};
+
+app.get('/api/files', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to view files.' });
+  const entityType = boundedText(req.query.entityType, 40);
+  const recordId = boundedText(req.query.recordId, 180);
+  const files = tenantRecords(db.fileRecords, actor).filter(file => file.accessState === 'active'
+    && (!entityType || file.entityType === entityType) && (!recordId || file.recordId === recordId)
+    && relatedRecordForFile(file, actor));
+  res.json(files.map(publicFileMetadata));
+});
+
+app.post('/api/files', async (req, res, next) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can upload files.' });
+  const entityType = boundedText(req.body?.entityType, 40);
+  const recordId = boundedText(req.body?.recordId, 180);
+  const probe = tagSchoolRecord(actor, { entityType, recordId });
+  if (!recordId || !relatedRecordForFile(probe, actor)) return res.status(404).json({ message: 'The related school record was not found.' });
+  let file;
+  try {
+    file = await createStoredFile(actor, { entityType, recordId, purpose: req.body?.purpose, originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl });
+    await saveDatabaseState();
+    req.persistenceCommitted = true;
+    res.status(201).json({ success: true, file: publicFileMetadata(file) });
+  } catch (error) {
+    if (file) await rollbackStoredFile(file);
+    next(error);
+  }
+});
+
+app.get('/api/files/integrity', async (req, res, next) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (!objectStorage.configured) return res.status(503).json({ message: 'Cloudflare R2 storage is not configured.' });
+  try {
+    const files = tenantRecords(db.fileRecords, actor).filter(file => file.accessState === 'active').slice(0, 500);
+    const results = [];
+    for (const file of files) {
+      try {
+        const object = await objectStorage.head({ key: file.objectKey });
+        results.push({ id: file.id, status: Number(object.size) === Number(file.size) ? 'ok' : 'size_mismatch' });
+      } catch (error) {
+        results.push({ id: file.id, status: (error?.code === 'ENOENT' || Number(error?.$metadata?.httpStatusCode) === 404) ? 'missing' : 'unverified' });
+      }
+    }
+    const issues = results.filter(item => item.status !== 'ok');
+    res.json({ checked: results.length, limited: tenantRecords(db.fileRecords, actor).filter(file => file.accessState === 'active').length > 500, issues });
+  } catch (error) { next(error); }
+});
+
+app.put('/api/files/:id', async (req, res, next) => {
+  const actor = getSessionAccount(req);
+  const previous = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  if (!previous || !canManageFile(previous, actor)) return res.status(404).json({ message: 'File not found.' });
+  let replacement;
+  let previousObjectDeleted = false;
+  try {
+    replacement = await createStoredFile(actor, {
+      entityType: previous.entityType, recordId: previous.recordId, purpose: previous.purpose,
+      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl
+    });
+    replacement.replacesFileId = previous.id;
+    previous.accessState = 'replaced'; previous.replacedByFileId = replacement.id; previous.updatedAt = new Date().toISOString();
+    const related = relatedRecordForFile(replacement, actor);
+    if (related && previous.entityType === 'post' && related.mediaFileId === previous.id) related.mediaFileId = replacement.id;
+    if (related && previous.entityType === 'worksheet' && related.photoFileId === previous.id) related.photoFileId = replacement.id;
+    await saveDatabaseState();
+    await objectStorage.delete({ key: previous.objectKey });
+    previousObjectDeleted = true;
+    previous.accessState = 'deleted'; previous.deletedAt = new Date().toISOString();
+    await saveDatabaseState();
+    req.persistenceCommitted = true;
+    res.json({ success: true, file: publicFileMetadata(replacement) });
+  } catch (error) {
+    if (replacement && !previousObjectDeleted) await rollbackStoredFile(replacement);
+    previous.accessState = previousObjectDeleted ? 'deleted' : 'active';
+    if (!previousObjectDeleted) { delete previous.replacedByFileId; delete previous.deletedAt; }
+    await saveDatabaseState().catch(() => {});
+    next(error);
+  }
+});
+
+app.get('/api/files/:id/content', async (req, res, next) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to download files.' });
+  const file = db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  if (!file || !relatedRecordForFile(file, actor)) return res.status(404).json({ message: 'File not found.' });
+  try {
+    const object = await objectStorage.get({ key: file.objectKey });
+    const bytes = Buffer.from(object.body);
+    if (bytes.length !== file.size || crypto.createHash('sha256').update(bytes).digest('hex') !== file.sha256) {
+      return res.status(409).json({ message: 'The stored file failed its integrity check. An administrator must restore or replace it.' });
+    }
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader('Content-Length', String(bytes.length));
+    res.setHeader('Content-Disposition', `inline; filename="${safeOriginalFilename(file.originalFilename, 'bin').replace(/["\\]/g, '_')}"`);
+    res.send(bytes);
+  } catch (error) {
+    if (String(error?.name || '').includes('NoSuchKey') || Number(error?.$metadata?.httpStatusCode) === 404 || error?.code === 'ENOENT') {
+      return res.status(404).json({ message: 'The file metadata exists, but the stored object is missing. An administrator must restore or replace it.' });
+    }
+    next(error);
+  }
+});
+
+app.delete('/api/files/:id', async (req, res, next) => {
+  const actor = getSessionAccount(req);
+  const file = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  if (!file || !canManageFile(file, actor)) return res.status(404).json({ message: 'File not found.' });
+  try {
+    const related = relatedRecordForFile(file, actor);
+    file.accessState = 'pending_delete'; file.updatedAt = new Date().toISOString();
+    if (related && file.entityType === 'post' && related.mediaFileId === file.id) related.mediaFileId = null;
+    if (related && file.entityType === 'worksheet' && related.photoFileId === file.id) related.photoFileId = null;
+    await saveDatabaseState();
+    await objectStorage.delete({ key: file.objectKey });
+    file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); file.deletedBy = actor.username;
+    await saveDatabaseState();
+    req.persistenceCommitted = true;
+    res.json({ success: true });
+  } catch (error) {
+    file.accessState = 'active'; delete file.deletedAt; delete file.deletedBy;
+    const related = relatedRecordForFile(file, actor);
+    if (related && file.entityType === 'post') related.mediaFileId = file.id;
+    if (related && file.entityType === 'worksheet') related.photoFileId = file.id;
+    await saveDatabaseState().catch(() => {});
+    next(error);
+  }
+});
+
 // Posts
 app.get('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view the school feed.' });
-  res.json(tenantRecords(db.posts, actor).map(post => ({ ...post, mediaUrl: safeStoredMedia(post.mediaUrl, validPostMediaData) })));
+  res.json(tenantRecords(db.posts, actor).map(post => ({ ...post, mediaUrl: post.mediaFileId ? `/api/files/${encodeURIComponent(post.mediaFileId)}/content` : safeStoredMedia(post.mediaUrl, validPostMediaData) })));
 });
-app.post('/api/posts', (req, res) => {
+app.post('/api/posts', async (req, res, next) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can post updates.' });
   if (req.body?.mediaUrl !== undefined && req.body.mediaUrl !== null && !validPostMediaData(req.body.mediaUrl)) return res.status(400).json({ message: 'Attached media must be a supported PNG, JPEG, or WebP image under 5 MB.' });
@@ -2426,16 +2705,40 @@ app.post('/api/posts', (req, res) => {
     createdBy: actor.username,
     createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
-  db.posts.unshift(post);
-  res.json({ success: true, post });
+  let file;
+  try {
+    if (post.mediaUrl && objectStorage.configured) {
+      file = await createStoredFile(actor, { entityType: 'post', recordId: post.id, purpose: 'school-feed-image', originalFilename: 'school-feed-image', dataUrl: post.mediaUrl });
+      post.mediaFileId = file.id; post.mediaUrl = null;
+    }
+    db.posts.unshift(post);
+    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; }
+    res.json({ success: true, post: { ...post, mediaUrl: file ? fileContentPath(file) : post.mediaUrl } });
+  } catch (error) {
+    db.posts = db.posts.filter(item => item !== post);
+    if (file) await rollbackStoredFile(file);
+    next(error);
+  }
 });
-app.delete('/api/posts/:id', (req, res) => {
+app.delete('/api/posts/:id', async (req, res, next) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const post = db.posts.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
   if (!post) return res.status(404).json({ message: 'School update not found.' });
-  db.posts = db.posts.filter(p => p !== post);
-  res.json({ success: true });
+  const file = post.mediaFileId && db.fileRecords.find(item => item.id === post.mediaFileId && recordInSchool(item, actor));
+  try {
+    if (file) { file.accessState = 'pending_delete'; file.updatedAt = new Date().toISOString(); }
+    db.posts = db.posts.filter(p => p !== post);
+    if (file) {
+      await saveDatabaseState(); await objectStorage.delete({ key: file.objectKey });
+      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true;
+    }
+    res.json({ success: true });
+  } catch (error) {
+    if (!db.posts.includes(post)) db.posts.unshift(post);
+    if (file) file.accessState = 'active';
+    await saveDatabaseState().catch(() => {}); next(error);
+  }
 });
 
 // Schedules
@@ -2460,8 +2763,10 @@ app.post('/api/schedules/import', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import schedules.' });
   const { schedules } = req.body;
-  if (Array.isArray(schedules)) {
-    const cleanSchedules = schedules.slice(0, 2000).map(item => ({
+  if (!Array.isArray(schedules) || !schedules.length) return res.status(400).json({ message: 'Add at least one schedule record to import.' });
+  if (schedules.length > 2000) return res.status(400).json({ message: 'Import up to 2,000 schedule records per file.' });
+  {
+    const cleanSchedules = schedules.map(item => ({
       studentName: boundedText(item?.studentName, 160),
       dayOfWeek: boundedText(item?.dayOfWeek, 20),
       timeSlot: boundedText(item?.timeSlot, 80),
@@ -2483,9 +2788,9 @@ app.delete('/api/schedules/:id', (req, res) => {
 app.get('/api/worksheets', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view learning files.' });
-  res.json(learnerRecordsVisibleTo(db.worksheets, actor).map(worksheet => ({ ...worksheet, photoUrl: safeStoredMedia(worksheet.photoUrl) })));
+  res.json(learnerRecordsVisibleTo(db.worksheets, actor).map(worksheet => ({ ...worksheet, photoUrl: worksheet.photoFileId ? `/api/files/${encodeURIComponent(worksheet.photoFileId)}/content` : safeStoredMedia(worksheet.photoUrl) })));
 });
-app.post('/api/worksheets', (req, res) => {
+app.post('/api/worksheets', async (req, res, next) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can add learning files.' });
   if (req.body?.photoUrl !== undefined && req.body.photoUrl !== null && !validWorksheetMediaData(req.body.photoUrl)) return res.status(400).json({ message: 'Attached evidence must be a supported PNG, JPEG, GIF, or WebP image under 5 MB.' });
@@ -2501,15 +2806,39 @@ app.post('/api/worksheets', (req, res) => {
     uploadedAt: new Date().toLocaleDateString(),
     createdAt: new Date().toISOString()
   });
-  db.worksheets.unshift(item);
-  res.json({ success: true, item });
+  let file;
+  try {
+    if (item.photoUrl && objectStorage.configured) {
+      file = await createStoredFile(actor, { entityType: 'worksheet', recordId: item.id, purpose: 'learning-evidence', originalFilename: 'learning-evidence', dataUrl: item.photoUrl });
+      item.photoFileId = file.id; item.photoUrl = null;
+    }
+    db.worksheets.unshift(item);
+    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; }
+    res.json({ success: true, item: { ...item, photoUrl: file ? fileContentPath(file) : item.photoUrl } });
+  } catch (error) {
+    db.worksheets = db.worksheets.filter(record => record !== item);
+    if (file) await rollbackStoredFile(file);
+    next(error);
+  }
 });
-app.delete('/api/worksheets/:id', (req, res) => {
+app.delete('/api/worksheets/:id', async (req, res, next) => {
   const actor = getSessionAccount(req);
   const item = db.worksheets.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
   if (!actor || !item || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(404).json({ message: 'Learning file not found.' });
-  db.worksheets = db.worksheets.filter(w => w !== item);
-  res.json({ success: true });
+  const file = item.photoFileId && db.fileRecords.find(record => record.id === item.photoFileId && recordInSchool(record, actor));
+  try {
+    if (file) { file.accessState = 'pending_delete'; file.updatedAt = new Date().toISOString(); }
+    db.worksheets = db.worksheets.filter(w => w !== item);
+    if (file) {
+      await saveDatabaseState(); await objectStorage.delete({ key: file.objectKey });
+      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true;
+    }
+    res.json({ success: true });
+  } catch (error) {
+    if (!db.worksheets.includes(item)) db.worksheets.unshift(item);
+    if (file) file.accessState = 'active';
+    await saveDatabaseState().catch(() => {}); next(error);
+  }
 });
 
 // Badges
@@ -2645,6 +2974,14 @@ app.patch('/api/staff/development-plans/:id', (req,res) => {
 
 // Little Feet Email Integration inbox: a separate delivery surface for portal events.
 const emailInboxVisibleTo = (item, actor) => item && recordInSchool(item, actor) && normalizeUsername(item.username) === normalizeUsername(actor.username);
+const emailSourceKey = item => `${item.type}:${item.sourceId}`;
+const dismissEmailSource = (actor, item) => {
+  if (!item?.sourceId) return;
+  const key = emailSourceKey(item);
+  if (!tenantRecords(db.emailDismissals, actor).some(entry => normalizeUsername(entry.username) === normalizeUsername(actor.username) && entry.sourceKey === key)) {
+    db.emailDismissals.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), username: actor.username, sourceKey: key, dismissedAt: new Date().toISOString() }));
+  }
+};
 const addEmailInboxItem = (actor, data) => {
   if (!actor) return null;
   const item = tagSchoolRecord(actor, {
@@ -2656,13 +2993,16 @@ const addEmailInboxItem = (actor, data) => {
   db.emailInbox.unshift(item); return item;
 };
 const buildEmailInbox = actor => {
+  const openTicketIds = new Set(tenantRecords(db.tickets, actor).filter(ticket => ticket.status !== 'Completed').map(ticket => ticket.id));
+  db.emailInbox = db.emailInbox.filter(item => !(emailInboxVisibleTo(item, actor) && item.type === 'Ticket' && !openTicketIds.has(item.sourceId)));
   const existing = tenantRecords(db.emailInbox, actor).filter(item => emailInboxVisibleTo(item, actor));
   const known = new Set(existing.map(item => item.type + ':' + item.sourceId));
+  const dismissed = new Set(tenantRecords(db.emailDismissals, actor).filter(item => normalizeUsername(item.username) === normalizeUsername(actor.username)).map(item => item.sourceKey));
   const add = (type, sourceId, title, message, sourceTab) => {
-    const key=type+':'+sourceId;if(!sourceId||known.has(key))return;
+    const key=type+':'+sourceId;if(!sourceId||known.has(key)||dismissed.has(key))return;
     const item=addEmailInboxItem(actor,{type,sourceId,title,message,sourceTab});if(item){existing.push(item);known.add(key);}
   };
-  tenantRecords(db.tickets, actor).filter(t=>normalizeUsername(t.createdBy)===normalizeUsername(actor.username)||normalizeUsername(t.assignedTo)===normalizeUsername(actor.username))
+  tenantRecords(db.tickets, actor).filter(t=>t.status!=='Completed'&&(normalizeUsername(t.createdBy)===normalizeUsername(actor.username)||normalizeUsername(t.assignedTo)===normalizeUsername(actor.username)))
     .forEach(t=>add('Ticket',t.id,t.subject,t.feedback||t.message||'Support ticket update','ticketsTab'));
   tenantRecords(db.staffNotices, actor).filter(n=>n.audience==='All staff'||n.audience===actor.role)
     .forEach(n=>add('Notice',n.id,n.title,n.message,'staffNoticesTab'));
@@ -2683,11 +3023,11 @@ app.patch('/api/email/inbox/:id',(req,res)=>{
 });
 app.delete('/api/email/inbox/:id',(req,res)=>{
   const actor=getSessionAccount(req),item=actor&&db.emailInbox.find(x=>x.id===req.params.id&&emailInboxVisibleTo(x,actor));
-  if(!item)return res.status(404).json({message:'Inbox item not found.'});db.emailInbox=db.emailInbox.filter(x=>x!==item);res.json({success:true});
+  if(!item)return res.status(404).json({message:'Inbox item not found.'});dismissEmailSource(actor,item);db.emailInbox=db.emailInbox.filter(x=>x!==item);res.json({success:true});
 });
 app.delete('/api/email/inbox',(req,res)=>{
   const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to manage your Little Feet email inbox.'});
-  const before=db.emailInbox.length;db.emailInbox=db.emailInbox.filter(x=>!emailInboxVisibleTo(x,actor));res.json({success:true,deleted:before-db.emailInbox.length});
+  const visible=db.emailInbox.filter(x=>emailInboxVisibleTo(x,actor));visible.forEach(item=>dismissEmailSource(actor,item));const before=db.emailInbox.length;db.emailInbox=db.emailInbox.filter(x=>!emailInboxVisibleTo(x,actor));res.json({success:true,deleted:before-db.emailInbox.length});
 });
 
 // Email is a delivery channel, separate from in-app notifications.
@@ -3082,8 +3422,10 @@ app.post('/api/attendance/import', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can import attendance.' });
   const { attendance } = req.body;
-  if (Array.isArray(attendance)) {
-    const cleanAttendance = attendance.slice(0, 2000).map(item => ({
+  if (!Array.isArray(attendance) || !attendance.length) return res.status(400).json({ message: 'Add at least one attendance record to import.' });
+  if (attendance.length > 2000) return res.status(400).json({ message: 'Import up to 2,000 attendance records per file.' });
+  {
+    const cleanAttendance = attendance.map(item => ({
       studentName: boundedText(item?.studentName, 160),
       status: boundedText(item?.status || 'Checked In', 40)
     })).filter(item => item.studentName && ATTENDANCE_STATUSES.has(item.status));
@@ -3300,6 +3642,7 @@ const purgeSchoolData = schoolId => {
   const chatGroupIds = new Set((db.chatGroups || []).filter(group => group.schoolId === schoolId).map(group => String(group.id)));
   for (const [key, value] of Object.entries(db)) {
     if (!Array.isArray(value)) continue;
+    if (key === 'storageCleanupJobs') continue;
     if (key === 'schools') {
       db.schools = value.filter(record => record.id !== schoolId);
       continue;
@@ -3332,7 +3675,11 @@ app.post('/api/school-deletion/execute', async (req, res) => {
 
   const schoolId = accountSchoolId(actor);
   const schoolName = actor.schoolName;
+  const schoolFiles = (db.fileRecords || []).filter(file => file.schoolId === schoolId && file.accessState !== 'deleted');
+  const cleanupJob = queueStorageCleanup(schoolId, schoolFiles, 'school-deletion');
+  if (cleanupJob) await saveDatabaseState();
   purgeSchoolData(schoolId);
+  await saveDatabaseState();
 
   if (postgresPool) {
     await postgresPool.query(
@@ -3342,6 +3689,13 @@ app.post('/api/school-deletion/execute', async (req, res) => {
     );
   }
 
+  if (cleanupJob) {
+    const cleaned = await runStorageCleanupJob(cleanupJob);
+    await saveDatabaseState();
+    if (!cleaned) return res.status(503).json({ message: 'The school records were deleted, but private object cleanup requires an automatic retry.', cleanupJobId: cleanupJob.id });
+  }
+
+  req.persistenceCommitted = true;
   res.json({ success: true, deletedSchoolId: schoolId, deletedSchoolName: schoolName });
 });
 
@@ -4157,12 +4511,43 @@ app.get('/api/household', (req, res) => {
 
 // Secure bulk learner import. The browser previews spreadsheet rows first; this
 // endpoint applies the authoritative duplicate check and encrypts sensitive fields.
+app.get('/api/students/import/:id', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['admin', 'principal'].includes(actor.role)) return res.status(403).json({ message: 'Only an administrator or principal may view learner imports.' });
+  const job = db.importJobs.find(item => item.id === req.params.id && recordInSchool(item, actor));
+  if (!job) return res.status(404).json({ message: 'Import job not found.' });
+  res.json({ id: job.id, status: job.status, processedBatches: job.processedBatches.length, totalBatches: job.totalBatches, imported: job.imported, rejected: job.rejected, createdAt: job.createdAt, updatedAt: job.updatedAt });
+});
+
 app.post('/api/students/import', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['admin', 'principal'].includes(actor.role)) return res.status(403).json({ message: 'Only an administrator or principal may import learner records.' });
   const incoming = Array.isArray(req.body?.students) ? req.body.students : [];
   if (!incoming.length) return res.status(400).json({ message: 'No learner records were supplied.' });
-  if (incoming.length > 1000) return res.status(400).json({ message: 'Import up to 1,000 learner records at a time.' });
+  if (incoming.length > 500) return res.status(400).json({ message: 'Import up to 500 learner records per bounded batch.' });
+  const requestedJobId = boundedText(req.body?.importId, 80);
+  const jobId = requestedJobId || crypto.randomUUID();
+  if (!/^[a-zA-Z0-9_-]{8,80}$/.test(jobId)) return res.status(400).json({ message: 'Invalid import job identifier.' });
+  const batchNumber = Number(req.body?.batchNumber ?? 0);
+  const totalBatches = Number(req.body?.totalBatches ?? 1);
+  if (!Number.isSafeInteger(batchNumber) || batchNumber < 0 || !Number.isSafeInteger(totalBatches) || totalBatches < 1 || totalBatches > 400 || batchNumber >= totalBatches) {
+    return res.status(400).json({ message: 'Invalid import batch sequence. Imports support up to 400 batches (200,000 supplied rows).' });
+  }
+  let job = db.importJobs.find(item => item.id === jobId && recordInSchool(item, actor));
+  if (job && normalizeUsername(job.createdBy) !== normalizeUsername(actor.username)) return res.status(403).json({ message: 'This import belongs to another account.' });
+  if (!job) {
+    job = tagSchoolRecord(actor, { id: jobId, type: 'learners', status: 'in_progress', totalBatches, processedBatches: [], imported: 0, rejected: 0, createdBy: actor.username, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    db.importJobs.unshift(job);
+    const completedForSchool = db.importJobs.filter(item => item !== job && item.status === 'completed' && recordInSchool(item, actor));
+    const expiredJobIds = new Set(completedForSchool.slice(100).map(item => item.id));
+    if (expiredJobIds.size) {
+      db.importJobs = db.importJobs.filter(item => !expiredJobIds.has(item.id));
+      db.importAudit = db.importAudit.filter(item => !expiredJobIds.has(item.importId));
+    }
+  }
+  if (job.totalBatches !== totalBatches) return res.status(409).json({ message: 'This import job was started with a different batch count.' });
+  const priorBatch = job.processedBatches.find(item => item.batchNumber === batchNumber);
+  if (priorBatch) return res.json({ success: true, duplicateBatch: true, importId: job.id, status: job.status, imported: priorBatch.imported, rejected: priorBatch.rejectedRows, progress: { processedBatches: job.processedBatches.length, totalBatches, imported: job.imported, rejected: job.rejected } });
 
   const recordKey = (student) => [student.studentName, student.className, student.contactEmail].map(normalizeComparableText).join('|');
   const knownRecords = new Set(tenantRecords(db.students, actor).map(recordKey));
@@ -4176,13 +4561,13 @@ app.post('/api/students/import', (req, res) => {
     const parentName = boundedText(row?.parentName, 160);
     const contactEmail = boundedText(row?.contactEmail, 160);
     if (!studentName || !className) {
-      rejected.push({ row: index + 2, reason: 'Learner name and class/grade are required.' });
+      rejected.push({ row: batchNumber * 500 + index + 2, reason: 'Learner name and class/grade are required.' });
       return;
     }
     const candidate = { studentName, className, contactEmail };
     const key = recordKey(candidate);
     if (knownRecords.has(key) || seenInFile.has(key)) {
-      rejected.push({ row: index + 2, reason: 'Duplicate learner record already exists.' });
+      rejected.push({ row: batchNumber * 500 + index + 2, reason: 'Duplicate learner record already exists.' });
       return;
     }
     seenInFile.add(key);
@@ -4204,8 +4589,12 @@ app.post('/api/students/import', (req, res) => {
     imported += 1;
   });
 
-  db.importAudit.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), importedAt: new Date().toISOString(), importedBy: actor.username, imported, rejected: rejected.length }));
-  res.status(201).json({ success: true, imported, rejected, message: `${imported} learner record${imported === 1 ? '' : 's'} imported.` });
+  job.processedBatches.push({ batchNumber, imported, rejected: rejected.length, rejectedRows: rejected.slice(0, 100), rejectedRowsTruncated: rejected.length > 100, processedAt: new Date().toISOString() });
+  job.processedBatches.sort((a, b) => a.batchNumber - b.batchNumber);
+  job.imported += imported; job.rejected += rejected.length; job.updatedAt = new Date().toISOString();
+  job.status = job.processedBatches.length === totalBatches ? 'completed' : 'in_progress';
+  db.importAudit.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), importId: job.id, batchNumber, importedAt: job.updatedAt, importedBy: actor.username, imported, rejected: rejected.length }));
+  res.status(201).json({ success: true, importId: job.id, status: job.status, imported, rejected, progress: { processedBatches: job.processedBatches.length, totalBatches, imported: job.imported, rejected: job.rejected }, message: `${imported} learner record${imported === 1 ? '' : 's'} imported.` });
 });
 
 // 1. Session and Passport Setup

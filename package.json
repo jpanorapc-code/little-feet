@@ -4,9 +4,10 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node tests/auth-crypto.test.js && node tests/tenant-isolation.test.js && node tests/security-regression.test.js && node tests/replica-restore.test.js && node tests/cinematic-navigation.test.js && node tests/web-quality.test.js && node tests/strengthening-regression.test.js && node tests/adversarial-security.test.js && node tests/adversarial-entrypoints.test.js && node tests/adversarial-sensitive-inputs.test.js && node tests/authorization-matrix.test.js && node tests/render-release-metadata.test.js && node tests/finance-automation.test.js && node tests/preferences-refresh.test.js && node tests/legal-compliance.test.js",
+    "test": "node scripts/audit-route-connections.js && node tests/auth-crypto.test.js && node tests/tenant-isolation.test.js && node tests/security-regression.test.js && node tests/replica-restore.test.js && node tests/storage-lifecycle.test.js && node tests/import-jobs.test.js && node tests/cinematic-navigation.test.js && node tests/web-quality.test.js && node tests/strengthening-regression.test.js && node tests/adversarial-security.test.js && node tests/adversarial-entrypoints.test.js && node tests/adversarial-sensitive-inputs.test.js && node tests/authorization-matrix.test.js && node tests/render-release-metadata.test.js && node tests/finance-automation.test.js && node tests/preferences-refresh.test.js && node tests/legal-compliance.test.js",
     "test:capacity": "node tests/capacity-smoke.test.js",
     "test:stress": "node tests/capacity-smoke.test.js",
+    "audit:routes": "node scripts/audit-route-connections.js",
     "start": "node server.js",
     "start:backup": "node backup-server.js",
     "postinstall": "node scripts/write-deploy-release.js"
@@ -16,6 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.888.0",
     "better-sqlite3": "^13.0.3",
     "compression": "^1.8.2",
     "express": "^5.2.1",
