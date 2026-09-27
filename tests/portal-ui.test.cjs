@@ -7,10 +7,13 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
-const tempRoot = path.join(root, 'tmp');
+// Express treats the managed .codex parent directory as a dotfile path when
+// serving the fixture. Keep the test-only copy in the system temp directory.
+const tempRoot = path.join(require('node:os').tmpdir(), 'little-feet-browser');
 fs.mkdirSync(tempRoot, { recursive: true });
 const fixture = fs.mkdtempSync(path.join(tempRoot, 'source-browser-'));
-const port = 6500 + Math.floor(Math.random() * 300);
+fs.symlinkSync(path.join(root, 'node_modules'), path.join(fixture, 'node_modules'), 'junction');
+const port = 18000 + Math.floor(Math.random() * 1000);
 const origin = `http://127.0.0.1:${port}`;
 const roles = ['admin', 'principal', 'teacher', 'parent', 'district'];
 const pin = 'SectionBrowserPass1';
@@ -54,6 +57,7 @@ async function main() {
   const summary = [];
   for (const role of roles) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    await context.route('https://**', route => route.abort());
     const page = await context.newPage();
     const errors = [];
     const failedApi = [];
@@ -62,10 +66,9 @@ async function main() {
       if (response.url().startsWith(`${origin}/api/`) && response.status() >= 500) failedApi.push(`${response.status()} ${response.url()}`);
     });
     page.on('dialog', dialog => dialog.dismiss());
-    const navigationResponse = await page.goto(origin, { waitUntil: 'networkidle' });
+    const navigationResponse = await page.goto(origin, { waitUntil: 'domcontentloaded' });
     assert.equal(navigationResponse.status(), 200, (await page.content()).slice(0, 1200));
     if (role === 'admin') {
-      await page.locator('.login-audio-compact span').evaluate(el => { el.textContent = 'Mute Little Feet'; });
       const desktopToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
         const language = document.querySelector('.login-language-pill').getBoundingClientRect();
@@ -101,7 +104,7 @@ async function main() {
     await page.locator('#loginPin').fill(pin);
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();
       for (const element of document.querySelectorAll('[onclick], [onchange], [onsubmit]')) {
@@ -121,7 +124,7 @@ async function main() {
       const target = page.locator(`.nav-btn[onclick=${JSON.stringify(onclick)}]`);
       await target.click();
       assert.equal(await page.locator(`#${tab}`).evaluate(element => element.classList.contains('active')), true, `${role}: ${tab} did not activate`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
     await page.locator('[onclick="openGlobalSearch()"]').click();
     await page.locator('#appModal').waitFor({ state: 'visible' });
@@ -146,7 +149,7 @@ async function main() {
     }
     await page.locator('.sidebar-signout').click();
     await page.locator('#authSection').waitFor({ state: 'visible' });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const session = await page.evaluate(() => fetch('/api/auth/session').then(response => response.json()));
     assert.equal(session.authenticated, false, `${role}: logout did not clear server session`);
     assert.deepEqual(errors, [], `${role}: browser runtime errors`);

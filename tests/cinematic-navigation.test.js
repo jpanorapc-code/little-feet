@@ -28,6 +28,9 @@ assert.match(page, /id="littleFeetCinematicJourney"/);
 assert.match(page, /id="littleFeetCinematicCanvas"/);
 
 assert.match(cinematic, /import \* as THREE from '\/vendor\/three\.module\.js'/);
+assert.match(cinematic, /new THREE\.Timer\(\)/);
+assert.match(cinematic, /clock\.connect\(document\)/);
+assert.doesNotMatch(cinematic, /new THREE\.Clock\(\)/);
 assert.match(cinematic, /prefers-reduced-motion: reduce/);
 assert.doesNotMatch(cinematic, /getContext\(['"]webgl2/);
 assert.doesNotMatch(cinematic, /canUseWebGL2/);
