@@ -3369,14 +3369,20 @@ async function loadSubscriptionBillingOverview() {
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription information.');
     const isAdmin = currentUser.role === 'admin';
     const bundles = data.pricing.bundles || [];
-    const awaiting = (data.orders || []).filter(order => order.status === 'awaiting payment');
+    const awaiting = (data.orders || []).filter(order => ['awaiting_payment', 'awaiting payment'].includes(String(order.paymentStatus || order.status || '').toLowerCase()));
     const requestedMonthly = awaiting.reduce((total, order) => total + Number(order.monthlyTotal || 0), 0);
     const potentialMargin = awaiting.reduce((total, order) => total + Number(order.profitMargin || 0), 0);
     const rows = bundles.map(bundle => {
       const margin = Number(bundle.sellingPrice || 0) - Number(bundle.costPrice || 0);
       return `<tr><td style="padding:9px 10px;"><strong>+${bundle.capacity} children</strong></td>${isAdmin ? `<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.costPrice)}</td>` : ''}<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.sellingPrice)}</td>${isAdmin ? `<td style="padding:9px 10px;color:#2dd4bf;font-weight:700;">${formatSubscriptionMoney(margin)}</td>` : ''}</tr>`;
     }).join('');
-    const orders = (data.orders || []).slice(0, 6).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(String(order.paymentStatus || order.status || '').replaceAll('_', ' '))}</li>`).join('') || '<li>No payment requests yet.</li>';
+    const orders = (data.orders || []).slice(0, 6).map(order => {
+      const paymentStatus = String(order.paymentStatus || order.status || '').replaceAll('_', ' ');
+      const reconcile = isAdmin && !['paid', 'refunded'].includes(String(order.paymentStatus || order.status || '').toLowerCase())
+        ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeURIComponent(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
+        : '';
+      return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(paymentStatus)}${reconcile}</li>`;
+    }).join('') || '<li>No payment requests yet.</li>';
     const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : escapeWorkspaceText(String(data.subscription?.status || 'trial').toUpperCase());
     container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
   } catch (error) {
@@ -3394,7 +3400,12 @@ async function openSubscriptionBillingAdmin() {
   } catch (error) { return alert(error.message || 'Unable to load subscription billing.'); }
   const bundle = (capacity, field) => data.pricing.bundles.find(item => item.capacity === capacity)?.[field] || 0;
   const payment = data.payment || {};
-  const orders = (data.orders || []).slice(0, 8).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(order.status)}</li>`).join('') || '<li>No subscription payment requests yet.</li>';
+  const orders = (data.orders || []).slice(0, 8).map(order => {
+    const reconcile = !['paid', 'refunded'].includes(String(order.paymentStatus || order.status || '').toLowerCase())
+      ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeURIComponent(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
+      : '';
+    return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(String(order.paymentStatus || order.status || '').replaceAll('_', ' '))}${reconcile}</li>`;
+  }).join('') || '<li>No subscription payment requests yet.</li>';
   openModal('Subscription pricing & payment account', `
     <form id="subscriptionBillingForm" onsubmit="saveSubscriptionBillingConfig(event)" style="display:grid;gap:14px;">
       <p style="margin:0;color:var(--text-muted);">Set what schools pay and your underlying cost. The portal calculates the margin on each learner add-on privately for administrators.</p>
@@ -3459,6 +3470,25 @@ async function createSubscriptionOrder(event) {
     openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
     renderCapitecPayMeQr(payment);
   } catch (error) { alert(error.message || 'Unable to create payment request.'); }
+}
+
+function openSubscriptionPaymentReconcile(encodedReference, expectedAmount) {
+  if (currentUser?.role !== 'admin') return alert('Only an administrator can reconcile a subscription payment.');
+  const reference = decodeURIComponent(encodedReference);
+  openModal('Record subscription payment', `<form onsubmit="reconcileSubscriptionPayment(event,'${encodeURIComponent(reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">Payment reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Confirm the bank or provider transaction only after the funds have cleared. The school subscription activates immediately after this record is accepted.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(expectedAmount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
+}
+
+async function reconcileSubscriptionPayment(event, encodedReference) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/payments/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: `subscription-${Date.now()}-${Math.random().toString(16).slice(2)}`, reference: decodeURIComponent(encodedReference), status: 'paid', amount: form.elements.amount.value, bankReference: form.elements.bankReference.value }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to record the subscription payment.');
+    closeModal();
+    await loadSubscriptionBillingOverview();
+    alert('Payment recorded. The school subscription is active.');
+  } catch (error) { alert(error.message || 'Unable to record the subscription payment.'); }
 }
 
 async function refreshCurrentUserAccess() {
