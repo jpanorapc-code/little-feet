@@ -11,10 +11,10 @@
   <!-- Set this to the public standby URL when deploying behind a load balancer. -->
   <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
   <meta name="referrer" content="no-referrer-when-downgrade">
-  <meta name="description" content="Little Feet is an early childhood development portal for school communication, attendance, learning records, safeguarding and family engagement.">
+  <meta name="description" content="Little Feet is a secure school operations platform for communication, learning, attendance, finance, staff workflows, safeguarding and family engagement.">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="canonical" href="https://littlefeet.co.za/">
-  <title>Little Feet | ECD Portal</title>
+  <title>Little Feet | School Operations Platform</title>
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -261,8 +261,10 @@
     @keyframes sloganLift { 50% { transform:translateY(-2px); box-shadow:0 7px 18px rgba(13,148,136,.28); } }
 
     nav { background-color: #07111e; border-bottom: 3px solid var(--primary-color); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; position: relative; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
-    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #ffffff; font-size: 1.15rem; cursor: pointer; user-select: none; }
-    .nav-brand img { height: 42px; width: 42px; background: #ffffff; padding: 2px; border:1px solid rgba(45,212,191,.72); border-radius:7px; filter: drop-shadow(0 0 5px rgba(45,212,191,.55)); object-fit: contain; }
+    .nav-brand { display: flex; align-items: center; gap: 11px; font-weight: bold; color: #ffffff; cursor: pointer; user-select: none; }
+    .nav-brand img { height: 46px; width: 46px; background: #ffffff; padding: 2px; border:1px solid rgba(94,234,212,.86); border-radius:10px; filter: drop-shadow(0 0 8px rgba(45,212,191,.62)); object-fit: contain; }
+    .nav-brand .site-name { display:inline-block; color:transparent; background:linear-gradient(105deg,#ffffff 8%,#c8fff7 44%,#5eead4 70%,#ffffff 96%); background-size:180% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:clamp(1.35rem,1.7vw,1.7rem); font-weight:800; letter-spacing:.025em; line-height:1; text-shadow:0 1px 12px rgba(94,234,212,.28); animation:siteNameShimmer 8s ease-in-out infinite; }
+    @keyframes siteNameShimmer { 50% { background-position:100% center; } }
     .ui-icon { width:1.22em; height:1.22em; flex:0 0 auto; display:inline-block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.22em; }
     .ui-icon--fill { fill:currentColor; stroke:none; }
     .icon-label { display:inline-flex; align-items:center; gap:7px; }
@@ -277,7 +279,7 @@
     .sidebar-links .nav-btn:hover .ui-icon, .sidebar-links .nav-btn.active .ui-icon { color:#fff; }
     .sidebar-signout .ui-icon { width:1rem; height:1rem; margin-right:8px; vertical-align:0; }
     input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus { -webkit-text-fill-color: var(--input-text); -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset; box-shadow: 0 0 0 1000px var(--input-bg) inset; caret-color: var(--input-text); }
-    .nav-brand .org-badge { font-size: 0.68rem; background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px; font-weight: normal; color: #94a3b8; vertical-align: middle; }
+    .nav-brand .org-badge { margin-top:4px; font-size:.61rem; background:rgba(94,234,212,.12); padding:3px 6px; border:1px solid rgba(94,234,212,.22); border-radius:999px; font-weight:700; letter-spacing:.055em; color:#bffaf1; vertical-align:middle; }
 
     .nav-user-panel { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #cbd5e1; }
     .user-switch-control { display:inline-flex; align-items:center; gap:7px; min-width:0; margin:0; padding:4px 7px 4px 4px; border:1px solid transparent; border-radius:999px; background:transparent; color:#cbd5e1; font:inherit; cursor:pointer; }
@@ -696,7 +698,7 @@
     }
     @media (max-width: 640px) {
       nav { padding:9px 12px; }
-      .nav-brand { font-size:1rem; gap:7px; }
+      .nav-brand { gap:7px; }
       .nav-brand img { width:36px; height:36px; }
       .nav-user-panel { font-size:.72rem; gap:6px; }
       #displayRole { max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1040,7 +1042,7 @@
       .profile-icon-choice { min-height:48px; font-size:1.18rem; }
     }
 
-    /* The login identity lives above the glass card, like a moon in the night scene. */
+    /* The login identity sits above the glass card as an iceberg beacon. */
     #authSection { padding-top: 255px; padding-bottom: 44px; }
     #authSection > .auth-card {
       overflow: visible;
@@ -4404,6 +4406,39 @@
     .lf-notification-popup{pointer-events:auto;background:linear-gradient(145deg,var(--panel-bg),rgba(15,43,72,.96));color:var(--text-dark);border:1px solid rgba(94,234,212,.36);border-left:4px solid var(--primary-color);border-radius:13px;padding:14px;box-shadow:0 18px 45px rgba(0,0,0,.32)}
     .lf-notification-popup header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.lf-notification-popup p{margin:8px 0 10px;color:var(--text-muted);font-size:.84rem;line-height:1.45}.lf-notification-popup .actions{display:flex;gap:8px;justify-content:flex-end}.lf-notification-popup .action-btn{min-height:34px;margin:0;padding:6px 12px;border:1px solid rgba(94,234,212,.28);background:rgba(13,148,136,.14);color:#dffcf8}.lf-notification-popup .action-btn:hover{background:rgba(13,148,136,.26)}
     .lf-notification-popup.is-pinned{border-left-color:#fbbf24;box-shadow:0 18px 45px rgba(0,0,0,.32),inset 0 0 0 1px rgba(251,191,36,.16)}
+
+    /* Login refinement: readable controls, even spacing, and an iceberg identity frame. */
+    #authSection > .auth-card{width:min(100%,560px)!important;max-width:560px!important;padding:22px!important;border-radius:20px}
+    #authSection .login-card-tools{gap:10px;margin-bottom:12px}
+    #authSection .login-secure-label{font-size:.84rem;letter-spacing:.075em}
+    #authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 44px 138px;gap:9px}
+    #authSection .login-language-pill,#authSection .login-audio-compact,#authSection .login-background-compact{height:44px;min-height:44px!important}
+    #authSection .login-background-compact{width:138px!important;min-width:138px!important;font-size:.78rem}
+    #authSection .login-access-note{margin-bottom:16px;padding-bottom:13px;font-size:.88rem;line-height:1.45}
+    #authSection #loginForm > div:not(.social-signin):not(.login-divider):not(.login-utility-row){margin-bottom:11px}
+    #authSection #loginForm label{font-size:.92rem;margin-bottom:6px}
+    #authSection #loginForm input{min-height:48px;font-size:1rem}
+    #authSection .login-utility-row{margin:6px 0 14px}
+    #authSection .login-remember label,#authSection .login-help-inline{font-size:.80rem;line-height:1.35}
+    #authSection #loginForm > .submit-btn{min-height:50px;font-size:1rem}
+    #authSection .login-divider{margin:14px auto 10px;font-size:.73rem}
+    #authSection .social-signin{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    #authSection .social-signin button{min-height:44px;padding:8px 9px;font-size:.82rem}
+    #authSection .login-new-account{margin-top:14px;padding-top:14px;gap:14px}
+    #authSection .login-new-account p{font-size:.84rem}
+    #authSection .login-new-account .action-btn{min-height:44px;padding:8px 16px;font-size:.86rem}
+    .mascot-stage::before{width:190px;height:190px;border:1px solid rgba(191,250,241,.82);border-radius:0;clip-path:polygon(12% 100%,19% 62%,29% 70%,39% 31%,50% 55%,62% 15%,72% 63%,84% 52%,92% 100%);background:linear-gradient(145deg,rgba(240,253,255,.98) 0%,rgba(151,224,239,.92) 48%,rgba(30,126,164,.95) 100%);box-shadow:0 0 13px rgba(191,250,241,.70),0 15px 30px rgba(2,8,23,.30),inset -16px -13px 22px rgba(4,63,94,.30)}
+    .mascot-stage::after{content:"";display:block;position:absolute;z-index:1;left:50%;bottom:8px;width:164px;height:33px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(ellipse,rgba(94,234,212,.46),rgba(8,40,78,.08) 68%,transparent 72%);filter:blur(4px);pointer-events:none}
+    .brand-header img{border-color:rgba(240,253,255,.92);box-shadow:0 9px 23px rgba(2,8,23,.28),0 0 0 5px rgba(94,234,212,.16)}
+    @media (max-width:640px){
+      #authSection > .auth-card{padding:18px!important;border-radius:18px}
+      #authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 42px}
+      #authSection .login-background-compact{grid-column:1 / -1;width:100%!important;min-width:0!important}
+      #authSection .social-signin{grid-template-columns:1fr}
+      #authSection .social-signin button{font-size:.88rem}
+      .mascot-stage::before{width:166px;height:166px}
+    }
+    @media (max-width:420px){#authSection > .auth-card{padding:16px!important}}
     .email-inbox-toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:14px 0}.email-inbox-list{display:grid;gap:9px}
     .email-inbox-item{border:1px solid var(--border-color);border-radius:12px;padding:13px;background:rgba(2,15,29,.16)}.email-inbox-item.is-unread{border-left:4px solid #5eead4}.email-inbox-item.is-pinned{box-shadow:inset 0 0 0 1px rgba(94,234,212,.35)}
     .email-inbox-item header{display:flex;justify-content:space-between;gap:10px}.email-inbox-item .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
@@ -4583,7 +4618,7 @@
       <div class="login-info-runner-track">
         <div class="login-info-runner-group">
           <strong>Little Feet</strong>
-          <span>is a secure ECD and school management portal</span>
+          <span>is a secure ECD, primary and secondary school operations platform</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
           <span>Learning &amp; development</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
@@ -4600,7 +4635,7 @@
         </div>
         <div class="login-info-runner-group" aria-hidden="true">
           <strong>Little Feet</strong>
-          <span>is a secure ECD and school management portal</span>
+          <span>is a secure ECD, primary and secondary school operations platform</span>
           <span class="login-info-runner-dot">●</span>
           <span>Learning &amp; development</span>
           <span class="login-info-runner-dot">●</span>
@@ -4625,8 +4660,8 @@
       <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
         <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
         <div>
-          <span>Little Feet</span>
-          <span class="org-badge">ECD Portal v3.2</span>
+          <span class="site-name">Little Feet</span>
+          <span class="org-badge">School Platform v3.2</span>
         </div>
       </div>
 
@@ -4772,20 +4807,20 @@
 
         <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
           <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-connected-learning-4k.jpg" alt="Little Feet mascot guiding connected school life">
-            <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected learning</span><h2>One home for everyday school life.</h2><p>Bring schedules, learning evidence, parent updates, attendance, and daily care into role-specific workspaces.</p><div class="portal-tour-fact"><strong>Did you know?</strong> Each role sees only the tools needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-platform-operations.png" alt="Professional school operations workspace with planning dashboards">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected operations</span><h2>One platform for the whole school day.</h2><p>Coordinate communication, learning, attendance, finance, staff work, facilities and family engagement from role-aware workspaces.</p><div class="portal-tour-fact"><strong>Designed for focus:</strong> Each role sees the tools and records needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 2 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-school-admin-4k.jpg" alt="Little Feet mascot reviewing secure learner records">
-            <div class="portal-tour-copy"><span class="portal-tour-kicker">Smarter school admin</span><h2>Import the register, then review it once.</h2><p>Principals and administrators can preview a school spreadsheet before importing learner records, instead of retyping a whole register.</p><div class="portal-tour-fact"><strong>Built in:</strong> Duplicate learner records are skipped, while medical, emergency, and pickup fields are encrypted when saved.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('dataImportTab')">Open Data Import</button></div></div>
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-secure-administration.png" alt="Secure school administration workspace with records and compliance tools">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Leadership &amp; compliance</span><h2>Lead with a clear view of people, records and priorities.</h2><p>Administrators can manage accounts, imports, approvals, staff development, qualifications, notices and reporting in one secure platform.</p><div class="portal-tour-fact"><strong>Built in:</strong> Duplicate learner records are skipped, while medical, emergency and pickup fields are encrypted when saved.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('dataImportTab')">Open Data Import</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 3 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-family-partnership-4k.jpg" alt="Little Feet penguin mascots sharing family learning updates">
-            <div class="portal-tour-copy"><span class="portal-tour-kicker">Family partnership</span><h2>Turn updates into meaningful conversations.</h2><p>Parents can see the learning records, reports, badges, and notices made available to their family account.</p><div class="portal-tour-fact"><strong>Helpful reminder:</strong> Parent report review records can capture teacher and parent acknowledgements before a report is marked complete.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('reportsTab')">View reports</button></div></div>
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-finance-facilities.png" alt="Professional school finance and facilities coordination workspace">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Finance &amp; service delivery</span><h2>Keep essential school services moving.</h2><p>Coordinate billing, parent payments, purchasing, inventory, resource bookings, maintenance and school-store workflows.</p><div class="portal-tour-fact"><strong>Connected records:</strong> Give the right staff a clear view of the work that needs action, without exposing unrelated school data.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('reportsTab')">View reports</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 4 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-safety-first-4k.jpg" alt="Little Feet mascot supporting calm care and safeguarding">
-            <div class="portal-tour-copy"><span class="portal-tour-kicker">Safety first</span><h2>Keep the right information close at hand.</h2><p>Care, safeguarding, pickup, and area-alert tools are grouped so staff can act calmly when time matters.</p><div class="portal-tour-fact"><strong>Privacy by design:</strong> Location is used only for relevant area alerts, and is not shown to other users.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('careTab')">Open Care &amp; Safety</button></div></div>
+            <img class="portal-tour-image" loading="lazy" decoding="async" src="assets/4k/tour-safety-communications.png" alt="Secure school entrance and safeguarding operations workspace">
+            <div class="portal-tour-copy"><span class="portal-tour-kicker">Safe communication &amp; response</span><h2>Respond clearly when every minute matters.</h2><p>Bring notices, email, tickets, family communication, consent, safeguarding, pickup and area alerts into controlled workflows.</p><div class="portal-tour-fact"><strong>Privacy by design:</strong> Location is used only for relevant area alerts and is not shown to other users.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('careTab')">Open Care &amp; Safety</button></div></div>
           </article>
           <div class="tour-controls"><button type="button" onclick="movePortalTour(-1)" aria-label="Previous slide">‹</button><div class="tour-dots" role="tablist" aria-label="Portal tour slides"><button type="button" class="is-active" onclick="showPortalTourSlide(0)" aria-label="Show slide 1"></button><button type="button" onclick="showPortalTourSlide(1)" aria-label="Show slide 2"></button><button type="button" onclick="showPortalTourSlide(2)" aria-label="Show slide 3"></button><button type="button" onclick="showPortalTourSlide(3)" aria-label="Show slide 4"></button></div><button type="button" onclick="movePortalTour(1)" aria-label="Next slide">›</button></div>
         </section>
@@ -4819,7 +4854,7 @@
                 alt="" decoding="async" fetchpriority="high">
             </picture>
             <picture class="cinematic-paused-picture" aria-hidden="true">
-              <img src="/assets/4k/tour-school-admin-4k.jpg"
+              <img src="/assets/4k/cinematic-admin-assistant.png"
                 alt="" loading="lazy" decoding="async">
             </picture>
             <div class="cinematic-surface-air" aria-hidden="true"></div>
@@ -5773,7 +5808,7 @@
           <p style="margin-top: 6px; font-size: 0.7rem; color: #64748b;">© 2026 Little Feet. All rights reserved. · Official site: <a href="https://littlefeet.co.za/" style="color:#94a3b8;text-decoration:none;">littlefeet.co.za</a></p>
         </div>
         <div class="compliance-text">
-          <p>Built for South African ECD and school communities across learning, operations, family engagement, finance, safeguarding and privacy workflows.</p>
+          <p>Built for South African ECD, primary and secondary school communities across learning, operations, family engagement, finance, staff work, safeguarding and privacy workflows.</p>
         </div>
       </div>
     </footer>
@@ -5788,7 +5823,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260926-layout-v3" defer></script>
+  <script src="backup.js?v=20260927-sticky-note-v1" defer></script>
   <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>
   <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>
   <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>

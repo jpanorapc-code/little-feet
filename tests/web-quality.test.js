@@ -16,7 +16,7 @@ const curriculum = fs.readFileSync(path.join(root, 'assets', 'curriculum-framewo
 const auroraWallpaper = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-aurora-stars-4k.svg'), 'utf8');
 const starGlowMask = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-star-glow-mask-4k.svg'), 'utf8');
 
-assert.match(page, /<meta name="description" content="Little Feet is an early childhood development portal/);
+assert.match(page, /<meta name="description" content="Little Feet is a secure school operations platform/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
 assert.ok(page.includes('<link rel="canonical" href="https://littlefeet.co.za/">'));
 assert.ok(page.includes('<script type="application/ld+json">'));
@@ -61,7 +61,7 @@ assert.match(client, /const iconId = portalAudioMuted \? 'icon-volume-off' : 'ic
 assert.match(client, /classList\.toggle\('is-muted', portalAudioMuted\)/);
 assert.match(page, /class="login-info-runner"/);
 assert.match(page, /aria-label="About Little Feet"/);
-assert.match(page, /Little Feet<\/strong>[\s\S]*secure ECD and school management portal/);
+assert.match(page, /Little Feet<\/strong>[\s\S]*secure ECD, primary and secondary school operations platform/);
 assert.match(page, /@keyframes loginInfoRunner/);
 assert.match(page, /\.login-info-runner-track \{[\s\S]*animation:loginInfoRunner 30s linear infinite/);
 assert.match(page, /@media \(max-width:640px\)[\s\S]*\.login-info-runner-track \{ animation-duration:24s; \}/);
@@ -113,11 +113,12 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20260926-layout-v3/);
+assert.match(page, /backup\.js\?v=20260927-sticky-note-v1/);
 assert.match(page, /id="stickyNoteForm"/);
 assert.doesNotMatch(page, /onsubmit="saveStickyNote\(event\)"/);
 assert.match(client, /function bindStickyNoteForm\(\)/);
 assert.match(client, /form\.addEventListener\('submit', saveStickyNote\)/);
+assert.match(client, /window\.saveStickyNote = saveStickyNote/);
 assert.doesNotMatch(page, /little-feet-wallpaper-no-moon-4k\.jpg/);
 assert.doesNotMatch(page, /campfire wallpaper/i);
 assert.match(client, /classList\.add\('has-custom-wallpaper'\)/);
@@ -145,9 +146,9 @@ assert.match(server, /RENDER_GIT_REPO_SLUG/);
 assert.match(server, /releaseVersionForUpdateLines = updateLineCount => Number\(updateLineCount\) <= 8 \? '8\.2\.9' : '9\.0'/);
 assert.match(server, /commit\?\.stats\?\.total/);
 assert.match(server, /source: 'Render'/);
-assert.match(client, /Render deploy/);
-assert.match(client, /update line/);
-assert.match(client, /<svg viewBox="0 0 24 24"/);
+assert.match(client, /Latest platform improvements/);
+assert.doesNotMatch(client, /Render deploy/);
+assert.doesNotMatch(client, /update line/);
 
 const parsedManifest = JSON.parse(manifest);
 assert.equal(parsedManifest.display, 'standalone');
@@ -172,7 +173,7 @@ assert.match(page, /cinematic\.css\?v=20260926-cinematic-v14/);
 
 assert.match(page, /Little Feet™ School Portal/);
 assert.match(page, /Official site: <a href="https:\/\/littlefeet\.co\.za\//);
-assert.match(page, /Built for South African ECD and school communities across learning, operations, family engagement, finance, safeguarding and privacy workflows/);
+assert.match(page, /Built for South African ECD, primary and secondary school communities across learning, operations, family engagement, finance, staff work, safeguarding and privacy workflows/);
 assert.doesNotMatch(page, /<strong>Portal status:<\/strong>/);
 assert.doesNotMatch(page, /Designed to support ECD, education, POPIA and safeguarding workflows/);
 assert.match(page, /\.nav-term-panel \{ display:grid; grid-template-columns:minmax\(0,1fr\) auto/);
