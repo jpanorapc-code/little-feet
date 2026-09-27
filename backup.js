@@ -1194,7 +1194,7 @@ function loadWorkspaceOnDemand(tabId) {
     attendanceTab: [loadAttendance], ticketsTab: [loadTickets, loadTicketAssignees],
     broadcastsTab: [loadBroadcasts], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
     registryTab: [loadRegistry, loadAccounts, loadLearnerAccessCodes],
-    financeTab: [loadSubscriptionBillingOverview, () => window.loadFinanceAutomationOverview?.()], parentPaymentsTab: [loadParentPayments],
+    financeTab: [loadSubscriptionBillingOverview, () => window.loadFinanceAutomationOverview?.()], parentPaymentsTab: [loadParentPayments, loadParentSubscription],
     bookRegisterTab: [loadBookRegister], safetyNetworkTab: [loadSafetyNetwork],
     visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
@@ -3376,8 +3376,9 @@ async function loadSubscriptionBillingOverview() {
       const margin = Number(bundle.sellingPrice || 0) - Number(bundle.costPrice || 0);
       return `<tr><td style="padding:9px 10px;"><strong>+${bundle.capacity} children</strong></td>${isAdmin ? `<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.costPrice)}</td>` : ''}<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.sellingPrice)}</td>${isAdmin ? `<td style="padding:9px 10px;color:#2dd4bf;font-weight:700;">${formatSubscriptionMoney(margin)}</td>` : ''}</tr>`;
     }).join('');
-    const orders = (data.orders || []).slice(0, 6).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(order.status)}</li>`).join('') || '<li>No payment requests yet.</li>';
-    container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.paymentConfigured ? 'info' : 'urgent'}">${data.paymentConfigured ? 'PAYMENT READY' : 'SETUP NEEDED'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
+    const orders = (data.orders || []).slice(0, 6).map(order => `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(String(order.paymentStatus || order.status || '').replaceAll('_', ' '))}</li>`).join('') || '<li>No payment requests yet.</li>';
+    const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : escapeWorkspaceText(String(data.subscription?.status || 'trial').toUpperCase());
+    container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
   } catch (error) {
     container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load subscription information.')}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
   }
@@ -3458,6 +3459,46 @@ async function createSubscriptionOrder(event) {
     openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
     renderCapitecPayMeQr(payment);
   } catch (error) { alert(error.message || 'Unable to create payment request.'); }
+}
+
+async function refreshCurrentUserAccess() {
+  const response = await fetch('/api/auth/session');
+  const session = await response.json();
+  if (!response.ok || !session.authenticated || !session.user) return;
+  const previousSubscription = currentUser?.subscription;
+  currentUser = session.user;
+  if (currentUser.subscription !== previousSubscription) applyRolePermissions(currentUser.role);
+}
+
+async function loadParentSubscription() {
+  const panel = document.getElementById('parentSubscriptionPanel');
+  if (!panel || currentUser?.role !== 'parent') return;
+  try {
+    const response = await fetch('/api/parent-subscription');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load subscription access.');
+    if (data.active) await refreshCurrentUserAccess();
+    const status = data.active ? '<span class="badge-tag info">ACTIVE</span>' : '<span class="badge-tag urgent">BASIC ACCESS</span>';
+    const latest = data.latest
+      ? `<p class="meta">Latest request: <strong>${escapeWorkspaceText(data.latest.reference)}</strong> · ${escapeWorkspaceText(String(data.latest.status || '').replaceAll('_', ' '))}</p>`
+      : '<p class="meta">No subscription payment request has been created yet.</p>';
+    panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2>${status}</div><p>Unlock Progress Insights for your linked learners. The plan is R${Number(data.pricePerChild || 29).toFixed(0)} per child for 30 days and activates automatically when payment is confirmed.</p>${latest}<button type="button" class="action-btn btn-green" onclick="openParentSubscriptionCheckout()" ${data.paymentConfigured ? '' : 'disabled'}>${data.active ? 'Renew Plus access' : 'Get Plus access'}</button>${data.paymentConfigured ? '' : '<p class="meta">The payment destination has not been configured yet.</p>'}`;
+  } catch (error) {
+    panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2><span class="badge-tag urgent">UNAVAILABLE</span></div><p class="meta">${escapeWorkspaceText(error.message || 'Unable to load subscription access.')}</p><button type="button" class="action-btn btn-blue" onclick="loadParentSubscription()">Try again</button>`;
+  }
+}
+
+async function openParentSubscriptionCheckout() {
+  if (currentUser?.role !== 'parent') return alert('Parent subscription access is available to parent accounts.');
+  try {
+    const response = await fetch('/api/parent-subscription/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to create the subscription payment request.');
+    const destination = paymentDestinationMarkup(result.payment);
+    openModal('Activate LittleSteps Plus', `<p style="margin:0 0 10px;">Your access activates automatically after the payment is confirmed.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Total: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong><br><span class="meta">30 days of Plus access</span></div>${destination}<p class="meta">Use this exact reference so the payment can be matched to your account.</p>`);
+    renderCapitecPayMeQr(result.payment);
+    await loadParentSubscription();
+  } catch (error) { alert(error.message || 'Unable to create the subscription payment request.'); }
 }
 
 function parentPaymentStatusLabel(payment) {
