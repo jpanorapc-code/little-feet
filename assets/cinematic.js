@@ -990,7 +990,8 @@ function initCinematicJourney() {
   // Depth is now supplied by the portrait background and lightweight 2D parallax.
   // The old 3D mist/terrace/haze backdrop created the blob silhouettes, so it is not added.
 
-  const clock = new THREE.Clock();
+  const clock = new THREE.Timer();
+  clock.connect(document);
   const pointer = { x: 0, y: 0, smoothX: 0, smoothY: 0, activity: 0, lastX: 0, lastY: 0 };
   let scrollProgress = 0;
   let smoothProgress = 0;
@@ -2091,8 +2092,9 @@ function initCinematicJourney() {
 
   const render = frameTime => {
     if (renderFailed || !cinematicShouldRun()) return;
+    clock.update(frameTime);
     const dt = Math.min(clock.getDelta(), .05);
-    const time = clock.elapsedTime;
+    const time = clock.getElapsed();
     try {
       if (!firstFrameRendered && !resize()) return;
       const workStart = performance.now();
@@ -2176,7 +2178,7 @@ function initCinematicJourney() {
   const startCinematicLoop = () => {
     if (cinematicLoopRunning || !cinematicShouldRun()) return;
     cinematicLoopRunning = true;
-    clock.getDelta();
+    clock.update();
     stage.dataset.cinematicRuntime = 'running';
     scheduleCinematicFrame(true);
   };
@@ -2247,7 +2249,7 @@ function initCinematicJourney() {
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      clock.getDelta();
+      clock.update();
       syncVisibleStage();
     }
     syncCinematicRuntime();
