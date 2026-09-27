@@ -143,3 +143,72 @@ body:is(.light-mode,:not(.light-mode)) .nav-more-toggle:hover {
   #dashboardSection { padding-top:var(--portal-header-height,68px); }
   #dashboardSection > nav { position:fixed !important; inset:0 0 auto; width:100%; }
 }
+
+/* Stronger separation for controls and nested panels; each remains readable
+   over the moving wallpaper without making the whole page opaque. */
+body:is(.light-mode,:not(.light-mode)) .app-sidebar [data-nav-group],
+body:is(.light-mode,:not(.light-mode)) .sidebar-links .nav-btn,
+body:is(.light-mode,:not(.light-mode)) .sidebar-group-toggle {
+  border-color:rgba(174,222,255,.46) !important;
+  background-color:rgba(var(--lf-glass-deep-rgb),.42);
+}
+body:is(.light-mode,:not(.light-mode)) .workspace-card,
+body:is(.light-mode,:not(.light-mode)) .store-item,
+body:is(.light-mode,:not(.light-mode)) .guide-link-card,
+body:is(.light-mode,:not(.light-mode)) .item-row {
+  background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(var(--lf-glass-deep-rgb),.78)) !important;
+  border-color:rgba(174,222,255,.48) !important;
+}
+body:is(.light-mode,:not(.light-mode)) input,
+body:is(.light-mode,:not(.light-mode)) select,
+body:is(.light-mode,:not(.light-mode)) textarea,
+body:is(.light-mode,:not(.light-mode)) .chat-box {
+  background:linear-gradient(180deg,rgba(var(--lf-glass-deep-rgb),.88),rgba(0,20,70,.92)) !important;
+  border-color:rgba(174,222,255,.58) !important;
+}
+/* Per-card backdrop blur is expensive while a video is running. The gradient
+   and rim light preserve the glass material, while only the shell is blurred. */
+body:is(.light-mode,:not(.light-mode)) .card,
+body:is(.light-mode,:not(.light-mode)) .workspace-card,
+body:is(.light-mode,:not(.light-mode)) .workspace-results-panel,
+body:is(.light-mode,:not(.light-mode)) .store-item,
+body:is(.light-mode,:not(.light-mode)) .chat-shell,
+body:is(.light-mode,:not(.light-mode)) .guide-link-card,
+body:is(.light-mode,:not(.light-mode)) .modal-card,
+body:is(.light-mode,:not(.light-mode)) .item-row { backdrop-filter:none; -webkit-backdrop-filter:none; }
+@media (max-width:959px) {
+  body:is(.light-mode,:not(.light-mode)) #dashboardSection > nav,
+  body:is(.light-mode,:not(.light-mode)) .app-sidebar { backdrop-filter:none; -webkit-backdrop-filter:none; }
+}
+body:is(.light-mode,:not(.light-mode)) .nav-more-toggle {
+  background:linear-gradient(145deg,var(--primary-hover),var(--lf-blue)) !important;
+  color:#fff !important;
+}
+
+/* Professional system typography: fast, high-density-display friendly, and
+   compatible with every existing language and form control. */
+body,
+input,
+select,
+textarea,
+button { font-family:Aptos, "Segoe UI Variable", "Segoe UI", Arial, sans-serif; }
+h1,
+h2,
+h3,
+.card-header-bar h2,
+.workspace-card h3,
+.portal-welcome-banner h2 { font-family:"Aptos Display", Aptos, "Segoe UI Variable Display", "Segoe UI", Arial, sans-serif; letter-spacing:-.018em; }
+h1 { font-weight:750; }
+h2 { font-weight:720; }
+h3 { font-weight:680; }
+.sidebar-heading,
+.sidebar-group-toggle,
+.portal-welcome-kicker,
+.badge-tag { letter-spacing:.085em; font-weight:720; }
+label,
+.form-label { font-weight:650; letter-spacing:.01em; }
+.action-btn,
+button.submit-btn,
+.nav-shortcut,
+.nav-more-toggle,
+.sidebar-links .nav-btn { font-weight:650; letter-spacing:.005em; }
