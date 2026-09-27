@@ -18,6 +18,7 @@ let portalAudioContext = null;
 let schoolStatusTimer = null;
 let reportSignaturePads = {};
 let pendingLearnerImport = [];
+let pendingLearnerImportId = '';
 let portalTourIndex = 0;
 let portalTourTimer = null;
 let releaseNotesRefreshTimer = null;
@@ -651,11 +652,6 @@ function setupSignaturePads() {
 
 function clearSignature(id) { reportSignaturePads[id]?.clear(); }
 
-function quickFill(user, pin) {
-  document.getElementById('loginUsername').value = user;
-  document.getElementById('loginPin').value = pin;
-}
-
 function toggleLoginPinVisibility() {
   const input = document.getElementById('loginPin');
   const button = document.getElementById('loginPinToggle');
@@ -1016,11 +1012,7 @@ function setupSession() {
   });
   updateAlertLocationFilterStatus();
   const isParent = currentUser.role === 'parent';
-  const subscriptionEntry = document.getElementById('subscriptionEntryButton');
-  const subscriptionFooter = document.getElementById('subscriptionFooterLink');
   const navLivePill = document.getElementById('navLivePill');
-  if (subscriptionEntry) subscriptionEntry.textContent = isParent ? '💎 Parent Subscription' : '💎 Plans & Benefits';
-  if (subscriptionFooter) subscriptionFooter.textContent = isParent ? 'Parent Subscription' : 'School Subscriptions';
   if (navLivePill) updateSchoolDayStatus();
   if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
   schoolStatusTimer = window.setInterval(updateSchoolDayStatus, 60 * 1000);
@@ -1046,9 +1038,9 @@ function setupSession() {
   document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
   startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
-  alertMonitorId = setInterval(() => { if (currentUser) loadBroadcasts(); }, 30000);
+  alertMonitorId = setInterval(() => { if (currentUser && !document.hidden) loadBroadcasts(); }, 30000);
   if (ticketMonitorId) clearInterval(ticketMonitorId);
-  ticketMonitorId = setInterval(() => { if (currentUser) loadTickets(true); }, 20000);
+  ticketMonitorId = setInterval(() => { if (currentUser && !document.hidden) loadTickets(true); }, 20000);
 }
 
 function applyRolePermissions(role) {
@@ -1520,7 +1512,7 @@ async function startHealthMonitor() {
   };
 
   checkStatus();
-  setInterval(checkStatus, 30000);
+  setInterval(() => { if (!document.hidden) checkStatus(); }, 30000);
 }
 
 async function loadAllData() {
@@ -1587,6 +1579,12 @@ const toBase64 = file => new Promise((resolve, reject) => {
   reader.onload = () => resolve(reader.result);
   reader.onerror = error => reject(error);
 });
+const validateSpreadsheetFile = (file, maxBytes = 8 * 1024 * 1024) => {
+  const extension = String(file?.name || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '';
+  if (!['.xlsx', '.xls', '.csv'].includes(extension)) return 'Use an XLSX, XLS, or CSV spreadsheet.';
+  if (file.size > maxBytes) return `This spreadsheet exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`;
+  return '';
+};
 
 // Editable Academic Term Functions
 async function loadAcademicTerm() {
@@ -2039,6 +2037,8 @@ async function importScheduleExcel() {
     logAppError('ERR_FILE_404', 'Excel file import attempted without selecting a file.');
     return alert('Select a valid Excel (.xlsx / .xls) or CSV file.');
   }
+  const fileError = validateSpreadsheetFile(file);
+  if (fileError) return alert(fileError);
 
   const reader = new FileReader();
   reader.onload = async function (e) {
@@ -2047,6 +2047,7 @@ async function importScheduleExcel() {
       const workbook = XLSX.read(data, { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      if (rows.length > 2001) throw new Error('Schedule imports are limited to 2,000 records per file.');
 
       const schedules = rows.slice(1).map(row => ({
         id: row[0] ? String(row[0]) : Date.now().toString(),
@@ -2200,7 +2201,8 @@ function previewLearnerDatabaseImport() {
   const preview = document.getElementById('schoolDatabasePreview');
   const file = input?.files?.[0];
   if (!file || !preview) return alert('Choose an Excel or CSV school register first.');
-  if (file.size > 50 * 1024 * 1024) return alert('This register is larger than 50 MB. Split it into smaller school-approved files before importing.');
+  const fileError = validateSpreadsheetFile(file, 50 * 1024 * 1024);
+  if (fileError) return alert(fileError);
   if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
   const reader = new FileReader();
   reader.onload = (event) => {
@@ -2208,6 +2210,7 @@ function previewLearnerDatabaseImport() {
       const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const sourceRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      if (sourceRows.length > 100000) throw new Error('This register contains more than 100,000 rows. Split it into school-approved files of 100,000 rows or fewer.');
       const rows = sourceRows.map(row => ({
         studentName: importValue(row, ['learnername', 'studentname', 'childname', 'name']),
         className: importValue(row, ['gradeclass', 'classname', 'class', 'grade']),
@@ -2219,10 +2222,12 @@ function previewLearnerDatabaseImport() {
       })).filter(row => row.studentName || row.className || row.parentName || row.contactEmail);
       const validRows = rows.filter(row => row.studentName && row.className);
       pendingLearnerImport = validRows;
+      pendingLearnerImportId = (globalThis.crypto?.randomUUID?.() || `import-${Date.now()}-${Math.random().toString(16).slice(2)}`);
       const previewRows = validRows.slice(0, 8).map(row => `<tr><td>${escapeWorkspaceText(row.studentName)}</td><td>${escapeWorkspaceText(row.className)}</td><td>${escapeWorkspaceText(row.parentName || 'Not supplied')}</td><td>${escapeWorkspaceText(row.contactEmail || 'Not supplied')}</td></tr>`).join('');
       preview.innerHTML = `<div class="item-row" style="display:block;"><strong>${validRows.length} valid learner record${validRows.length === 1 ? '' : 's'} detected</strong><p class="meta" style="margin:7px 0 12px;">${rows.length - validRows.length} row${rows.length - validRows.length === 1 ? '' : 's'} need a learner name and class/grade before they can be imported. Only the first eight records are shown below.</p><div style="overflow-x:auto;"><table><thead><tr><th>Learner</th><th>Class</th><th>Parent / guardian</th><th>Contact email</th></tr></thead><tbody>${previewRows || '<tr><td colspan="4">No valid learner rows found.</td></tr>'}</tbody></table></div><button type="button" class="submit-btn" style="margin-top:14px;max-width:330px;" onclick="confirmLearnerDatabaseImport()">Review and import ${validRows.length} record${validRows.length === 1 ? '' : 's'}</button></div>`;
     } catch (error) {
       pendingLearnerImport = [];
+      pendingLearnerImportId = '';
       preview.textContent = 'This file could not be read. Download the template to check the expected column headings.';
       logAppError('ERR_IMPORT_FILE_400', error.message || 'The learner import file could not be read.');
     }
@@ -2234,23 +2239,30 @@ async function confirmLearnerDatabaseImport() {
   if (!pendingLearnerImport.length) return alert('Preview a valid school register before importing it.');
   if (!confirm(`Import ${pendingLearnerImport.length} learner record${pendingLearnerImport.length === 1 ? '' : 's'}? Existing matches will not be overwritten.`)) return;
   const chunkSize = 250;
+  const totalBatches = Math.ceil(pendingLearnerImport.length / chunkSize);
+  const importId = pendingLearnerImportId || (globalThis.crypto?.randomUUID?.() || `import-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  pendingLearnerImportId = importId;
   let imported = 0;
   const rejected = [];
   for (let offset = 0; offset < pendingLearnerImport.length; offset += chunkSize) {
+    const batchNumber = Math.floor(offset / chunkSize);
     const response = await fetch('/api/students/import', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actorUsername: currentUser?.username, students: pendingLearnerImport.slice(offset, offset + chunkSize) })
+      body: JSON.stringify({ importId, batchNumber, totalBatches, students: pendingLearnerImport.slice(offset, offset + chunkSize) })
     });
     const result = await response.json();
     if (!response.ok) return alert(result.message || 'The learner import could not be completed.');
     imported += Number(result.imported || 0);
     rejected.push(...(result.rejected || []));
+    const preview = document.getElementById('schoolDatabasePreview');
+    if (preview) preview.querySelector('strong').textContent = `Importing batch ${batchNumber + 1} of ${totalBatches} · ${result.progress?.imported ?? imported} records saved`;
   }
   const duplicateSummary = rejected.length ? ` ${rejected.length} duplicate or incomplete row${rejected.length === 1 ? ' was' : 's were'} skipped.` : '';
   alert(`${imported} learner record${imported === 1 ? '' : 's'} imported in smaller secure batches.${duplicateSummary}`);
   document.getElementById('schoolDatabaseFile').value = '';
   document.getElementById('schoolDatabasePreview').innerHTML = '';
   pendingLearnerImport = [];
+  pendingLearnerImportId = '';
   playDingSound();
 }
 
@@ -2404,6 +2416,8 @@ async function importAttendanceExcel() {
     logAppError('ERR_FILE_404', 'Attendance file import attempted without selecting a file.');
     return alert('Select a valid Excel (.xlsx / .xls) or CSV file.');
   }
+  const fileError = validateSpreadsheetFile(file);
+  if (fileError) return alert(fileError);
 
   const reader = new FileReader();
   reader.onload = async function (e) {
@@ -2412,6 +2426,7 @@ async function importAttendanceExcel() {
       const workbook = XLSX.read(data, { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      if (rows.length > 2001) throw new Error('Attendance imports are limited to 2,000 records per file.');
 
       const attendanceData = rows.slice(1).map(row => ({
         id: Date.now().toString() + Math.random().toString(36).substr(2, 4),
@@ -3295,11 +3310,6 @@ function setupFormListeners() {
   }
 }
 
-// Footer Info Modals
-function openLegalModal(title, text) {
-  openModal(title, `<p style="font-size:0.9rem; line-height:1.5; color:var(--text-dark);">${text}</p>`);
-}
-
 function paymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
   const primary = payment.paymentLink
     ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">${escapeWorkspaceText(linkLabel)}</a>`
@@ -3344,115 +3354,6 @@ async function createDonationIntent(event) {
     openModal('Donation ready', `<p style="margin:0 0 10px;">Thank you for supporting Little Feet.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Donation: ${formatSubscriptionMoney(result.donation.amount)}</strong><br>Reference: <strong>${escapeWorkspaceText(result.donation.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the contribution can be matched correctly.</p>`);
     renderCapitecPayMeQr(payment);
   } catch (error) { alert(error.message || 'Unable to prepare the donation.'); }
-}
-
-async function openSubscriptionsModal() {
-  const schoolRoles = ['teacher', 'principal', 'district', 'admin'];
-  if (currentUser?.role === 'parent') {
-    let parentSubscription = null;
-    try { const response = await fetch('/api/parent-subscription'); if (response.ok) parentSubscription = await response.json(); } catch { /* show the plan even when the payment service is briefly unavailable */ }
-    const activeBadge = parentSubscription?.active ? '<span class="badge-tag info">PAID · SPECIAL ACCESS ACTIVE</span>' : '<span class="badge-tag urgent">NOT PAID · BASIC ACCESS</span>';
-    const parentContent = `
-      <section style="font-size:0.9rem; line-height:1.55; color:var(--text-dark);">
-        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:4px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">FAMILY PLAN</div>
-        <h2 style="margin:10px 0 4px; color:var(--text-dark); font-size:1.5rem;">LittleSteps Plus ${activeBadge}</h2>
-        <p style="margin:0 0 16px; color:#10b981; font-size:1rem; font-weight:700;">More ways to follow and celebrate your child’s learning.</p>
-        <div style="padding:16px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:10px; background:rgba(16,185,129,0.08);">
-          <strong style="display:block; font-size:1.4rem; color:var(--text-dark);">R29 / month per child</strong>
-          <span style="display:block; margin:2px 0 13px; color:#10b981; font-size:.78rem; font-weight:700;">Optional parent subscription</span>
-          <ul style="margin:0; padding-left:20px; display:grid; gap:8px;">
-            <li>Full-quality downloads of approved school photos and videos.</li>
-            <li>Weekly learning and development highlights.</li>
-            <li>Priority handling for eligible help requests.</li>
-            <li>Extended access to your child’s learning portfolio, reports, and achievements.</li>
-            <li>Additional family access for approved caregivers.</li>
-          </ul>
-        </div>
-        <p style="margin:14px 0 0; color:var(--text-muted); font-size:.78rem;">Only a paid parent subscription unlocks the special features. If payment was made outside the portal, an administrator can grant access manually.</p>
-        ${parentSubscription?.active ? '<p style="margin:10px 0 0;color:#059669;font-weight:700;">Your Plus features are unlocked.</p>' : parentSubscription?.paymentConfigured ? '<button type="button" class="submit-btn" style="margin-top:12px;" onclick="openParentSubscriptionCheckout()">Start paid parent subscription</button>' : '<p class="meta" style="margin-top:10px;">The school has not configured a payment destination yet.</p>'}
-      </section>`;
-    openModal('Parent Subscription', parentContent);
-    document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
-    return;
-  }
-  if (!schoolRoles.includes(currentUser?.role)) {
-    return alert('School subscription information is available to authorised school staff only.');
-  }
-  let billing = null;
-  try {
-    const response = await fetch('/api/subscription-billing');
-    const result = await response.json();
-    if (response.ok) billing = result;
-  } catch { /* The page still explains the service when billing is temporarily unavailable. */ }
-  const subscriptionPricingOverview = billing
-    ? `<div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:6px;"><table style="width:100%; min-width:620px; border-collapse:collapse; text-align:left; font-size:0.8rem;"><thead><tr style="background:#065f46; color:#fff;"><th style="padding:9px 10px;">Monthly school plan</th><th style="padding:9px 10px;">Extra learner capacity</th><th style="padding:9px 10px;">Monthly add-on price</th></tr></thead><tbody><tr><td style="padding:9px 10px;font-weight:700;">${formatSubscriptionMoney(billing.pricing.baseMonthly)} / month</td><td style="padding:9px 10px;">Included by your selected school plan</td><td style="padding:9px 10px;">Choose a bundle below if needed</td></tr>${billing.pricing.bundles.map(bundle => `<tr style="background:rgba(16,185,129,0.08);"><td style="padding:8px 10px;">School capacity add-on</td><td style="padding:8px 10px;font-weight:700;">+${bundle.capacity} children</td><td style="padding:8px 10px;font-weight:700;">${formatSubscriptionMoney(bundle.sellingPrice)} / month</td></tr>`).join('')}</tbody></table></div>${billing.pricing.lateFeeEnabled ? `<p style="margin:10px 0 0;color:var(--text-muted);font-size:.78rem;">Late-payment term: ${formatSubscriptionMoney(billing.pricing.lateFee)} applies only when accepted during checkout.</p>` : ''}`
-    : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);color:var(--text-muted);">Live pricing is temporarily unavailable. Please try again shortly.</div>`;
-  const content = `
-    <div style="font-size:0.88rem; line-height:1.5; color:var(--text-dark);">
-      <section style="margin-bottom:22px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);">
-        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">MIGRATION &amp; LAUNCH</div>
-        <h2 style="margin:8px 0 6px;color:var(--text-dark);font-size:1.25rem;">Move to Little Feet with a guided setup</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
-          <div><strong>Week 1: Integration</strong><br><span style="color:var(--text-muted);">Import learner, family, class, and approved school data; review roles and consent records.</span></div>
-          <div><strong>Two-week trial</strong><br><span style="color:var(--text-muted);">Use the agreed plan with real workflows before the contract starts.</span></div>
-          <div><strong>Launch support</strong><br><span style="color:var(--text-muted);">Confirm staff training, parent access, and go-live checks together.</span></div>
-        </div>
-        <p style="margin:12px 0 0;color:var(--text-muted);font-size:.78rem;">Commercial terms: 30-day money-back guarantee, 36-month agreement, cancellation and post-contract customisation fees are fixed in the signed school quotation based on the selected plan. No fee is charged or agreement created by this portal.</p>
-      </section>
-      <section style="margin-bottom:26px;">
-        <div style="display:inline-block; background:#059669; color:#fff; border-radius:999px; padding:3px 11px; font-size:0.68rem; font-weight:700; letter-spacing:0.08em;">INSTITUTIONAL PRICING & BENEFITS</div>
-        <h2 style="margin:8px 0 2px; color:var(--text-dark); font-size:1.55rem;">School Subscriptions & Operational Advantages</h2>
-        <p style="margin:0 0 7px; color:#10b981; font-size:1rem; font-weight:700;">Predictable Pricing Models Designed for Scalability</p><p style="margin:0 0 12px;color:var(--text-muted);font-size:.8rem;">Plan names show a common fit, not an age restriction. Choose by learner capacity and the exact grades your institution offers.</p>
-        <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; margin-bottom:12px;">
-          <table style="width:100%; min-width:700px; border-collapse:collapse; text-align:left; font-size:.82rem;">
-            <thead><tr style="background:#065f46; color:#fff;"><th style="padding:10px;">Package tier</th><th style="padding:10px;">Common institution / age fit</th><th style="padding:10px;">School learners</th><th style="padding:10px;">Monthly fee</th><th style="padding:10px;">Extra learner fee</th></tr></thead>
-            <tbody><tr><td style="padding:10px;"><strong>Micro / ECD Tier</strong></td><td style="padding:10px;">Day care / ECD · Birth–4/5 · small Grade R or micro school</td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 / learner / month</td></tr><tr style="background:rgba(16,185,129,.10);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Primary · typically Grades R–7 · approx. 5–13 years</td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 / learner / month</td></tr><tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Large primary, secondary/high Grades 8–12, or combined school</td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr></tbody>
-          </table>
-        </div>
-        ${subscriptionPricingOverview}
-        <div style="margin-top:10px; padding:12px 14px; border:1px solid #6ee7b7; border-left:5px solid #10b981; border-radius:8px; background:rgba(16,185,129,0.08);">
-          <h3 style="margin:0 0 7px; color:var(--text-dark); font-size:0.95rem;">Key Institutional Advantages of Subscribing</h3>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:4px 22px; font-size:0.78rem;">
-            <p style="margin:0;"><strong>• 15+ Hours Saved Monthly:</strong> Automates daily administrative logs, attendance tracking, and grading uploads so teachers focus on teaching.</p>
-            <p style="margin:0;"><strong>• 100% Digital Audit Trail:</strong> Maintain verifiable records for support queries, fee receipts, and official compliance requirements.</p>
-            <p style="margin:0;"><strong>• Zero Paper & Printing Costs:</strong> Replaces physical notices, printed newsletters, and paper report covers with instant digital delivery.</p>
-            <p style="margin:0;"><strong>• Stronger Parent Retention:</strong> High-transparency communication drives parent trust and institutional reputation.</p>
-          </div>
-        </div>
-      </section>
-
-      ${currentUser?.role === 'admin' ? `<section style="margin-top:20px;padding:15px;border:1px solid #6ee7b7;border-radius:10px;background:rgba(16,185,129,.08);"><div style="display:inline-block;background:#059669;color:#fff;border-radius:999px;padding:3px 11px;font-size:.68rem;font-weight:700;letter-spacing:.08em;">ADMIN VIEW · PARENT PLAN</div><h2 style="margin:8px 0 4px;color:var(--text-dark);font-size:1.25rem;">LittleSteps Plus</h2><strong style="font-size:1.2rem;color:#10b981;">R29 / month per child</strong><p style="margin:8px 0 0;color:var(--text-muted);">Administrators can review both the institutional subscription and the optional parent plan. Other school roles see only institutional pricing.</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="openParentSubscriptionAccessAdmin()">Grant or remove parent access</button></section>` : ''}
-      ${['principal', 'admin'].includes(currentUser?.role) ? `<section style="margin-top:24px;padding:16px;border:1px solid #2dd4bf;border-radius:10px;background:rgba(13,148,136,.1);"><h3 style="margin:0 0 6px;color:var(--text-dark);">Ready to subscribe?</h3><p style="margin:0 0 12px;color:var(--text-muted);">Choose your learner capacity, accept the late-payment terms if enabled, and receive a unique payment reference.</p><button type="button" class="submit-btn" onclick="openSubscriptionCheckout()">Choose plan &amp; pay</button></section>` : ''}
-    </div>`;
-  openModal('School Subscriptions & Advantages', content);
-  document.querySelector('#appModal .modal-card').classList.add('subscription-modal-card');
-}
-
-async function openParentSubscriptionCheckout() {
-  if (currentUser?.role !== 'parent') return;
-  try {
-    const response = await fetch('/api/parent-subscription/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to start the parent subscription.');
-    const destination = paymentDestinationMarkup(result.payment);
-    openModal('Parent subscription payment', `<p style="margin:0 0 10px;">${formatSubscriptionMoney(result.order.amount)} for ${result.order.children} linked child${result.order.children === 1 ? '' : 'ren'}.</p><p class="meta">Use reference <strong>${escapeWorkspaceText(result.order.reference)}</strong>. Special features unlock automatically after the payment is recorded.</p>${destination}`);
-    renderCapitecPayMeQr(result.payment);
-  } catch (error) { alert(error.message || 'Unable to start parent subscription.'); }
-}
-
-async function openParentSubscriptionAccessAdmin() {
-  if (currentUser?.role !== 'admin') return;
-  try {
-    const response = await fetch('/api/parent-subscription'); const data = await response.json(); if (!response.ok) throw new Error(data.message || 'Unable to load parent subscriptions.');
-    const options = (data.parents || []).map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name || parent.username)} · ${escapeWorkspaceText(parent.status || 'basic')}${parent.grantedUntil ? ` · until ${escapeWorkspaceText(parent.grantedUntil)}` : ''}</option>`).join('');
-    if (!options) return alert('No parent accounts are available in this school.');
-    openModal('Manual parent Plus access', `<form onsubmit="saveParentSubscriptionAccess(event)" style="display:grid;gap:12px;"><p class="meta">Use this only when payment was confirmed outside the portal or a school-approved exception was granted. Paid access remains visible in the account audit.</p><label>Parent account<select name="username">${options}</select></label><label>Access status<select name="status"><option value="paid">Paid / special access</option><option value="basic">Basic / remove access</option></select></label><label>Access end date (optional)<input name="grantedUntil" type="date"><span class="meta">Leave blank for ongoing paid access.</span></label><button class="submit-btn">Save access decision</button></form>`);
-  } catch (error) { alert(error.message || 'Unable to load parent subscriptions.'); }
-}
-
-async function saveParentSubscriptionAccess(event) {
-  event.preventDefault(); const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  try { const response = await fetch(`/api/accounts/${encodeURIComponent(payload.username)}/parent-subscription`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: payload.status, grantedUntil: payload.grantedUntil }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save parent access.'); closeModal(); alert(`${result.account.name || result.account.username} now has ${result.account.subscription === 'plus' ? 'Plus' : 'basic'} access.`); } catch (error) { alert(error.message || 'Unable to save parent access.'); }
 }
 
 function formatSubscriptionMoney(value) {
@@ -3757,9 +3658,9 @@ function importBookRegisterExcel() {
   if (!input) return;
   input.value = ''; input.onchange = event => {
     const file = event.target.files?.[0]; if (!file) return;
-    if (file.size > 8 * 1024 * 1024) return alert('Keep the checklist file under 8 MB.');
+    const fileError = validateSpreadsheetFile(file); if (fileError) return alert(fileError);
     const reader = new FileReader(); reader.onload = async () => {
-      try { const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }); const response = await fetch('/api/book-register/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to import checklist.'); await loadBookRegister(); alert(`Imported ${result.imported} row(s).${result.rejected?.length ? ` Rejected ${result.rejected.length} row(s).` : ''}`); } catch (error) { alert(error.message || 'Unable to import checklist.'); }
+      try { const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }); if (rows.length > 2000) throw new Error('Book-register imports are limited to 2,000 records per file.'); const response = await fetch('/api/book-register/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to import checklist.'); await loadBookRegister(); alert(`Imported ${result.imported} row(s).${result.rejected?.length ? ` Rejected ${result.rejected.length} row(s).` : ''}`); } catch (error) { alert(error.message || 'Unable to import checklist.'); }
     }; reader.readAsArrayBuffer(file);
   }; input.click();
 }
@@ -4069,12 +3970,6 @@ async function loadRegistry() {
   } catch { list.textContent = 'Unable to load learner registry.'; }
 }
 
-function distanceInKm(lat1, lng1, lat2, lng2) {
-  const radians = value => value * Math.PI / 180;
-  const a = Math.sin(radians(lat2 - lat1) / 2) ** 2 + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(radians(lng2 - lng1) / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 const ALERT_LOCATION_SESSION_KEY = 'lf_alert_location';
 
 function getCachedAlertPosition() {
@@ -4211,17 +4106,6 @@ async function removeStoreProduct(productId) {
   const response = await fetch(`/api/store/products/${encodeURIComponent(productId)}`, { method:'DELETE' });
   if (!response.ok) return alert('Unable to remove the store item.');
   loadStoreItems();
-}
-
-async function loadStoreOrders() {
-  const box = document.getElementById('storeOrderNotifications');
-  if (!box || !['teacher','principal','admin'].includes(currentUser?.role)) return;
-  try {
-    const response = await fetch('/api/store/orders');
-    const orders = await response.json();
-    if (!response.ok) throw new Error(orders.message || 'Unable to load store orders.');
-    box.innerHTML = orders.length ? orders.map(order => `<div class="item-row"><strong>🛍️ ${escapeWorkspaceText(order.productName)} × ${order.quantity}</strong><span class="badge-tag urgent">${escapeWorkspaceText(order.status)}</span><p style="margin:3px 0 0;color:var(--text-muted);">Parent: ${escapeWorkspaceText(order.parentName)} · ${formatSubscriptionMoney(order.amount)} · Ref ${escapeWorkspaceText(order.reference)}</p></div>`).join('') : '<p class="meta">No school-store orders are waiting for preparation.</p>';
-  } catch { box.textContent = 'Unable to load school-store orders.'; }
 }
 
 async function loadReportReviews() {
@@ -4512,20 +4396,4 @@ async function deleteWorkspaceRecord(module, id) {
   if (!confirm('Delete this record?')) return;
   await fetch(`/api/modules/${module}/${id}`, { method: 'DELETE' });
   loadWorkspaceRecords(module);
-}
-
-function openModulesBreakdownModal() {
-  const content = `
-    <div style="font-size:.88rem;line-height:1.55;color:var(--text-dark);">
-      <p style="color:var(--text-muted);margin-bottom:14px;">Little Feet brings communication, records, learning evidence, and safety notices into one school portal.</p>
-      <div style="display:grid;gap:10px;">
-        <div style="padding:11px;border-left:4px solid #0d9488;background:rgba(13,148,136,.08);border-radius:6px;"><strong>🗺️ Nearby Schools & Campus Discovery</strong><br><span style="color:var(--text-muted);">Uses your optional device location to show mapped education facilities in a 20 km radius. Results are grouped to keep the map readable; select a pin for mapped address and public contact details.</span></div>
-        <div style="padding:11px;border-left:4px solid #0284c7;background:rgba(2,132,199,.08);border-radius:6px;"><strong>📚 Learning Records & Portfolio</strong><br><span style="color:var(--text-muted);">Schedules, worksheets, badges, and attendance support day-to-day classroom documentation. Uploaded evidence remains connected to the relevant record.</span></div>
-        <div style="padding:11px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.08);border-radius:6px;"><strong>🚨 Location-Aware Safety Alerts</strong><br><span style="color:var(--text-muted);">Administrators can create an alert with a location and radius. A user sees it only when their device is within that area and location access is enabled.</span></div>
-        <div style="padding:11px;border-left:4px solid #8b5cf6;background:rgba(139,92,246,.08);border-radius:6px;"><strong>💬 Secure Communication Workspaces</strong><br><span style="color:var(--text-muted);">Group and direct chat support staff coordination, while Support Desk provides a separate route for issues requiring tracking and follow-up.</span></div>
-        <div style="padding:11px;border-left:4px solid #22c55e;background:rgba(34,197,94,.08);border-radius:6px;"><strong>🟢 Live Service Indicator</strong><br><span style="color:var(--text-muted);">The header light reflects whether the portal is online, busy, or unavailable. A green light means the app can reach the server.</span></div>
-      </div>
-      <p style="margin-top:14px;font-size:.78rem;color:var(--text-muted);">Data availability depends on your role, school configuration, browser permissions, and the public information supplied by the mapped school.</p>
-    </div>`;
-  openModal('System Capabilities & Architecture', content);
 }

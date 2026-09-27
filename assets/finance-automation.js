@@ -215,6 +215,8 @@
   async function previewBankStatementFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    const extension = String(file.name || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '';
+    if (!['.csv', '.xlsx', '.xls'].includes(extension)) return alert('Use a CSV, XLSX, or XLS bank statement file.');
     if (file.size > 5 * 1024 * 1024) return alert('Bank statement files are limited to 5 MB.');
     if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
     const data = await file.arrayBuffer();
