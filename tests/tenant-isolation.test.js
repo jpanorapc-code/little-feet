@@ -172,10 +172,16 @@ const rawRequest = async (route) => {
     assert.equal(stickyNote.response.status, 200);
     const alphaStickyNotes = await request('/api/modules/stickyNotes', { cookie: alphaLogin.cookie });
     const bravoStickyNotes = await request('/api/modules/stickyNotes', { cookie: bravoLogin.cookie });
+    const updatedStickyNote = await request(`/api/modules/stickyNotes/${stickyNote.data.record.id}`, { method: 'PATCH', cookie: alphaLogin.cookie, body: { type: 'Call family today', details: 'Confirm the authorised pickup time after 15:00.', colour: 'blue' } });
+    const crossSchoolStickyEdit = await request(`/api/modules/stickyNotes/${stickyNote.data.record.id}`, { method: 'PATCH', cookie: bravoLogin.cookie, body: { type: 'Cross-school edit', details: 'This must not update.', colour: 'rose' } });
     const parentStickyNote = await request('/api/modules/stickyNotes', { method: 'POST', cookie: alphaParentLogin.cookie, body: { type: 'Unauthorised', details: 'This must not be saved.' } });
     assert.equal(alphaStickyNotes.data.length, 1);
     assert.equal(alphaStickyNotes.data[0].type, 'Call family');
     assert.equal(bravoStickyNotes.data.length, 0);
+    assert.equal(updatedStickyNote.response.status, 200);
+    assert.equal(updatedStickyNote.data.record.type, 'Call family today');
+    assert.equal(updatedStickyNote.data.record.colour, 'blue');
+    assert.equal(crossSchoolStickyEdit.response.status, 404);
     assert.equal(parentStickyNote.response.status, 403);
     const parentStickyNotes = await request('/api/modules/stickyNotes', { cookie: alphaParentLogin.cookie });
     assert.equal(parentStickyNotes.response.status, 403);

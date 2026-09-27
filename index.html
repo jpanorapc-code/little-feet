@@ -4407,6 +4407,34 @@
     .lf-notification-popup header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.lf-notification-popup p{margin:8px 0 10px;color:var(--text-muted);font-size:.84rem;line-height:1.45}.lf-notification-popup .actions{display:flex;gap:8px;justify-content:flex-end}.lf-notification-popup .action-btn{min-height:34px;margin:0;padding:6px 12px;border:1px solid rgba(94,234,212,.28);background:rgba(13,148,136,.14);color:#dffcf8}.lf-notification-popup .action-btn:hover{background:rgba(13,148,136,.26)}
     .lf-notification-popup.is-pinned{border-left-color:#fbbf24;box-shadow:0 18px 45px rgba(0,0,0,.32),inset 0 0 0 1px rgba(251,191,36,.16)}
 
+    /* Sticky notes use the same glass material in both portal themes. */
+    .sticky-note-form{grid-template-columns:minmax(180px,.85fr) minmax(250px,1.55fr) minmax(140px,.55fr) auto;gap:14px;padding:16px;border-color:rgba(94,234,212,.30);background:linear-gradient(135deg,rgba(8,40,78,.70),rgba(12,82,113,.38));box-shadow:inset 0 1px rgba(255,255,255,.10),0 12px 26px rgba(2,8,23,.16)}
+    .sticky-note-form label{color:var(--text-dark);font-size:.84rem}
+    .sticky-note-form input,.sticky-note-form textarea,.sticky-note-form select{background:rgba(2,15,38,.62);border-color:rgba(148,215,232,.46);color:var(--text-dark)}
+    .sticky-note-form-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-self:end}
+    .sticky-note-form-actions .action-btn{min-height:42px;padding:8px 12px}
+    .sticky-notes-board{gap:16px}
+    .sticky-note,.floating-sticky-note{color:var(--text-dark);border:1px solid rgba(148,215,232,.42);background:linear-gradient(145deg,rgba(8,40,78,.93),rgba(13,73,101,.86));box-shadow:0 16px 32px rgba(2,8,23,.28),inset 0 1px rgba(255,255,255,.12)}
+    .sticky-note{min-height:192px;padding:18px 16px 15px;transform:none;cursor:default}
+    .sticky-note:nth-child(even){transform:none}
+    .sticky-note::before,.floating-sticky-note::before{background:linear-gradient(120deg,rgba(94,234,212,.10),transparent 42%),repeating-linear-gradient(0deg,transparent 0 28px,rgba(191,250,241,.08) 29px 30px)}
+    .sticky-note::after,.floating-sticky-note::after{display:none}
+    .sticky-note--yellow,.floating-sticky-note--yellow{background:linear-gradient(145deg,rgba(104,86,20,.94),rgba(73,58,14,.90));border-color:rgba(250,204,21,.56)}
+    .sticky-note--teal,.floating-sticky-note--teal{background:linear-gradient(145deg,rgba(7,91,91,.94),rgba(8,61,74,.90));border-color:rgba(45,212,191,.58)}
+    .sticky-note--blue,.floating-sticky-note--blue{background:linear-gradient(145deg,rgba(13,66,124,.94),rgba(8,45,92,.90));border-color:rgba(96,165,250,.60)}
+    .sticky-note--rose,.floating-sticky-note--rose{background:linear-gradient(145deg,rgba(115,39,75,.94),rgba(73,26,59,.90));border-color:rgba(251,113,133,.58)}
+    body.light-mode .sticky-note,body.light-mode .floating-sticky-note{background:linear-gradient(145deg,rgba(239,251,255,.96),rgba(207,239,248,.92));color:#12324a;border-color:rgba(8,89,179,.28);box-shadow:0 12px 25px rgba(8,89,179,.16),inset 0 1px rgba(255,255,255,.75)}
+    body.light-mode .sticky-note--yellow,body.light-mode .floating-sticky-note--yellow{background:linear-gradient(145deg,#fff9d9,#f6e8a6);border-color:rgba(180,132,0,.34)}
+    body.light-mode .sticky-note--teal,body.light-mode .floating-sticky-note--teal{background:linear-gradient(145deg,#e1fbf6,#bdeee4);border-color:rgba(13,148,136,.35)}
+    body.light-mode .sticky-note--blue,body.light-mode .floating-sticky-note--blue{background:linear-gradient(145deg,#e6f2ff,#c9e2ff);border-color:rgba(0,89,179,.34)}
+    body.light-mode .sticky-note--rose,body.light-mode .floating-sticky-note--rose{background:linear-gradient(145deg,#fff0f5,#ffd7e3);border-color:rgba(225,29,72,.30)}
+    .sticky-note strong,.floating-sticky-note strong{color:inherit}.sticky-note p,.floating-sticky-note p{color:inherit}.sticky-note span,.floating-sticky-note span{color:inherit;opacity:.78}
+    .sticky-note-actions{position:absolute;z-index:3;top:9px;right:9px;display:flex;align-items:center;gap:6px}
+    .sticky-note-edit,.sticky-note-delete,.floating-sticky-note-edit,.floating-sticky-note-delete{position:static;width:auto;height:28px;min-width:28px;padding:0 8px;border:1px solid rgba(191,250,241,.35);border-radius:8px;background:rgba(2,15,38,.42);color:inherit;font:700 .71rem inherit;cursor:pointer}
+    .sticky-note-delete,.floating-sticky-note-delete{padding:0;font-size:1.08rem}.sticky-note-edit:hover,.sticky-note-delete:hover,.floating-sticky-note-edit:hover,.floating-sticky-note-delete:hover{background:rgba(94,234,212,.22);color:inherit}
+    .floating-sticky-note-handle{background:rgba(2,15,38,.30);border-bottom-color:rgba(191,250,241,.18);color:inherit}
+    @media(max-width:760px){.sticky-note-form{grid-template-columns:1fr}.sticky-note-form-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
     /* Login refinement: readable controls, even spacing, and an iceberg identity frame. */
     #authSection > .auth-card{width:min(100%,560px)!important;max-width:560px!important;padding:22px!important;border-radius:20px}
     #authSection .login-card-tools{gap:10px;margin-bottom:12px}
@@ -4422,13 +4450,14 @@
     #authSection .login-remember label,#authSection .login-help-inline{font-size:.80rem;line-height:1.35}
     #authSection #loginForm > .submit-btn{min-height:50px;font-size:1rem}
     #authSection .login-divider{margin:14px auto 10px;font-size:.73rem}
-    #authSection .social-signin{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    #authSection .social-signin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     #authSection .social-signin button{min-height:44px;padding:8px 9px;font-size:.82rem}
+    #authSection .social-signin button[data-provider-signin="yahoo"]{grid-column:1 / -1}
     #authSection .login-new-account{margin-top:14px;padding-top:14px;gap:14px}
     #authSection .login-new-account p{font-size:.84rem}
     #authSection .login-new-account .action-btn{min-height:44px;padding:8px 16px;font-size:.86rem}
-    .mascot-stage::before{width:190px;height:190px;border:1px solid rgba(191,250,241,.82);border-radius:0;clip-path:polygon(12% 100%,19% 62%,29% 70%,39% 31%,50% 55%,62% 15%,72% 63%,84% 52%,92% 100%);background:linear-gradient(145deg,rgba(240,253,255,.98) 0%,rgba(151,224,239,.92) 48%,rgba(30,126,164,.95) 100%);box-shadow:0 0 13px rgba(191,250,241,.70),0 15px 30px rgba(2,8,23,.30),inset -16px -13px 22px rgba(4,63,94,.30)}
-    .mascot-stage::after{content:"";display:block;position:absolute;z-index:1;left:50%;bottom:8px;width:164px;height:33px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(ellipse,rgba(94,234,212,.46),rgba(8,40,78,.08) 68%,transparent 72%);filter:blur(4px);pointer-events:none}
+    .mascot-stage::before{width:246px;height:218px;border:1px solid rgba(224,252,255,.88);border-radius:0;clip-path:polygon(3% 100%,12% 55%,25% 67%,37% 23%,49% 48%,61% 6%,73% 59%,86% 43%,97% 100%);background:linear-gradient(135deg,rgba(245,254,255,.98) 0 24%,rgba(148,229,244,.96) 24% 49%,rgba(34,145,187,.95) 49% 72%,rgba(9,70,129,.94) 72%);box-shadow:0 0 16px rgba(191,250,241,.76),0 18px 34px rgba(2,8,23,.34),inset -18px -14px 24px rgba(4,63,94,.30)}
+    .mascot-stage::after{content:"";display:block;position:absolute;z-index:1;left:50%;bottom:-5px;width:230px;height:92px;transform:translateX(-50%);clip-path:polygon(0 100%,8% 52%,23% 68%,35% 32%,48% 62%,61% 40%,76% 68%,89% 49%,100% 100%);background:linear-gradient(160deg,rgba(184,242,250,.74),rgba(14,111,159,.88));box-shadow:0 12px 24px rgba(2,8,23,.30),0 0 18px rgba(94,234,212,.35);pointer-events:none}
     .brand-header img{border-color:rgba(240,253,255,.92);box-shadow:0 9px 23px rgba(2,8,23,.28),0 0 0 5px rgba(94,234,212,.16)}
     @media (max-width:640px){
       #authSection > .auth-card{padding:18px!important;border-radius:18px}
@@ -4436,7 +4465,7 @@
       #authSection .login-background-compact{grid-column:1 / -1;width:100%!important;min-width:0!important}
       #authSection .social-signin{grid-template-columns:1fr}
       #authSection .social-signin button{font-size:.88rem}
-      .mascot-stage::before{width:166px;height:166px}
+      .mascot-stage::before{width:212px;height:188px}.mascot-stage::after{width:196px;height:74px}
     }
     @media (max-width:420px){#authSection > .auth-card{padding:16px!important}}
     .email-inbox-toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:14px 0}.email-inbox-list{display:grid;gap:9px}
@@ -5596,10 +5625,11 @@
         <div class="card"><div class="card-header-bar"><h2 class="icon-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Staff Sticky Notes</span></h2><span class="badge-tag info">STAFF ONLY</span></div>
           <p style="color:var(--text-muted);margin:0 0 14px;">Keep quick internal reminders, handovers and follow-ups in one place. Do not include medical, safeguarding or other sensitive learner information here.</p>
           <form id="stickyNoteForm" class="sticky-note-form">
+            <input type="hidden" name="noteId">
             <label>Note title<input name="noteTitle" maxlength="90" required placeholder="e.g. Call parent after 15:00"></label>
             <label>Reminder<textarea name="details" rows="4" maxlength="600" required placeholder="Add the task, owner or follow-up detail"></textarea></label>
             <label>Colour<select name="colour"><option value="yellow">Sunshine</option><option value="teal">Teal</option><option value="blue">Blue</option><option value="rose">Rose</option></select></label>
-            <button class="submit-btn">Add sticky note</button>
+            <div class="sticky-note-form-actions"><button id="stickyNoteSubmit" class="submit-btn" type="submit">Add sticky note</button><button id="cancelStickyNoteEdit" class="action-btn hidden" type="button" onclick="cancelStickyNoteEdit()">Cancel</button></div>
           </form>
           <div id="stickyNotesRecords" class="sticky-notes-board" data-empty-title="No sticky notes yet" data-empty-text="Add a staff reminder to begin."></div>
         </div>
@@ -5823,7 +5853,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260927-sticky-note-v1" defer></script>
+  <script src="backup.js?v=20260927-sticky-note-v2" defer></script>
   <script src="/assets/my-day.js?v=20260926-my-day-v1" defer></script>
   <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>
   <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>

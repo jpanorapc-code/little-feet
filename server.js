@@ -3786,8 +3786,26 @@ app.post('/api/modules/:module', (req, res) => {
     if (!payload.type || !payload.details) return res.status(400).json({ message: 'Add a record type and details.' });
   }
 
-  const record = tagSchoolRecord(actor, { ...payload, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() });
+  const record = tagSchoolRecord(actor, { ...payload, id: crypto.randomUUID(), ...(req.params.module === 'stickyNotes' ? { createdBy: actor.username } : {}), createdAt: new Date().toLocaleString() });
   records.unshift(record);
+  res.json({ success: true, record });
+});
+app.patch('/api/modules/stickyNotes/:id', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !['teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Authorised school staff can edit sticky notes.' });
+  const records = moduleRecordCollection('stickyNotes');
+  const record = records?.find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!record) return res.status(404).json({ message: 'Sticky note not found.' });
+  if (actor.role !== 'admin' && record.createdBy !== actor.username) return res.status(403).json({ message: 'You can edit only sticky notes you created.' });
+  const type = boundedText(req.body?.type, 160);
+  const details = boundedText(req.body?.details, 1800);
+  const colour = boundedText(req.body?.colour, 20);
+  if (!type || !details) return res.status(400).json({ message: 'Add a note title and reminder.' });
+  if (!['yellow', 'teal', 'blue', 'rose'].includes(colour)) return res.status(400).json({ message: 'Choose a supported note colour.' });
+  record.type = type;
+  record.details = details;
+  record.colour = colour;
+  record.updatedAt = new Date().toLocaleString();
   res.json({ success: true, record });
 });
 app.delete('/api/modules/:module/:id', (req, res) => {
