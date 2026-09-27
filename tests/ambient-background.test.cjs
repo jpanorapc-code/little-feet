@@ -25,6 +25,8 @@ async function main() {
   for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));
   }
+  fs.mkdirSync(path.join(fixture, 'lib', 'storage'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(fixture, 'lib', 'storage', 'object-storage.js'));
   fs.cpSync(path.join(root, 'assets'), path.join(fixture, 'assets'), { recursive: true });
   fs.writeFileSync(path.join(fixture, 'littlefeet-replica.json'), JSON.stringify({
     schools: [{ id: 'browser-school', name: 'Browser Test School', status: 'active' }],

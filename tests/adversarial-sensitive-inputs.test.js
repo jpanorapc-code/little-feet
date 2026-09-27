@@ -16,6 +16,8 @@ const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).t
 for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
+fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
+fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
 fs.mkdirSync(path.join(temp, 'output', 'pdf'), { recursive: true });
 fs.writeFileSync(path.join(temp, 'output', 'pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'), '%PDF-1.4\npublic-test-document\n');
 fs.writeFileSync(path.join(temp, 'output', 'pdf', 'secret-export.pdf'), '%PDF-1.4\nprivate-test-document\n');

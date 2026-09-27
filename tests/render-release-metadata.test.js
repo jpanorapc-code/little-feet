@@ -27,6 +27,8 @@ try {
   for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json']) {
     fs.copyFileSync(path.join(root, file), path.join(temp, file));
   }
+  fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
   fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     schools: [], users: [], students: [], moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}, schoolBilling: {}
   }));
