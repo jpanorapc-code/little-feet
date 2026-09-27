@@ -1,0 +1,34 @@
+name: Production monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check production health, database, and readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin='https://littlefeet.co.za'
+          health="$(curl --fail --silent --show-error --location --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 30 "$origin/api/health")"
+          ready="$(curl --fail --silent --show-error --location --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 30 "$origin/api/ready")"
+          keepalive="$(curl --fail --silent --show-error --location --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 30 "$origin/api/keepalive")"
+          node -e '
+            const [health, ready, keepalive] = process.argv.slice(1).map(JSON.parse);
+            if (health.status !== "OK") throw new Error(`Health status: ${health.status}`);
+            if (ready.ready !== true || ready.status !== "READY") throw new Error(`Readiness status: ${ready.status}`);
+            if (keepalive.status !== "OK") throw new Error(`Database keepalive status: ${keepalive.status}`);
+            console.log(JSON.stringify({ health: health.status, readiness: ready.status, database: keepalive.status }));
+          ' "$health" "$ready" "$keepalive"

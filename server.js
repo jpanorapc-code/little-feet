@@ -1468,10 +1468,13 @@ app.get('/api/production-readiness', (req, res) => {
     signedPaymentWebhook: Boolean(process.env.LF_PAYMENT_WEBHOOK_SECRET),
     emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
     smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
-    monitoring: Boolean(process.env.LF_MONITORING_DSN),
+    monitoring: Boolean(process.env.LF_MONITORING_DSN || process.env.LF_MONITORING_PROVIDER),
+    monitoringProvider: boundedText(process.env.LF_MONITORING_PROVIDER || (process.env.LF_MONITORING_DSN ? 'external-dsn' : ''), 80),
     privateObjectStorage: objectStorage.configured,
     objectStorageProvider: objectStorage.kind,
-    offsiteBackup: false
+    offsiteBackup: Boolean(process.env.LF_BACKUP_R2_BUCKET && process.env.LF_BACKUP_REHEARSAL_ID),
+    backupProvider: process.env.LF_BACKUP_R2_BUCKET ? 'cloudflare-r2-isolated-bucket' : '',
+    backupRehearsalId: boundedText(process.env.LF_BACKUP_REHEARSAL_ID, 120)
   };
   const missingActions = [];
   if (!readiness.checks.database) missingActions.push('Connect a persistent PostgreSQL DATABASE_URL.');
