@@ -143,11 +143,11 @@ const rawRequest = async (route) => {
     const liveStatus = await request('/api/system-status', { cookie: alphaLogin.cookie });
     assert.equal(liveStatus.response.status, 200);
     assert.equal(liveStatus.data.status, 'operational');
-    assert.equal(liveStatus.data.recentUpdates[0].version, '3.2');
+    assert.equal(liveStatus.data.recentUpdates[0].version, '1.0');
     const releaseNotes = await request('/api/release-notes');
     assert.equal(releaseNotes.response.status, 200);
-    assert.deepEqual(releaseNotes.data.slice(0, 3).map(note => note.version), ['3.2', '3.1', '3.0']);
-    assert.equal(releaseNotes.data.find(note => note.id === '2026-08-safeguarding').title, 'Safeguarding and family records');
+    assert.deepEqual(releaseNotes.data.map(note => note.version), ['1.0']);
+    assert.equal(releaseNotes.data[0].title, 'Production foundation');
 
     const opaqueCredentialSignup = await request('/api/signup', {
       method: 'POST',

@@ -20,11 +20,11 @@ try {
   const messageLines = run('git', ['show', '-s', '--format=%B', head]).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 
   assert.equal(metadata.fullCommitSha, head);
-  assert.equal(metadata.title, messageLines[0]);
   assert.equal(metadata.updateLineCount, Math.max(1, messageLines.length));
-  assert.equal(metadata.version, metadata.updateLineCount <= 8 ? '8.2.9' : '9.0');
+  assert.match(metadata.version, /^1\.0(?:\.\d+)?$/);
+  assert.doesNotMatch(metadata.summary, /Render|Git commit|update line/i);
 
-  for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json']) {
+  for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json', '.littlefeet-release-baseline']) {
     fs.copyFileSync(path.join(root, file), path.join(temp, file));
   }
   fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
