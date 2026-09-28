@@ -272,7 +272,8 @@
       repairQueued = false;
       const role = String(currentUser?.role || '').toLowerCase();
       if (!STAFF_ROLES.has(role)) return;
-      if (!document.querySelector('[data-my-day-nav]') || !document.getElementById('myDayTab')) init();
+      const tab = document.getElementById('myDayTab');
+      if (!document.querySelector('[data-my-day-nav]') || !tab || tab.dataset.myDayReady !== 'true') init();
     });
   };
 
