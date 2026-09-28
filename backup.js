@@ -3970,6 +3970,8 @@ function resetAccountForm() {
   document.getElementById('accountSaveButton').textContent = 'Create account';
   const deleteButton = document.getElementById('accountDeleteButton');
   if (deleteButton) deleteButton.style.display = 'none';
+  const resetLoginButton = document.getElementById('accountResetLoginWaitButton');
+  if (resetLoginButton) resetLoginButton.style.display = 'none';
   document.getElementById('accountPinHint').textContent = '*';
   document.getElementById('accountPin').placeholder = 'Required for a new account';
   updateAccountRoleFields();
@@ -4009,6 +4011,8 @@ function editAccount(account) {
   document.getElementById('accountSaveButton').textContent = 'Save account changes';
   const deleteButton = document.getElementById('accountDeleteButton');
   if (deleteButton) deleteButton.style.display = 'inline-flex';
+  const resetLoginButton = document.getElementById('accountResetLoginWaitButton');
+  if (resetLoginButton) resetLoginButton.style.display = 'inline-flex';
   document.getElementById('accountsTab').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -4071,6 +4075,27 @@ async function deleteSelectedAccount() {
   if (!originalUsername) return alert('Choose an account to edit before deleting it.');
   await deleteAccount(encodeURIComponent(originalUsername));
   resetAccountForm();
+}
+
+async function resetSelectedAccountLoginWait() {
+  const originalUsername = document.getElementById('accountOriginalUsername')?.value;
+  if (!originalUsername) return alert('Choose an account first.');
+  const account = accountsCache.find(entry => entry.username === originalUsername);
+  const label = account?.name || originalUsername;
+  if (!confirm(`Clear the 10-minute sign-in wait for ${label}? This does not change the password.`)) return;
+  try {
+    const response = await fetch(`/api/accounts/${encodeURIComponent(originalUsername)}/reset-login-lockout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const result = await response.json();
+    if (!response.ok) return alert(result.message || 'Unable to reset the sign-in wait.');
+    alert(result.message || 'The sign-in wait has been cleared.');
+    playDingSound();
+  } catch {
+    alert('Unable to reset the sign-in wait. Please try again.');
+  }
 }
 
 async function approveAccount(encodedUsername) {
