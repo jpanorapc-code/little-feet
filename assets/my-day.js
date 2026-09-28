@@ -53,9 +53,10 @@
     `<button type="button" class="my-day-action" data-my-day-open="${esc(tab)}"><strong>${esc(title)}</strong><span>${esc(description)}</span><b>${esc(label)}</b></button>`;
 
   const buildTab = user => {
-    if (document.getElementById('myDayTab')) return;
     const container = document.querySelector('#dashboardSection .container');
     if (!container) return;
+    let tab = document.getElementById('myDayTab');
+    if (tab?.dataset.myDayReady === 'true') return;
 
     const role = String(user.role || '').toLowerCase();
     const firstName = String(user.name || user.displayName || 'there').trim().split(/\s+/)[0];
@@ -69,9 +70,16 @@
       ? action('accountsTab', 'People & accounts', 'Manage staff and family accounts, links and access from one place.')
       : '';
 
-    const tab = document.createElement('div');
-    tab.id = 'myDayTab';
-    tab.className = 'tab-content';
+    if (!tab) {
+      tab = document.createElement('div');
+      tab.id = 'myDayTab';
+      tab.className = 'tab-content';
+      tab.dataset.roles = 'teacher,principal,admin,staff';
+      const guide = document.getElementById('guideTab');
+      if (guide) container.insertBefore(tab, guide);
+      else container.appendChild(tab);
+    }
+    tab.dataset.myDayReady = 'true';
     tab.innerHTML = `
       <section class="my-day-hero" aria-labelledby="myDayHeading">
         <div class="my-day-kicker">Your working day</div>
@@ -104,10 +112,6 @@
 
       <p class="my-day-note"><strong>My Day does not duplicate school records.</strong> It brings the existing Little Feet workspaces together into one daily starting point, so updates stay in their original systems and permissions continue to apply.</p>
     `;
-
-    const guide = document.getElementById('guideTab');
-    if (guide) container.insertBefore(tab, guide);
-    else container.appendChild(tab);
 
     tab.addEventListener('click', event => {
       const button = event.target.closest('[data-my-day-open]');
@@ -260,10 +264,36 @@
     loadAttention();
   };
 
-  // Initialise both on page load and whenever the main app finishes a login/session restore.
-  // Without the session-ready listener My Day could disappear after a fresh login because this
-  // module may initialise before currentUser exists.
-  document.addEventListener('littlefeet:session-ready', init);
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once:true });
-  else init();
+  let repairQueued = false;
+  const queueRepair = () => {
+    if (repairQueued || !currentUser) return;
+    repairQueued = true;
+    requestAnimationFrame(() => {
+      repairQueued = false;
+      const role = String(currentUser?.role || '').toLowerCase();
+      if (!STAFF_ROLES.has(role)) return;
+      const tab = document.getElementById('myDayTab');
+      if (!document.querySelector('[data-my-day-nav]') || !tab || tab.dataset.myDayReady !== 'true') init();
+    });
+  };
+
+  const watchMyDayMounts = () => {
+    const dashboard = document.getElementById('dashboardSection');
+    if (!dashboard || dashboard.dataset.myDayObserverReady === 'true') return;
+    dashboard.dataset.myDayObserverReady = 'true';
+    new MutationObserver(queueRepair).observe(dashboard, { childList:true, subtree:true });
+  };
+
+  const start = async () => {
+    await init();
+    watchMyDayMounts();
+  };
+
+  // Initialise on page load, login/session restore, bfcache restore, and tab visibility changes.
+  // The static nav/tab plus the observer make My Day self-healing if another UI refresh replaces DOM.
+  document.addEventListener('littlefeet:session-ready', start);
+  window.addEventListener('pageshow', start);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
+  else start();
 })();

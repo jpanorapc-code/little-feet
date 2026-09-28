@@ -4723,6 +4723,7 @@
       <p class="sidebar-heading">Overview</p>
       <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn active" onclick="switchTab('homeTab', this)"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></button></li>
+        <li data-roles="teacher,principal,admin,staff" data-my-day-nav="true"><button type="button" class="nav-btn" onclick="switchTab('myDayTab', this)">My Day</button></li>
       </ul>
       <section data-nav-group>
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-academics"></use></svg><span>Academics</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
@@ -4920,6 +4921,8 @@
       </div>
 
       <!-- 1. Activity Feed -->
+      <div id="myDayTab" class="tab-content" data-roles="teacher,principal,admin,staff" aria-live="polite"></div>
+
       <div id="feedTab" class="tab-content">
         <div class="card role-admin role-teacher">
           <div class="card-header-bar">
@@ -5864,8 +5867,8 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260928-login-reset-v2" defer></script>
-  <script src="/assets/my-day.js?v=20260928-my-day-v2" defer></script>
+  <script src="backup.js?v=20260928-account-loader-v3" defer></script>
+  <script src="/assets/my-day.js?v=20260928-my-day-v3" defer></script>
   <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>
   <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>
   <script src="/assets/staff-notices.js?v=20260926-staff-notices-v1" defer></script>
