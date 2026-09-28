@@ -1,4 +1,12 @@
 let currentUser = null;
+const LITTLE_FEET_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
+const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.platformAccess === true));
+const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role || ''));
+const displayRoleName = user => {
+  if (!user) return '';
+  if (user.role === 'admin' && user.platformAccess) return 'CEO / ADMINISTRATOR';
+  return ({ staff:'LITTLE FEET STAFF', crm:'CRM', accounts:'ACCOUNTS', support:'SOFTWARE SUPPORT' }[user.role] || String(user.role || '').toUpperCase());
+};
 window.getLittleFeetCurrentUser = () => currentUser;
 let parentPaymentData = null;
 let bookRegisterData = null;
@@ -799,7 +807,7 @@ function sanitiseDebugText(value) {
 }
 
 function configureDebugMode() {
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = isFullAccessUser();
   debugModeEnabled = isAdmin && localStorage.getItem('lf_admin_debug_mode') === 'true';
   if (isAdmin) {
     try { debugEvents = JSON.parse(sessionStorage.getItem('lf_debug_events') || '[]'); } catch { debugEvents = []; }
@@ -811,7 +819,7 @@ function configureDebugMode() {
 }
 
 function captureDebugEvent(event) {
-  if (!debugModeEnabled || currentUser?.role !== 'admin') return;
+  if (!debugModeEnabled || !isFullAccessUser()) return;
   const item = {
     id: `DBG-${Date.now()}`,
     timestamp: new Date().toISOString(),
@@ -833,20 +841,20 @@ function updateDebugModePanel() {
   const panel = document.getElementById('debugModePanel');
   const toggle = document.getElementById('debugModeToggle');
   const status = document.getElementById('debugModeStatus');
-  if (!panel || currentUser?.role !== 'admin') return;
+  if (!panel || !isFullAccessUser()) return;
   if (toggle) { toggle.textContent = debugModeEnabled ? 'Disable debug mode' : 'Enable debug mode'; toggle.className = `action-btn ${debugModeEnabled ? 'btn-red' : 'btn-blue'}`; }
   if (status) status.textContent = debugModeEnabled ? `Debug mode is on. ${debugEvents.length} safe technical event${debugEvents.length === 1 ? '' : 's'} captured this session.` : 'Debug mode is off. Turn it on only while diagnosing a problem.';
 }
 
 function toggleDebugMode() {
-  if (currentUser?.role !== 'admin') return alert('Debug mode is available to administrators only.');
+  if (!isFullAccessUser()) return alert('Debug mode is available to administrators only.');
   debugModeEnabled = !debugModeEnabled;
   localStorage.setItem('lf_admin_debug_mode', String(debugModeEnabled));
   updateDebugModePanel();
 }
 
 async function openDebugReport() {
-  if (currentUser?.role !== 'admin') return;
+  if (!isFullAccessUser()) return;
   try {
     const [diagnosticsResponse, errorsResponse] = await Promise.all([fetch('/api/system-diagnostics'), fetch('/api/system-errors')]);
     latestServerDiagnostics = diagnosticsResponse.ok ? await diagnosticsResponse.json() : null;
@@ -861,7 +869,7 @@ async function openDebugReport() {
 }
 
 async function downloadDebugReport() {
-  if (currentUser?.role !== 'admin') return;
+  if (!isFullAccessUser()) return;
   if (!latestServerDiagnostics) {
     try {
       const [diagnosticsResponse, errorsResponse] = await Promise.all([fetch('/api/system-diagnostics'), fetch('/api/system-errors')]);
@@ -878,7 +886,7 @@ async function downloadDebugReport() {
 }
 
 function clearDebugReport() {
-  if (currentUser?.role !== 'admin' || !confirm('Clear this session’s debug report?')) return;
+  if (!isFullAccessUser() || !confirm('Clear this session’s debug report?')) return;
   debugEvents = [];
   sessionStorage.removeItem('lf_debug_events');
   updateDebugModePanel();
@@ -1019,10 +1027,10 @@ function setupSession() {
   const footerSchoolName = document.getElementById('footerSchoolName');
   if (footerSchoolName) footerSchoolName.textContent = `${currentUser.schoolName || 'Little Feet'} School Portal`;
   const displayRoleEl = document.getElementById('displayRole');
-  if (displayRoleEl) displayRoleEl.textContent = `${currentUser.name || currentUser.username} · ${currentUser.role.toUpperCase()}`;
+  if (displayRoleEl) displayRoleEl.textContent = `${currentUser.name || currentUser.username} · ${displayRoleName(currentUser)}`;
 
   if (document.getElementById('postAuthorTag')) {
-    document.getElementById('postAuthorTag').textContent = `${currentUser.role.toUpperCase()} - ${currentUser.username}`;
+    document.getElementById('postAuthorTag').textContent = `${displayRoleName(currentUser)} - ${currentUser.username}`;
   }
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('dashboardSection').classList.remove('hidden');
@@ -1044,14 +1052,15 @@ function setupSession() {
 }
 
 function applyRolePermissions(role) {
+  const fullAccess = isFullAccessUser(currentUser);
   document.querySelectorAll('.role-admin, .role-teacher').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('[data-roles]').forEach(el => {
-    const roleAllowed = role === 'admin' || el.dataset.roles.split(',').includes(role);
+    const roleAllowed = fullAccess || el.dataset.roles.split(',').includes(role);
     const subscriptionAllowed = !el.dataset.subscription || role !== 'parent' || currentUser?.subscription === el.dataset.subscription;
     el.classList.toggle('hidden', !roleAllowed || !subscriptionAllowed);
   });
-  if (role === 'admin') {
-    document.querySelectorAll('.role-admin').forEach(el => el.classList.remove('hidden'));
+  if (fullAccess) {
+    document.querySelectorAll('.role-admin, .role-teacher').forEach(el => el.classList.remove('hidden'));
   } else if (role === 'teacher') {
     document.querySelectorAll('.role-teacher').forEach(el => el.classList.remove('hidden'));
   } else if (role === 'principal') {
@@ -1085,8 +1094,24 @@ function renderRoleHomePanel() {
       message: 'Use the approved cross-school tools to review progress, find records, and stay informed about safety notices.'
     },
     admin: {
-      icon: '🐧', title: `Admin centre for ${currentUser.name || 'your school'}`,
-      message: 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.'
+      icon: '🐧', title: currentUser.platformAccess ? `CEO centre for ${currentUser.name || 'Little Feet'}` : `Admin centre for ${currentUser.name || 'your school'}`,
+      message: currentUser.platformAccess ? 'Company-wide administrator access is active across Little Feet workspaces and schools.' : 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.'
+    },
+    staff: {
+      icon: '🐧', title: `Little Feet Staff · ${currentUser.name || 'Team member'}`,
+      message: 'Company-wide staff access is active. This account can work across every Little Feet workspace and does not need a school link.'
+    },
+    crm: {
+      icon: '🤝', title: `CRM workspace · ${currentUser.name || 'Little Feet'}`,
+      message: 'Manage client communication, support tickets, messages, email and engagement work without requiring a school link.'
+    },
+    accounts: {
+      icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'Little Feet'}`,
+      message: 'Work with billing, parent payments, tickets and company email from the Little Feet accounts department.'
+    },
+    support: {
+      icon: '🛠️', title: `Software Support · ${currentUser.name || 'Little Feet'}`,
+      message: 'Handle support tickets, client messages and software-support communication for Little Feet.'
     }
   };
   const experience = experiences[currentUser.role] || experiences.parent;
@@ -2496,7 +2521,7 @@ async function clearAttendanceRegistry() {
 
 // Support Tickets Archive & Queue
 function ticketCanBeManaged(ticket) {
-  return currentUser?.role === 'admin' || String(ticket.assignedTo || '').toLowerCase() === String(currentUser?.username || '').toLowerCase();
+  return isFullAccessUser() || String(ticket.assignedTo || '').toLowerCase() === String(currentUser?.username || '').toLowerCase();
 }
 
 function showTicketNotification(ticket) {
@@ -2532,7 +2557,7 @@ function filterTicketAssignees(searchId, selectId) {
 }
 
 async function loadTicketAssignees() {
-  if (!document.getElementById('ticketAssignee') || currentUser?.role !== 'admin') return;
+  if (!document.getElementById('ticketAssignee') || !isFullAccessUser()) return;
   try {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
@@ -2571,7 +2596,7 @@ async function loadTickets(checkForNew = false) {
                 <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              ${currentUser?.role === 'admin' && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeURIComponent(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+              ${isFullAccessUser() && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeURIComponent(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.ticketType === 'Meeting request' ? `<p class="meta" style="margin-top:6px;"><strong>Requested meeting:</strong> ${escapeWorkspaceText(t.meetingDate || 'Date not set')} ${escapeWorkspaceText(t.meetingTime || '')}${t.meetingLocation ? ' · ' + escapeWorkspaceText(t.meetingLocation) : ''}</p>` : ''}
@@ -2597,7 +2622,7 @@ async function loadTickets(checkForNew = false) {
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
             <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
-            ${currentUser?.role === 'admin' ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
           <p style="font-size:0.85rem; margin-top:4px;">${escapeWorkspaceText(t.message)}</p>
           ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${escapeWorkspaceText(t.feedback)}</p>` : ''}
@@ -2612,7 +2637,7 @@ async function loadTickets(checkForNew = false) {
 }
 
 async function deleteTicket(id) {
-  if (currentUser?.role !== 'admin') return alert('Only an administrator can delete support tickets.');
+  if (!isFullAccessUser()) return alert('Only an administrator can delete support tickets.');
   if (!confirm('Are you sure you want to delete this support ticket?')) return;
   const response = await fetch(`/api/tickets/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   if (!response.ok) return alert('Unable to delete this ticket.');
@@ -2644,7 +2669,7 @@ if (ticketForm) {
       subject: document.getElementById('ticketSubject').value,
       message: document.getElementById('ticketMessage').value,
       createdBy: currentUser?.username,
-      assignedTo: currentUser?.role === 'admin' ? document.getElementById('ticketAssignee')?.value : ''
+      assignedTo: isFullAccessUser() ? document.getElementById('ticketAssignee')?.value : ''
     };
     const response = await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const result = await response.json();
@@ -2671,11 +2696,11 @@ function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssig
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
         <label for="editCompleted" style="margin-bottom:0;">Mark Ticket as Completed</label>
       </div>
-      ${currentUser?.role === 'admin' ? '<div><label for="editTicketAssigneeSearch">Find an account</label><input id="editTicketAssigneeSearch" type="search" placeholder="Search a teacher, principal, or parent" oninput="filterTicketAssignees(\'editTicketAssigneeSearch\', \'editTicketAssignee\')"><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
+      ${isFullAccessUser() ? '<div><label for="editTicketAssigneeSearch">Find an account</label><input id="editTicketAssigneeSearch" type="search" placeholder="Search a teacher, principal, or parent" oninput="filterTicketAssignees(\'editTicketAssigneeSearch\', \'editTicketAssignee\')"><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
       <button type="submit" class="submit-btn">Save Ticket Resolution</button>
     </form>`;
   openModal('Edit Support Ticket', html);
-  if (currentUser?.role === 'admin') loadTicketAssignees().then(() => renderTicketAssigneeOptions('editTicketAssignee', '', currentAssignee));
+  if (isFullAccessUser()) loadTicketAssignees().then(() => renderTicketAssigneeOptions('editTicketAssignee', '', currentAssignee));
 
   document.getElementById('editTicketForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2684,7 +2709,7 @@ function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssig
     const response = await fetch('/api/tickets/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin', assignedTo: currentUser?.role === 'admin' ? document.getElementById('editTicketAssignee')?.value : undefined })
+      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin', assignedTo: isFullAccessUser() ? document.getElementById('editTicketAssignee')?.value : undefined })
     });
     const result = await response.json();
     if (!response.ok) return alert(result.message || 'Unable to update this ticket.');
@@ -2695,7 +2720,7 @@ function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssig
 }
 
 async function requestOwnAccountDeletion() {
-  if (!currentUser || currentUser.role === 'admin') return alert('Administrators can manage accounts directly from Account Management.');
+  if (!currentUser || isFullAccessUser()) return alert('Administrators can manage accounts directly from Account Management.');
   if (!confirm('Are you sure you want to request deletion of your account? Your account will stay active until an administrator reviews the request.')) return;
   try {
     const response = await fetch('/api/account-deletion-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
@@ -2723,7 +2748,7 @@ async function requestSchoolDeletion() {
 }
 
 async function executeSchoolDeletion(ticketId) {
-  if (currentUser?.role !== 'admin') return alert('Administrator access is required.');
+  if (!isFullAccessUser()) return alert('Administrator access is required.');
   const confirmation = prompt('This permanently deletes every account and all data linked to this school. Type DELETE SCHOOL exactly to continue.');
   if (confirmation === null) return;
   if (confirmation.trim() !== 'DELETE SCHOOL') return alert('School deletion cancelled. The confirmation text did not match.');
@@ -2764,10 +2789,10 @@ async function loadBroadcasts() {
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
               <span class="badge-tag urgent">${escapeWorkspaceText(b.bcPriority || 'Urgent Notice')}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${['admin','principal'].includes(currentUser?.role) ? `<button type="button" onclick="deleteBroadcast('${encodeURIComponent(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${(isFullAccessUser() || currentUser?.role === 'principal') ? `<button type="button" onclick="deleteBroadcast('${encodeURIComponent(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
             </div>
             <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${escapeWorkspaceText(b.bcMessage)}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeURIComponent(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${['admin','principal'].includes(currentUser?.role) ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${['admin','principal'].includes(currentUser?.role) ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeURIComponent(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
           </div>
         `).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
@@ -2779,7 +2804,7 @@ async function loadBroadcasts() {
 async function loadSafetyNetwork() {
   const summary = document.getElementById('safetyNetworkSummary');
   const visitorList = document.getElementById('safetyNetworkVisitors');
-  if (!summary || !['admin', 'principal'].includes(currentUser?.role)) return;
+  if (!summary || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
   try {
     const response = await fetch('/api/safety-network');
     const data = await response.json();
@@ -2944,7 +2969,7 @@ async function loadChatGroups() {
     select.disabled = !groups.length;
     
     const delBtn = document.getElementById('btnDeleteGroup');
-    if (delBtn && currentUser && currentUser.role === 'admin') {
+    if (delBtn && currentUser && isFullAccessUser()) {
       if (!select.value || select.value === 'general') {
         delBtn.classList.add('hidden');
       } else {
@@ -2967,7 +2992,7 @@ async function loadGroupChatMessages() {
   }
 
   const delBtn = document.getElementById('btnDeleteGroup');
-  if (delBtn && currentUser && currentUser.role === 'admin') {
+  if (delBtn && currentUser && isFullAccessUser()) {
     if (groupId === 'general') {
       delBtn.classList.add('hidden');
     } else {
@@ -2988,7 +3013,7 @@ async function loadGroupChatMessages() {
     chatBox.innerHTML = msgs.length
       ? msgs.map(m => {
           const isMe = currentUser && m.sender === currentUser.username;
-          const moderation = currentUser?.role === 'admin' && m.id
+          const moderation = isFullAccessUser() && m.id
             ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${encodeURIComponent(groupId)}','${encodeURIComponent(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
@@ -3005,7 +3030,7 @@ async function loadGroupChatMessages() {
 }
 
 async function deleteGroupChatMessage(encodedGroupId, encodedMessageId) {
-  if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this chat message?')) return;
+  if (!currentUser || !isFullAccessUser() || !confirm('Delete this chat message?')) return;
   const groupId = decodeURIComponent(String(encodedGroupId || ''));
   const messageId = decodeURIComponent(String(encodedMessageId || ''));
   const response = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
@@ -3090,7 +3115,7 @@ async function loadDirectChatMessages() {
     box.innerHTML = msgs.length
       ? msgs.map(m => {
           const isMe = m.sender === currentUser.username;
-          const moderation = currentUser?.role === 'admin' && m.id
+          const moderation = isFullAccessUser() && m.id
             ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${encodeURIComponent(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
@@ -3107,7 +3132,7 @@ async function loadDirectChatMessages() {
 }
 
 async function deleteDirectChatMessage(encodedMessageId) {
-  if (!currentUser || currentUser.role !== 'admin' || !confirm('Delete this private message?')) return;
+  if (!currentUser || !isFullAccessUser() || !confirm('Delete this private message?')) return;
   const messageId = decodeURIComponent(String(encodedMessageId || ''));
   const response = await fetch(`/api/chat/direct/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
   const result = await response.json();
@@ -3154,6 +3179,7 @@ function setupFormListeners() {
         actorUsername: currentUser?.username
       };
       if (!originalUsername && !body.pin) return alert('Set a password or PIN for the new account.');
+      if (!isInternalCompanyRole(body.role) && !body.schoolName) return alert('Choose a linked school for this school-facing account.');
       const response = await fetch(originalUsername ? `/api/accounts/${encodeURIComponent(originalUsername)}` : '/api/accounts', { method: originalUsername ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) return alert(result.message || 'Unable to save account.');
@@ -3334,7 +3360,7 @@ async function openDonationModal() {
     if (!response.ok) throw new Error(status.message || 'Unable to open donations.');
   } catch (error) { return alert(error.message || 'Unable to open donations.'); }
   if (!status.configured) {
-    if (currentUser?.role === 'admin') {
+    if (isFullAccessUser()) {
       return openModal('Set up donations', `<p style="font-size:.9rem;line-height:1.6;">No donation payment destination has been saved yet. Add a secure payment link or bank-transfer account once, then the Donate button will accept real donation requests.</p><button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionBillingAdmin();">Add payment destination</button>`);
     }
     return openModal('Donations temporarily unavailable', `<p style="font-size:.9rem;line-height:1.6;">Little Feet has not published its secure donation destination yet. Please check back soon.</p>`);
@@ -3362,12 +3388,12 @@ function formatSubscriptionMoney(value) {
 
 async function loadSubscriptionBillingOverview() {
   const container = document.getElementById('subscriptionBillingOverview');
-  if (!container || !['principal', 'admin'].includes(currentUser?.role)) return;
+  if (!container || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
   try {
     const response = await fetch('/api/subscription-billing');
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription information.');
-    const isAdmin = currentUser.role === 'admin';
+    const isAdmin = isFullAccessUser();
     const bundles = data.pricing.bundles || [];
     const awaiting = (data.orders || []).filter(order => ['awaiting_payment', 'awaiting payment'].includes(String(order.paymentStatus || order.status || '').toLowerCase()));
     const requestedMonthly = awaiting.reduce((total, order) => total + Number(order.monthlyTotal || 0), 0);
@@ -3391,7 +3417,7 @@ async function loadSubscriptionBillingOverview() {
 }
 
 async function openSubscriptionBillingAdmin() {
-  if (currentUser?.role !== 'admin') return alert('Only an administrator can manage subscription pricing and payment details.');
+  if (!isFullAccessUser()) return alert('Only an administrator can manage subscription pricing and payment details.');
   let data;
   try {
     const response = await fetch('/api/subscription-billing');
@@ -3444,7 +3470,7 @@ async function saveSubscriptionBillingConfig(event) {
 }
 
 async function openSubscriptionCheckout() {
-  if (!['principal', 'admin'].includes(currentUser?.role)) return alert('Only a principal or administrator can create a subscription payment request.');
+  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can create a subscription payment request.');
   let data;
   try {
     const response = await fetch('/api/subscription-billing');
@@ -3473,7 +3499,7 @@ async function createSubscriptionOrder(event) {
 }
 
 function openSubscriptionPaymentReconcile(encodedReference, expectedAmount) {
-  if (currentUser?.role !== 'admin') return alert('Only an administrator can reconcile a subscription payment.');
+  if (!isFullAccessUser()) return alert('Only an administrator can reconcile a subscription payment.');
   const reference = decodeURIComponent(encodedReference);
   openModal('Record subscription payment', `<form onsubmit="reconcileSubscriptionPayment(event,'${encodeURIComponent(reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">Payment reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Confirm the bank or provider transaction only after the funds have cleared. The school subscription activates immediately after this record is accepted.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(expectedAmount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
 }
@@ -3567,7 +3593,7 @@ async function loadParentPayments() {
 }
 
 async function openParentPaymentAdmin() {
-  if (!['principal', 'admin'].includes(currentUser?.role)) return alert('Only a principal or administrator can create parent payment requests.');
+  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can create parent payment requests.');
   let parents;
   try {
     const response = await fetch('/api/parent-payments/parents');
@@ -3617,7 +3643,7 @@ function openParentPaymentReport() {
   const summary = parentPaymentData.summary || {};
   const ageing = parentPaymentData.ageing || {};
   const rows = (parentPaymentData.payments || []).map(payment => `<tr><td style="padding:8px;">${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? `<br><span class="meta">${escapeWorkspaceText(payment.learnerName)}</span>` : ''}</td><td style="padding:8px;">${escapeWorkspaceText(payment.description)}</td><td style="padding:8px;">${escapeWorkspaceText(payment.effectiveDueDate)}${payment.daysPastDue ? `<br><span style="color:#fca5a5;">${Number(payment.daysPastDue)} days overdue</span>` : '<br><span class="meta">Current</span>'}${payment.arrangementActive ? `<br><span class="meta">${escapeWorkspaceText(payment.arrangementNote || 'Approved arrangement')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.amountDue)}${Number(payment.creditTotal || 0) > 0 ? `<br><span class="meta">Credits ${formatSubscriptionMoney(payment.creditTotal)}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.paidAmount)}${payment.paymentHistory?.length ? `<br><span class="meta">${payment.paymentHistory.map(item => `${formatSubscriptionMoney(item.amount)} ${escapeWorkspaceText(item.status)} · ${new Date(item.receivedAt).toLocaleDateString()}`).join('<br>')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.balance)}${payment.arrears ? `<br><span style="color:#fca5a5;">Arrears ${formatSubscriptionMoney(payment.arrears)}</span>` : ''}</td></tr>`).join('');
-  const ageingSummary = ['principal', 'admin'].includes(currentUser?.role)
+  const ageingSummary = (isFullAccessUser() || currentUser?.role === 'principal')
     ? `<div class="workspace-card" style="margin-top:10px;"><strong>Debtor ageing</strong><p class="meta" style="margin:6px 0 0;">Current ${formatSubscriptionMoney(ageing.current)} · 1–30 ${formatSubscriptionMoney(ageing.days1to30)} · 31–60 ${formatSubscriptionMoney(ageing.days31to60)} · 61–90 ${formatSubscriptionMoney(ageing.days61to90)} · 90+ ${formatSubscriptionMoney(ageing.days90plus)}</p></div>`
     : '';
   openModal('Full parent payment report', `<p class="meta">Generated ${parentPaymentData.recalculatedAt ? new Date(parentPaymentData.recalculatedAt).toLocaleString() : 'now'}. Paid history, approved arrangements and live ageing are calculated from the current ledger.</p><div class="workspace-card" style="display:flex;gap:18px;flex-wrap:wrap;"><strong>Due: ${formatSubscriptionMoney(summary.amountDue)}</strong><strong>Paid: ${formatSubscriptionMoney(summary.paidAmount)}</strong><strong>Open: ${formatSubscriptionMoney(summary.balance)}</strong><strong>Arrears: ${formatSubscriptionMoney(summary.arrears)}</strong></div>${ageingSummary}<div style="overflow:auto;margin-top:12px;"><table style="width:100%;min-width:760px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:8px;">Account</th><th style="padding:8px;">Description</th><th style="padding:8px;">Due / ageing</th><th style="padding:8px;">Due</th><th style="padding:8px;">Paid / history</th><th style="padding:8px;">Balance</th></tr></thead><tbody>${rows || '<tr><td colspan="6" style="padding:12px;">No payment records.</td></tr>'}</tbody></table></div>`);
@@ -3680,7 +3706,7 @@ async function loadBookRegister() {
 }
 
 async function openBookIssueModal() {
-  if (!['principal', 'admin'].includes(currentUser?.role)) return alert('Only a principal or administrator can add book checklists.');
+  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can add book checklists.');
   let parents;
   try { const response = await fetch('/api/book-register/parents'); parents = await response.json(); if (!response.ok) throw new Error(parents.message || 'Unable to load parents.'); } catch (error) { return alert(error.message || 'Unable to load parents.'); }
   if (!parents.length) return alert('Create or approve a parent account first.');
@@ -3787,7 +3813,7 @@ function downloadScheduleTemplate() {
 
 async function loadAccounts() {
   const list = document.getElementById('accountsList');
-  if (!list || currentUser?.role !== 'admin') return;
+  if (!list || !isFullAccessUser()) return;
   try {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
@@ -3798,13 +3824,13 @@ async function loadAccounts() {
       accountSelector.innerHTML = `<option value="">Create a new account / select an existing account</option>${accounts.map(account => `<option value="${encodeURIComponent(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.username)} · ${escapeWorkspaceText(account.role)}</option>`).join('')}`;
       if (previousSelection && [...accountSelector.options].some(option => option.value === previousSelection)) accountSelector.value = previousSelection;
     }
-    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve account</button>` : ''}${account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeURIComponent(account.username)}')">Approve learner request</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
+    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName || 'Not linked · Little Feet company account')}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve account</button>` : ''}${account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeURIComponent(account.username)}')">Approve learner request</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
   } catch { list.textContent = 'Unable to load account records.'; }
 }
 
 async function loadLearnerAccessCodes() {
   const list = document.getElementById('learnerCodeList');
-  if (!list || !['admin', 'principal'].includes(currentUser?.role)) return;
+  if (!list || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
   try {
     const response = await fetch(`/api/learner-access-codes?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const records = await response.json();
@@ -3822,8 +3848,8 @@ async function loadLearnerAccessCodes() {
 
 function renderLearnerAccessCodes() {
   const list = document.getElementById('learnerCodeList');
-  if (!list || !['admin', 'principal'].includes(currentUser?.role)) return;
-  const canManage = currentUser.role === 'admin';
+  if (!list || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
+  const canManage = isFullAccessUser();
   const query = String(document.getElementById('learnerCodeSearch')?.value || '').trim().toLowerCase();
   const records = learnerAccessCodeRecords.filter(record => !query || [record.learnerName, record.className, record.parentName, record.accessCode].some(value => String(value || '').toLowerCase().includes(query)));
   if (!records.length) {
@@ -3842,7 +3868,7 @@ function renderLearnerAccessCodes() {
 }
 
 async function toggleLearnerCodeTeacherPreview() {
-  if (currentUser?.role !== 'admin') return;
+  if (!isFullAccessUser()) return;
   const panel = document.getElementById('learnerCodeTeacherPreview');
   if (!panel) return;
   if (!panel.classList.contains('hidden')) {
@@ -3867,7 +3893,7 @@ function learnerCodeRecord(encodedKey) {
 }
 
 function openLearnerCodeIssue(encodedKey) {
-  if (currentUser?.role !== 'admin') return alert('Only an administrator can issue a learner access code.');
+  if (!isFullAccessUser()) return alert('Only an administrator can issue a learner access code.');
   const record = learnerCodeRecord(encodedKey);
   if (!record) return alert('Learner record not found. Refresh the code list and try again.');
   openModal('Issue learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Issue a physical code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Leave the field blank to generate a secure school code automatically, or enter a school-approved code in the shown format.</p><label for="manualLearnerAccessCode">Manual code (optional)</label><input id="manualLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}')">Issue code</button>`);
@@ -3886,7 +3912,7 @@ async function issueLearnerAccessCode(encodedKey) {
 }
 
 async function replaceLearnerAccessCode(id) {
-  if (currentUser?.role !== 'admin' || !confirm('Replace this code? The existing physical copy will stop working immediately.')) return;
+  if (!isFullAccessUser() || !confirm('Replace this code? The existing physical copy will stop working immediately.')) return;
   const response = await fetch(`/api/learner-access-codes/${encodeURIComponent(id)}/replace`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username })
   });
@@ -3897,7 +3923,7 @@ async function replaceLearnerAccessCode(id) {
 }
 
 async function revokeLearnerAccessCode(id) {
-  if (currentUser?.role !== 'admin' || !confirm('Invalidate this code? Its printed copy will no longer work.')) return;
+  if (!isFullAccessUser() || !confirm('Invalidate this code? Its printed copy will no longer work.')) return;
   const response = await fetch(`/api/learner-access-codes/${encodeURIComponent(id)}/revoke`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username })
   });
@@ -3907,7 +3933,7 @@ async function revokeLearnerAccessCode(id) {
 }
 
 async function printLearnerCodeForm(encodedKey) {
-  if (!['admin', 'principal'].includes(currentUser?.role)) return alert('Only an administrator or principal can print this learner form.');
+  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only an administrator or principal can print this learner form.');
   const response = await fetch(`/api/learner-access-codes/${encodedKey}/printable`);
   const record = await response.json();
   if (!response.ok) return alert(record.message || 'An active learner code is required before this form can be printed.');
@@ -3945,6 +3971,23 @@ function resetAccountForm() {
   if (deleteButton) deleteButton.style.display = 'none';
   document.getElementById('accountPinHint').textContent = '*';
   document.getElementById('accountPin').placeholder = 'Required for a new account';
+  updateAccountRoleFields();
+}
+
+function updateAccountRoleFields() {
+  const role = document.getElementById('accountRole')?.value || 'parent';
+  const schoolField = document.getElementById('accountSchoolName');
+  const schoolRequired = document.getElementById('accountSchoolRequired');
+  const schoolHelp = document.getElementById('accountSchoolHelp');
+  const internalRole = isInternalCompanyRole(role);
+  if (schoolField) {
+    schoolField.required = !internalRole;
+    schoolField.placeholder = internalRole ? 'Optional · link to a school only if needed' : 'e.g. Little Feet ECD Portal';
+  }
+  if (schoolRequired) schoolRequired.textContent = internalRole ? '(optional)' : '*';
+  if (schoolHelp) schoolHelp.textContent = internalRole
+    ? 'Little Feet company staff can work without a school link. Add one only when this account should be scoped to a specific school.'
+    : 'Required for school-facing accounts.';
 }
 
 function editAccount(account) {
@@ -3955,6 +3998,7 @@ function editAccount(account) {
   document.getElementById('accountUsername').value = account.username || '';
   document.getElementById('accountRole').value = account.role || 'parent';
   document.getElementById('accountSchoolName').value = account.schoolName || '';
+  updateAccountRoleFields();
   document.getElementById('accountStoreUrl').value = account.schoolStoreUrl || '';
   document.getElementById('accountAssignedClasses').value = (account.assignedClasses || []).join(', ');
   document.getElementById('accountLinkedLearners').value = (account.linkedLearners || []).join(', ');
@@ -4039,7 +4083,7 @@ async function approveAccount(encodedUsername) {
 }
 
 async function approveRequestedLearnerLinks(encodedUsername) {
-  if (currentUser?.role !== 'admin') return alert('Only an administrator can approve learner relationships.');
+  if (!isFullAccessUser()) return alert('Only an administrator can approve learner relationships.');
   const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
   if (!account?.requestedLearnerLinks?.length) return alert('There are no pending learner requests for this account.');
   const requested = account.requestedLearnerLinks.join(', ');
@@ -4482,7 +4526,7 @@ async function loadWorkspaceRecords(module) {
     const emptyIcon = `<svg class="ui-icon" aria-hidden="true"><use href="#${emptyIconName}"></use></svg>`;
     const emptyTitle = escapeWorkspaceText(list.dataset.emptyTitle || 'No records yet');
     const emptyText = escapeWorkspaceText(list.dataset.emptyText || 'New records will appear here after they are saved.');
-    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${currentUser?.role === 'admin' ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : `<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">${emptyIcon}</span><span><strong>${emptyTitle}</strong><span>${emptyText}</span></span></div>`;
+    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${isFullAccessUser() ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : `<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">${emptyIcon}</span><span><strong>${emptyTitle}</strong><span>${emptyText}</span></span></div>`;
   } catch { list.textContent = 'Unable to load workspace records.'; }
 }
 
