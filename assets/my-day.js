@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const STAFF_ROLES = new Set(['teacher', 'principal', 'admin']);
+  const STAFF_ROLES = new Set(['teacher', 'principal', 'admin', 'staff']);
   const STYLE_ID = 'littleFeetMyDayStyles';
   let currentUser = null;
 
@@ -124,7 +124,7 @@
     if (!homeItem) return;
 
     const item = document.createElement('li');
-    item.dataset.roles = 'teacher,principal,admin';
+    item.dataset.roles = 'teacher,principal,admin,staff';
     item.dataset.myDayNav = 'true';
     item.innerHTML = '<button type="button" class="nav-btn">My Day</button>';
     item.querySelector('button').addEventListener('click', function () {
@@ -260,6 +260,10 @@
     loadAttention();
   };
 
+  // Initialise both on page load and whenever the main app finishes a login/session restore.
+  // Without the session-ready listener My Day could disappear after a fresh login because this
+  // module may initialise before currentUser exists.
+  document.addEventListener('littlefeet:session-ready', init);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once:true });
   else init();
 })();
