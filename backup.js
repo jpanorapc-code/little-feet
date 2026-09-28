@@ -2,6 +2,7 @@ let currentUser = null;
 const LITTLE_FEET_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
 const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.platformAccess === true));
 const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role || ''));
+const isFinanceUser = (user = currentUser) => Boolean(user && (isFullAccessUser(user) || user.role === 'accounts'));
 const displayRoleName = user => {
   if (!user) return '';
   if (user.role === 'admin' && user.platformAccess) return 'CEO / ADMINISTRATOR';
@@ -2190,7 +2191,7 @@ if (worksheetForm) {
 
 // Milestone Badges
 function canManageBadges() {
-  return ['teacher', 'principal', 'admin'].includes(currentUser?.role);
+  return isFullAccessUser() || ['teacher', 'principal'].includes(currentUser?.role);
 }
 
 function downloadLearnerImportTemplate() {
@@ -2827,7 +2828,7 @@ async function loadVisitorMeetingRecipients() {
 
 async function loadVisitorMeetings() {
   const list = document.getElementById('visitorMeetingList');
-  if (!list || !['parent','teacher','principal','admin'].includes(currentUser?.role)) return;
+  if (!list || !(isFullAccessUser() || ['parent','teacher','principal'].includes(currentUser?.role))) return;
   try {
     const response = await fetch('/api/visitor-meetings');
     const meetings = await response.json();
@@ -2837,7 +2838,7 @@ async function loadVisitorMeetings() {
       let actions = '';
       if (currentUser.role === 'teacher' && meeting.status === 'awaiting-teacher-response') actions = `<button type="button" class="action-btn btn-green" onclick="respondVisitorMeeting('${meeting.id}','accept')">Accept time</button><button type="button" class="action-btn btn-blue" onclick="respondVisitorMeeting('${meeting.id}','counter')">Counter-offer</button>`;
       if (currentUser.role === 'parent' && meeting.status === 'awaiting-parent-confirmation') actions = `<button type="button" class="action-btn btn-green" onclick="confirmVisitorMeeting('${meeting.id}')">Confirm agreed time</button>`;
-      if (['principal','admin'].includes(currentUser.role) && meeting.status === 'awaiting-principal-approval') actions = `<button type="button" class="action-btn btn-green" onclick="approveVisitorMeeting('${meeting.id}')">Approve & issue QR pass</button>`;
+      if ((isFullAccessUser() || currentUser.role === 'principal') && meeting.status === 'awaiting-principal-approval') actions = `<button type="button" class="action-btn btn-green" onclick="approveVisitorMeeting('${meeting.id}')">Approve & issue QR pass</button>`;
       return `<div class="item-row"><div><strong>${escapeWorkspaceText(meeting.parentName)} → ${escapeWorkspaceText(meeting.hostName)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(meeting.purpose)}<br>Meeting: ${escapeWorkspaceText(meeting.agreedAt || meeting.proposedAt)}</p><span class="meta">Status: ${escapeWorkspaceText(status)}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}</div></div>`;
     }).join('') : '<p class="meta">No meeting requests are waiting for your action.</p>';
   } catch (error) { list.textContent = error.message || 'Unable to load meeting requests.'; }
@@ -3417,7 +3418,7 @@ async function loadSubscriptionBillingOverview() {
 }
 
 async function openSubscriptionBillingAdmin() {
-  if (!isFullAccessUser()) return alert('Only an administrator can manage subscription pricing and payment details.');
+  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can manage subscription pricing and payment details.');
   let data;
   try {
     const response = await fetch('/api/subscription-billing');
@@ -3499,7 +3500,7 @@ async function createSubscriptionOrder(event) {
 }
 
 function openSubscriptionPaymentReconcile(encodedReference, expectedAmount) {
-  if (!isFullAccessUser()) return alert('Only an administrator can reconcile a subscription payment.');
+  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can reconcile a subscription payment.');
   const reference = decodeURIComponent(encodedReference);
   openModal('Record subscription payment', `<form onsubmit="reconcileSubscriptionPayment(event,'${encodeURIComponent(reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">Payment reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Confirm the bank or provider transaction only after the funds have cleared. The school subscription activates immediately after this record is accepted.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(expectedAmount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
 }
@@ -3567,7 +3568,7 @@ function parentPaymentStatusLabel(payment) {
 async function loadParentPayments() {
   const summaryBox = document.getElementById('parentPaymentsSummary');
   const list = document.getElementById('parentPaymentsList');
-  if (!summaryBox || !list || !currentUser || !['parent', 'principal', 'admin'].includes(currentUser.role)) return;
+  if (!summaryBox || !list || !currentUser || !(isFinanceUser() || ['parent', 'principal'].includes(currentUser.role))) return;
   try {
     const response = await fetch('/api/parent-payments');
     const data = await response.json();
@@ -3575,11 +3576,11 @@ async function loadParentPayments() {
     parentPaymentData = data;
     const summary = data.summary || {};
     const ageing = data.ageing || {};
-    const ageingMarkup = ['principal', 'admin'].includes(currentUser.role)
+    const ageingMarkup = (isFinanceUser() || currentUser.role === 'principal')
       ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color);"><span class="meta" style="display:block;margin-bottom:7px;">Debtor ageing · open balance by days overdue</span><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;"><div><span class="meta">Current</span><strong style="display:block;">${formatSubscriptionMoney(ageing.current)}</strong></div><div><span class="meta">1–30 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days1to30)}</strong></div><div><span class="meta">31–60 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days31to60)}</strong></div><div><span class="meta">61–90 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days61to90)}</strong></div><div><span class="meta">90+ days</span><strong style="display:block;color:${Number(ageing.days90plus || 0) > 0 ? '#fca5a5' : 'inherit'};">${formatSubscriptionMoney(ageing.days90plus)}</strong></div></div></div>`
       : '';
     summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>${ageingMarkup}`;
-    const admin = ['principal', 'admin'].includes(currentUser.role);
+    const admin = isFinanceUser() || currentUser.role === 'principal';
     list.innerHTML = data.payments?.length ? data.payments.map(payment => {
       const arrangement = payment.arrangementActive ? `<p style="margin:4px 0;color:#99f6e4;">Approved arrangement: ${formatSubscriptionMoney(payment.arrangementAmount)} due ${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementNote ? ` · ${escapeWorkspaceText(payment.arrangementNote)}` : ''}</p>` : '';
       const destination = payment.payment?.paymentLink ? `<a class="action-btn btn-green" style="display:inline-block;text-decoration:none;" target="_blank" rel="noopener" href="${escapeWorkspaceText(payment.payment.paymentLink)}">Pay securely</a>` : payment.payment?.accountNumber ? `<span class="meta">Pay by bank transfer to ${escapeWorkspaceText(payment.payment.bankName)} · ${escapeWorkspaceText(payment.payment.accountNumber)} · Ref ${escapeWorkspaceText(payment.reference)}</span>` : '<span class="meta">Payment destination not configured.</span>';
@@ -3593,7 +3594,7 @@ async function loadParentPayments() {
 }
 
 async function openParentPaymentAdmin() {
-  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can create parent payment requests.');
+  if (!(isFinanceUser() || currentUser?.role === 'principal')) return alert('Only a principal, administrator, or Accounts user can create parent payment requests.');
   let parents;
   try {
     const response = await fetch('/api/parent-payments/parents');
@@ -3688,7 +3689,7 @@ function bookStatusLabel(record) {
 async function loadBookRegister() {
   const summaryBox = document.getElementById('bookRegisterSummary');
   const list = document.getElementById('bookRegisterRecords');
-  if (!summaryBox || !list || !currentUser || !['parent', 'teacher', 'principal', 'admin'].includes(currentUser.role)) return;
+  if (!summaryBox || !list || !currentUser || !(isFullAccessUser() || ['parent', 'teacher', 'principal'].includes(currentUser.role))) return;
   try {
     const response = await fetch('/api/book-register');
     const data = await response.json();
@@ -3699,7 +3700,7 @@ async function loadBookRegister() {
       const returnDetails = record.status === 'returned' ? `<p class="meta">Returned ${record.returnedAt ? new Date(record.returnedAt).toLocaleString() : ''} · ${escapeWorkspaceText(record.returnCondition)} · ${escapeWorkspaceText(record.returnStatus)}${record.penaltyAmount ? ` · Penalty ${formatSubscriptionMoney(record.penaltyAmount)}` : ''}</p>` : '';
       const signatures = `<p class="meta">Admin signed: ${escapeWorkspaceText(record.adminSignature || '—')} ${record.adminSignedAt ? `(${new Date(record.adminSignedAt).toLocaleString()})` : ''} · Parent signed: ${escapeWorkspaceText(record.parentSignature || '—')} ${record.parentSignedAt ? `(${new Date(record.parentSignedAt).toLocaleString()})` : ''}</p>`;
       const parentActions = currentUser.role === 'parent' ? `${!record.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeURIComponent(record.id)}','received')">Sign received</button>` : ''}${record.status === 'returned' && !record.returnParentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeURIComponent(record.id)}','returned')">Sign returned</button>` : ''}` : '';
-      const staffActions = ['principal', 'admin'].includes(currentUser.role) && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeURIComponent(record.id)}')">Record return</button>` : '';
+      const staffActions = (isFullAccessUser() || currentUser.role === 'principal') && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeURIComponent(record.id)}')">Record return</button>` : '';
       return `<div class="item-row"><div><strong>${escapeWorkspaceText(record.bookTitle)}${record.bookCode ? ` · ${escapeWorkspaceText(record.bookCode)}` : ''}</strong> ${bookStatusLabel(record)}<p style="margin:4px 0;">Learner: ${escapeWorkspaceText(record.learnerName)} · Class: ${escapeWorkspaceText(record.className || 'Not recorded')} · Parent: ${escapeWorkspaceText(record.parentName)}</p><p class="meta">Handover condition: ${escapeWorkspaceText(record.issueCondition)} · Replacement price: ${formatSubscriptionMoney(record.bookPrice)}</p>${returnDetails}${signatures}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${parentActions}${staffActions}</div></div>`;
     }).join('') : '<p class="meta">No books have been added to the school checklist yet.</p>';
   } catch (error) { summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load book checklist.')}</p>`; list.innerHTML = ''; }
@@ -4389,7 +4390,7 @@ function cancelStickyNoteEdit() {
 
 async function loadStickyNotes() {
   const board = document.getElementById('stickyNotesRecords');
-  const canUseStickyNotes = ['teacher', 'principal', 'admin'].includes(currentUser?.role);
+  const canUseStickyNotes = isFullAccessUser() || ['teacher', 'principal'].includes(currentUser?.role);
   if (!canUseStickyNotes) {
     document.getElementById('stickyNotesOverlay')?.replaceChildren();
     document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
