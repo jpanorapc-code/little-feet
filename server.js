@@ -3251,20 +3251,69 @@ const addEmailInboxItem = (actor, data) => {
   db.emailInbox.unshift(item); return item;
 };
 const buildEmailInbox = actor => {
-  const openTicketIds = new Set(tenantRecords(db.tickets, actor).filter(ticket => ticket.status !== 'Completed').map(ticket => ticket.id));
+  const isParent = actor?.role === 'parent';
+  const parentUsername = normalizeUsername(actor?.username);
+  const parentAllowedTypes = new Set(['Ticket', 'Message', 'Payment', 'Subscription']);
+
+  // Parent inboxes are deliberately isolated from staff notices, internal school alerts,
+  // and other operational material. Remove any legacy items that were created before
+  // this boundary existed so old data cannot keep leaking into a parent account.
+  if (isParent) {
+    db.emailInbox = db.emailInbox.filter(item => !emailInboxVisibleTo(item, actor) || parentAllowedTypes.has(item.type));
+  }
+
+  const openTicketIds = new Set(
+    tenantRecords(db.tickets, actor)
+      .filter(ticket => ticket.status !== 'Completed' && (!isParent || normalizeUsername(ticket.createdBy) === parentUsername))
+      .map(ticket => ticket.id)
+  );
   db.emailInbox = db.emailInbox.filter(item => !(emailInboxVisibleTo(item, actor) && item.type === 'Ticket' && !openTicketIds.has(item.sourceId)));
-  const existing = tenantRecords(db.emailInbox, actor).filter(item => emailInboxVisibleTo(item, actor));
+
+  const existing = tenantRecords(db.emailInbox, actor)
+    .filter(item => emailInboxVisibleTo(item, actor))
+    .filter(item => !isParent || parentAllowedTypes.has(item.type));
   const known = new Set(existing.map(item => item.type + ':' + item.sourceId));
-  const dismissed = new Set(tenantRecords(db.emailDismissals, actor).filter(item => normalizeUsername(item.username) === normalizeUsername(actor.username)).map(item => item.sourceKey));
+  const dismissed = new Set(tenantRecords(db.emailDismissals, actor).filter(item => normalizeUsername(item.username) === parentUsername).map(item => item.sourceKey));
   const add = (type, sourceId, title, message, sourceTab) => {
     const key=type+':'+sourceId;if(!sourceId||known.has(key)||dismissed.has(key))return;
     const item=addEmailInboxItem(actor,{type,sourceId,title,message,sourceTab});if(item){existing.push(item);known.add(key);}
   };
-  tenantRecords(db.tickets, actor).filter(t=>t.status!=='Completed'&&(normalizeUsername(t.createdBy)===normalizeUsername(actor.username)||normalizeUsername(t.assignedTo)===normalizeUsername(actor.username)))
+
+  if (isParent) {
+    // Parent-facing only: their own support requests, messages addressed to them,
+    // their payment requests and their own LittleSteps subscription activity.
+    tenantRecords(db.tickets, actor)
+      .filter(t => t.status !== 'Completed' && normalizeUsername(t.createdBy) === parentUsername)
+      .forEach(t => add('Ticket', t.id, t.subject, t.feedback || t.message || 'Support ticket update', 'ticketsTab'));
+    tenantRecords(db.directMessages, actor)
+      .filter(m => normalizeUsername(m.recipient) === parentUsername)
+      .forEach(m => add('Message', m.id, 'Message from ' + (m.sender || 'Little Feet'), m.message, 'chatTab'));
+    (db.parentPayments || [])
+      .filter(record => recordInSchool(record, actor) && normalizeUsername(record.parentUsername) === parentUsername)
+      .forEach(record => add(
+        'Payment',
+        record.id,
+        record.description || 'Parent payment request',
+        `${record.learnerName ? record.learnerName + ' · ' : ''}${record.reference || 'Payment'} · ${String(record.paymentStatus || 'awaiting payment').replaceAll('_',' ')}`,
+        'parentPaymentsTab'
+      ));
+    (db.parentSubscriptions || [])
+      .filter(record => recordInSchool(record, actor) && normalizeUsername(record.parentUsername) === parentUsername)
+      .forEach(record => add(
+        'Subscription',
+        record.id,
+        'LittleSteps subscription',
+        `${record.reference || 'Subscription'} · ${String(record.paymentStatus || 'awaiting payment').replaceAll('_',' ')}`,
+        'parentPaymentsTab'
+      ));
+    return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  }
+
+  tenantRecords(db.tickets, actor).filter(t=>t.status!=='Completed'&&(normalizeUsername(t.createdBy)===parentUsername||normalizeUsername(t.assignedTo)===parentUsername))
     .forEach(t=>add('Ticket',t.id,t.subject,t.feedback||t.message||'Support ticket update','ticketsTab'));
   tenantRecords(db.staffNotices, actor).filter(n=>n.audience==='All staff'||n.audience===actor.role)
     .forEach(n=>add('Notice',n.id,n.title,n.message,'staffNoticesTab'));
-  tenantRecords(db.directMessages, actor).filter(m=>normalizeUsername(m.recipient)===normalizeUsername(actor.username))
+  tenantRecords(db.directMessages, actor).filter(m=>normalizeUsername(m.recipient)===parentUsername)
     .forEach(m=>add('Message',m.id,'Message from '+(m.sender||'Little Feet'),m.message,'chatTab'));
   tenantRecords(db.broadcasts, actor).forEach(b=>add('Alert',b.id,b.bcPriority||'School alert',b.bcMessage,'broadcastsTab'));
   return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
