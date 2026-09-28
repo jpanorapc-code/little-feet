@@ -30,6 +30,7 @@ assert.match(page, /<option value="staff">Little Feet Staff<\/option>/);
 assert.match(page, /<option value="crm">CRM<\/option>/);
 assert.match(page, /<option value="accounts">Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
+assert.match(page, /backup\.js\?v=20260928-company-roles-v1/);
 assert.match(client, /function updateAccountRoleFields\(\)/);
 assert.match(client, /CEO \/ ADMINISTRATOR/);
 assert.match(server, /const PLATFORM_INTERNAL_ROLES = new Set\(\['staff', 'crm', 'accounts', 'support'\]\)/);
