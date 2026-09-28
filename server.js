@@ -1307,8 +1307,15 @@ function applyOwnerAccountMigration() {
 }
 function syncConfiguredPlatformOwnerAccess() {
   const ownerUsername = configuredPlatformOwnerUsername();
-  if (!ownerUsername) return false;
-  const owner = db.users.find(account => normalizeUsername(account.username) === ownerUsername);
+  let owner = ownerUsername ? db.users.find(account => normalizeUsername(account.username) === ownerUsername) : null;
+  // Safe first-run fallback: if no owner username is configured yet and the
+  // installation has exactly one administrator, that founding administrator
+  // becomes the platform owner. Once set, the persisted platformAccess flag
+  // keeps the ownership capability explicit rather than depending on a name.
+  if (!owner) {
+    const administrators = db.users.filter(account => account.role === 'admin');
+    if (!ownerUsername && administrators.length === 1) owner = administrators[0];
+  }
   if (!owner) return false;
   owner.role = 'admin';
   owner.platformAccess = true;
@@ -1924,7 +1931,7 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
 app.get('/api/subscription-billing', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
-  if (!['teacher', 'principal', 'district', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
+  if (!['teacher', 'principal', 'district', 'admin', 'staff'].includes(actor.role)) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
   const billing = subscriptionBillingState(actor);
   const isAdmin = isAdminLike(actor);
   const school = db.schools.find(entry => entry.id === accountSchoolId(actor));
@@ -2167,7 +2174,7 @@ const bookRecordsForSchool = actor => (db.bookRegister || []).filter(record => b
 
 app.get('/api/book-register', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !['parent', 'teacher', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Book register access is required.' });
+  if (!actor || !['parent', 'teacher', 'principal', 'admin', 'staff'].includes(actor.role)) return res.status(403).json({ message: 'Book register access is required.' });
   const className = normalizeComparableText(req.query.className);
   let records = bookRecordsForSchool(actor);
   if (className) records = records.filter(record => normalizeComparableText(record.className) === className);
@@ -4109,7 +4116,7 @@ app.get('/api/visitor-meetings/recipients', (req, res) => {
 
 app.get('/api/visitor-meetings', (req, res) => {
   const user = getSessionAccount(req);
-  if (!user || !['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'You are not authorised to view meeting requests.' });
+  if (!user || !['parent', 'teacher', 'principal', 'admin', 'staff'].includes(user.role)) return res.status(403).json({ message: 'You are not authorised to view meeting requests.' });
   const meetings = db.visitorMeetings.filter(meeting => {
     if (!recordInSchool(meeting, user)) return false;
     if (user.role === 'parent') return normalizeUsername(meeting.parentUsername) === normalizeUsername(user.username);
@@ -4457,7 +4464,7 @@ app.post('/api/report-signing-pin', (req, res) => {
 app.get('/api/report-reviews', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view reports.' });
-  if (!['parent', 'teacher', 'principal', 'admin'].includes(user.role)) return res.status(403).json({ message: 'This role cannot access learner reports.' });
+  if (!['parent', 'teacher', 'principal', 'admin', 'staff'].includes(user.role)) return res.status(403).json({ message: 'This role cannot access learner reports.' });
   const reports = user.role === 'parent'
     ? tenantRecords(db.reportReviews, user).filter(report => normalizeUsername(report.parentUsername) === normalizeUsername(user.username))
     : learnerRecordsVisibleTo(db.reportReviews, user);
@@ -4663,7 +4670,7 @@ app.get('/api/students/search', (req, res) => {
   if (requester.role === 'district') {
     return res.json(results.map(student => ({ id: student.id || null, studentName: student.studentName, className: student.className })));
   }
-  if (!['parent', 'teacher', 'principal', 'admin'].includes(requester.role)) return res.status(403).json({ message: 'This role cannot access learner records.' });
+  if (!['parent', 'teacher', 'principal', 'admin', 'staff'].includes(requester.role)) return res.status(403).json({ message: 'This role cannot access learner records.' });
   res.json(results.map(studentSensitiveView));
 });
 
