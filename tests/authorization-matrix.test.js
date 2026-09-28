@@ -25,6 +25,8 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username:'alpha-principal', pinHash:hash('PrincipalPass1'), name:'Alpha Principal', role:'principal', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
     { username:'alpha-teacher', pinHash:hash('TeacherPass1'), name:'Alpha Teacher', role:'teacher', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active', assignedClasses:['Grade 1'] },
     { username:'alpha-district', pinHash:hash('DistrictPass1'), name:'Alpha District', role:'district', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
+    { username:'littlefeet-staff', pinHash:hash('StaffPass1'), name:'Little Feet Staff', role:'staff', schoolId:'', schoolName:'', verificationStatus:'Active' },
+    { username:'littlefeet-crm', pinHash:hash('CrmPass1'), name:'Little Feet CRM', role:'crm', schoolId:'', schoolName:'', verificationStatus:'Active' },
     { username:'alpha-parent@example.test', pinHash:hash('ParentPass1'), name:'Alpha Parent', role:'parent', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active', parentRelationshipStatus:'Administrator approved', linkedLearners:['Alpha Learner'] }
   ],
   students:[{ id:'student-1', studentName:'Alpha Learner', className:'Grade 1', parentName:'Alpha Parent', contactEmail:'alpha-parent@example.test', schoolId:'school-alpha', schoolName:'Alpha School' }],
@@ -89,6 +91,8 @@ function assertDenied(result,label){
     const principal=await login('alpha-principal','PrincipalPass1');
     const teacher=await login('alpha-teacher','TeacherPass1');
     const district=await login('alpha-district','DistrictPass1');
+    const staff=await login('littlefeet-staff','StaffPass1');
+    const crm=await login('littlefeet-crm','CrmPass1');
     const parent=await login('alpha-parent@example.test','ParentPass1');
 
     // Anonymous users must not read private operational data.
@@ -126,6 +130,18 @@ function assertDenied(result,label){
     assertDenied(await request('/api/modules/operations',{cookie:district}),'district modules');
     assertDenied(await request('/api/chat/groups',{cookie:district}),'district group chat');
     assertDenied(await request('/api/chat/direct/users',{cookie:district}),'district direct chat');
+
+    // Little Feet company roles: Staff is company-wide; CRM is department-scoped.
+    const staffAccounts=await request('/api/accounts',{cookie:staff});
+    assert.equal(staffAccounts.response.status,200);
+    assert.ok(staffAccounts.data.some(account=>account.username==='alpha-admin'));
+    const staffCreatesCrm=await request('/api/accounts',{method:'POST',cookie:staff,body:{username:'new-crm-user',pin:'Password1',name:'New CRM User',role:'crm',schoolName:''}});
+    assert.equal(staffCreatesCrm.response.status,201);
+    assert.equal(staffCreatesCrm.data.account.schoolName,'');
+    const schoolAdminCreatesCrm=await request('/api/accounts',{method:'POST',cookie:admin,body:{username:'blocked-crm-user',pin:'Password1',name:'Blocked CRM User',role:'crm',schoolName:''}});
+    assert.equal(schoolAdminCreatesCrm.response.status,403);
+    assertDenied(await request('/api/accounts',{cookie:crm}),'crm account administration');
+    assert.equal((await request('/api/tickets',{cookie:crm})).response.status,200);
 
     // Username collision by truncation must fail rather than create ambiguous identities.
     const prefix='a'.repeat(160);
