@@ -549,6 +549,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
@@ -5099,9 +5101,13 @@ app.get('/auth/microsoft/callback', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  const blockedFile = /^\/(?:\.env|server\.js|backup-server\.js|littlefeet-replica\.json|littlefeet\.db(?:-(?:shm|wal))?|littlesteps\.db|package(?:-lock)?\.json|create_portal_documents\.py)$/i.test(req.path);
-  const blockedDirectory = /^\/(?:\.git|node_modules|output|tests|tmp|uploads)(?:\/|$)/i.test(req.path);
-  if (blockedFile || blockedDirectory) return res.sendStatus(404);
+  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
+  const blockedDirectory = /^\/(?:\.git|\.github|node_modules|output|tests|tmp|uploads|scripts|lib)(?:\/|$)/i.test(req.path);
+  const blockedSourceMap = /\.map$/i.test(req.path);
+  if (blockedFile || blockedDirectory || blockedSourceMap) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.sendStatus(404);
+  }
   next();
 });
 

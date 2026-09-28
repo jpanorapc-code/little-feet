@@ -14,6 +14,8 @@ const requiredServerPatterns = [
   /monitoring:\s*Boolean\(process\.env\.LF_MONITORING_DSN \|\| process\.env\.LF_MONITORING_PROVIDER\)/,
   /app\.disable\(['"]x-powered-by['"]\)/,
   /Content-Security-Policy/,
+  /X-Permitted-Cross-Domain-Policies/,
+  /Cross-Origin-Resource-Policy/,
   /Cross-origin state changes are not allowed/,
   /littlefeet\.sid/,
   /message:\s*['"]An unexpected server error occurred\./
@@ -79,6 +81,39 @@ const forbiddenClientPatterns = [
 for (const pattern of forbiddenClientPatterns) {
   assert.doesNotMatch(client, pattern, `Unsafe raw interpolation still present: ${pattern}`);
 }
+
+const publicClientFiles = [
+  path.join(root, 'index.html'),
+  path.join(root, 'backup.js'),
+  ...fs.readdirSync(path.join(root, 'assets'), { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.js'))
+    .map(entry => path.join(root, 'assets', entry.name))
+];
+const forbiddenPublicSourcePatterns = [
+  /process\.env/,
+  /DATABASE_URL/,
+  /SESSION_SECRET/,
+  /LF_FIELD_ENCRYPTION_KEY/,
+  /LF_SMTP_PASSWORD/,
+  /LF_EMAIL_API_KEY/,
+  /GOOGLE_CLIENT_SECRET/,
+  /MICROSOFT_CLIENT_SECRET/,
+  /R2_SECRET_ACCESS_KEY/,
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+  /postgres(?:ql)?:\/\//i,
+  /mongodb(?:\+srv)?:\/\//i
+];
+for (const file of publicClientFiles) {
+  const content = fs.readFileSync(file, 'utf8');
+  for (const pattern of forbiddenPublicSourcePatterns) {
+    assert.doesNotMatch(content, pattern, `Sensitive server-only material leaked into public client source: ${path.relative(root, file)} -> ${pattern}`);
+  }
+}
+
+assert.match(server, /blockedSourceMap = \/\\\.map\$\/i\.test\(req\.path\)/);
+assert.match(server, /auth-crypto\\\.js/);
+assert.match(server, /finance-automation-server\\\.js/);
+assert.match(server, /scripts\|lib/);
 
 const secretPatterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
