@@ -24,7 +24,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username:'alpha-admin', pinHash:hash('AdminPass1'), name:'Alpha Admin', role:'admin', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
     { username:'alpha-principal', pinHash:hash('PrincipalPass1'), name:'Alpha Principal', role:'principal', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
     { username:'alpha-teacher', pinHash:hash('TeacherPass1'), name:'Alpha Teacher', role:'teacher', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active', assignedClasses:['Grade 1'] },
-    { username:'alpha-district', pinHash:hash('DistrictPass1'), name:'Alpha District', role:'district', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
+    { username:'alpha-district@example.test', pinHash:hash('DistrictPass1'), name:'Alpha District', role:'district', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
     { username:'littlefeet-staff', pinHash:hash('StaffPass1'), name:'Little Feet Staff', role:'staff', schoolId:'', schoolName:'', verificationStatus:'Active' },
     { username:'littlefeet-crm', pinHash:hash('CrmPass1'), name:'Little Feet CRM', role:'crm', schoolId:'', schoolName:'', verificationStatus:'Active' },
     { username:'alpha-parent@example.test', pinHash:hash('ParentPass1'), name:'Alpha Parent', role:'parent', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active', parentRelationshipStatus:'Administrator approved', linkedLearners:['Alpha Learner'] }
@@ -90,7 +90,7 @@ function assertDenied(result,label){
     const admin=await login('alpha-admin','AdminPass1');
     const principal=await login('alpha-principal','PrincipalPass1');
     const teacher=await login('alpha-teacher','TeacherPass1');
-    const district=await login('alpha-district','DistrictPass1');
+    const district=await login('alpha-district@example.test','DistrictPass1');
     const staff=await login('littlefeet-staff','StaffPass1');
     const crm=await login('littlefeet-crm','CrmPass1');
     const parent=await login('alpha-parent@example.test','ParentPass1');
@@ -112,7 +112,7 @@ function assertDenied(result,label){
     assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'TeacherPass1'}})).response.status,200);
 
     // Anonymous users must not read private operational data.
-    for(const route of ['/api/accounts','/api/schools/search?q=L','/api/registry','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
+    for(const route of ['/api/accounts','/api/schools/search?q=L','/api/email/status','/api/registry','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
       assertDenied(await request(route),'anonymous '+route);
     }
 
@@ -120,6 +120,9 @@ function assertDenied(result,label){
     assert.equal((await request('/api/store',{cookie:parent})).response.status,200);
     assert.equal((await request('/api/chat/groups',{cookie:parent})).response.status,200);
     assert.equal((await request('/api/chat/direct/users',{cookie:parent})).response.status,200);
+    const parentEmailStatus=await request('/api/email/status',{cookie:parent});
+    assert.equal(parentEmailStatus.response.status,200);
+    assert.equal(parentEmailStatus.data.address,'alpha-parent@example.test');
     assertDenied(await request('/api/subscription-billing',{cookie:parent}),'parent school billing');
     assertDenied(await request('/api/modules/operations',{method:'POST',cookie:parent,body:{type:'probe',details:'probe'}}),'parent module write');
     assertDenied(await request('/api/store/products',{method:'POST',cookie:parent,body:{name:'probe',price:1,stockQuantity:1}}),'parent store admin');
@@ -147,6 +150,9 @@ function assertDenied(result,label){
     assertDenied(await request('/api/modules/operations',{cookie:district}),'district modules');
     assertDenied(await request('/api/chat/groups',{cookie:district}),'district group chat');
     assertDenied(await request('/api/chat/direct/users',{cookie:district}),'district direct chat');
+    const districtEmailStatus=await request('/api/email/status',{cookie:district});
+    assert.equal(districtEmailStatus.response.status,200);
+    assert.equal(districtEmailStatus.data.address,'alpha-district@example.test');
 
     // Little Feet company roles: Staff is company-wide; CRM is department-scoped.
     const staffAccounts=await request('/api/accounts',{cookie:staff});
