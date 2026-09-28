@@ -3440,9 +3440,9 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
   if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
   return true;
 };
-const emailActor = req => requireSchoolStaff(req) || requireCompanyStaff(req);
+const emailActor = req => getSessionAccount(req);
 app.get('/api/email/status',(req,res)=>{
-  const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});
+  const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to manage your account email.'});
   const address=accountSecurityEmail(actor);
   res.json({
     configured:smtpEmailConfigured()||apiEmailConfigured(),
@@ -3453,14 +3453,14 @@ app.get('/api/email/status',(req,res)=>{
   });
 });
 app.post('/api/email/verification/request',async(req,res,next)=>{
-  try{const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
+  try{const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to verify your account email.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
     const code=String(crypto.randomInt(100000,1000000)),hash=crypto.createHash('sha256').update(code).digest('hex');emailVerificationTokens.set(normalizeUsername(actor.username),{hash,expiresAt:Date.now()+10*60*1000});
     const sent=await sendLittleFeetEmail({to,subject:'Verify your Little Feet email',text:`Your Little Feet verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`});
     if(!sent){emailVerificationTokens.delete(normalizeUsername(actor.username));return res.status(503).json({message:'Email delivery is not configured yet. Configure the Little Feet SMTP or email API environment settings.'});}res.json({success:true,expiresInSeconds:600,provider:emailDeliveryProvider()});
   }catch(error){emailVerificationTokens.delete(normalizeUsername(getSessionAccount(req)?.username));next(error);}
 });
 app.post('/api/email/verification/confirm',(req,res)=>{
-  const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
+  const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to verify your account email.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
   if(!entry||entry.expiresAt<Date.now()){emailVerificationTokens.delete(key);return res.status(400).json({message:'Verification code expired. Request a new one.'});}
   const hash=crypto.createHash('sha256').update(code).digest('hex');if(code.length!==6||hash!==entry.hash)return res.status(400).json({message:'Verification code is incorrect.'});
   actor.emailVerifiedAt=new Date().toISOString();emailVerificationTokens.delete(key);res.json({success:true,verifiedAt:actor.emailVerifiedAt});
