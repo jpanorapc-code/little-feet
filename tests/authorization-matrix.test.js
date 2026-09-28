@@ -112,7 +112,7 @@ function assertDenied(result,label){
     assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'TeacherPass1'}})).response.status,200);
 
     // Anonymous users must not read private operational data.
-    for(const route of ['/api/accounts','/api/registry','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
+    for(const route of ['/api/accounts','/api/schools/search?q=L','/api/registry','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
       assertDenied(await request(route),'anonymous '+route);
     }
 
@@ -136,6 +136,7 @@ function assertDenied(result,label){
     // Principal: operational leadership is preserved, platform-admin controls remain admin-only.
     assert.equal((await request('/api/subscription-billing',{cookie:principal})).response.status,200);
     assertDenied(await request('/api/accounts',{method:'POST',cookie:principal,body:{username:'x',pin:'1234',name:'x',role:'teacher'}}),'principal account admin');
+    assertDenied(await request('/api/schools/search?q=L',{cookie:principal}),'principal school search');
     assertDenied(await request('/api/payments/ledger',{cookie:principal}),'principal payment ledger');
     assertDenied(await request('/api/store/products',{method:'POST',cookie:principal,body:{name:'probe',price:1,stockQuantity:1}}),'principal store product admin');
     assertDenied(await request('/api/learner-access-codes/printable-list',{cookie:principal}),'principal bulk code export');
@@ -150,6 +151,9 @@ function assertDenied(result,label){
     // Little Feet company roles: Staff is company-wide; CRM is department-scoped.
     const staffAccounts=await request('/api/accounts',{cookie:staff});
     assert.equal(staffAccounts.response.status,200);
+    const staffSchoolSearch=await request('/api/schools/search?q=L',{cookie:staff});
+    assert.equal(staffSchoolSearch.response.status,200);
+    assert.deepEqual(staffSchoolSearch.data.results,[]);
     assert.ok(staffAccounts.data.some(account=>account.username==='alpha-admin'));
     const staffCreatesCrm=await request('/api/accounts',{method:'POST',cookie:staff,body:{username:'new-crm-user',pin:'Password1',name:'New CRM User',role:'crm',schoolName:''}});
     assert.equal(staffCreatesCrm.response.status,201);
