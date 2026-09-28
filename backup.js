@@ -3792,6 +3792,12 @@ async function loadAccounts() {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
     accountsCache = accounts;
+    const accountSelector = document.getElementById('accountEditSelect');
+    if (accountSelector) {
+      const previousSelection = accountSelector.value;
+      accountSelector.innerHTML = `<option value="">Create a new account / select an existing account</option>${accounts.map(account => `<option value="${encodeURIComponent(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.username)} · ${escapeWorkspaceText(account.role)}</option>`).join('')}`;
+      if (previousSelection && [...accountSelector.options].some(option => option.value === previousSelection)) accountSelector.value = previousSelection;
+    }
     list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(account.role)}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName)}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve account</button>` : ''}${account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeURIComponent(account.username)}')">Approve learner request</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
   } catch { list.textContent = 'Unable to load account records.'; }
 }
@@ -3931,6 +3937,8 @@ function resetAccountForm() {
   const form = document.getElementById('accountForm');
   if (!form) return;
   form.reset();
+  const accountSelector = document.getElementById('accountEditSelect');
+  if (accountSelector) accountSelector.value = '';
   document.getElementById('accountOriginalUsername').value = '';
   document.getElementById('accountSaveButton').textContent = 'Create account';
   const deleteButton = document.getElementById('accountDeleteButton');
@@ -3940,6 +3948,8 @@ function resetAccountForm() {
 }
 
 function editAccount(account) {
+  const accountSelector = document.getElementById('accountEditSelect');
+  if (accountSelector) accountSelector.value = encodeURIComponent(account.username);
   document.getElementById('accountOriginalUsername').value = account.username;
   document.getElementById('accountName').value = account.name || '';
   document.getElementById('accountUsername').value = account.username || '';
@@ -3960,6 +3970,19 @@ function editAccount(account) {
 function editAccountByUsername(encodedUsername) {
   const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
   if (account) editAccount(account);
+}
+
+function selectAccountForEditing(encodedUsername) {
+  if (!encodedUsername) {
+    resetAccountForm();
+    return;
+  }
+  const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
+  if (!account) {
+    resetAccountForm();
+    return alert('That account is no longer available. Refresh the account list and try again.');
+  }
+  editAccount(account);
 }
 
 async function openLearnerLinkPicker() {
