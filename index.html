@@ -656,6 +656,45 @@
     .guide-link-card h3 { color:var(--text-dark); margin:0 0 7px; font-size:1rem; }
     .guide-link-card p { color:var(--text-muted); margin:0; }
     .guide-link-card .guide-open { display:block; margin-top:12px; color:var(--primary-color); font-size:.78rem; font-weight:700; }
+    /* School setup: compact, ordered steps that use the available width instead of tall empty cards. */
+    .school-setup-card { padding:20px 22px; }
+    .school-setup-card .card-header-bar { margin-bottom:6px; }
+    .school-setup-card .card-header-bar h2 { font-size:clamp(1.2rem,1.5vw,1.48rem); }
+    .school-setup-intro { margin:0 0 14px; color:var(--text-muted); font-size:clamp(.96rem,1.05vw,1.08rem); line-height:1.45; }
+    .school-setup-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .school-setup-step {
+      min-height:0;
+      padding:15px 16px;
+      display:grid;
+      grid-template-rows:auto auto auto;
+      align-content:start;
+      gap:7px;
+      border-radius:13px;
+    }
+    .school-setup-step h3 { display:flex; align-items:center; gap:9px; margin:0; font-size:clamp(1.04rem,1.1vw,1.18rem); line-height:1.25; }
+    .school-setup-step p { margin:0; font-size:clamp(.9rem,.98vw,1rem); line-height:1.42; }
+    .school-setup-step .guide-open { margin-top:3px; font-size:clamp(.82rem,.9vw,.92rem); }
+    .school-setup-number {
+      display:inline-grid;
+      place-items:center;
+      width:28px;
+      height:28px;
+      flex:0 0 28px;
+      border:1px solid rgba(94,234,212,.42);
+      border-radius:9px;
+      background:rgba(45,212,191,.14);
+      color:#99f6e4;
+      font-size:.86rem;
+      font-weight:900;
+    }
+    @media (max-width:1180px) { .school-setup-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:640px) {
+      .school-setup-card { padding:16px; }
+      .school-setup-grid { grid-template-columns:1fr; }
+      .school-setup-step { padding:14px; }
+      .school-setup-step h3 { font-size:1.08rem; }
+      .school-setup-step p { font-size:.94rem; }
+    }
     button, .nav-links li button { transition:transform .16s ease, box-shadow .16s ease, background-color .16s ease, border-color .16s ease; }
     button.submit-btn:not(:disabled)::after { content:'→'; margin-left:3px; transition:transform .16s ease; }
     button.submit-btn:hover::after { transform:translateX(3px); }
@@ -4823,14 +4862,14 @@
           </div>
         </section>
         <div id="householdSwitcher" class="card hidden" style="margin-bottom:20px;"></div>
-        <section class="card role-admin" data-roles="admin" style="margin-bottom:18px;">
-          <div class="card-header-bar"><h2>🚀 School setup checklist</h2><span class="badge-tag info">ADMIN</span></div>
-          <p style="color:var(--text-muted);margin-bottom:12px;">Complete these essentials before inviting families and staff.</p>
-          <div class="workspace-grid">
-            <button type="button" class="guide-link-card" onclick="openWorkspace('dataImportTab')"><h3>1. Import learners</h3><p>Upload your approved learner register and check for duplicates.</p><span class="guide-open">Open data import →</span></button>
-            <button type="button" class="guide-link-card" onclick="openWorkspace('accountsTab')"><h3>2. Add people &amp; links</h3><p>Create staff and parent accounts, then link each parent to their learners.</p><span class="guide-open">Open accounts →</span></button>
-            <button type="button" class="guide-link-card" onclick="openWorkspace('safeguardingTab')"><h3>3. Record consent</h3><p>Capture media consent and approved pickup information.</p><span class="guide-open">Open safeguarding →</span></button>
-            <button type="button" class="guide-link-card" onclick="openWorkspace('financeTab')"><h3>4. Confirm finance setup</h3><p>Review billing rules and connect approved payment services when ready.</p><span class="guide-open">Open finance →</span></button>
+        <section class="card role-admin school-setup-card" data-roles="admin" style="margin-bottom:18px;">
+          <div class="card-header-bar"><h2>School setup checklist</h2><span class="badge-tag info">ADMIN</span></div>
+          <p class="school-setup-intro">Complete these essentials in order before inviting families and staff.</p>
+          <div class="workspace-grid school-setup-grid">
+            <button type="button" class="guide-link-card school-setup-step" onclick="openWorkspace('dataImportTab')"><h3><span class="school-setup-number">1</span>Import learners</h3><p>Upload the approved learner register and check for duplicates.</p><span class="guide-open">Open data import →</span></button>
+            <button type="button" class="guide-link-card school-setup-step" onclick="openWorkspace('accountsTab')"><h3><span class="school-setup-number">2</span>Add people &amp; links</h3><p>Create staff and parent accounts, then link parents to their learners.</p><span class="guide-open">Open accounts →</span></button>
+            <button type="button" class="guide-link-card school-setup-step" onclick="openWorkspace('safeguardingTab')"><h3><span class="school-setup-number">3</span>Record consent</h3><p>Capture media consent and approved pickup information.</p><span class="guide-open">Open safeguarding →</span></button>
+            <button type="button" class="guide-link-card school-setup-step" onclick="openWorkspace('financeTab')"><h3><span class="school-setup-number">4</span>Confirm finance setup</h3><p>Review billing rules and connect approved payment services when ready.</p><span class="guide-open">Open finance →</span></button>
           </div>
         </section>
         <section id="updatesBoard" class="card hidden" style="margin-bottom:18px;"></section>
