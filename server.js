@@ -3250,17 +3250,16 @@ const addEmailInboxItem = (actor, data) => {
   });
   db.emailInbox.unshift(item); return item;
 };
-const emailInboxPreferenceDefaults = actor => actor?.role === 'parent'
-  ? { tickets:true, messages:true, payments:true, subscriptions:true }
-  : { tickets:true, messages:true, notices:true, alerts:true };
-const emailInboxPreferenceKeys = actor => actor?.role === 'parent'
-  ? ['tickets','messages','payments','subscriptions']
-  : ['tickets','messages','notices','alerts'];
-const emailInboxPreferencesFor = actor => {
-  const defaults = emailInboxPreferenceDefaults(actor);
-  const saved = actor?.emailInboxPreferences && typeof actor.emailInboxPreferences === 'object' ? actor.emailInboxPreferences : {};
-  return Object.fromEntries(Object.keys(defaults).map(key => [key, saved[key] !== undefined ? Boolean(saved[key]) : defaults[key]]));
+const emailInboxPreferenceDefaults = actor => {
+  const role = String(actor?.role || '');
+  if (role === 'parent') return { tickets:true, messages:true, payments:true, subscriptions:true };
+  if (role === 'district') return { tickets:true, alerts:true };
+  if (role === 'crm' || role === 'support') return { tickets:true, messages:true };
+  if (role === 'accounts') return { tickets:true };
+  return { tickets:true, messages:true, notices:true, alerts:true };
 };
+const emailInboxPreferenceKeys = actor => Object.keys(emailInboxPreferenceDefaults(actor));
+const emailInboxPreferencesFor = actor => emailInboxPreferenceDefaults(actor);
 const emailInboxTypeKey = type => ({
   Ticket:'tickets', Message:'messages', Notice:'notices', Alert:'alerts', Payment:'payments', Subscription:'subscriptions'
 })[type] || '';
@@ -3340,18 +3339,6 @@ const buildEmailInbox = actor => {
   tenantRecords(db.broadcasts, actor).forEach(b=>add('Alert',b.id,b.bcPriority||'School alert',b.bcMessage,'broadcastsTab'));
   return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
 };
-app.get('/api/email/preferences',(req,res)=>{
-  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to manage email preferences.'});
-  res.json({ preferences: emailInboxPreferencesFor(actor), keys: emailInboxPreferenceKeys(actor), parentOnly: actor.role === 'parent' });
-});
-app.patch('/api/email/preferences',(req,res)=>{
-  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to manage email preferences.'});
-  const allowed=emailInboxPreferenceKeys(actor),next=emailInboxPreferencesFor(actor);
-  for(const key of allowed){if(typeof req.body?.[key]==='boolean')next[key]=req.body[key];}
-  actor.emailInboxPreferences=next;
-  res.json({success:true,preferences:next,keys:allowed,parentOnly:actor.role==='parent'});
-});
-
 app.get('/api/email/inbox',(req,res)=>{
   const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view your Little Feet email inbox.'});
   res.json(buildEmailInbox(actor));
@@ -3534,21 +3521,6 @@ app.get('/api/email/status',(req,res)=>{
     verified:Boolean(actor.emailVerifiedAt),
     verifiedAt:actor.emailVerifiedAt||null
   });
-});
-app.post('/api/email/test',async(req,res,next)=>{
-  try{
-    const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to test email delivery.'});
-    const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
-    if(!actor.emailVerifiedAt)return res.status(409).json({message:'Verify this email address first, then send a test message.'});
-    const sent=await sendLittleFeetEmail({
-      to,
-      subject:'Little Feet email connection test',
-      text:`Hello ${String(actor.name||'Little Feet user').trim()},\n\nYour Little Feet email connection is working.\n\nSent: ${new Date().toISOString()}\n\nLittle Feet`
-    });
-    if(!sent)return res.status(503).json({message:'Email delivery is not configured yet.'});
-    actor.emailLastTestSentAt=new Date().toISOString();
-    res.json({success:true,sentTo:to,sentAt:actor.emailLastTestSentAt,provider:emailDeliveryProvider()});
-  }catch(error){next(error);}
 });
 app.post('/api/email/verification/request',async(req,res,next)=>{
   try{const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to verify your account email.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
