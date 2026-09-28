@@ -12,6 +12,7 @@ const checklist = fs.readFileSync(path.join(root, 'VIDEO_REVIEW_CHECKLIST.md'), 
 const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 const mobilePwa = fs.readFileSync(path.join(root, 'assets', 'mobile-pwa.js'), 'utf8');
+const myDay = fs.readFileSync(path.join(root, 'assets', 'my-day.js'), 'utf8');
 const curriculum = fs.readFileSync(path.join(root, 'assets', 'curriculum-frameworks.js'), 'utf8');
 const auroraWallpaper = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-aurora-stars-4k.svg'), 'utf8');
 const starGlowMask = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-star-glow-mask-4k.svg'), 'utf8');
