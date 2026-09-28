@@ -3250,6 +3250,26 @@ const addEmailInboxItem = (actor, data) => {
   });
   db.emailInbox.unshift(item); return item;
 };
+const emailInboxPreferenceDefaults = actor => actor?.role === 'parent'
+  ? { tickets:true, messages:true, payments:true, subscriptions:true }
+  : { tickets:true, messages:true, notices:true, alerts:true };
+const emailInboxPreferenceKeys = actor => actor?.role === 'parent'
+  ? ['tickets','messages','payments','subscriptions']
+  : ['tickets','messages','notices','alerts'];
+const emailInboxPreferencesFor = actor => {
+  const defaults = emailInboxPreferenceDefaults(actor);
+  const saved = actor?.emailInboxPreferences && typeof actor.emailInboxPreferences === 'object' ? actor.emailInboxPreferences : {};
+  return Object.fromEntries(Object.keys(defaults).map(key => [key, saved[key] !== undefined ? Boolean(saved[key]) : defaults[key]]));
+};
+const emailInboxTypeKey = type => ({
+  Ticket:'tickets', Message:'messages', Notice:'notices', Alert:'alerts', Payment:'payments', Subscription:'subscriptions'
+})[type] || '';
+const emailInboxTypeEnabled = (actor, type) => {
+  const key = emailInboxTypeKey(type);
+  if (!key || !emailInboxPreferenceKeys(actor).includes(key)) return false;
+  return emailInboxPreferencesFor(actor)[key] !== false;
+};
+
 const buildEmailInbox = actor => {
   const isParent = actor?.role === 'parent';
   const parentUsername = normalizeUsername(actor?.username);
@@ -3271,10 +3291,12 @@ const buildEmailInbox = actor => {
 
   const existing = tenantRecords(db.emailInbox, actor)
     .filter(item => emailInboxVisibleTo(item, actor))
-    .filter(item => !isParent || parentAllowedTypes.has(item.type));
+    .filter(item => !isParent || parentAllowedTypes.has(item.type))
+    .filter(item => emailInboxTypeEnabled(actor, item.type));
   const known = new Set(existing.map(item => item.type + ':' + item.sourceId));
   const dismissed = new Set(tenantRecords(db.emailDismissals, actor).filter(item => normalizeUsername(item.username) === parentUsername).map(item => item.sourceKey));
   const add = (type, sourceId, title, message, sourceTab) => {
+    if (!emailInboxTypeEnabled(actor, type)) return;
     const key=type+':'+sourceId;if(!sourceId||known.has(key)||dismissed.has(key))return;
     const item=addEmailInboxItem(actor,{type,sourceId,title,message,sourceTab});if(item){existing.push(item);known.add(key);}
   };
@@ -3318,6 +3340,18 @@ const buildEmailInbox = actor => {
   tenantRecords(db.broadcasts, actor).forEach(b=>add('Alert',b.id,b.bcPriority||'School alert',b.bcMessage,'broadcastsTab'));
   return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
 };
+app.get('/api/email/preferences',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to manage email preferences.'});
+  res.json({ preferences: emailInboxPreferencesFor(actor), keys: emailInboxPreferenceKeys(actor), parentOnly: actor.role === 'parent' });
+});
+app.patch('/api/email/preferences',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to manage email preferences.'});
+  const allowed=emailInboxPreferenceKeys(actor),next=emailInboxPreferencesFor(actor);
+  for(const key of allowed){if(typeof req.body?.[key]==='boolean')next[key]=req.body[key];}
+  actor.emailInboxPreferences=next;
+  res.json({success:true,preferences:next,keys:allowed,parentOnly:actor.role==='parent'});
+});
+
 app.get('/api/email/inbox',(req,res)=>{
   const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view your Little Feet email inbox.'});
   res.json(buildEmailInbox(actor));
@@ -3500,6 +3534,21 @@ app.get('/api/email/status',(req,res)=>{
     verified:Boolean(actor.emailVerifiedAt),
     verifiedAt:actor.emailVerifiedAt||null
   });
+});
+app.post('/api/email/test',async(req,res,next)=>{
+  try{
+    const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to test email delivery.'});
+    const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
+    if(!actor.emailVerifiedAt)return res.status(409).json({message:'Verify this email address first, then send a test message.'});
+    const sent=await sendLittleFeetEmail({
+      to,
+      subject:'Little Feet email connection test',
+      text:`Hello ${String(actor.name||'Little Feet user').trim()},\n\nYour Little Feet email connection is working.\n\nSent: ${new Date().toISOString()}\n\nLittle Feet`
+    });
+    if(!sent)return res.status(503).json({message:'Email delivery is not configured yet.'});
+    actor.emailLastTestSentAt=new Date().toISOString();
+    res.json({success:true,sentTo:to,sentAt:actor.emailLastTestSentAt,provider:emailDeliveryProvider()});
+  }catch(error){next(error);}
 });
 app.post('/api/email/verification/request',async(req,res,next)=>{
   try{const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to verify your account email.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
