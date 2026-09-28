@@ -3,6 +3,7 @@ const compression = require('compression');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+const tls = require('tls');
 const Database = require('better-sqlite3');
 const { Pool } = require('pg');
 const session = require('express-session');
@@ -468,38 +469,22 @@ const accountSecurityEmail = account => {
 };
 const sendLoginLockoutEmail = async account => {
   const to = accountSecurityEmail(account);
-  const from = String(process.env.LF_EMAIL_FROM || '').trim();
-  const apiKey = String(process.env.LF_EMAIL_API_KEY || '').trim();
-  if (!to || !from || !apiKey) return false;
-
-  const endpoint = safeHttpsUrl(process.env.LF_EMAIL_API_URL || 'https://api.resend.com/emails');
-  if (!endpoint) throw new Error('Invalid LF_EMAIL_API_URL');
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: 'Little Feet sign-in temporarily locked',
-      text: [
-        `Hello ${String(account?.name || 'Little Feet user').trim()},`,
-        '',
-        'Little Feet blocked sign-in attempts to your account for 10 minutes after three unsuccessful password or PIN attempts.',
-        `Lock started: ${new Date().toISOString()}`,
-        '',
-        'If this was you, wait 10 minutes before trying again.',
-        'If this was not you, contact your school administrator and change your password or PIN as soon as you can.',
-        '',
-        'Little Feet security'
-      ].join('\n')
-    })
+  if (!to) return false;
+  return sendLittleFeetEmail({
+    to,
+    subject: 'Little Feet sign-in temporarily locked',
+    text: [
+      `Hello ${String(account?.name || 'Little Feet user').trim()},`,
+      '',
+      'Little Feet blocked sign-in attempts to your account for 10 minutes after three unsuccessful password or PIN attempts.',
+      `Lock started: ${new Date().toISOString()}`,
+      '',
+      'If this was you, wait 10 minutes before trying again.',
+      'If this was not you, contact your school administrator and change your password or PIN as soon as you can.',
+      '',
+      'Little Feet security'
+    ].join('\n')
   });
-  if (!response.ok) throw new Error(`Email provider returned HTTP ${response.status}`);
-  return true;
 };
 
 const pruneLoginAttempts = (now = Date.now()) => {
@@ -3199,27 +3184,178 @@ app.delete('/api/email/inbox',(req,res)=>{
 });
 
 // Email is a delivery channel, separate from in-app notifications.
+// Little Feet can use the existing HTTPS email API or a real mailbox SMTP
+// connection (for example Zoho Mail) without exposing mailbox credentials.
 const emailVerificationTokens = new Map();
-const sendLittleFeetEmail = async ({to,subject,text}) => {
-  const from=String(process.env.LF_EMAIL_FROM||'').trim(),apiKey=String(process.env.LF_EMAIL_API_KEY||'').trim();
-  if(!looksLikeEmailAddress(to)||!from||!apiKey)return false;
-  const endpoint=safeHttpsUrl(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails');if(!endpoint)throw new Error('Invalid LF_EMAIL_API_URL');
-  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({from,to:[to],subject,text})});
-  if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);return true;
+const emailHeaderText = value => String(value || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 300);
+const smtpConfig = () => {
+  const port = Number(process.env.LF_SMTP_PORT || 465);
+  return {
+    host: String(process.env.LF_SMTP_HOST || '').trim(),
+    port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 465,
+    username: String(process.env.LF_SMTP_USERNAME || '').trim(),
+    password: String(process.env.LF_SMTP_PASSWORD || ''),
+    from: String(process.env.LF_EMAIL_FROM || process.env.LF_SMTP_USERNAME || '').trim(),
+    fromName: emailHeaderText(process.env.LF_EMAIL_FROM_NAME || 'Little Feet')
+  };
 };
+const smtpEmailConfigured = () => {
+  const config = smtpConfig();
+  return Boolean(config.host && config.username && config.password && looksLikeEmailAddress(config.from));
+};
+const apiEmailConfigured = () => Boolean(
+  looksLikeEmailAddress(process.env.LF_EMAIL_FROM) &&
+  String(process.env.LF_EMAIL_API_KEY || '').trim()
+);
+const emailDeliveryProvider = () => {
+  if (smtpEmailConfigured()) {
+    const host = smtpConfig().host.toLowerCase();
+    return host.includes('zoho') ? 'Zoho SMTP' : 'SMTP';
+  }
+  if (apiEmailConfigured()) return 'Email API';
+  return 'Not configured';
+};
+
+const smtpSend = async ({to,subject,text}) => {
+  const config = smtpConfig();
+  if (!smtpEmailConfigured()) return false;
+  if (config.port !== 465) throw new Error('Little Feet SMTP currently requires implicit TLS on port 465.');
+
+  const responseQueue = [];
+  const waiters = [];
+  let lineBuffer = '';
+  let responseLines = [];
+  let terminalError = null;
+
+  const deliver = response => {
+    const waiter = waiters.shift();
+    if (waiter) waiter.resolve(response);
+    else responseQueue.push(response);
+  };
+  const failAll = error => {
+    if (terminalError) return;
+    terminalError = error instanceof Error ? error : new Error(String(error || 'SMTP connection failed.'));
+    while (waiters.length) waiters.shift().reject(terminalError);
+  };
+  const nextResponse = () => {
+    if (responseQueue.length) return Promise.resolve(responseQueue.shift());
+    if (terminalError) return Promise.reject(terminalError);
+    return new Promise((resolve,reject)=>waiters.push({resolve,reject}));
+  };
+  const expect = async (allowed, label) => {
+    const response = await nextResponse();
+    if (!allowed.includes(response.code)) throw new Error(`SMTP ${label} failed with ${response.code}: ${response.text}`);
+    return response;
+  };
+
+  const socket = tls.connect({
+    host: config.host,
+    port: config.port,
+    servername: config.host,
+    rejectUnauthorized: true
+  });
+  socket.setTimeout(15000, () => {
+    const error = new Error('SMTP connection timed out.');
+    failAll(error);
+    socket.destroy(error);
+  });
+  socket.on('error', failAll);
+  socket.on('close', () => {
+    if (waiters.length && !terminalError) failAll(new Error('SMTP connection closed unexpectedly.'));
+  });
+  socket.on('data', chunk => {
+    lineBuffer += chunk.toString('utf8');
+    const lines = lineBuffer.split(/\r?\n/);
+    lineBuffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line) continue;
+      responseLines.push(line);
+      if (/^\d{3} /.test(line)) {
+        const code = Number(line.slice(0,3));
+        deliver({ code, text: responseLines.join(' | ').slice(0,1200) });
+        responseLines = [];
+      }
+    }
+  });
+
+  try {
+    await new Promise((resolve,reject)=>{
+      if (socket.authorized) return resolve();
+      socket.once('secureConnect', resolve);
+      socket.once('error', reject);
+    });
+    await expect([220], 'greeting');
+    const command = async (value, allowed, label) => {
+      socket.write(`${value}\r\n`);
+      return expect(allowed, label);
+    };
+    await command('EHLO littlefeet.co.za', [250], 'EHLO');
+    await command('AUTH LOGIN', [334], 'authentication');
+    await command(Buffer.from(config.username).toString('base64'), [334], 'username');
+    await command(Buffer.from(config.password).toString('base64'), [235], 'password');
+    await command(`MAIL FROM:<${config.from}>`, [250], 'sender');
+    await command(`RCPT TO:<${to}>`, [250,251], 'recipient');
+    await command('DATA', [354], 'data');
+
+    const cleanSubject = emailHeaderText(subject || 'Little Feet');
+    const cleanText = String(text || '').replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+    const fromHeader = config.fromName ? `${config.fromName} <${config.from}>` : config.from;
+    const message = [
+      `From: ${fromHeader}`,
+      `To: ${to}`,
+      `Subject: ${cleanSubject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      `Date: ${new Date().toUTCString()}`,
+      '',
+      cleanText
+    ].join('\r\n');
+    socket.write(`${message}\r\n.\r\n`);
+    await expect([250], 'message delivery');
+    socket.write('QUIT\r\n');
+    await expect([221], 'QUIT').catch(()=>{});
+    socket.end();
+    return true;
+  } catch (error) {
+    socket.destroy();
+    throw error;
+  }
+};
+
+const sendLittleFeetEmail = async ({to,subject,text}) => {
+  if (!looksLikeEmailAddress(to)) return false;
+  if (smtpEmailConfigured()) return smtpSend({to,subject,text});
+
+  const from=String(process.env.LF_EMAIL_FROM||'').trim(),apiKey=String(process.env.LF_EMAIL_API_KEY||'').trim();
+  if(!looksLikeEmailAddress(from)||!apiKey)return false;
+  const endpoint=safeHttpsUrl(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails');
+  if(!endpoint)throw new Error('Invalid LF_EMAIL_API_URL');
+  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({from,to:[to],subject:emailHeaderText(subject),text:String(text||'')})});
+  if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
+  return true;
+};
+const emailActor = req => requireSchoolStaff(req) || requireCompanyStaff(req);
 app.get('/api/email/status',(req,res)=>{
-  const actor=requireSchoolStaff(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
-  const address=accountSecurityEmail(actor);res.json({configured:Boolean(process.env.LF_EMAIL_FROM&&process.env.LF_EMAIL_API_KEY),address,verified:Boolean(actor.emailVerifiedAt),verifiedAt:actor.emailVerifiedAt||null});
+  const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});
+  const address=accountSecurityEmail(actor);
+  res.json({
+    configured:smtpEmailConfigured()||apiEmailConfigured(),
+    provider:emailDeliveryProvider(),
+    address,
+    verified:Boolean(actor.emailVerifiedAt),
+    verifiedAt:actor.emailVerifiedAt||null
+  });
 });
 app.post('/api/email/verification/request',async(req,res,next)=>{
-  try{const actor=requireCompanyStaff(req);if(!actor)return res.status(403).json({message:'Little Feet staff access is required.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
+  try{const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
     const code=String(crypto.randomInt(100000,1000000)),hash=crypto.createHash('sha256').update(code).digest('hex');emailVerificationTokens.set(normalizeUsername(actor.username),{hash,expiresAt:Date.now()+10*60*1000});
     const sent=await sendLittleFeetEmail({to,subject:'Verify your Little Feet email',text:`Your Little Feet verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`});
-    if(!sent){emailVerificationTokens.delete(normalizeUsername(actor.username));return res.status(503).json({message:'Email delivery is not configured yet.'});}res.json({success:true,expiresInSeconds:600});
-  }catch(error){next(error);}
+    if(!sent){emailVerificationTokens.delete(normalizeUsername(actor.username));return res.status(503).json({message:'Email delivery is not configured yet. Configure the Little Feet SMTP or email API environment settings.'});}res.json({success:true,expiresInSeconds:600,provider:emailDeliveryProvider()});
+  }catch(error){emailVerificationTokens.delete(normalizeUsername(getSessionAccount(req)?.username));next(error);}
 });
 app.post('/api/email/verification/confirm',(req,res)=>{
-  const actor=requireCompanyStaff(req);if(!actor)return res.status(403).json({message:'Little Feet staff access is required.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
+  const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
   if(!entry||entry.expiresAt<Date.now()){emailVerificationTokens.delete(key);return res.status(400).json({message:'Verification code expired. Request a new one.'});}
   const hash=crypto.createHash('sha256').update(code).digest('hex');if(code.length!==6||hash!==entry.hash)return res.status(400).json({message:'Verification code is incorrect.'});
   actor.emailVerifiedAt=new Date().toISOString();emailVerificationTokens.delete(key);res.json({success:true,verifiedAt:actor.emailVerifiedAt});
