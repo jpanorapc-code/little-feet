@@ -3250,21 +3250,91 @@ const addEmailInboxItem = (actor, data) => {
   });
   db.emailInbox.unshift(item); return item;
 };
+const emailInboxPreferenceDefaults = actor => {
+  const role = String(actor?.role || '');
+  if (role === 'parent') return { tickets:true, messages:true, payments:true, subscriptions:true };
+  if (role === 'district') return { tickets:true, alerts:true };
+  if (role === 'crm' || role === 'support') return { tickets:true, messages:true };
+  if (role === 'accounts') return { tickets:true };
+  return { tickets:true, messages:true, notices:true, alerts:true };
+};
+const emailInboxPreferenceKeys = actor => Object.keys(emailInboxPreferenceDefaults(actor));
+const emailInboxPreferencesFor = actor => emailInboxPreferenceDefaults(actor);
+const emailInboxTypeKey = type => ({
+  Ticket:'tickets', Message:'messages', Notice:'notices', Alert:'alerts', Payment:'payments', Subscription:'subscriptions'
+})[type] || '';
+const emailInboxTypeEnabled = (actor, type) => {
+  const key = emailInboxTypeKey(type);
+  if (!key || !emailInboxPreferenceKeys(actor).includes(key)) return false;
+  return emailInboxPreferencesFor(actor)[key] !== false;
+};
+
 const buildEmailInbox = actor => {
-  const openTicketIds = new Set(tenantRecords(db.tickets, actor).filter(ticket => ticket.status !== 'Completed').map(ticket => ticket.id));
+  const isParent = actor?.role === 'parent';
+  const parentUsername = normalizeUsername(actor?.username);
+  const parentAllowedTypes = new Set(['Ticket', 'Message', 'Payment', 'Subscription']);
+
+  // Parent inboxes are deliberately isolated from staff notices, internal school alerts,
+  // and other operational material. Remove any legacy items that were created before
+  // this boundary existed so old data cannot keep leaking into a parent account.
+  if (isParent) {
+    db.emailInbox = db.emailInbox.filter(item => !emailInboxVisibleTo(item, actor) || parentAllowedTypes.has(item.type));
+  }
+
+  const openTicketIds = new Set(
+    tenantRecords(db.tickets, actor)
+      .filter(ticket => ticket.status !== 'Completed' && (!isParent || normalizeUsername(ticket.createdBy) === parentUsername))
+      .map(ticket => ticket.id)
+  );
   db.emailInbox = db.emailInbox.filter(item => !(emailInboxVisibleTo(item, actor) && item.type === 'Ticket' && !openTicketIds.has(item.sourceId)));
-  const existing = tenantRecords(db.emailInbox, actor).filter(item => emailInboxVisibleTo(item, actor));
+
+  const existing = tenantRecords(db.emailInbox, actor)
+    .filter(item => emailInboxVisibleTo(item, actor))
+    .filter(item => !isParent || parentAllowedTypes.has(item.type))
+    .filter(item => emailInboxTypeEnabled(actor, item.type));
   const known = new Set(existing.map(item => item.type + ':' + item.sourceId));
-  const dismissed = new Set(tenantRecords(db.emailDismissals, actor).filter(item => normalizeUsername(item.username) === normalizeUsername(actor.username)).map(item => item.sourceKey));
+  const dismissed = new Set(tenantRecords(db.emailDismissals, actor).filter(item => normalizeUsername(item.username) === parentUsername).map(item => item.sourceKey));
   const add = (type, sourceId, title, message, sourceTab) => {
+    if (!emailInboxTypeEnabled(actor, type)) return;
     const key=type+':'+sourceId;if(!sourceId||known.has(key)||dismissed.has(key))return;
     const item=addEmailInboxItem(actor,{type,sourceId,title,message,sourceTab});if(item){existing.push(item);known.add(key);}
   };
-  tenantRecords(db.tickets, actor).filter(t=>t.status!=='Completed'&&(normalizeUsername(t.createdBy)===normalizeUsername(actor.username)||normalizeUsername(t.assignedTo)===normalizeUsername(actor.username)))
+
+  if (isParent) {
+    // Parent-facing only: their own support requests, messages addressed to them,
+    // their payment requests and their own LittleSteps subscription activity.
+    tenantRecords(db.tickets, actor)
+      .filter(t => t.status !== 'Completed' && normalizeUsername(t.createdBy) === parentUsername)
+      .forEach(t => add('Ticket', t.id, t.subject, t.feedback || t.message || 'Support ticket update', 'ticketsTab'));
+    tenantRecords(db.directMessages, actor)
+      .filter(m => normalizeUsername(m.recipient) === parentUsername)
+      .forEach(m => add('Message', m.id, 'Message from ' + (m.sender || 'Little Feet'), m.message, 'chatTab'));
+    (db.parentPayments || [])
+      .filter(record => recordInSchool(record, actor) && normalizeUsername(record.parentUsername) === parentUsername)
+      .forEach(record => add(
+        'Payment',
+        record.id,
+        record.description || 'Parent payment request',
+        `${record.learnerName ? record.learnerName + ' · ' : ''}${record.reference || 'Payment'} · ${String(record.paymentStatus || 'awaiting payment').replaceAll('_',' ')}`,
+        'parentPaymentsTab'
+      ));
+    (db.parentSubscriptions || [])
+      .filter(record => recordInSchool(record, actor) && normalizeUsername(record.parentUsername) === parentUsername)
+      .forEach(record => add(
+        'Subscription',
+        record.id,
+        'LittleSteps subscription',
+        `${record.reference || 'Subscription'} · ${String(record.paymentStatus || 'awaiting payment').replaceAll('_',' ')}`,
+        'parentPaymentsTab'
+      ));
+    return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  }
+
+  tenantRecords(db.tickets, actor).filter(t=>t.status!=='Completed'&&(normalizeUsername(t.createdBy)===parentUsername||normalizeUsername(t.assignedTo)===parentUsername))
     .forEach(t=>add('Ticket',t.id,t.subject,t.feedback||t.message||'Support ticket update','ticketsTab'));
   tenantRecords(db.staffNotices, actor).filter(n=>n.audience==='All staff'||n.audience===actor.role)
     .forEach(n=>add('Notice',n.id,n.title,n.message,'staffNoticesTab'));
-  tenantRecords(db.directMessages, actor).filter(m=>normalizeUsername(m.recipient)===normalizeUsername(actor.username))
+  tenantRecords(db.directMessages, actor).filter(m=>normalizeUsername(m.recipient)===parentUsername)
     .forEach(m=>add('Message',m.id,'Message from '+(m.sender||'Little Feet'),m.message,'chatTab'));
   tenantRecords(db.broadcasts, actor).forEach(b=>add('Alert',b.id,b.bcPriority||'School alert',b.bcMessage,'broadcastsTab'));
   return existing.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -3440,9 +3510,9 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
   if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
   return true;
 };
-const emailActor = req => requireSchoolStaff(req) || requireCompanyStaff(req);
+const emailActor = req => getSessionAccount(req);
 app.get('/api/email/status',(req,res)=>{
-  const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});
+  const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to manage your account email.'});
   const address=accountSecurityEmail(actor);
   res.json({
     configured:smtpEmailConfigured()||apiEmailConfigured(),
@@ -3453,14 +3523,14 @@ app.get('/api/email/status',(req,res)=>{
   });
 });
 app.post('/api/email/verification/request',async(req,res,next)=>{
-  try{const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
+  try{const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to verify your account email.'});const to=accountSecurityEmail(actor);if(!to)return res.status(400).json({message:'Your account does not have a valid email address.'});
     const code=String(crypto.randomInt(100000,1000000)),hash=crypto.createHash('sha256').update(code).digest('hex');emailVerificationTokens.set(normalizeUsername(actor.username),{hash,expiresAt:Date.now()+10*60*1000});
     const sent=await sendLittleFeetEmail({to,subject:'Verify your Little Feet email',text:`Your Little Feet verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`});
     if(!sent){emailVerificationTokens.delete(normalizeUsername(actor.username));return res.status(503).json({message:'Email delivery is not configured yet. Configure the Little Feet SMTP or email API environment settings.'});}res.json({success:true,expiresInSeconds:600,provider:emailDeliveryProvider()});
   }catch(error){emailVerificationTokens.delete(normalizeUsername(getSessionAccount(req)?.username));next(error);}
 });
 app.post('/api/email/verification/confirm',(req,res)=>{
-  const actor=emailActor(req);if(!actor)return res.status(403).json({message:'Staff email access is required.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
+  const actor=emailActor(req);if(!actor)return res.status(401).json({message:'Sign in to verify your account email.'});const key=normalizeUsername(actor.username),entry=emailVerificationTokens.get(key),code=boundedText(req.body?.code,6);
   if(!entry||entry.expiresAt<Date.now()){emailVerificationTokens.delete(key);return res.status(400).json({message:'Verification code expired. Request a new one.'});}
   const hash=crypto.createHash('sha256').update(code).digest('hex');if(code.length!==6||hash!==entry.hash)return res.status(400).json({message:'Verification code is incorrect.'});
   actor.emailVerifiedAt=new Date().toISOString();emailVerificationTokens.delete(key);res.json({success:true,verifiedAt:actor.emailVerifiedAt});
