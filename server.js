@@ -584,6 +584,7 @@ app.use('/api', (req, res, next) => {
 app.use((req, res, next) => {
   if (req.method === 'POST' && req.path === '/api/signup' && !enforcePublicRateLimit(req, res, 'signup', 20, 60 * 60 * 1000)) return;
   if (req.method === 'GET' && req.path === '/api/nearby-schools' && !enforcePublicRateLimit(req, res, 'nearby-schools', 60, 10 * 60 * 1000)) return;
+  if (req.method === 'GET' && req.path === '/api/schools/search' && !enforcePublicRateLimit(req, res, 'school-name-search', 90, 10 * 60 * 1000)) return;
   if (req.method === 'POST' && req.path === '/api/schools/enrich' && !enforcePublicRateLimit(req, res, 'school-enrich', 60, 10 * 60 * 1000)) return;
   if (req.method === 'POST' && req.path === '/api/donations/intents' && !enforcePublicRateLimit(req, res, 'donation-intent', 30, 60 * 60 * 1000)) return;
   next();
@@ -2517,6 +2518,81 @@ app.post('/api/accounts/:username/approve', (req, res) => {
   account.approvedAt = new Date().toISOString();
   scheduleReplicaSnapshot();
   res.json({ success: true, account: safeAccount(account) });
+});
+
+// Search schools by name for Account Management. Known Little Feet schools are
+// returned first; public South African school names are then filled from OpenStreetMap.
+app.get('/api/schools/search', async (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+
+  const query = boundedText(req.query.q, 120).trim();
+  if (query.length < 2) return res.json({ results: [], liveSearchAvailable: true });
+
+  const queryKey = schoolKey(query);
+  const visibleLocalSchools = new Map();
+  const addLocalSchool = (name, id = '') => {
+    const cleanName = boundedText(name, 160).trim();
+    if (!cleanName || !schoolKey(cleanName).includes(queryKey)) return;
+    if (!hasPlatformAccess(actor) && schoolKey(cleanName) !== schoolKey(actor.schoolName)) return;
+    const key = schoolKey(cleanName);
+    if (!visibleLocalSchools.has(key)) {
+      visibleLocalSchools.set(key, { name: cleanName, schoolId: id || '', locality: 'Saved in Little Feet', source: 'Little Feet' });
+    }
+  };
+  (db.schools || []).forEach(school => addLocalSchool(school.name, school.id));
+  (db.users || []).forEach(account => addLocalSchool(account.schoolName, account.schoolId));
+
+  const localResults = [...visibleLocalSchools.values()].slice(0, 8);
+  const cacheKey = `school-name:${queryKey}`;
+  const cached = readSchoolSearchCache(cacheKey);
+  let publicResults = cached?.data?.results || [];
+  let liveSearchAvailable = true;
+
+  if (!cached) {
+    try {
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.search = new URLSearchParams({
+        format: 'jsonv2',
+        addressdetails: '1',
+        countrycodes: 'za',
+        limit: '10',
+        dedupe: '1',
+        q: `${query} school`
+      }).toString();
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json', 'User-Agent': 'LittleFeetSchoolFinder/1.0' },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!response.ok) throw new Error(`Nominatim returned ${response.status}`);
+      const places = await response.json();
+      if (!Array.isArray(places)) throw new Error('Nominatim returned an invalid school-name result.');
+      publicResults = places.map(place => {
+        const name = boundedText(place.name || String(place.display_name || '').split(',')[0], 160).trim();
+        const locality = boundedText(
+          place.address?.suburb || place.address?.neighbourhood || place.address?.city ||
+          place.address?.town || place.address?.village || place.address?.municipality || '',
+          160
+        ).trim();
+        return { name, schoolId: '', locality, source: 'OpenStreetMap' };
+      }).filter(result => result.name);
+      writeSchoolSearchCache(cacheKey, { results: publicResults });
+    } catch (error) {
+      liveSearchAvailable = false;
+      console.warn('School-name search fallback unavailable:', error.message);
+    }
+  }
+
+  const merged = [];
+  const seen = new Set();
+  for (const result of [...localResults, ...publicResults]) {
+    const key = schoolKey(result.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(result);
+    if (merged.length >= 12) break;
+  }
+  res.json({ results: merged, liveSearchAvailable });
 });
 
 // Live nearby-school search. Results are sourced from OpenStreetMap via Overpass.

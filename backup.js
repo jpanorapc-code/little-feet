@@ -17,6 +17,8 @@ let schoolMapRequestToken = 0;
 let nearbySchoolRecords = [];
 let alertLocation = null;
 let accountsCache = [];
+let accountSchoolSearchTimer = null;
+let accountSchoolSearchToken = 0;
 let broadcastsLoaded = false;
 let alertMonitorId = null;
 let ticketMonitorId = null;
@@ -3968,12 +3970,80 @@ async function redeemLearnerAccessCode() {
   playDingSound();
 }
 
+function hideAccountSchoolSearchResults() {
+  const box = document.getElementById('accountSchoolSearchResults');
+  if (!box) return;
+  box.style.display = 'none';
+  box.innerHTML = '';
+}
+
+function selectAccountSchool(encodedName) {
+  const name = decodeURIComponent(String(encodedName || ''));
+  const linkedSchool = document.getElementById('accountSchoolName');
+  const search = document.getElementById('accountSchoolSearch');
+  if (linkedSchool) linkedSchool.value = name;
+  if (search) search.value = name;
+  hideAccountSchoolSearchResults();
+  linkedSchool?.dispatchEvent(new Event('change', { bubbles:true }));
+}
+
+async function searchAccountSchools(query, token) {
+  const box = document.getElementById('accountSchoolSearchResults');
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '<div class="meta" style="padding:9px 10px;">Searching schools…</div>';
+  try {
+    const response = await fetch(`/api/schools/search?q=${encodeURIComponent(query)}`, { cache:'no-store' });
+    const data = await response.json();
+    if (token !== accountSchoolSearchToken) return;
+    if (!response.ok) throw new Error(data.message || 'Unable to search schools.');
+    const results = Array.isArray(data.results) ? data.results : [];
+    if (!results.length) {
+      box.innerHTML = `<div class="meta" style="padding:9px 10px;">No school matched “${escapeWorkspaceText(query)}”. You can still type the linked school name manually.</div>`;
+      return;
+    }
+    box.innerHTML = results.map(result => {
+      const encodedName = escapeWorkspaceText(encodeURIComponent(result.name || ''));
+      const locality = result.locality ? ` · ${escapeWorkspaceText(result.locality)}` : '';
+      const source = escapeWorkspaceText(result.source || 'School search');
+      return `<button type="button" data-account-school-choice="${encodedName}" style="display:block;width:100%;padding:10px 11px;border:0;border-bottom:1px solid var(--border-color);background:transparent;color:var(--text-dark);text-align:left;cursor:pointer;"><strong>${escapeWorkspaceText(result.name || '')}</strong><br><span class="meta">${source}${locality}</span></button>`;
+    }).join('');
+    box.querySelectorAll('[data-account-school-choice]').forEach(button => {
+      button.addEventListener('click', () => selectAccountSchool(button.dataset.accountSchoolChoice));
+    });
+  } catch (error) {
+    if (token !== accountSchoolSearchToken) return;
+    box.innerHTML = `<div class="meta" style="padding:9px 10px;">${escapeWorkspaceText(error.message || 'School search is temporarily unavailable.')} You can still enter the linked school manually.</div>`;
+  }
+}
+
+function queueAccountSchoolSearch(force = false) {
+  const field = document.getElementById('accountSchoolSearch');
+  const box = document.getElementById('accountSchoolSearchResults');
+  if (!field || !box) return;
+  const query = field.value.trim();
+  window.clearTimeout(accountSchoolSearchTimer);
+  if (query.length < 2) {
+    accountSchoolSearchToken += 1;
+    if (force && query.length) {
+      box.style.display = 'block';
+      box.innerHTML = '<div class="meta" style="padding:9px 10px;">Type at least 2 characters to search.</div>';
+    } else hideAccountSchoolSearchResults();
+    return;
+  }
+  const token = ++accountSchoolSearchToken;
+  accountSchoolSearchTimer = window.setTimeout(() => searchAccountSchools(query, token), force ? 0 : 280);
+}
+
 function resetAccountForm() {
   const form = document.getElementById('accountForm');
   if (!form) return;
   form.reset();
   const accountSelector = document.getElementById('accountEditSelect');
   if (accountSelector) accountSelector.value = '';
+  const schoolSearch = document.getElementById('accountSchoolSearch');
+  if (schoolSearch) schoolSearch.value = '';
+  hideAccountSchoolSearchResults();
   document.getElementById('accountOriginalUsername').value = '';
   document.getElementById('accountSaveButton').textContent = 'Create account';
   const deleteButton = document.getElementById('accountDeleteButton');
@@ -4009,6 +4079,9 @@ function editAccount(account) {
   document.getElementById('accountUsername').value = account.username || '';
   document.getElementById('accountRole').value = account.role || 'parent';
   document.getElementById('accountSchoolName').value = account.schoolName || '';
+  const schoolSearch = document.getElementById('accountSchoolSearch');
+  if (schoolSearch) schoolSearch.value = account.schoolName || '';
+  hideAccountSchoolSearchResults();
   updateAccountRoleFields();
   document.getElementById('accountStoreUrl').value = account.schoolStoreUrl || '';
   document.getElementById('accountAssignedClasses').value = (account.assignedClasses || []).join(', ');
