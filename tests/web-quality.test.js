@@ -148,7 +148,7 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20260928-company-roles-v1/);
+assert.match(page, /backup\.js\?v=20260928-login-reset-v2/);
 assert.match(page, /id="stickyNoteForm"/);
 assert.doesNotMatch(page, /onsubmit="saveStickyNote\(event\)"/);
 assert.match(client, /function bindStickyNoteForm\(\)/);
