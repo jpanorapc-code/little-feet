@@ -95,6 +95,22 @@ function assertDenied(result,label){
     const crm=await login('littlefeet-crm','CrmPass1');
     const parent=await login('alpha-parent@example.test','ParentPass1');
 
+    // Administrators can clear the 10-minute sign-in wait for a managed account
+    // without changing that account's password.
+    assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'WrongPass1'}})).response.status,401);
+    assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'WrongPass1'}})).response.status,401);
+    assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'WrongPass1'}})).response.status,429);
+    assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'TeacherPass1'}})).response.status,429);
+    assertDenied(
+      await request('/api/accounts/alpha-teacher/reset-login-lockout',{method:'POST',cookie:principal,body:{}}),
+      'principal login lockout reset'
+    );
+    const resetLoginWait=await request('/api/accounts/alpha-teacher/reset-login-lockout',{method:'POST',cookie:admin,body:{}});
+    assert.equal(resetLoginWait.response.status,200);
+    assert.equal(resetLoginWait.data.success,true);
+    assert.match(resetLoginWait.data.message,/sign-in wait has been cleared/i);
+    assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'TeacherPass1'}})).response.status,200);
+
     // Anonymous users must not read private operational data.
     for(const route of ['/api/accounts','/api/registry','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
       assertDenied(await request(route),'anonymous '+route);

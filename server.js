@@ -462,6 +462,19 @@ const activeAttempt = (map, key) => {
 const activeLoginAttempt = key => activeAttempt(loginAttempts, key);
 const activeUsernameAttempt = username => activeAttempt(loginUsernameAttempts, normalizeUsername(username));
 const loginLockoutRemainingSeconds = entry => Math.max(1, Math.ceil((Number(entry?.lockedUntil) - Date.now()) / 1000));
+const clearLoginLockoutForAccount = account => {
+  const identity = normalizeUsername(account?.username);
+  if (!identity) return 0;
+  let cleared = loginUsernameAttempts.delete(identity) ? 1 : 0;
+  const suffix = `:${identity}`;
+  for (const key of [...loginAttempts.keys()]) {
+    if (key.endsWith(suffix)) {
+      loginAttempts.delete(key);
+      cleared += 1;
+    }
+  }
+  return cleared;
+};
 const looksLikeEmailAddress = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 const accountSecurityEmail = account => {
   const candidates = [account?.email, account?.username, ...(Array.isArray(account?.loginAliases) ? account.loginAliases : [])];
@@ -2476,6 +2489,20 @@ app.delete('/api/accounts/:username', async (req, res, next) => {
     req.persistenceCommitted = true;
     res.json({ success: true });
   } catch (error) { next(error); }
+});
+
+app.post('/api/accounts/:username/reset-login-lockout', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const account = findAccountByUsername(req.params.username);
+  if (!canManageAccount(actor, account)) return res.status(404).json({ message: 'Account not found.' });
+  const clearedBuckets = clearLoginLockoutForAccount(account);
+  res.json({
+    success: true,
+    clearedBuckets,
+    account: safeAccount(account),
+    message: 'The 10-minute sign-in wait has been cleared. The account can try the correct password again now.'
+  });
 });
 
 app.post('/api/accounts/:username/approve', (req, res) => {
