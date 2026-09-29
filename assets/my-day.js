@@ -140,9 +140,16 @@
 
 
   const fetchJson = async url => {
-    const response = await fetch(url, { credentials:'same-origin', headers:{ Accept:'application/json' } });
-    if (!response.ok) return null;
-    return response.json();
+    try {
+      const response = await fetch(url, { credentials:'same-origin', headers:{ Accept:'application/json' } });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      // My Day is an optional dashboard summary. A transient/offline API failure
+      // must not become an unhandled promise rejection or break the signed-in UI.
+      console.warn('[My Day] Unable to load dashboard summary endpoint:', url, error);
+      return null;
+    }
   };
 
   const loadAttention = async () => {
