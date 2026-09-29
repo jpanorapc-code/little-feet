@@ -699,6 +699,11 @@ const sendPublicRootFile = (req, res) => {
   res.sendFile(req.path.slice(1), { root: __dirname });
 };
 app.get('/backup.js', sendPublicRootFile);
+app.get('/paia.html', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.type('html');
+  res.sendFile('paia.html', { root: __dirname });
+});
 app.get(['/little-feet-mascot.jfif', '/logo.png', '/logo-transparent.png'], sendPublicRootFile);
 app.get('/manifest.webmanifest', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
