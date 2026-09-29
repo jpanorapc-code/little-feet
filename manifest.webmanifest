@@ -1,7 +1,7 @@
 {
-  "name": "Little Feet ECD Portal",
+  "name": "Little Feet School Management Platform",
   "short_name": "Little Feet",
-  "description": "Early childhood development portal for school communication, attendance, learning records, safeguarding and family engagement.",
+  "description": "South African school management platform for ECD, primary and secondary education, including communication, attendance, learning records, safeguarding, administration and family engagement.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
