@@ -5003,13 +5003,15 @@ app.get('/api/students/import/:id', (req, res) => {
   if (!actor || !['admin', 'principal', 'staff', 'accounts'].includes(actor.role)) return res.status(403).json({ message: 'Only an administrator or principal may view learner imports.' });
   const job = db.importJobs.find(item => item.id === req.params.id && recordInSchool(item, actor));
   if (!job) return res.status(404).json({ message: 'Import job not found.' });
-  res.json({ id: job.id, status: job.status, processedBatches: job.processedBatches.length, totalBatches: job.totalBatches, imported: job.imported, rejected: job.rejected, createdAt: job.createdAt, updatedAt: job.updatedAt });
+  res.json({ id: job.id, type: job.type, sourceSystem: job.sourceSystem || null, status: job.status, processedBatches: job.processedBatches.length, totalBatches: job.totalBatches, imported: job.imported, rejected: job.rejected, createdAt: job.createdAt, updatedAt: job.updatedAt });
 });
 
 app.post('/api/students/import', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !['admin', 'principal', 'staff', 'accounts'].includes(actor.role)) return res.status(403).json({ message: 'Only an administrator or principal may import learner records.' });
   const incoming = Array.isArray(req.body?.students) ? req.body.students : [];
+  const sourceSystem = boundedText(req.body?.sourceSystem, 40);
+  if (sourceSystem && sourceSystem !== 'SA-SAMS') return res.status(400).json({ message: 'Unsupported learner import source.' });
   if (!incoming.length) return res.status(400).json({ message: 'No learner records were supplied.' });
   if (incoming.length > 500) return res.status(400).json({ message: 'Import up to 500 learner records per bounded batch.' });
   const requestedJobId = boundedText(req.body?.importId, 80);
@@ -5023,7 +5025,7 @@ app.post('/api/students/import', (req, res) => {
   let job = db.importJobs.find(item => item.id === jobId && recordInSchool(item, actor));
   if (job && normalizeUsername(job.createdBy) !== normalizeUsername(actor.username)) return res.status(403).json({ message: 'This import belongs to another account.' });
   if (!job) {
-    job = tagSchoolRecord(actor, { id: jobId, type: 'learners', status: 'in_progress', totalBatches, processedBatches: [], imported: 0, rejected: 0, createdBy: actor.username, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    job = tagSchoolRecord(actor, { id: jobId, type: sourceSystem === 'SA-SAMS' ? 'sa-sams-learners' : 'learners', sourceSystem: sourceSystem || null, status: 'in_progress', totalBatches, processedBatches: [], imported: 0, rejected: 0, createdBy: actor.username, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     db.importJobs.unshift(job);
     const completedForSchool = db.importJobs.filter(item => item !== job && item.status === 'completed' && recordInSchool(item, actor));
     const expiredJobIds = new Set(completedForSchool.slice(100).map(item => item.id));
@@ -5033,6 +5035,7 @@ app.post('/api/students/import', (req, res) => {
     }
   }
   if (job.totalBatches !== totalBatches) return res.status(409).json({ message: 'This import job was started with a different batch count.' });
+  if ((job.sourceSystem || '') !== (sourceSystem || '')) return res.status(409).json({ message: 'This import job was started from a different source system.' });
   const priorBatch = job.processedBatches.find(item => item.batchNumber === batchNumber);
   if (priorBatch) return res.json({ success: true, duplicateBatch: true, importId: job.id, status: job.status, imported: priorBatch.imported, rejected: priorBatch.rejectedRows, progress: { processedBatches: job.processedBatches.length, totalBatches, imported: job.imported, rejected: job.rejected } });
 
@@ -5080,7 +5083,7 @@ app.post('/api/students/import', (req, res) => {
   job.processedBatches.sort((a, b) => a.batchNumber - b.batchNumber);
   job.imported += imported; job.rejected += rejected.length; job.updatedAt = new Date().toISOString();
   job.status = job.processedBatches.length === totalBatches ? 'completed' : 'in_progress';
-  db.importAudit.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), importId: job.id, batchNumber, importedAt: job.updatedAt, importedBy: actor.username, imported, rejected: rejected.length }));
+  db.importAudit.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), importId: job.id, sourceSystem: job.sourceSystem || null, batchNumber, importedAt: job.updatedAt, importedBy: actor.username, imported, rejected: rejected.length }));
   res.status(201).json({ success: true, importId: job.id, status: job.status, imported, rejected, progress: { processedBatches: job.processedBatches.length, totalBatches, imported: job.imported, rejected: job.rejected }, message: `${imported} learner record${imported === 1 ? '' : 's'} imported.` });
 });
 
