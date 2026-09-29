@@ -203,8 +203,8 @@ const validSecretLength = (value, { min = 1, max = 128 } = {}) =>
   typeof value === 'string' && value.length >= min && value.length <= max;
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
 const PLATFORM_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
-const FULL_PLATFORM_ROLES = new Set(['staff', 'crm']);
-const ACCOUNT_ROLES = new Set(['parent', 'teacher', 'principal', 'district', 'admin', 'staff', 'crm', 'accounts', 'support']);
+const FULL_PLATFORM_ROLES = new Set(['staff', 'crm', 'accounts']);
+const ACCOUNT_ROLES = new Set(['parent', 'teacher', 'principal', 'district', 'admin', 'school_accounts', 'staff', 'crm', 'accounts', 'support']);
 const CHAT_ROLES = new Set(['parent', 'teacher', 'principal', 'admin', 'staff', 'crm', 'support']);
 const configuredPlatformOwnerUsername = () => normalizeUsername(process.env.LF_OWNER_ADMIN_USERNAME || process.env.LF_BOOTSTRAP_ADMIN_USERNAME || '');
 const isConfiguredPlatformOwner = account => Boolean(account && configuredPlatformOwnerUsername() && normalizeUsername(account.username) === configuredPlatformOwnerUsername());
@@ -1595,7 +1595,7 @@ const requireAdmin = (req) => {
 };
 const requireSchoolStaff = (req) => {
   const account = getSessionAccount(req);
-  return account && (hasPlatformAccess(account) || ['teacher', 'principal', 'admin', 'staff'].includes(account.role)) ? account : null;
+  return account && (hasPlatformAccess(account) || ['teacher', 'principal', 'admin', 'staff', 'school_accounts'].includes(account.role)) ? account : null;
 };
 const requireCompanyStaff = (req) => {
   const account = getSessionAccount(req);
@@ -2050,7 +2050,7 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
 });
 
-const allowedParentPaymentRoles = new Set(['parent', 'principal', 'admin']);
+const allowedParentPaymentRoles = new Set(['parent', 'principal', 'admin', 'school_accounts']);
 const parentPaymentParentForSchool = (username, actor) => {
   const parent = findAccountByUsername(username);
   return parent && parent.role === 'parent' && isSameSchool(actor, parent) ? parent : null;
@@ -2097,7 +2097,7 @@ app.get('/api/parent-payments/parents', (req, res) => {
 
 app.get('/api/parent-payments', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !allowedParentPaymentRoles.has(actor.role)) return res.status(403).json({ message: 'Parent payment access is required.' });
+  if (!actor || !(hasPlatformAccess(actor) || allowedParentPaymentRoles.has(actor.role))) return res.status(403).json({ message: 'Parent payment access is required.' });
   let records = (db.parentPayments || []).filter(record => recordInSchool(record, actor));
   if (actor.role === 'parent') records = records.filter(record => normalizeUsername(record.parentUsername) === normalizeUsername(actor.username));
   const payments = records.map(record => parentPaymentView(record, actor));
@@ -2448,7 +2448,7 @@ app.put('/api/accounts/:username', (req, res) => {
   account.role = nextRole;
   account.schoolName = scope.schoolName;
   account.schoolId = scope.schoolId;
-  account.platformAccess = nextRole === 'staff' || isConfiguredPlatformOwner(account);
+  account.platformAccess = FULL_PLATFORM_ROLES.has(nextRole) || isConfiguredPlatformOwner(account);
 
   const normalisedStoreUrl = safeHttpsUrl(schoolStoreUrl);
   if (String(schoolStoreUrl || '').trim() && !normalisedStoreUrl) return res.status(400).json({ message: 'School web-store links must use a valid HTTPS URL.' });
@@ -3261,7 +3261,7 @@ const emailInboxPreferenceDefaults = actor => {
   if (role === 'parent') return { tickets:true, messages:true, payments:true, subscriptions:true };
   if (role === 'district') return { tickets:true, alerts:true };
   if (role === 'crm' || role === 'support') return { tickets:true, messages:true };
-  if (role === 'accounts') return { tickets:true };
+  if (role === 'school_accounts') return { tickets:true };
   return { tickets:true, messages:true, notices:true, alerts:true };
 };
 const emailInboxPreferenceKeys = actor => Object.keys(emailInboxPreferenceDefaults(actor));
@@ -3700,7 +3700,7 @@ app.post('/api/staff/notices/:id/acknowledge', (req, res) => {
 // Management approvals centre aggregates existing workflows without duplicating their records.
 app.get('/api/approvals', (req, res) => {
   const actor = requireSchoolStaff(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role))) return res.status(403).json({ message: 'School management access is required.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School management access is required.' });
   const leave = tenantRecords(db.staffLeave, actor).filter(item => item.status === 'Pending').map(item => ({
     id: item.id, type: 'Leave', title: `${item.staffName} · ${item.leaveType}`, detail: `${item.startDate} to ${item.endDate}`, createdAt: item.createdAt, actions: ['Approve', 'Reject']
   }));
@@ -3712,7 +3712,7 @@ app.get('/api/approvals', (req, res) => {
 });
 app.post('/api/approvals/:type/:id', (req, res) => {
   const actor = requireSchoolStaff(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role))) return res.status(403).json({ message: 'School management access is required.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School management access is required.' });
   const decision = boundedText(req.body?.decision, 20);
   if (!['Approve', 'Reject'].includes(decision)) return res.status(400).json({ message: 'Choose Approve or Reject.' });
   if (req.params.type === 'Leave') {
@@ -3747,7 +3747,7 @@ app.get('/api/staff/performance-reviews', (req, res) => {
 });
 app.post('/api/staff/performance-reviews', (req, res) => {
   const actor = requireSchoolStaff(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only school management can create performance reviews.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only school management can create performance reviews.' });
   const employee = staffAccountInSchool(actor, req.body?.username);
   if (!employee) return res.status(400).json({ message: 'Choose a staff member from this school.' });
   const criteriaInput = Array.isArray(req.body?.criteria) ? req.body.criteria : [];
@@ -3851,7 +3851,7 @@ app.patch('/api/staff/leave/:id', (req, res) => {
   const requestedStatus = boundedText(req.body?.status, 30);
   if (!LEAVE_STATUSES.has(requestedStatus)) return res.status(400).json({ message: 'Choose a valid leave status.' });
   const ownCancellation = requestedStatus === 'Cancelled' && normalizeUsername(item.username) === normalizeUsername(actor.username) && item.status === 'Pending';
-  if (!(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role)) && !ownCancellation) return res.status(403).json({ message: 'Management approval is required.' });
+  if (!(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role)) && !ownCancellation) return res.status(403).json({ message: 'Management approval is required.' });
   item.status = requestedStatus;
   item.reviewedBy = actor.username;
   item.reviewedAt = new Date().toISOString();
@@ -3866,7 +3866,7 @@ app.get('/api/staff/cover', (req, res) => {
 });
 app.post('/api/staff/cover', (req, res) => {
   const actor = requireSchoolStaff(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only school management can create cover assignments.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only school management can create cover assignments.' });
   const absent = staffAccountInSchool(actor, req.body?.absentTeacher);
   const cover = req.body?.coverTeacher ? staffAccountInSchool(actor, req.body.coverTeacher) : null;
   const date = boundedText(req.body?.date, 30);
@@ -3880,7 +3880,7 @@ app.patch('/api/staff/cover/:id', (req, res) => {
   const actor = requireSchoolStaff(req);
   const item = actor && db.teacherCover.find(record => record.id === req.params.id && recordInSchool(record, actor));
   if (!item) return res.status(404).json({ message: 'Cover assignment not found.' });
-  if (!(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role)) && normalizeUsername(item.coverTeacher) !== normalizeUsername(actor.username)) return res.status(403).json({ message: 'You cannot update this cover assignment.' });
+  if (!(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role)) && normalizeUsername(item.coverTeacher) !== normalizeUsername(actor.username)) return res.status(403).json({ message: 'You cannot update this cover assignment.' });
   const status = boundedText(req.body?.status || item.status, 30);
   if (!COVER_STATUSES.has(status)) return res.status(400).json({ message: 'Choose a valid cover status.' });
   item.status = status;
@@ -5001,7 +5001,7 @@ app.get('/api/household', (req, res) => {
 // endpoint applies the authoritative duplicate check and encrypts sensitive fields.
 app.get('/api/students/import/:id', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only an administrator or principal may view learner imports.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only an administrator or principal may view learner imports.' });
   const job = db.importJobs.find(item => item.id === req.params.id && recordInSchool(item, actor));
   if (!job) return res.status(404).json({ message: 'Import job not found.' });
   res.json({ id: job.id, type: job.type, sourceSystem: job.sourceSystem || null, status: job.status, processedBatches: job.processedBatches.length, totalBatches: job.totalBatches, imported: job.imported, rejected: job.rejected, createdAt: job.createdAt, updatedAt: job.updatedAt });
@@ -5009,7 +5009,7 @@ app.get('/api/students/import/:id', (req, res) => {
 
 app.post('/api/students/import', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only an administrator or principal may import learner records.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'accounts', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only an administrator or principal may import learner records.' });
   const incoming = Array.isArray(req.body?.students) ? req.body.students : [];
   const sourceSystem = boundedText(req.body?.sourceSystem, 40);
   if (sourceSystem && sourceSystem !== 'SA-SAMS') return res.status(400).json({ message: 'Unsupported learner import source.' });
