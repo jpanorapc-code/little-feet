@@ -5135,8 +5135,8 @@
       <section data-nav-group>
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-finance"></use></svg><span>Finance</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
         <ul class="sidebar-links">
-        <li data-roles="principal,admin,accounts"><button type="button" class="nav-btn" onclick="switchTab('financeTab', this)">Billing &amp; Finance</button></li>
-        <li data-roles="parent,principal,admin,accounts"><button type="button" class="nav-btn" onclick="switchTab('parentPaymentsTab', this)">Parent Payments</button></li>
+        <li data-roles="principal,admin,accounts,school_accounts"><button type="button" class="nav-btn" onclick="switchTab('financeTab', this)">Billing &amp; Finance</button></li>
+        <li data-roles="parent,principal,admin,accounts,school_accounts"><button type="button" class="nav-btn" onclick="switchTab('parentPaymentsTab', this)">Parent Payments</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('storeTab', this)">School Store</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('inventoryTab', this)">Supplies</button></li>
         <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('bookRegisterTab', this)">Books &amp; Returns</button></li>
@@ -5174,9 +5174,9 @@
       <section data-nav-group>
         <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-help"></use></svg><span>Communication</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
         <ul class="sidebar-links">
-        <li data-roles="parent,teacher,principal,district,admin,staff,crm,accounts,support"><button type="button" class="nav-btn" onclick="switchTab('emailIntegrationTab', this)">Emails</button></li>
+        <li data-roles="parent,teacher,principal,district,admin,staff,crm,accounts,school_accounts,support"><button type="button" class="nav-btn" onclick="switchTab('emailIntegrationTab', this)">Emails</button></li>
         <li data-roles="parent,teacher,principal,admin,crm,support"><button type="button" class="nav-btn" onclick="switchTab('chatTab', this)">Messages</button></li>
-        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,support"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
+        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,school_accounts,support"><button type="button" class="nav-btn" onclick="switchTab('ticketsTab', this)">Tickets</button></li>
         <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('notesTab', this)">Sticky Notes</button></li>
         <li data-roles="parent,teacher,principal,district,admin,crm"><button type="button" class="nav-btn" onclick="switchTab('engagementTab', this)">Family Engagement</button></li>
         </ul>
@@ -5188,9 +5188,9 @@
         <li data-roles="admin,staff"><button type="button" class="nav-btn" onclick="switchTab('accountsTab', this)">Account Management</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('learnerCodesTab', this)">Learner Code Forms</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('dataImportTab', this)">Import School Data</button></li>
-        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,support"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
-        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,support"><button type="button" class="nav-btn" onclick="switchTab('settingsTab', this)">Settings</button></li>
-        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,support"><button type="button" class="nav-btn" onclick="switchTab('wallpaperTab', this)"><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg><span>Wallpaper Mode</span></button></li>
+        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,school_accounts,support"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
+        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,school_accounts,support"><button type="button" class="nav-btn" onclick="switchTab('settingsTab', this)">Settings</button></li>
+        <li data-roles="parent,teacher,principal,district,admin,crm,accounts,school_accounts,support"><button type="button" class="nav-btn" onclick="switchTab('wallpaperTab', this)"><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg><span>Wallpaper Mode</span></button></li>
         </ul>
       </section>
       <section data-nav-group>
@@ -5901,7 +5901,7 @@
             <div><label for="accountName">Full name *</label><input id="accountName" name="accountName" autocomplete="section-managed-account name" required placeholder="e.g. Amina Jacobs"></div>
             <div><label for="accountUsername">Username / email *</label><input id="accountUsername" name="accountUsername" autocomplete="section-managed-account username" autocapitalize="none" spellcheck="false" required placeholder="e.g. amina@school.com"></div>
             <div><label for="accountPin">Password / PIN <span id="accountPinHint">*</span></label><input id="accountPin" name="accountPassword" type="password" autocomplete="section-managed-account new-password" placeholder="Required for a new account"></div>
-            <div><label for="accountRole">Role / user type *</label><select id="accountRole" required onchange="updateAccountRoleFields()"><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option><option value="staff">Little Feet Staff</option><option value="crm">CRM</option><option value="accounts">Accounts</option><option value="support">Software Support</option></select></div>
+            <div><label for="accountRole">Role / user type *</label><select id="accountRole" required onchange="updateAccountRoleFields()"><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option><option value="school_accounts">School Accounts</option><option value="staff">Little Feet Staff</option><option value="crm">CRM</option><option value="accounts">Little Feet Accounts</option><option value="support">Software Support</option></select></div>
             <div><label for="accountSchoolName">Linked school name <span id="accountSchoolRequired">*</span></label><input id="accountSchoolName" name="schoolName" autocomplete="section-managed-account organization" required placeholder="e.g. Little Feet ECD Portal"><small id="accountSchoolHelp" style="display:block;margin-top:6px;color:var(--text-muted);">Required for school-facing accounts. Optional for Little Feet company staff.</small></div>
             <div><label for="accountStoreUrl">Official school web-store link</label><input id="accountStoreUrl" name="schoolStoreUrl" type="url" autocomplete="off" placeholder="https://... (leave empty if none)"></div>
             <div><label for="accountAssignedClasses">Assigned classroom(s)</label><input id="accountAssignedClasses" name="assignedClasses" placeholder="Teachers only · e.g. ECD Preschool, Grade R, Grade 4"></div>
@@ -5963,7 +5963,7 @@
         </div>
       </div>
 
-      <div id="financeTab" class="tab-content" data-roles="principal,admin,accounts">
+      <div id="financeTab" class="tab-content" data-roles="principal,admin,accounts,school_accounts">
         <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-finance"></use></svg></span><span>Finance &amp; Parent Payments</span></h2><span class="badge-tag urgent">SCHOOL FINANCE</span></div>
           <div class="workspace-grid">
             <div class="workspace-card" data-roles="admin"><h3>Subscription billing</h3><p>Set your monthly plan, learner add-on prices and profit margin, optional late-payment fee, and where approved schools pay.</p><button type="button" class="action-btn btn-blue" onclick="openSubscriptionBillingAdmin()">Manage subscriptions</button></div>
@@ -6015,7 +6015,7 @@
         </div>
       </div>
 
-      <div id="parentPaymentsTab" class="tab-content" data-roles="parent,principal,admin,accounts">
+      <div id="parentPaymentsTab" class="tab-content" data-roles="parent,principal,admin,accounts,school_accounts">
         <div id="parentSubscriptionPanel" class="card" data-roles="parent" aria-live="polite">
           <div class="card-header-bar"><h2>LittleSteps Plus</h2><span class="badge-tag">PARENT PLAN</span></div>
           <p class="meta">Loading your subscription access…</p>
@@ -6205,7 +6205,7 @@
           <div id="qualificationsTab" class="tab-content" data-roles="teacher,principal,admin"><div class="card"><div class="card-header-bar"><h2>Training &amp; Qualifications</h2><button class="action-btn" type="button" onclick="refreshStaffQualifications()">Refresh</button></div><p class="section-intro">Track staff qualifications, certificates and expiry compliance.</p><div id="qualificationsContent">Loading qualifications…</div></div></div>
           <div id="kpiHistoryTab" class="tab-content" data-roles="teacher,principal,admin"><div class="card"><div class="card-header-bar"><h2>KPI History &amp; Trends</h2><button class="action-btn" type="button" onclick="refreshKpiHistory()">Refresh</button></div><p class="section-intro">See monthly task-completion KPI history instead of only the current month.</p><div id="kpiHistoryContent">Loading KPI history…</div></div></div>
           <div id="staffDevelopmentTab" class="tab-content" data-roles="teacher,principal,admin"><div class="card-header-bar"><h2>Staff Development</h2><button class="action-btn" type="button" onclick="refreshStaffDevelopment()">Refresh</button></div><p class="section-intro">Turn performance review findings into concrete development goals and follow-up actions.</p><div id="staffDevelopmentContent">Loading development plans…</div></div>
-          <div id="emailIntegrationTab" class="tab-content" data-roles="parent,teacher,principal,district,admin,staff,crm,accounts,support"><div class="card"><div class="card-header-bar"><h2>Email Integration</h2><button class="action-btn" type="button" onclick="refreshEmailIntegration()">Refresh</button></div><p class="section-intro">Manage the email delivery channel separately from in-app notifications and verify your own account email.</p><div id="emailIntegrationContent">Loading email status…</div></div></div>
+          <div id="emailIntegrationTab" class="tab-content" data-roles="parent,teacher,principal,district,admin,staff,crm,accounts,school_accounts,support"><div class="card"><div class="card-header-bar"><h2>Email Integration</h2><button class="action-btn" type="button" onclick="refreshEmailIntegration()">Refresh</button></div><p class="section-intro">Manage the email delivery channel separately from in-app notifications and verify your own account email.</p><div id="emailIntegrationContent">Loading email status…</div></div></div>
           <div id="guideTab" class="tab-content">
         <div class="card">
           <div class="card-header-bar"><h2>Help Centre & Practical User Guide</h2><span class="badge-tag info">START HERE</span></div>
@@ -6273,7 +6273,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260930-crm-full-v1" defer></script>
+  <script src="backup.js?v=20260930-accounts-full-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20260929-my-day-v4" defer></script>
   <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>
