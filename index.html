@@ -1001,10 +1001,15 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
     }
     .footer-container { gap: 10px; }
-    .footer-links a { color:#b6d9e9; padding:6px 8px; transition:color .18s ease, background-color .18s ease; }
-    .footer-links a:hover { color:#e6fffb; background:rgba(45,212,191,.13); text-decoration:none; }
+    .footer-links a { color:#e6fffb; padding:6px 8px; font-weight:700; transition:color .18s ease, background-color .18s ease; }
+    .footer-links a:hover, .footer-links a:focus-visible { color:#ffffff; background:rgba(45,212,191,.20); text-decoration:underline; outline:2px solid rgba(94,234,212,.72); outline-offset:2px; }
+    #appModal #modalTitle { color:#e6fffb !important; }
+    #appModal #modalBody a { color:#67e8f9; font-weight:700; text-decoration:underline; text-underline-offset:2px; }
+    #appModal #modalBody a:hover, #appModal #modalBody a:focus-visible { color:#ffffff; }
     body.light-mode footer { background: linear-gradient(120deg, rgba(199,231,244,.96), rgba(221,243,251,.92)); border-top-color:rgba(14,116,144,.24); }
-    body.light-mode .footer-links a { color:#14556f; }
+    body.light-mode .footer-links a { color:#0c4a6e; }
+    body.light-mode #appModal #modalTitle { color:#0f4c5c !important; }
+    body.light-mode #appModal #modalBody a { color:#075985; }
 
     @media (max-width: 640px) {
       .card { border-radius: 14px; padding: 16px; }
@@ -5889,7 +5894,7 @@
             <a href="#settingsTab" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</a>
             <a href="#donate" onclick="event.preventDefault(); openDonationModal()">Donate</a>
           </div>
-          <p style="margin-top: 6px; font-size: 0.7rem; color: #64748b;">© 2026 Little Feet. All rights reserved. · Official site: <a href="https://littlefeet.co.za/" style="color:#94a3b8;text-decoration:none;">littlefeet.co.za</a></p>
+          <p style="margin-top:6px;font-size:.74rem;color:#cbd5e1;">© 2026 Little Feet Technologies (Pty) Ltd. All rights reserved. · Registration No. 2026/775509/07 · South Africa · Official site: <a href="https://littlefeet.co.za/" style="color:#e6fffb;font-weight:700;text-decoration:underline;text-underline-offset:2px;">littlefeet.co.za</a></p>
         </div>
         <div class="compliance-text">
           <p>Built for South African ECD, primary and secondary school communities across learning, operations, family engagement, finance, staff work, safeguarding and privacy workflows.</p>
@@ -5918,7 +5923,7 @@
   <script src="/assets/purchase-requests.js?v=20260926-purchase-requests-v1" defer></script>
   <script src="/assets/workplace-extended.js?v=20260928-email-link-v2" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20260925-preferences-v2" defer></script>
-  <script src="/assets/legal-notices.js?v=20260926-legal-v3" defer></script>
+  <script src="/assets/legal-notices.js?v=20260929-legal-v5" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260925-curriculum-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
