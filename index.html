@@ -3753,6 +3753,219 @@
       }
     }
 
+    /* Responsive shell repair: treat side-by-side/narrow desktop windows like tablets
+       before the header gets cramped, while keeping the full desktop shell on wide screens. */
+    @media (min-width:960px) and (max-width:1180px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) auto !important;
+        align-items:center !important;
+        min-height:0 !important;
+        padding:8px 12px !important;
+        gap:8px 10px !important;
+      }
+      .nav-brand {
+        grid-column:1;
+        grid-row:1;
+        width:auto;
+        max-width:100%;
+        min-width:0;
+      }
+      .nav-brand > div { min-width:0; overflow:visible !important; }
+      .nav-brand .site-name {
+        font-size:clamp(.94rem,1.75vw,1.14rem) !important;
+        white-space:nowrap !important;
+      }
+      .nav-brand .org-badge { font-size:.52rem !important; }
+      .nav-user-panel {
+        grid-column:1 / -1;
+        grid-row:3;
+        width:100%;
+        margin:0 !important;
+        justify-content:flex-start !important;
+        flex-wrap:wrap;
+      }
+      .nav-quickbar {
+        grid-column:1 / -1;
+        grid-row:2;
+        display:grid !important;
+        grid-template-columns:minmax(220px,1fr) repeat(3,auto);
+        width:100%;
+        gap:7px !important;
+      }
+      .nav-quickbar .nav-live-pill { display:none; }
+      .nav-term-panel { max-width:none; width:100%; }
+      .nav-more-toggle {
+        display:inline-flex !important;
+        grid-column:2;
+        grid-row:3;
+        width:auto !important;
+        min-height:36px !important;
+        padding:7px 12px !important;
+        justify-self:end;
+        align-self:center;
+      }
+      .app-sidebar {
+        width:min(86vw,300px) !important;
+        transform:translateX(-105%);
+        transition:transform .22s ease;
+        z-index:35 !important;
+      }
+      #dashboardSection.sidebar-open .app-sidebar { transform:translateX(0); }
+      #dashboardSection.sidebar-open::after {
+        content:"";
+        position:fixed;
+        inset:0;
+        z-index:34;
+        background:rgba(2,8,23,.58);
+      }
+      #dashboardSection > .app-sidebar ~ .container,
+      #dashboardSection.sidebar-collapsed > .app-sidebar ~ .container {
+        width:100% !important;
+        max-width:100% !important;
+        margin-left:0 !important;
+        padding:clamp(14px,2.2vw,24px) !important;
+      }
+      #dashboardSection > .app-sidebar ~ footer,
+      #dashboardSection.sidebar-collapsed > .app-sidebar ~ footer { margin-left:0 !important; }
+    }
+
+    @media (max-width:959px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) auto !important;
+        align-items:center !important;
+        min-height:0 !important;
+        padding:8px 10px !important;
+        gap:8px !important;
+      }
+      .nav-brand { grid-column:1; grid-row:1; min-width:0; max-width:100%; }
+      .nav-brand img { width:38px; height:38px; }
+      .nav-brand > div { min-width:0; overflow:visible !important; }
+      .nav-brand .site-name {
+        display:block;
+        max-width:none !important;
+        overflow:visible !important;
+        text-overflow:clip !important;
+        white-space:normal !important;
+        font-size:clamp(.86rem,2.35vw,1.05rem) !important;
+        line-height:1.05;
+      }
+      .nav-brand .org-badge { display:none !important; }
+      .nav-user-panel {
+        grid-column:1 / -1 !important;
+        grid-row:3 !important;
+        width:100% !important;
+        margin:0 !important;
+        justify-content:flex-start !important;
+        flex-wrap:wrap;
+        gap:6px !important;
+      }
+      .nav-user-panel .user-switch-control { min-width:0; max-width:100%; }
+      .nav-user-panel #displayRole {
+        max-width:min(52vw,260px) !important;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      .nav-quickbar {
+        grid-column:1 / -1 !important;
+        grid-row:2 !important;
+        width:100%;
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) repeat(3,minmax(0,auto)) !important;
+        gap:6px !important;
+      }
+      .nav-term-panel { width:100%; max-width:none !important; }
+      .nav-quickbar .nav-shortcut { width:auto !important; min-width:0; }
+      .nav-more-toggle {
+        grid-column:2 !important;
+        grid-row:3 !important;
+        width:auto !important;
+        min-height:38px !important;
+        justify-self:end;
+        align-self:center;
+      }
+      .container { padding:clamp(10px,2.5vw,18px) !important; }
+    }
+
+    @media (max-width:640px) {
+      #dashboardSection > nav {
+        grid-template-columns:minmax(0,1fr) auto !important;
+        padding:8px !important;
+      }
+      .nav-brand img { width:34px; height:34px; }
+      .nav-brand .site-name {
+        font-size:clamp(.78rem,4vw,.98rem) !important;
+        line-height:1.08;
+      }
+      .nav-quickbar {
+        grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      }
+      .nav-term-panel {
+        grid-column:1 / -1;
+        grid-row:1;
+      }
+      .nav-quickbar .nav-shortcut {
+        width:100% !important;
+        min-height:40px !important;
+        padding:7px 5px !important;
+        font-size:.68rem !important;
+      }
+      .nav-user-panel {
+        grid-column:1 !important;
+        grid-row:3 !important;
+        min-width:0;
+      }
+      .nav-user-panel .user-switch-control { max-width:100%; }
+      .nav-user-panel #displayRole { max-width:42vw !important; }
+      .nav-user-panel .action-btn {
+        min-width:36px !important;
+        min-height:36px !important;
+        padding:6px !important;
+      }
+      .nav-more-toggle {
+        grid-column:2 !important;
+        grid-row:3 !important;
+        width:auto !important;
+        min-width:72px;
+      }
+      .portal-welcome-banner {
+        min-height:190px !important;
+        padding:14px !important;
+        background-size:cover,auto 92% !important;
+        background-position:center,right bottom !important;
+      }
+      .portal-welcome-copy {
+        max-width:72% !important;
+        padding-right:4px;
+      }
+      .portal-welcome-banner h1 { font-size:clamp(1.05rem,5.2vw,1.3rem); }
+      .portal-welcome-banner p { font-size:.82rem; }
+      .workspace-grid,
+      .workspace-results-grid,
+      .store-grid { grid-template-columns:minmax(0,1fr) !important; }
+      .footer-container {
+        align-items:flex-start !important;
+        text-align:left;
+      }
+      .compliance-text {
+        max-width:100% !important;
+        text-align:left !important;
+      }
+    }
+
+    @media (max-width:420px) {
+      .nav-brand .site-name { font-size:.76rem !important; }
+      .nav-user-panel #displayRole { max-width:36vw !important; }
+      .nav-user-panel #serverStatusText { display:none; }
+      .portal-welcome-copy { max-width:100% !important; }
+      .portal-welcome-banner {
+        background-image:linear-gradient(90deg,rgba(4,18,34,.96),rgba(7,29,47,.86)),url('assets/4k/admin-mascot-dashboard-4k.jpg') !important;
+        background-position:center,right bottom !important;
+      }
+    }
+
     /* Desktop sidebar scroll lock — behavior only, no visual/layout redesign. */
     @media (min-width:960px) {
       #dashboardSection > nav {
