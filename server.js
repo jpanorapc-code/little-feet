@@ -203,7 +203,7 @@ const validSecretLength = (value, { min = 1, max = 128 } = {}) =>
   typeof value === 'string' && value.length >= min && value.length <= max;
 const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'GradeR', 'Foundation', 'Intermediate', 'Senior', 'Primary', 'FET', 'HighSchool']);
 const PLATFORM_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
-const FULL_PLATFORM_ROLES = new Set(['staff']);
+const FULL_PLATFORM_ROLES = new Set(['staff', 'crm']);
 const ACCOUNT_ROLES = new Set(['parent', 'teacher', 'principal', 'district', 'admin', 'staff', 'crm', 'accounts', 'support']);
 const CHAT_ROLES = new Set(['parent', 'teacher', 'principal', 'admin', 'staff', 'crm', 'support']);
 const configuredPlatformOwnerUsername = () => normalizeUsername(process.env.LF_OWNER_ADMIN_USERNAME || process.env.LF_BOOTSTRAP_ADMIN_USERNAME || '');
