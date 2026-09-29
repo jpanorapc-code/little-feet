@@ -5952,9 +5952,9 @@
           </div>
           <div id="schoolDatabasePreview" class="record-list" aria-live="polite" style="margin-top:18px;"></div>
           <section class="workspace-card" style="margin-top:18px;border-left:4px solid var(--primary-color);">
-            <div class="card-header-bar"><h3>SA-SAMS Integration</h3><span class="badge-tag info">LIVE IMPORT</span></div>
-            <p style="color:var(--text-muted);line-height:1.55;">Import a learner/parent spreadsheet exported from SA-SAMS into this school's real Little Feet learner register. Little Feet maps common SA-SAMS learner name, surname, grade, register class and guardian contact columns, previews the result, then sends approved rows through the same bounded, tenant-isolated server import used by the production learner register.</p>
-            <p class="meta" style="margin:8px 0 12px;">This does not pretend to submit data to DBE, LURITS, or a private SA-SAMS API. Direct database/API export will only be enabled against an officially supported SA-SAMS interface or validated database specification.</p>
+            <div class="card-header-bar"><h3>SA-SAMS Integration</h3><span class="badge-tag info">WORK IN PROGRESS</span></div>
+            <p style="color:var(--text-muted);line-height:1.55;">SA-SAMS learner import is available and working. Import a learner/parent spreadsheet exported from SA-SAMS into this school's real Little Feet learner register. Little Feet maps common SA-SAMS learner name, surname, grade, register class and guardian contact columns, previews the result, then sends approved rows through the same bounded, tenant-isolated server import used by the production learner register.</p>
+            <p class="meta" style="margin:8px 0 12px;">Direct Little Feet → LURITS/DBE submission is not yet available. Little Feet Technologies has requested the official DBE third-party integration specifications and will only enable this feature once it has been implemented and validated against the official requirements.</p>
             <label for="saSamsImportFile">SA-SAMS learner/parent export (.xlsx, .xls or .csv)</label>
             <input id="saSamsImportFile" type="file" accept=".xlsx,.xls,.csv" aria-label="Upload SA-SAMS learner and parent export">
             <button type="button" class="action-btn btn-green" onclick="previewSaSamsImport()">Check SA-SAMS export</button>
