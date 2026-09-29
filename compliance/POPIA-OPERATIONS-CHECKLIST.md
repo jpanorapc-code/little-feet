@@ -1,0 +1,21 @@
+# POPIA Operations Checklist
+
+- [x] Company legal identity recorded
+- [x] Information Officer registered
+- [x] Section 51 PAIA Manual completed, uploaded and publicly available
+- [x] Public Privacy & POPIA Notice
+- [x] POPIA compliance framework documented
+- [x] Initial PIIA documented
+- [x] Data-subject/PAIA request procedure documented
+- [x] Security-compromise procedure documented
+- [x] Operator/DPA template documented
+- [x] Retention methodology documented
+- [x] Vendor/cross-border register created
+- [x] Section 57 screening procedure documented
+- [ ] Execute school/client DPA with each client
+- [ ] Verify each active provider contract, processing location and section 72 basis
+- [ ] Approve/configure numeric retention periods only where evidence supports them
+- [ ] Maintain request, incident and training/awareness registers as events occur
+- [ ] Perform periodic access review
+- [ ] Re-run PIIA before material/high-risk processing changes
+- [ ] Review current Information Regulator requirements at least annually
