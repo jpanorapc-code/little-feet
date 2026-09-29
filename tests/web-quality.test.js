@@ -54,7 +54,7 @@ assert.match(client, /if \(!response\.ok\) throw new Error\(accounts\?\.message 
 assert.match(client, /reset-login-lockout/);
 assert.match(server, /const clearLoginLockoutForAccount = account =>/);
 assert.match(server, /app\.post\('\/api\/accounts\/:username\/reset-login-lockout'/);
-assert.match(page, /my-day\.js\?v=20260930-accounts-full-v1/);
+assert.match(page, /my-day\.js\?v=20260930-user-switch-v2/);
 assert.match(page, /data-my-day-nav="true"/);
 assert.match(page, /onclick="switchTab\('myDayTab', this\)"/);
 assert.match(page, /id="myDayTab" class="tab-content" data-roles="teacher,principal,admin,staff"/);
@@ -81,6 +81,8 @@ assert.match(myDay, /new MutationObserver\(queueRepair\)/);
 assert.match(myDay, /window\.addEventListener\('pageshow', start\)/);
 assert.match(myDay, /visibilitychange/);
 assert.match(myDay, /tab\?\.dataset\.myDayReady === 'true'/);
+assert.match(myDay, /tab\.dataset\.myDayUser = userKey/);
+assert.match(myDay, /tab\.dataset\.myDayUser !== userKey/);
 assert.match(myDay, /teacher', 'principal', 'admin', 'staff/);
 assert.match(client, /function updateAccountRoleFields\(\)/);
 assert.match(client, /CEO \/ ADMINISTRATOR/);
