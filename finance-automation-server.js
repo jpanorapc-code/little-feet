@@ -6,12 +6,12 @@ function registerFinanceAutomation(app, deps) {
     findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
     dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
     applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
-    scheduleReplicaSnapshot, persistenceReady
+    scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess
   } = deps;
 
   const financeActor = req => {
     const actor = getSessionAccount(req);
-    return actor && ['principal', 'admin'].includes(actor.role) ? actor : null;
+    return actor && (hasPlatformAccess(actor) || ['principal', 'admin', 'school_accounts'].includes(actor.role)) ? actor : null;
   };
   const financeRecords = (name, actor) => (Array.isArray(db[name]) ? db[name].filter(record => recordInSchool(record, actor)) : []);
   const todayParts = (dateKey = dateKeyInSouthAfrica()) => {
@@ -395,7 +395,7 @@ function registerFinanceAutomation(app, deps) {
 
   app.get('/api/finance/statements', (req, res) => {
     const actor = getSessionAccount(req);
-    if (!actor || !['parent', 'principal', 'admin'].includes(actor.role)) return res.status(403).json({ message: 'Statement access is required.' });
+    if (!actor || !(hasPlatformAccess(actor) || ['parent', 'principal', 'admin', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Statement access is required.' });
     const parentUsername = actor.role === 'parent' ? actor.username : String(req.query?.parentUsername || '').trim();
     if (!parentUsername) return res.status(400).json({ message: 'Choose a parent account.' });
     const { from, to } = safeDateRange(req);
