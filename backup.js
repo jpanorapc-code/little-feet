@@ -1,6 +1,6 @@
 let currentUser = null;
 const LITTLE_FEET_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
-const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.platformAccess === true));
+const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.role === 'crm' || user.platformAccess === true));
 const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role || ''));
 const isFinanceUser = (user = currentUser) => Boolean(user && (isFullAccessUser(user) || user.role === 'accounts'));
 const displayRoleName = user => {
