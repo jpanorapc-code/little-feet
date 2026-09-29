@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v22-legal-compliance';
+const CACHE_NAME = 'little-feet-shell-v23-crm-full-access';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -10,7 +10,7 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-aurora-stars-4k.svg',
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
-  '/backup.js?v=20260927-sticky-note-v2',
+  '/backup.js?v=20260930-crm-full-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260925-curriculum-v1',
