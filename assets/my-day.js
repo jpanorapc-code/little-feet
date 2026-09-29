@@ -62,11 +62,11 @@
     const firstName = String(user.name || user.displayName || 'there').trim().split(/\s+/)[0];
     const today = new Intl.DateTimeFormat(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());
 
-    const management = role === 'admin' || role === 'principal'
+    const management = window.isLittleFeetFullAccessUser?.(user) || role === 'admin' || role === 'principal'
       ? action('operationsTab', 'School operations', 'Review operational records, school workflows and items that need management attention.')
       : action('progressTab', 'Development', 'Jump into learner development records and today\'s classroom evidence.');
 
-    const adminOnly = role === 'admin'
+    const adminOnly = window.isLittleFeetFullAccessUser?.(user) || role === 'admin'
       ? action('accountsTab', 'People & accounts', 'Manage staff and family accounts, links and access from one place.')
       : '';
 
@@ -97,7 +97,7 @@
       <section class="my-day-grid" aria-label="Today's main work">
         ${action('attendanceTab', 'Daily attendance', 'Capture or review today\'s learner attendance before the school day gets away from you.')}
         ${action('scheduleTab', 'Timetable', 'See timetable records and the day\'s scheduled learning activities.')}
-        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${action('maintenanceTab', 'Maintenance', 'Report issues, assign work orders and track repairs to completion.')}\n        ${action('resourceBookingTab', 'Resource Booking', 'Reserve rooms, facilities, vehicles and equipment without double-booking.')}\n        ${action('purchaseRequestsTab', 'Purchase Requests', 'Request supplies and equipment, then track approval and fulfilment.')}\n        ${action('qualificationsTab', 'Training & Qualifications', 'Track certificates, renewals and staff compliance expiries.')}\n        ${action('kpiHistoryTab', 'KPI History', 'Review your monthly task-performance trend over time.')}\n        ${action('staffDevelopmentTab', 'Staff Development', 'Follow development goals created from performance feedback.')}\n        ${['admin','principal'].includes(role) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
+        ${action('schoolDayTab', 'School Day Hub', 'Open the existing day-to-day school workspace for live operational work.')}\n        ${action('staffWorkTab', 'Staff Work', 'Manage staff tasks, leave requests and teacher cover from one workplace.')}\n        ${action('staffNoticesTab', 'Staff Notice Board', 'Read staff notices and acknowledge required updates.')}\n        ${action('meetingMinutesTab', 'Meetings & Minutes', 'Turn approved meetings into minutes, decisions and assigned action tasks.')}\n        ${action('maintenanceTab', 'Maintenance', 'Report issues, assign work orders and track repairs to completion.')}\n        ${action('resourceBookingTab', 'Resource Booking', 'Reserve rooms, facilities, vehicles and equipment without double-booking.')}\n        ${action('purchaseRequestsTab', 'Purchase Requests', 'Request supplies and equipment, then track approval and fulfilment.')}\n        ${action('qualificationsTab', 'Training & Qualifications', 'Track certificates, renewals and staff compliance expiries.')}\n        ${action('kpiHistoryTab', 'KPI History', 'Review your monthly task-performance trend over time.')}\n        ${action('staffDevelopmentTab', 'Staff Development', 'Follow development goals created from performance feedback.')}\n        ${(window.isLittleFeetFullAccessUser?.(user) || ['admin','principal'].includes(role)) ? action('approvalsTab', 'Approvals Centre', 'Review leave and meeting requests waiting for a management decision.') : ''}
         ${action('chatTab', 'Messages', 'Open school conversations and follow up on communication that needs a response.')}
       </section>
 
@@ -204,12 +204,12 @@
     }
     if (Array.isArray(leave)) {
       const pendingLeave = leave.filter(item => String(item.status || '') === 'Pending');
-      if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && pendingLeave.length) items.push({ tab:'approvalsTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
+      if ((window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) && pendingLeave.length) items.push({ tab:'approvalsTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
     }
     if (Array.isArray(cover)) {
       const needsCover = cover.filter(item => String(item.status || '') === 'Needs Cover');
       const assignedToMe = cover.filter(item => String(item.status || '') === 'Assigned' && String(item.coverTeacher || '').toLowerCase() === username);
-      if (['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) && needsCover.length) items.push({ tab:'staffWorkTab', title:`${needsCover.length} class cover request${needsCover.length === 1 ? '' : 's'} unassigned`, detail:'Assign teacher cover' });
+      if ((window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) && needsCover.length) items.push({ tab:'staffWorkTab', title:`${needsCover.length} class cover request${needsCover.length === 1 ? '' : 's'} unassigned`, detail:'Assign teacher cover' });
       if (assignedToMe.length) items.push({ tab:'staffWorkTab', title:`${assignedToMe.length} cover assignment${assignedToMe.length === 1 ? '' : 's'} for you`, detail:'Review teacher cover' });
     }
     if (Array.isArray(reviews)) {
@@ -223,7 +223,7 @@
     }
     if (Array.isArray(maintenance)) {
       const mine = maintenance.filter(item => item.status !== 'Completed' && String(item.assignedTo || '').toLowerCase() === username);
-      const unassigned = ['admin','principal'].includes(String(currentUser.role || '').toLowerCase()) ? maintenance.filter(item => item.status !== 'Completed' && !item.assignedTo) : [];
+      const unassigned = (window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) ? maintenance.filter(item => item.status !== 'Completed' && !item.assignedTo) : [];
       if (mine.length) items.push({ tab:'maintenanceTab', title:`${mine.length} maintenance work order${mine.length===1?'':'s'} assigned to you`, detail:'Open maintenance' });
       if (unassigned.length) items.push({ tab:'maintenanceTab', title:`${unassigned.length} unassigned maintenance issue${unassigned.length===1?'':'s'}`, detail:'Assign work orders' });
     }
@@ -263,7 +263,7 @@
     if (!document.getElementById('dashboardSection')) return;
     const user = window.getLittleFeetCurrentUser?.() || await getSessionUser();
     const role = String(user?.role || '').toLowerCase();
-    if (!user || !STAFF_ROLES.has(role)) return;
+    if (!user || !(window.isLittleFeetFullAccessUser?.(user) || STAFF_ROLES.has(role))) return;
     currentUser = user;
     addStyles();
     buildNav();
@@ -278,7 +278,7 @@
     requestAnimationFrame(() => {
       repairQueued = false;
       const role = String(currentUser?.role || '').toLowerCase();
-      if (!STAFF_ROLES.has(role)) return;
+      if (!(window.isLittleFeetFullAccessUser?.(currentUser) || STAFF_ROLES.has(role))) return;
       const tab = document.getElementById('myDayTab');
       if (!document.querySelector('[data-my-day-nav]') || !tab || tab.dataset.myDayReady !== 'true') init();
     });
