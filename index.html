@@ -3701,6 +3701,58 @@
     }
 
 
+    /* Compact legal-brand layout: keep the registered name readable without growing the shell. */
+    @media (min-width:960px) {
+      #dashboardSection > nav {
+        min-height:56px !important;
+        padding:6px 18px !important;
+        gap:8px !important;
+      }
+      .nav-brand { gap:8px !important; flex:0 1 auto; }
+      .nav-brand img { width:40px !important; height:40px !important; }
+      .nav-brand > div { gap:6px !important; overflow:visible !important; }
+      .nav-brand .site-name {
+        font-size:clamp(.98rem,1.25vw,1.34rem) !important;
+        letter-spacing:.012em !important;
+        overflow:visible !important;
+        text-overflow:clip !important;
+        white-space:nowrap !important;
+      }
+      .nav-brand .org-badge {
+        margin-top:0 !important;
+        padding:2px 5px !important;
+        font-size:.55rem !important;
+        line-height:1.05 !important;
+        white-space:nowrap !important;
+      }
+      .nav-user-panel { gap:7px !important; font-size:.76rem !important; }
+      .nav-user-panel .action-btn { min-height:34px !important; padding:6px 9px !important; }
+      .nav-quickbar { gap:7px !important; }
+      .nav-quickbar .action-btn, .nav-shortcut { min-height:34px !important; padding:6px 9px !important; }
+      .app-sidebar { top:var(--portal-header-height,56px) !important; }
+    }
+
+    /* Login legal identity: use the available width and keep clear air above the portal card. */
+    @media (min-width:641px) {
+      #authSection { padding-top:238px !important; }
+      .brand-header {
+        top:-268px !important;
+        width:min(620px,calc(100vw - 48px)) !important;
+        padding-top:184px !important;
+      }
+      .brand-header h1 {
+        margin:10px auto 8px !important;
+        padding:0 8px;
+        font-size:clamp(1.72rem,3vw,2.25rem) !important;
+        line-height:1.08 !important;
+        white-space:nowrap !important;
+      }
+      .brand-header p.slogan {
+        margin:2px auto 0 !important;
+        transform:none;
+      }
+    }
+
     /* Desktop sidebar scroll lock — behavior only, no visual/layout redesign. */
     @media (min-width:960px) {
       #dashboardSection > nav {
