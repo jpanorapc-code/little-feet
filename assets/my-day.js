@@ -56,7 +56,8 @@
     const container = document.querySelector('#dashboardSection .container');
     if (!container) return;
     let tab = document.getElementById('myDayTab');
-    if (tab?.dataset.myDayReady === 'true') return;
+    const userKey = String(user.username || user.email || user.name || '').trim().toLowerCase();
+    if (tab?.dataset.myDayReady === 'true' && tab.dataset.myDayUser === userKey) return;
 
     const role = String(user.role || '').toLowerCase();
     const firstName = String(user.name || user.displayName || 'there').trim().split(/\s+/)[0];
@@ -80,6 +81,7 @@
       else container.appendChild(tab);
     }
     tab.dataset.myDayReady = 'true';
+    tab.dataset.myDayUser = userKey;
     tab.innerHTML = `
       <section class="my-day-hero" aria-labelledby="myDayHeading">
         <div class="my-day-kicker">Your working day</div>
@@ -280,7 +282,8 @@
       const role = String(currentUser?.role || '').toLowerCase();
       if (!(window.isLittleFeetFullAccessUser?.(currentUser) || STAFF_ROLES.has(role))) return;
       const tab = document.getElementById('myDayTab');
-      if (!document.querySelector('[data-my-day-nav]') || !tab || tab.dataset.myDayReady !== 'true') init();
+      const userKey = String(currentUser?.username || currentUser?.email || currentUser?.name || '').trim().toLowerCase();
+      if (!document.querySelector('[data-my-day-nav]') || !tab || tab.dataset.myDayReady !== 'true' || tab.dataset.myDayUser !== userKey) init();
     });
   };
 
