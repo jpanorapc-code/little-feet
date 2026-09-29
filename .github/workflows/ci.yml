@@ -37,6 +37,7 @@ jobs:
           node --check auth-crypto.js
           node --check service-worker.js
           node --check assets/mobile-pwa.js
+          node --check assets/sa-sams-integration.js
           node --check assets/curriculum-frameworks.js
           node --check assets/education-stages.js
           node --check finance-automation-server.js
