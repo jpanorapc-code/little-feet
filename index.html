@@ -5951,6 +5951,15 @@
             </div>
           </div>
           <div id="schoolDatabasePreview" class="record-list" aria-live="polite" style="margin-top:18px;"></div>
+          <section class="workspace-card" style="margin-top:18px;border-left:4px solid var(--primary-color);">
+            <div class="card-header-bar"><h3>SA-SAMS Integration</h3><span class="badge-tag info">LIVE IMPORT</span></div>
+            <p style="color:var(--text-muted);line-height:1.55;">Import a learner/parent spreadsheet exported from SA-SAMS into this school's real Little Feet learner register. Little Feet maps common SA-SAMS learner name, surname, grade, register class and guardian contact columns, previews the result, then sends approved rows through the same bounded, tenant-isolated server import used by the production learner register.</p>
+            <p class="meta" style="margin:8px 0 12px;">This does not pretend to submit data to DBE, LURITS, or a private SA-SAMS API. Direct database/API export will only be enabled against an officially supported SA-SAMS interface or validated database specification.</p>
+            <label for="saSamsImportFile">SA-SAMS learner/parent export (.xlsx, .xls or .csv)</label>
+            <input id="saSamsImportFile" type="file" accept=".xlsx,.xls,.csv" aria-label="Upload SA-SAMS learner and parent export">
+            <button type="button" class="action-btn btn-green" onclick="previewSaSamsImport()">Check SA-SAMS export</button>
+            <div id="saSamsImportPreview" class="record-list" aria-live="polite" style="margin-top:14px;"></div>
+          </section>
         </div>
       </div>
 
@@ -6264,7 +6273,8 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260928-school-search-v4" defer></script>
+  <script src="backup.js?v=20260929-sasams-v1" defer></script>
+  <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20260929-my-day-v4" defer></script>
   <script src="/assets/staff-work.js?v=20260926-staff-work-v1" defer></script>
   <script src="/assets/approvals.js?v=20260926-approvals-v1" defer></script>
