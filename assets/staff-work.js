@@ -15,7 +15,7 @@
     const selectedMonth = document.getElementById('staffKpiMonth')?.value || new Date().toISOString().slice(0,7);
     const [tasks, leave, cover, reviews, kpi] = await Promise.all([api('/api/staff/tasks'),api('/api/staff/leave'),api('/api/staff/cover'),api('/api/staff/performance-reviews'),api('/api/staff/kpi-monthly?month='+encodeURIComponent(selectedMonth))]);
     const root=document.getElementById('staffWorkContent'); if(!root) return;
-    const manager=['admin','principal'].includes(user.role);
+    const manager=(window.isLittleFeetFullAccessUser?.(user) || ['admin','principal'].includes(user.role));
     root.innerHTML=`
       <div class="staff-work-grid">
         <section class="staff-work-card"><h3>Staff Tasks</h3>
@@ -58,8 +58,8 @@
     document.querySelectorAll('[data-review-ack]').forEach(el=>el.addEventListener('click',async()=>{const id=el.dataset.reviewAck;const comment=document.querySelector('[data-review-comment="'+CSS.escape(id)+'"]')?.value||'';await api('/api/staff/performance-reviews/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({employeeComment:comment,acknowledged:true})});await render();}));
   };
   const init=async()=>{
-    user=window.getLittleFeetCurrentUser?.(); if(!user||!['teacher','principal','admin'].includes(user.role)) return;
-    if(['admin','principal'].includes(user.role)) { try { accounts=await api('/api/accounts'); } catch { accounts=[]; } }
+    user=window.getLittleFeetCurrentUser?.(); if(!user||!(window.isLittleFeetFullAccessUser?.(user) || ['teacher','principal','admin'].includes(user.role))) return;
+    if((window.isLittleFeetFullAccessUser?.(user) || ['admin','principal'].includes(user.role))) { try { accounts=await api('/api/accounts'); } catch { accounts=[]; } }
     else accounts=[user];
     await render().catch(err=>{const r=document.getElementById('staffWorkContent');if(r)r.innerHTML='<p>'+esc(err.message)+'</p>';});
   };
