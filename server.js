@@ -1937,7 +1937,7 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
 app.get('/api/subscription-billing', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view subscription billing.' });
-  if (!(hasPlatformAccess(actor) || ['teacher', 'principal', 'district', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
+  if (!(hasPlatformAccess(actor) || ['teacher', 'principal', 'district', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School subscription information is available to authorised school staff only.' });
   const billing = subscriptionBillingState(actor);
   const isAdmin = isAdminLike(actor);
   const school = db.schools.find(entry => entry.id === accountSchoolId(actor));
@@ -2025,7 +2025,7 @@ app.put('/api/subscription-billing', async (req, res) => {
 
 app.post('/api/subscription-billing/orders', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Only a principal or administrator can create a school subscription payment request.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only a principal, administrator, or school accounts user can create a school subscription payment request.' });
   const requestedPlanCode = String(req.body?.planCode || '').trim().toLowerCase();
   const requestedPlan = schoolSubscriptionPlans.find(plan => plan.code === requestedPlanCode);
   if (requestedPlanCode && !requestedPlan) return res.status(400).json({ message: 'Choose a valid school subscription plan.' });
@@ -2086,12 +2086,12 @@ registerFinanceAutomation(app, {
   findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
   dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
   applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
-  scheduleReplicaSnapshot, persistenceReady
+  scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess
 });
 
 app.get('/api/parent-payments/parents', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'School finance access is required.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School finance access is required.' });
   res.json(db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name || account.username, linkedLearners: account.linkedLearners || [] })));
 });
 
@@ -2106,7 +2106,7 @@ app.get('/api/parent-payments', (req, res) => {
 
 app.post('/api/parent-payments', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Only a principal or administrator can create parent payment requests.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only a principal, administrator, or school accounts user can create parent payment requests.' });
   const result = createParentPaymentRecord(req.body, actor);
   if (result.error) return res.status(400).json({ message: result.error });
   if (!Array.isArray(db.parentPayments)) db.parentPayments = [];
@@ -2127,7 +2127,7 @@ app.post('/api/parent-payments/:id/acknowledge', (req, res) => {
 
 app.get('/api/parent-subscription', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['parent', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Parent subscription access is required.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['parent', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Parent subscription access is required.' });
   const records = (db.parentSubscriptions || []).filter(record => recordInSchool(record, actor) && (isAdminLike(actor) || normalizeUsername(record.parentUsername) === normalizeUsername(actor.username)));
   res.json({ active: isAdminLike(actor) ? undefined : parentSubscriptionActive(actor), pricePerChild: 29, latest: records[0] ? { reference: records[0].reference, status: records[0].paymentStatus, amount: records[0].amount, createdAt: records[0].createdAt } : null, parents: isAdminLike(actor) ? db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name, active: parentSubscriptionActive(account), status: account.parentSubscriptionStatus || 'basic', grantedUntil: account.parentSubscriptionGrantedUntil || '' })) : undefined, paymentConfigured: billingPaymentConfigured(subscriptionBillingState(actor).payment) });
 });
@@ -2282,14 +2282,14 @@ app.put('/api/book-register/:id/return', (req, res) => {
 // same ledger can accept a gateway later through the signed, provider-neutral
 // webhook without changing the finance screens or historical records.
 app.get('/api/payments/ledger', (req, res) => {
-  const actor = requireAdmin(req);
-  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const actor = getSessionAccount(req);
+  if (!actor || !(hasPlatformAccess(actor) || ['admin', 'principal', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School finance access is required.' });
   res.json((db.paymentLedger || []).filter(entry => entry.schoolId === accountSchoolId(actor)));
 });
 
 app.post('/api/payments/reconcile', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Only a principal or administrator can reconcile a school payment.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Only a principal, administrator, or school accounts user can reconcile a school payment.' });
   const eventId = String(req.body?.eventId || '').trim().slice(0, 160);
   if (!eventId) return res.status(400).json({ message: 'A unique reconciliation event ID is required.' });
   const result = applyPaymentEvent({
