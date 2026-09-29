@@ -1,14 +1,15 @@
 let currentUser = null;
 const LITTLE_FEET_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
-const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.role === 'crm' || user.platformAccess === true));
+const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.role === 'crm' || user.role === 'accounts' || user.platformAccess === true));
 const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role || ''));
-const isFinanceUser = (user = currentUser) => Boolean(user && (isFullAccessUser(user) || user.role === 'accounts'));
+const isFinanceUser = (user = currentUser) => Boolean(user && (isFullAccessUser(user) || user.role === 'school_accounts'));
 const displayRoleName = user => {
   if (!user) return '';
   if (user.role === 'admin' && user.platformAccess) return 'CEO / ADMINISTRATOR';
-  return ({ staff:'LITTLE FEET STAFF', crm:'CRM', accounts:'ACCOUNTS', support:'SOFTWARE SUPPORT' }[user.role] || String(user.role || '').toUpperCase());
+  return ({ staff:'LITTLE FEET STAFF', crm:'CRM', accounts:'ACCOUNTS', school_accounts:'ACCOUNTS', support:'SOFTWARE SUPPORT' }[user.role] || String(user.role || '').toUpperCase());
 };
 window.getLittleFeetCurrentUser = () => currentUser;
+window.isLittleFeetFullAccessUser = user => isFullAccessUser(user || currentUser);
 let parentPaymentData = null;
 let bookRegisterData = null;
 const errorLog = [];
@@ -1110,7 +1111,11 @@ function renderRoleHomePanel() {
     },
     accounts: {
       icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'Little Feet'}`,
-      message: 'Work with billing, parent payments, tickets and company email from the Little Feet accounts department.'
+      message: 'Company-wide Little Feet Accounts access is active across all platform workspaces and schools.'
+    },
+    school_accounts: {
+      icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'School accounts'}`,
+      message: 'Work with the finance and accounting tools for your linked school.'
     },
     support: {
       icon: '🛠️', title: `Software Support · ${currentUser.name || 'Little Feet'}`,
