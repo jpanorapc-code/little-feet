@@ -205,7 +205,7 @@ const POST_AUDIENCES = new Set(['All', 'Infants', 'Toddlers', 'Preschool', 'Grad
 const PLATFORM_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
 const FULL_PLATFORM_ROLES = new Set(['staff', 'crm', 'accounts']);
 const ACCOUNT_ROLES = new Set(['parent', 'teacher', 'principal', 'district', 'admin', 'school_accounts', 'staff', 'crm', 'accounts', 'support']);
-const CHAT_ROLES = new Set(['parent', 'teacher', 'principal', 'admin', 'staff', 'crm', 'support']);
+const CHAT_ROLES = new Set(['parent', 'teacher', 'principal', 'admin', 'staff', 'crm', 'accounts', 'support']);
 const configuredPlatformOwnerUsername = () => normalizeUsername(process.env.LF_OWNER_ADMIN_USERNAME || process.env.LF_BOOTSTRAP_ADMIN_USERNAME || '');
 const isConfiguredPlatformOwner = account => Boolean(account && configuredPlatformOwnerUsername() && normalizeUsername(account.username) === configuredPlatformOwnerUsername());
 const hasPlatformAccess = account => Boolean(account && (account.platformAccess === true || FULL_PLATFORM_ROLES.has(account.role) || isConfiguredPlatformOwner(account)));
