@@ -60,13 +60,11 @@
       const last=status.lastSyncAt?new Date(status.lastSyncAt).toLocaleString():'Initial sync pending';
       return `<div class="workspace-card"><h3>Connected mailbox</h3><p><strong>${esc(provider)}</strong> · ${esc(status.email)}</p><p><strong>Last synced:</strong> ${esc(last)}</p>${status.initialSyncComplete?'':`<p class="meta">Older inbox messages are still being imported in safe batches.</p>`}${status.lastError?`<p class="meta">Last issue: ${esc(status.lastError)}</p>`:''}<div class="actions"><button id="syncConnectedMailbox" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectConnectedMailbox" class="action-btn" type="button">Disconnect</button></div><p class="meta">Little Feet imports the inbox in safe batches and checks for new mail while this dashboard is open. Your mailbox remains the source.</p></div>`;
     }
-    const providers=[
-      ['google','Google Gmail'],
-      ['microsoft','Microsoft Outlook'],
-      ['zoho','Zoho Mail'],
-      ['yahoo','Yahoo Mail']
-    ];
-    const buttons=providers.filter(([key])=>status.availableProviders?.[key]).map(([key,label])=>`<a class="action-btn btn-green" href="/api/email/mailbox/connect/${key}">Connect ${label}</a>`).join('');
+    const google=status.availableProviders?.google?'<a class="action-btn btn-green" href="/api/email/mailbox/connect/google">Connect Google Gmail</a>':'';
+    const microsoft=status.availableProviders?.microsoft?'<a class="action-btn btn-green" href="/api/email/mailbox/connect/microsoft">Connect Microsoft Outlook</a>':'';
+    const zoho=status.availableProviders?.zoho?'<a class="action-btn btn-green" href="/api/email/mailbox/connect/zoho">Connect Zoho Mail</a>':'';
+    const yahoo=status.availableProviders?.yahoo?'<a class="action-btn btn-green" href="/api/email/mailbox/connect/yahoo">Connect Yahoo Mail</a>':'';
+    const buttons=google+microsoft+zoho+yahoo;
     return `<div class="workspace-card"><h3>Connect your email inbox</h3><p>Connect a mailbox to import its recent inbox and keep new incoming messages synced on this dashboard.</p><div class="actions">${buttons}</div><p class="meta">Little Feet requests read-only mailbox access. Passwords are never stored. ${buttons?'Choose your provider to continue securely.':'Mailbox providers must first be enabled by the Little Feet server administrator.'}</p></div>`;
   };
 
