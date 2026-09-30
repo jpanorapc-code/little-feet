@@ -19,7 +19,7 @@ const curriculum = fs.readFileSync(path.join(root, 'assets', 'curriculum-framewo
 const auroraWallpaper = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-aurora-stars-4k.svg'), 'utf8');
 const starGlowMask = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-star-glow-mask-4k.svg'), 'utf8');
 
-assert.match(page, /<meta name="description" content="Little Feet is a secure school operations platform/);
+assert.match(page, /<meta name="description" content="Little Feet by Little Feet Technologies \(Pty\) Ltd is a South African school operations platform/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
 assert.ok(page.includes('<link rel="canonical" href="https://littlefeet.co.za/">'));
 assert.ok(page.includes('<script type="application/ld+json">'));
