@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v26-mailbox-oauth';
+const CACHE_NAME = 'little-feet-shell-v27-mailbox-oauth-clean';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
