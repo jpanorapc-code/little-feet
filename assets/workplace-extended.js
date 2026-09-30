@@ -54,14 +54,20 @@
     return `<div class="workspace-card"><h3>Receive email in Little Feet</h3><p><strong>Your private forwarding address</strong></p><div class="actions"><input id="forwardingAddress" type="text" readonly value="${esc(forwarding.address)}" style="flex:1;min-width:220px;"><button id="copyForwardingAddress" class="action-btn btn-green" type="button">Copy address</button></div><p><strong>Last received:</strong> ${esc(last)}</p><p class="meta">In Gmail, Outlook, Zoho, Yahoo or another provider that supports forwarding, forward new incoming mail to this address. Provider confirmation emails sent here will appear in the inbox below. Keep this private address out of public pages.</p></div>`;
   };
   const mailboxMarkup=status=>{
+    const labels={google:'Google Gmail',microsoft:'Microsoft Outlook',zoho:'Zoho Mail',yahoo:'Yahoo Mail'};
     if(status.connected){
-      const provider=status.provider==='google'?'Google Gmail':'Microsoft Outlook';
+      const provider=labels[status.provider]||status.provider||'Connected mailbox';
       const last=status.lastSyncAt?new Date(status.lastSyncAt).toLocaleString():'Initial sync pending';
       return `<div class="workspace-card"><h3>Connected mailbox</h3><p><strong>${esc(provider)}</strong> · ${esc(status.email)}</p><p><strong>Last synced:</strong> ${esc(last)}</p>${status.initialSyncComplete?'':`<p class="meta">Older inbox messages are still being imported in safe batches.</p>`}${status.lastError?`<p class="meta">Last issue: ${esc(status.lastError)}</p>`:''}<div class="actions"><button id="syncConnectedMailbox" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectConnectedMailbox" class="action-btn" type="button">Disconnect</button></div><p class="meta">Little Feet imports the inbox in safe batches and checks for new mail while this dashboard is open. Your mailbox remains the source.</p></div>`;
     }
-    const google=status.availableProviders?.google?'<a class="action-btn btn-green" href="/api/email/mailbox/connect/google">Connect Google Gmail</a>':'';
-    const microsoft=status.availableProviders?.microsoft?'<a class="action-btn btn-green" href="/api/email/mailbox/connect/microsoft">Connect Microsoft Outlook</a>':'';
-    return `<div class="workspace-card"><h3>Connect your email inbox</h3><p>Connect a mailbox to import its recent inbox and keep new incoming messages synced on this dashboard.</p><div class="actions">${google}${microsoft}</div><p class="meta">Little Feet requests read-only mailbox access. Passwords are never stored. ${google||microsoft?'Choose your provider to continue securely.':'Google and Microsoft mailbox access must first be enabled by the Little Feet server administrator.'}</p></div>`;
+    const providers=[
+      ['google','Google Gmail'],
+      ['microsoft','Microsoft Outlook'],
+      ['zoho','Zoho Mail'],
+      ['yahoo','Yahoo Mail']
+    ];
+    const buttons=providers.filter(([key])=>status.availableProviders?.[key]).map(([key,label])=>`<a class="action-btn btn-green" href="/api/email/mailbox/connect/${key}">Connect ${label}</a>`).join('');
+    return `<div class="workspace-card"><h3>Connect your email inbox</h3><p>Connect a mailbox to import its recent inbox and keep new incoming messages synced on this dashboard.</p><div class="actions">${buttons}</div><p class="meta">Little Feet requests read-only mailbox access. Passwords are never stored. ${buttons?'Choose your provider to continue securely.':'Mailbox providers must first be enabled by the Little Feet server administrator.'}</p></div>`;
   };
 
   async function email(){
