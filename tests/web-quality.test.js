@@ -72,6 +72,8 @@ assert.match(workplaceExtended, /\/api\/email\/forwarding\/setup/);
 assert.match(workplaceExtended, /No mailbox email, forwarded email or Little Feet notifications yet/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/sync/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/connect\/google/);
+assert.match(server, /req\.session\?\.mailboxOAuth\?\.provider === 'google'/);
+assert.match(server, /completeMailboxOAuth\(req, res, 'google'\)/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/connect\/microsoft/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/connect\/zoho/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/connect\/yahoo/);
