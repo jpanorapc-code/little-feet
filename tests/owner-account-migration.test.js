@@ -17,6 +17,7 @@ fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.joi
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temp, 'lib', 'yahoo-imap.js'));
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const request = async (route, options = {}) => {
