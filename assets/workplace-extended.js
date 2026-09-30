@@ -54,8 +54,7 @@
     if(mailbox.connected){
       const last=mailbox.lastSyncAt?new Date(mailbox.lastSyncAt).toLocaleString():'Not synced yet';
       const status=syncError||mailbox.lastSyncStatus==='error'?'Sync needs attention':'Connected';
-      const method=mailbox.authMode==='imap'?'Advanced IMAP':'Secure sign-in';
-      return `<div class="workspace-card"><h3>Your personal mailbox</h3><p><strong>${esc(mailboxProviderName(mailbox.provider))}</strong><br>${esc(mailbox.address||'')}</p><p><strong>Status:</strong> ${esc(status)}</p><p><strong>Connection:</strong> ${esc(method)}</p><p><strong>Last sync:</strong> ${esc(last)}</p><p class="meta">Only this Little Feet user can see this connected mailbox. OAuth tokens or advanced credentials stay encrypted on the server.</p>${syncError?`<p class="meta" style="color:#fca5a5;">${esc(syncError)}</p>`:''}<div class="actions"><button id="syncMailboxNow" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectMailbox" class="action-btn btn-red" type="button">Disconnect mailbox</button></div></div>`;
+      return `<div class="workspace-card"><h3>Your personal mailbox</h3><p><strong>${esc(mailboxProviderName(mailbox.provider))}</strong><br>${esc(mailbox.address||'')}</p><p><strong>Status:</strong> ${esc(status)}</p><p><strong>Connection:</strong> Secure provider sign-in</p><p><strong>Last sync:</strong> ${esc(last)}</p><p class="meta">Only this Little Feet user can see this connected mailbox. OAuth tokens stay encrypted on the server.</p>${syncError?`<p class="meta" style="color:#fca5a5;">${esc(syncError)}</p>`:''}<div class="actions"><button id="syncMailboxNow" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectMailbox" class="action-btn btn-red" type="button">Disconnect mailbox</button></div></div>`;
     }
 
     const buttons=[
