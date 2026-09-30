@@ -8,6 +8,9 @@ const {
   gmailPayloadText,
   fetchGmailMessages,
   fetchMicrosoftMessages,
+  fetchZohoMessages,
+  zohoMailBaseForLocation,
+  normalizeAppPassword,
   fetchImapMessages
 } = require('../lib/mailbox-integration');
 
@@ -69,6 +72,44 @@ const {
   assert.equal(microsoft[0].subject, 'Microsoft subject');
   assert.match(microsoft[0].body, /Hello\s+Microsoft/);
 
+
+  assert.equal(normalizeAppPassword('Abc 123  XyZ'), 'Abc123XyZ');
+  assert.equal(zohoMailBaseForLocation('eu'), 'https://mail.zoho.eu');
+  assert.equal(zohoMailBaseForLocation('au'), 'https://mail.zoho.com.au');
+  assert.equal(zohoMailBaseForLocation('unknown'), '');
+
+  const zohoFetch = async (url, options = {}) => {
+    const target=String(url);
+    assert.equal(options.headers.Authorization, 'Zoho-oauthtoken zoho-token');
+    if (target === 'https://mail.zoho.com/api/accounts') return {
+      ok:true,json:async()=>({data:[{type:'ZOHO_ACCOUNT',enabled:true,accountId:'za1',primaryEmailAddress:'owner@example.com'}]})
+    };
+    if (target === 'https://mail.zoho.com/api/accounts/za1/folders') return {
+      ok:true,json:async()=>({data:[{folderType:'Inbox',folderName:'Inbox',path:'/Inbox',folderId:'inbox1'}]})
+    };
+    if (target.includes('/messages/view?')) return {
+      ok:true,json:async()=>({data:[{
+        messageId:'zm1',folderId:'inbox1',subject:'Zoho subject',sender:'Zoho Sender',
+        fromAddress:'sender@example.com',receivedTime:String(Date.parse('2026-09-30T12:00:00Z')),summary:'Zoho summary'
+      }]})
+    };
+    if (target.endsWith('/folders/inbox1/messages/zm1/content')) return {
+      ok:true,json:async()=>({data:{messageId:'zm1',content:'<div>Hello <b>Zoho</b></div>'}})
+    };
+    throw new Error('Unexpected Zoho URL: '+target);
+  };
+  const zoho = await fetchZohoMessages({
+    accessToken:'zoho-token',
+    mailApiBase:'https://mail.zoho.com',
+    address:'owner@example.com',
+    fetchImpl:zohoFetch,
+    limit:30
+  });
+  assert.equal(zoho.length,1);
+  assert.equal(zoho[0].subject,'Zoho subject');
+  assert.match(zoho[0].body,/Hello\s+Zoho/);
+  assert.equal(zoho[0].from,'Zoho Sender <sender@example.com>');
+
   class FakeSocket extends EventEmitter {
     constructor() {
       super();
@@ -81,6 +122,12 @@ const {
       const line = String(data).trim();
       const tag = line.split(' ')[0];
       if (line.includes(' LOGIN ')) setImmediate(() => this.emit('data', Buffer.from(tag + ' OK LOGIN completed\r\n')));
+      else if (line.includes(' AUTHENTICATE XOAUTH2 ')) {
+        const payload=Buffer.from(line.split(' ').slice(3).join(' '),'base64').toString('utf8');
+        assert.match(payload,/user=user@example\.com/);
+        assert.match(payload,/auth=Bearer oauth-token/);
+        setImmediate(() => this.emit('data', Buffer.from(tag + ' OK AUTHENTICATE completed\r\n')));
+      }
       else if (line.includes(' SELECT INBOX')) setImmediate(() => this.emit('data', Buffer.from('* 2 EXISTS\r\n' + tag + ' OK SELECT completed\r\n')));
       else if (line.includes(' UID SEARCH SINCE ')) setImmediate(() => this.emit('data', Buffer.from('* SEARCH 10 11\r\n' + tag + ' OK SEARCH completed\r\n')));
       else if (line.includes(' UID FETCH 11 ')) this.replyFetch(tag, 11, 'Newest', 'Newest body', '12:00:00');
@@ -123,6 +170,17 @@ const {
   assert.equal(imap[0].subject, 'Newest');
   assert.equal(imap[0].body, 'Newest body');
   assert.equal(imap[1].subject, 'Older');
+
+  const oauthImap = await fetchImapMessages({
+    host:'imap.mail.yahoo.com',
+    port:993,
+    address:'user@example.com',
+    accessToken:'oauth-token',
+    connect:()=>new FakeSocket(),
+    limit:1
+  });
+  assert.equal(oauthImap.length,1);
+  assert.equal(oauthImap[0].subject,'Newest');
 
   console.log('Mailbox integration regression test passed.');
 })().catch(error => {
