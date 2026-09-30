@@ -141,7 +141,7 @@ function assertDenied(result,label){
     assert.equal((await request('/api/subscription-billing',{cookie:principal})).response.status,200);
     assertDenied(await request('/api/accounts',{method:'POST',cookie:principal,body:{username:'x',pin:'1234',name:'x',role:'teacher'}}),'principal account admin');
     assertDenied(await request('/api/schools/search?q=L',{cookie:principal}),'principal school search');
-    assertDenied(await request('/api/payments/ledger',{cookie:principal}),'principal payment ledger');
+    assert.equal((await request('/api/payments/ledger',{cookie:principal})).response.status,200);
     assertDenied(await request('/api/store/products',{method:'POST',cookie:principal,body:{name:'probe',price:1,stockQuantity:1}}),'principal store product admin');
     assertDenied(await request('/api/learner-access-codes/printable-list',{cookie:principal}),'principal bulk code export');
 
@@ -155,7 +155,7 @@ function assertDenied(result,label){
     assert.equal(districtEmailStatus.response.status,200);
     assert.equal(districtEmailStatus.data.address,'alpha-district@example.test');
 
-    // Little Feet company roles: Staff is company-wide; CRM is department-scoped.
+    // Little Feet company roles: Staff and CRM are company-wide full-platform roles.
     const staffAccounts=await request('/api/accounts',{cookie:staff});
     assert.equal(staffAccounts.response.status,200);
     const staffSchoolSearch=await request('/api/schools/search?q=L',{cookie:staff});
@@ -167,7 +167,9 @@ function assertDenied(result,label){
     assert.equal(staffCreatesCrm.data.account.schoolName,'');
     const schoolAdminCreatesCrm=await request('/api/accounts',{method:'POST',cookie:admin,body:{username:'blocked-crm-user',pin:'Password1',name:'Blocked CRM User',role:'crm',schoolName:''}});
     assert.equal(schoolAdminCreatesCrm.response.status,403);
-    assertDenied(await request('/api/accounts',{cookie:crm}),'crm account administration');
+    const crmAccounts=await request('/api/accounts',{cookie:crm});
+    assert.equal(crmAccounts.response.status,200);
+    assert.ok(crmAccounts.data.some(account=>account.username==='alpha-admin'));
     assert.equal((await request('/api/tickets',{cookie:crm})).response.status,200);
 
     // Username collision by truncation must fail rather than create ambiguous identities.
