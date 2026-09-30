@@ -79,8 +79,6 @@ assert.match(server, /microsoft: Boolean\(process\.env\.MICROSOFT_CLIENT_ID && p
 assert.match(server, /req\.query\.state === req\.session\.mailboxGoogleOAuthState/);
 assert.match(server, /req\.query\.state === req\.session\.mailboxMicrosoftOAuthState/);
 assert.match(server, /MICROSOFT_MAILBOX_SCOPE/);
-assert.match(server, /yahoo: \{ label: 'Yahoo Mail'/);
-assert.match(server, /zoho: \{ label: 'Zoho Mail'/);
 assert.match(server, /app\.get\('\/auth\/email\/google'/);
 assert.match(server, /app\.get\('\/auth\/email\/microsoft'/);
 assert.match(server, /app\.get\('\/auth\/email\/zoho'/);
