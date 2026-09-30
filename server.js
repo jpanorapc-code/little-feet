@@ -3715,11 +3715,10 @@ app.get('/api/email/mailbox/connect/:provider', (req, res) => {
   }
 });
 
-app.get('/api/email/mailbox/oauth/:provider/callback', async (req, res) => {
+const completeMailboxOAuth = async (req, res, provider) => {
   const actor = getSessionAccount(req);
-  const provider = String(req.params.provider || '').toLowerCase();
   const pending = req.session?.mailboxOAuth;
-  delete req.session?.mailboxOAuth;
+  if (req.session) delete req.session.mailboxOAuth;
   const valid = actor && MAILBOX_PROVIDERS.has(provider) && pending?.provider === provider
     && pending.state === req.query.state && pending.username === normalizeUsername(actor.username)
     && Date.now() - Number(pending.createdAt || 0) < 10 * 60_000 && req.query.code && !req.query.error;
@@ -3747,13 +3746,18 @@ app.get('/api/email/mailbox/oauth/:provider/callback', async (req, res) => {
     };
     await syncConnectedMailbox(actor, { initial: true });
     await saveDatabaseState();
-    res.redirect('/?mailbox=connected');
+    return res.redirect('/?mailbox=connected');
   } catch (error) {
     if (previousConnection) actor.mailboxConnection = previousConnection;
     else delete actor.mailboxConnection;
     console.error(`${provider} mailbox connection failed:`, error.message);
-    res.redirect('/?mailboxError=mailbox-connection-failed');
+    return res.redirect('/?mailboxError=mailbox-connection-failed');
   }
+};
+
+app.get('/api/email/mailbox/oauth/:provider/callback', async (req, res) => {
+  const provider = String(req.params.provider || '').toLowerCase();
+  return completeMailboxOAuth(req, res, provider);
 });
 
 app.post('/api/email/mailbox/sync', async (req, res) => {
@@ -5491,6 +5495,12 @@ app.get('/auth/google', (req, res, next) => {
 });
 
 app.get('/auth/google/callback',
+  async (req, res, next) => {
+    if (req.session?.mailboxOAuth?.provider === 'google') {
+      return completeMailboxOAuth(req, res, 'google');
+    }
+    return next();
+  },
   (req, res, next) => {
     passport.authenticate('google', { failureRedirect: '/?oauthError=google-sign-in-failed' })(req, res, next);
   },

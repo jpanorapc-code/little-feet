@@ -26,7 +26,9 @@ const env = {
   for (const provider of PROVIDERS) {
     assert.equal(
       callbackUrl(provider, 'https://littlefeet.co.za/'),
-      'https://littlefeet.co.za/api/email/mailbox/oauth/' + provider + '/callback'
+      provider === 'google'
+        ? 'https://littlefeet.co.za/auth/google/callback'
+        : 'https://littlefeet.co.za/api/email/mailbox/oauth/' + provider + '/callback'
     );
   }
 
