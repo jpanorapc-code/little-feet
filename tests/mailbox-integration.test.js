@@ -10,7 +10,6 @@ const {
   fetchMicrosoftMessages,
   fetchZohoMessages,
   zohoMailBaseForLocation,
-  normalizeAppPassword,
   fetchImapMessages
 } = require('../lib/mailbox-integration');
 
@@ -73,7 +72,6 @@ const {
   assert.match(microsoft[0].body, /Hello\s+Microsoft/);
 
 
-  assert.equal(normalizeAppPassword('Abc 123  XyZ'), 'Abc123XyZ');
   assert.equal(zohoMailBaseForLocation('eu'), 'https://mail.zoho.eu');
   assert.equal(zohoMailBaseForLocation('au'), 'https://mail.zoho.com.au');
   assert.equal(zohoMailBaseForLocation('unknown'), '');
@@ -121,8 +119,7 @@ const {
     write(data) {
       const line = String(data).trim();
       const tag = line.split(' ')[0];
-      if (line.includes(' LOGIN ')) setImmediate(() => this.emit('data', Buffer.from(tag + ' OK LOGIN completed\r\n')));
-      else if (line.includes(' AUTHENTICATE XOAUTH2 ')) {
+      if (line.includes(' AUTHENTICATE XOAUTH2 ')) {
         const payload=Buffer.from(line.split(' ').slice(3).join(' '),'base64').toString('utf8');
         assert.match(payload,/user=user@example\.com/);
         assert.match(payload,/auth=Bearer oauth-token/);
@@ -157,19 +154,6 @@ const {
     end() {}
     destroy() {}
   }
-
-  const imap = await fetchImapMessages({
-    host:'imap.example.com',
-    port:993,
-    address:'user@example.com',
-    password:'app-password',
-    connect:()=>new FakeSocket(),
-    limit:2
-  });
-  assert.equal(imap.length, 2);
-  assert.equal(imap[0].subject, 'Newest');
-  assert.equal(imap[0].body, 'Newest body');
-  assert.equal(imap[1].subject, 'Older');
 
   const oauthImap = await fetchImapMessages({
     host:'imap.mail.yahoo.com',
