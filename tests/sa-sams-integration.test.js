@@ -12,6 +12,7 @@ const hash = pin => crypto.scryptSync(pin, 'little-feet-pin-salt', 64).toString(
 for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) fs.copyFileSync(path.join(root, file), path.join(temp, file));
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   schools: [{ id: 'school-alpha', name: 'Alpha School' }, { id: 'school-bravo', name: 'Bravo School' }],
   users: [
