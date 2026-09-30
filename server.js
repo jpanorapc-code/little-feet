@@ -5823,7 +5823,7 @@ app.get('/auth/google', (req, res, next) => {
 
 app.get('/auth/google/callback',
   (req, res, next) => {
-    if (req.session?.mailboxGoogleOAuthState) return completeGoogleMailboxOAuth(req, res);
+    if (req.session?.mailboxGoogleOAuthState && req.query.state === req.session.mailboxGoogleOAuthState) return completeGoogleMailboxOAuth(req, res);
     passport.authenticate('google', { failureRedirect: '/' })(req, res, next);
   },
   (req, res) => {
@@ -5900,7 +5900,7 @@ app.get('/auth/microsoft', (req, res) => {
 });
 
 app.get('/auth/microsoft/callback', async (req, res) => {
-  if (req.session?.mailboxMicrosoftOAuthState) return completeMicrosoftMailboxOAuth(req, res);
+  if (req.session?.mailboxMicrosoftOAuthState && req.query.state === req.session.mailboxMicrosoftOAuthState) return completeMicrosoftMailboxOAuth(req, res);
   const verifier = req.session.microsoftCodeVerifier;
   if (!microsoftSignInConfigured || req.query.error || !req.query.code || !verifier || req.query.state !== req.session.microsoftOAuthState) {
     return res.redirect('/?oauthError=microsoft-sign-in-failed');
