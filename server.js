@@ -3533,11 +3533,6 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
   return true;
 };
 
-const MAILBOX_IMAP_PROVIDERS = Object.freeze({
-  zoho: { label: 'Zoho Mail', port: 993 },
-  yahoo: { label: 'Yahoo Mail', host: 'imap.mail.yahoo.com', port: 993 }
-});
-const ZOHO_IMAP_HOST_PATTERN = /^imap(?:pro)?\.zoho\.(?:com|eu|in|jp|com\.au|com\.cn|ae|sa)$/i;
 const GOOGLE_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/google/callback';
 const MICROSOFT_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/microsoft/callback';
 const ZOHO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/zoho/callback';
@@ -3750,17 +3745,7 @@ const fetchMailboxMessagesForActor = async (actor, limit = 30) => {
       limit
     });
   }
-  const provider = MAILBOX_IMAP_PROVIDERS[connection.provider];
-  if (!provider) throw new Error('This mailbox provider is not supported.');
-  const password = mailboxSecret(connection.passwordEncrypted);
-  if (!password || !connection.imapHost) throw new Error('Reconnect this mailbox to restore its secure IMAP connection.');
-  return fetchImapMessages({
-    host: connection.imapHost,
-    port: Number(connection.imapPort || provider.port),
-    address: connection.address,
-    password,
-    limit
-  });
+  throw new Error('This mailbox connection method is no longer supported. Reconnect with your email provider.');
 };
 
 const syncMailboxForActor = async (actor, { limit = 30 } = {}) => {
@@ -3782,43 +3767,6 @@ const syncMailboxForActor = async (actor, { limit = 30 } = {}) => {
   }
 };
 
-const connectImapMailboxForActor = async (actor, providerName, address, password, requestedHost) => {
-  const provider = MAILBOX_IMAP_PROVIDERS[providerName];
-  if (!provider) throw new Error('Choose Zoho Mail or Yahoo Mail.');
-  const cleanAddress = boundedText(address, 254);
-  if (!looksLikeEmailAddress(cleanAddress)) throw new Error('Enter a valid mailbox email address.');
-  if (!validSecretLength(password, { min: 4, max: 256 })) throw new Error('Enter the mailbox app password.');
-  if (mailboxOwnerByAddress(cleanAddress, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
-
-  let selectedHost = '';
-  if (providerName === 'yahoo') selectedHost = provider.host;
-  else {
-    selectedHost = String(requestedHost || '').trim().toLowerCase();
-    if (!ZOHO_IMAP_HOST_PATTERN.test(selectedHost)) {
-      throw new Error('Enter the exact Zoho IMAP server shown in your Zoho Server Configuration Details.');
-    }
-  }
-  const messages = await fetchImapMessages({ host: selectedHost, port: provider.port, address: cleanAddress, password, limit: 30 });
-
-  actor.mailboxConnection = {
-    provider: providerName,
-    authMode: 'imap',
-    address: cleanAddress,
-    imapHost: selectedHost,
-    imapPort: provider.port,
-    passwordEncrypted: storeMailboxSecret(password),
-    connectedAt: new Date().toISOString(),
-    lastSyncAt: null,
-    lastSyncCount: 0,
-    lastSyncStatus: 'pending'
-  };
-  const result = addMailboxMessages(actor, messages);
-  actor.mailboxConnection.lastSyncAt = new Date().toISOString();
-  actor.mailboxConnection.lastSyncCount = result.total;
-  actor.mailboxConnection.lastSyncStatus = 'ok';
-  return { ...result, mailbox: publicMailboxConnection(actor.mailboxConnection) };
-};
-
 app.get('/api/email/mailbox/status', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to view mailbox status.' });
@@ -3826,19 +3774,6 @@ app.get('/api/email/mailbox/status', (req, res) => {
     mailbox: publicMailboxConnection(actor.mailboxConnection),
     providers: mailboxProviderAvailability()
   });
-});
-
-app.post('/api/email/mailbox/imap/connect', async (req, res, next) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to connect a mailbox.' });
-  try {
-    const provider = String(req.body?.provider || '').trim().toLowerCase();
-    const result = await connectImapMailboxForActor(actor, provider, req.body?.address, req.body?.appPassword, req.body?.imapHost);
-    res.json({ success: true, ...result });
-  } catch (error) {
-    const message = error?.message || 'Unable to connect this mailbox.';
-    res.status(400).json({ message });
-  }
 });
 
 app.post('/api/email/mailbox/sync', async (req, res) => {
@@ -3942,8 +3877,6 @@ const completeGoogleMailboxOAuth = async (req, res) => {
   }
 };
 
-app.get('/auth/email/google/callback', completeGoogleMailboxOAuth);
-
 app.get('/auth/email/microsoft', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.redirect('/?mailboxError=sign-in-required');
@@ -4026,8 +3959,6 @@ const completeMicrosoftMailboxOAuth = async (req, res) => {
     res.redirect('/?mailboxError=microsoft-connect-failed');
   }
 };
-
-app.get('/auth/email/microsoft/callback', completeMicrosoftMailboxOAuth);
 
 app.get('/auth/email/zoho', (req, res) => {
   const actor = getSessionAccount(req);
