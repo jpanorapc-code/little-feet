@@ -1585,7 +1585,6 @@ app.post('/api/signup', (req, res) => {
 const publicMailboxConnection = connection => connection ? {
   connected: true,
   provider: String(connection.provider || ''),
-  authMode: connection.authMode === 'imap' ? 'imap' : 'oauth',
   address: String(connection.address || ''),
   connectedAt: connection.connectedAt || null,
   lastSyncAt: connection.lastSyncAt || null,
@@ -3553,14 +3552,11 @@ const ZOHO_ACCOUNTS_SERVERS = Object.freeze({
   ae: 'https://accounts.zoho.ae',
   sa: 'https://accounts.zoho.sa'
 });
-const mailboxOauthFlag = name => String(process.env[name] || '').trim() === '1';
-
 const mailboxProviderAvailability = () => ({
   google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
   microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
-  zoho: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET && mailboxOauthFlag('ZOHO_MAILBOX_OAUTH_ENABLED')),
-  yahoo: Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET && mailboxOauthFlag('YAHOO_MAILBOX_OAUTH_ENABLED')),
-  advancedImap: true
+  zoho: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET),
+  yahoo: Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET)
 });
 
 const mailboxOwnerByAddress = (address, exceptAccount = null) =>
