@@ -1,0 +1,42 @@
+name: Mailbox Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server.js'
+      - 'lib/mailbox-integration.js'
+      - 'assets/workplace-extended.js'
+      - 'index.html'
+      - 'service-worker.js'
+      - 'tests/mailbox-integration.test.js'
+      - 'tests/web-quality.test.js'
+      - 'package.json'
+      - '.github/workflows/mailbox-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mailbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check server syntax
+        run: node --check server.js
+      - name: Check mailbox frontend syntax
+        run: node --check assets/workplace-extended.js
+      - name: Run mailbox provider regression
+        run: node tests/mailbox-integration.test.js
+      - name: Run web quality regression
+        run: node tests/web-quality.test.js
