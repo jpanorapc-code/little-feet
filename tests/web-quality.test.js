@@ -68,7 +68,6 @@ assert.match(workplaceExtended, /Connect Yahoo Mail/);
 assert.doesNotMatch(workplaceExtended, /app-password/i);
 assert.doesNotMatch(workplaceExtended, /imapMailboxConnectForm/);
 assert.doesNotMatch(workplaceExtended, /name="imapHost"/);
-assert.match(workplaceExtended, /Advanced \/ app-password fallback/);
 assert.match(workplaceExtended, /<option value="zoho">Zoho Mail<\/option>/);
 assert.match(workplaceExtended, /<option value="yahoo">Yahoo Mail<\/option>/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/sync/);
