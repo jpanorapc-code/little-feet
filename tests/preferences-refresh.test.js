@@ -49,7 +49,7 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v26-mailbox-oauth/);
+assert.match(serviceWorker, /little-feet-shell-v27-mailbox-oauth-clean/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20260925-preferences-v2/);
 
 assert.match(page, /id="loginLanguagePreference"/);
