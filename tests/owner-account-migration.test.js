@@ -14,6 +14,7 @@ for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js
 }
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const request = async (route, options = {}) => {
