@@ -1,19 +1,21 @@
 # Little Feet production-readiness audit
 
-Audit date: 27 September 2026  
-Audited base: `fd1f095e923ba630a3e17fbd56ae2eb86bb46c7f`  
-Audit branch: `codex/production-readiness-audit`
+Audit date: 30 September 2026
+
+Audited base: `620a8c16e02636d6e8b8caea8207a987a6a2f15e`
+
+Audit branch: `codex/final-readiness`
 
 This report distinguishes tested evidence from external work that still requires production infrastructure. It is not a security certification or a guarantee that the application is bug-free.
 
 ## Current launch-readiness decision
 
-- **VERIFIED:** local application regression, role authorization, tenant isolation, restart persistence, bounded imports, private-file lifecycle, browser runtime, responsive layout, dependency audit, secret-history scan, capacity smoke testing, production Cloudflare R2 configuration, a live private upload/retrieval, the one-account owner cutover, GitHub CI for the deployed audit head, and observed Render deployment health.
-- **UNVERIFIED:** live PostgreSQL backup/restore, a coordinated PostgreSQL + R2 recovery rehearsal, production email/SMS/OAuth delivery, automatic gateway webhook delivery, and manual testing on physical devices.
-- **BLOCKED:** a production offsite backup target and restore rehearsal, monitoring configuration, and any automatic payment-provider webhook until a provider is selected and configured. The signed webhook boundary is implemented and tested; bank transfers can be reconciled by an administrator in the portal.
+- **VERIFIED:** local application regression, role authorization, tenant isolation, restart persistence, bounded imports, private-file lifecycle, browser runtime, responsive layout, dependency audit, secret-history scan, capacity smoke testing, production Cloudflare R2 configuration, a live private upload/retrieval, the one-account owner cutover, an isolated coordinated PostgreSQL + R2 recovery rehearsal, scheduled production monitoring, GitHub CI for the deployed audit head, and observed Render deployment health.
+- **UNVERIFIED:** production SMTP delivery was configured by the owner but was not independently resent during this continuation; complete Google/Microsoft OAuth login, production PostgreSQL query plans, browser streaming of very large XLSX files, and manual testing on representative physical devices remain unverified.
+- **BLOCKED / NOT APPLICABLE:** no SMS provider or automatic payment provider is configured, so live SMS and payment-webhook delivery cannot be validated. Independent penetration testing, POPIA operational review, and representative physical-device testing require external people or devices.
 - **FAILED:** none in the final local suite recorded below.
 
-The application must not be described as fully launch-ready until the blocked production checks are completed. The audited `4fa2386` head was observed live on Render with `/api/health` returning `OK` and `/api/ready` returning `READY`; a later final report/UI commit must be deployed and observed again before merge.
+The application must not be described as certified or guaranteed bug-free. The audited `9192ae7` head was observed live on Render and used for the successful recovery rehearsal; the final pool/report commit must still pass CI and be observed after deployment.
 
 ## Temporary, demo, static, and duplicate functionality
 
@@ -46,7 +48,7 @@ The current persistence model was inspected rather than replaced:
 
 The PostgreSQL model remains a generic JSONB record store rather than a fully normalized relational schema. Application validation and tenant checks therefore carry more responsibility than database foreign keys. A migration to normalized domain tables was not attempted because it would be a high-risk rewrite of interconnected working features.
 
-**BLOCKED — REQUIRES PRODUCTION DATABASE ACCESS:** direct inspection of the live PostgreSQL instance, production query plans, a production backup, and a timed restore rehearsal.
+The production PostgreSQL data was captured and restored into an isolated schema during the coordinated recovery rehearsal described below. Direct production query-plan inspection remains **UNVERIFIED** because the rehearsal inventories the relevant indexes but does not run representative `EXPLAIN (ANALYZE)` statements against live traffic.
 
 ## Cloudflare object-storage architecture
 
@@ -74,7 +76,7 @@ Required server-only configuration:
 - `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
 - `CLOUDFLARE_R2_BUCKET`
 
-Production R2 is configured with a private bucket and bucket-scoped read/write credentials. A live 68-byte PNG upload created protected file metadata and the portal retrieved it successfully through `/api/files/:id/content` with the expected dimensions. Replacement, deletion, integrity disagreement, missing-object, restart, and cross-tenant cases passed against the same adapter in the automated lifecycle suite. Live replacement and a live coordinated restore remain unverified.
+Production R2 is configured with a private bucket and bucket-scoped read/write credentials. A live 68-byte PNG upload created protected file metadata and the portal retrieved it successfully through `/api/files/:id/content` with the expected dimensions. Replacement, deletion, integrity disagreement, missing-object, restart, and cross-tenant cases passed against the same adapter in the automated lifecycle suite. The coordinated production-data recovery rehearsal copied and restored the live R2 probe in the isolated recovery bucket and verified its hash before cleanup.
 
 ## Upload restrictions
 
@@ -115,10 +117,11 @@ The browser still parses XLSX files locally with SheetJS before batching. Very l
 - Fourteen unused legacy media files were removed, reducing checkout and build transfer size by about 20 MiB.
 - Import request sizes, persistent job history, and rejected-row samples are bounded.
 - The existing PostgreSQL indexes on school and collection ownership were retained.
+- The production PostgreSQL session pool is now capped at six connections and defaults to five. This keeps two briefly overlapping Render instances below the provider's 15-client session-mode limit during rolling deployments and leaves capacity for the isolated recovery job.
 
 Capacity smoke result: 1,500 school tenants, two 1,000-learner schools, and 500 sustained requests at up to 90 concurrent connections passed in 5,381 ms on the final local test host. This is a smoke measurement, not a production load guarantee.
 
-The current Render service uses a free instance. Render reports that an idle service can cold-start slowly; upgrading the instance is an operational choice that requires a billing decision and was not performed during this audit.
+The Render service now uses the 0.5 CPU / 512 MiB paid instance selected by the owner. Production capacity remains subject to real traffic and provider limits.
 
 ## Security findings and changes
 
@@ -140,11 +143,15 @@ PostgreSQL metadata and R2 bytes form one recovery set. Writes should be paused,
 
 The complete procedure is documented in `docs/production-storage.md`.
 
-**BLOCKED:** no production backup target or coordinated restore rehearsal was available in this environment.
+**VERIFIED on 30 September 2026:** recovery set `20260930T101109028Z-486f8384` was created from deployed application SHA `9192ae72f2f6fa04ea28b264d97e5b4423dbc6b2`. Four PostgreSQL tables containing 34 rows were encrypted to the separate private R2 recovery bucket, restored into a generated isolated PostgreSQL schema, and row-count checked. One R2 probe object was copied, restored under an isolated prefix, size/hash checked, and removed. The isolated schema and restored-object prefix were removed successfully; the encrypted recovery set and manifest remain as the offsite recovery artifact. Total rehearsal time was 3.84 seconds.
+
+The recovery bucket uses a dedicated account token restricted to Object Read & Write for `little-feet-private-prod` and `little-feet-recovery-prod`. Credentials remain server-side in Render and are not committed to Git.
+
+Production monitoring is also **VERIFIED**: `.github/workflows/production-monitor.yml` checks health, readiness, and database keepalive. Nine scheduled runs were visible as successful through 30 September 2026; the most recent observed run completed in seven seconds.
 
 ## Tests executed from the final local code state
 
-- `npm test`: passed all 20 scripted regression stages, including route connections, authentication migration, tenant isolation, security, replica restore, one-time owner reset, storage lifecycle, imports, cinematic navigation, web quality, adversarial entry points, authorization matrix, Render metadata, finance, preferences, and legal notices.
+- `npm test`: passed all 22 scripted regression stages, including route connections, authentication migration, inbound email forwarding, tenant isolation, security, replica restore, one-time owner reset, storage lifecycle, imports, cinematic navigation, web quality, adversarial entry points, authorization matrix, Render metadata, finance, preferences, and legal notices.
 - Owner-account migration: two prior accounts were replaced with one administrator, both prior credentials were rejected, the new credential authenticated, and restart/idempotency behavior passed using test-only credentials.
 - Subscription activation: signed payment notification, Basic-to-Plus activation, existing-session refresh, 30-day access date, duplicate provider-event protection, tenant isolation, school-plan activation, and paid-status display passed.
 - Private storage lifecycle: upload, validate, persist, retrieve, cross-tenant denial, replace, old-object denial, restart persistence, staff-account cleanup, related-post cleanup, and malicious filename handling passed.
@@ -157,20 +164,20 @@ The complete procedure is documented in `docs/production-storage.md`.
 - Git history secret-pattern scan: passed.
 - JavaScript syntax and diff hygiene checks: passed.
 
-CI status: GitHub `verify` passed for deployed audit head `4fa23864203bfce39cd2b2e4a1337f6782dae911`. CI must run once more for the final commit before merge.
+CI status: the final branch must pass GitHub `verify` before merge; the result will be recorded on the pull request.
 
 ## Manual and external validation still required
 
-1. Complete a live replacement/deletion/integrity check and a coordinated PostgreSQL + R2 restore rehearsal against an isolated recovery target.
-2. Inspect production PostgreSQL query plans and configure/test an offsite backup target.
-3. Verify production email, SMS, Google/Yahoo/Microsoft sign-in, and a signed payment webhook with real provider test accounts. The configured bank-transfer destination and manual cleared-payment path remain available without a gateway.
+1. Inspect representative production PostgreSQL query plans under controlled load.
+2. Independently revalidate SMTP delivery and complete Google/Microsoft OAuth login with real provider accounts. No SMS provider exists to test.
+3. Validate a signed payment webhook only after an automatic payment provider is selected and configured. The tested administrator-reconciled bank-transfer path remains available.
 4. Test representative physical Android, iOS, tablet, desktop, and accessibility-assistive devices.
 5. Run independent security review/penetration testing and confirm POPIA operational procedures with the responsible organization.
 6. Observe the final Render deployment and production health/readiness endpoints after the final commit and again after merge. A successful prior deployment is not deployment verification for a later code state.
 
 ## Configuration required before launch
 
-At minimum: `NODE_ENV`, `DATABASE_URL`, `SESSION_SECRET`, `LF_FIELD_ENCRYPTION_KEY`, the four `CLOUDFLARE_R2_*` variables, a production administrator, approved payment destination, `LF_PAYMENT_WEBHOOK_SECRET`, monitoring, and a tested offsite backup target. Optional providers additionally require their documented email, SMS, and OAuth secrets.
+At minimum: `NODE_ENV`, `DATABASE_URL`, `SESSION_SECRET`, `LF_FIELD_ENCRYPTION_KEY`, the four `CLOUDFLARE_R2_*` variables, a production administrator, and approved payment destination. The offsite R2 recovery target, dedicated recovery credentials, encryption key, rehearsal marker, and GitHub Actions production monitor are configured and tested. `LF_PAYMENT_WEBHOOK_SECRET` is required only when an automatic payment provider is configured. Optional SMS and OAuth providers require their documented secrets.
 
 The requested account cutover completed successfully. Remove the temporary `LF_OWNER_*` values and obsolete `LF_BOOTSTRAP_ADMIN_*` values from Render after verification; the database migration record prevents replay. Keep only ordinary runtime configuration and the four R2 variables.
 

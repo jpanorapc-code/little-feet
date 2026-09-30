@@ -965,7 +965,10 @@ async function openPostgresDatabase() {
   postgresPool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
-    max: Math.max(2, Math.min(12, Number(process.env.PG_POOL_MAX) || 8)),
+    // Keep enough database headroom for Render's rolling deploy overlap and
+    // the isolated recovery job. The production session pool allows 15
+    // clients, so two briefly concurrent web instances must stay below it.
+    max: Math.max(2, Math.min(6, Number(process.env.PG_POOL_MAX) || 5)),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: false

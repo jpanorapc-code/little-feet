@@ -52,6 +52,7 @@ assert.match(server, /'signature', 'signaturedata', 'mediaurl', 'photourl'/);
 assert.match(server, /state: true/);
 assert.match(server, /if \(!actor\) return res\.json\(\{ status, timestamp:/);
 assert.match(server, /while \(publicRateLimits\.size > 10000\)/);
+assert.match(server, /Math\.min\(6, Number\(process\.env\.PG_POOL_MAX\) \|\| 5\)/);
 assert.match(server, /id: crypto\.randomUUID\(\),\r?\n    studentName,/);
 assert.match(server, /Ticket status must be Open or Completed/);
 assert.match(client, /escapeWorkspaceText\(b\.category\)/);
