@@ -12,7 +12,7 @@ const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
-const { PROVIDERS: MAILBOX_PROVIDERS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox } = require('./lib/mailbox-oauth');
+const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, revokeMailboxAccess } = require('./lib/mailbox-oauth');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
@@ -3613,7 +3613,9 @@ const mailboxConnectionStatus = actor => {
     lastError: connected ? connection.lastError || '' : '',
     availableProviders: {
       google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-      microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET)
+      microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
+      zoho: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET),
+      yahoo: Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET)
     }
   };
 };
@@ -3628,11 +3630,17 @@ const mailboxAccessToken = async actor => {
   let accessToken = decryptField(connection.accessToken);
   if (accessToken && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return accessToken;
   const refreshToken = decryptField(connection.refreshToken);
-  const tokens = await refreshMailboxAccessToken({ provider: connection.provider, refreshToken });
+  const tokens = await refreshMailboxAccessToken({
+    provider: connection.provider,
+    refreshToken,
+    origin: publicOrigin(),
+    providerMetadata: connection.providerMetadata || {}
+  });
   accessToken = String(tokens.access_token || '');
   if (!accessToken) throw new Error('The mailbox provider did not return an access token.');
   connection.accessToken = encryptField(accessToken);
   if (tokens.refresh_token) connection.refreshToken = encryptField(tokens.refresh_token);
+  if (tokens.providerMetadata) connection.providerMetadata = { ...(connection.providerMetadata || {}), ...tokens.providerMetadata };
   connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in) || 3600) * 1000;
   return accessToken;
 };
@@ -3646,9 +3654,15 @@ const syncConnectedMailbox = async (actor, { initial = false } = {}) => {
   try {
     const accessToken = await mailboxAccessToken(actor);
     const limit = mailboxSyncLimit(initial);
-    const batches = [await fetchMailbox({ provider: connection.provider, accessToken, limit })];
+    const mailboxOptions = {
+      provider: connection.provider,
+      accessToken,
+      limit,
+      providerMetadata: connection.providerMetadata || {}
+    };
+    const batches = [await fetchMailbox(mailboxOptions)];
     if (!initial && connection.backlogCursor) {
-      batches.push(await fetchMailbox({ provider: connection.provider, accessToken, limit, cursor: connection.backlogCursor }));
+      batches.push(await fetchMailbox({ ...mailboxOptions, cursor: connection.backlogCursor }));
     }
     if (!batches[0].email) throw new Error('The mailbox provider did not identify the connected email address.');
     connection.email = boundedText(batches[0].email, 254).toLowerCase();
@@ -3664,7 +3678,7 @@ const syncConnectedMailbox = async (actor, { initial = false } = {}) => {
       addEmailInboxItem(actor, {
         type: 'Email', sourceId, title: message.subject,
         message: `From: ${message.from}\n\n${message.preview}`,
-        sender: message.from, provider: connection.provider === 'google' ? 'Gmail' : 'Microsoft Outlook',
+        sender: message.from, provider: MAILBOX_PROVIDER_LABELS[connection.provider] || connection.provider,
         sourceTab: 'emailIntegrationTab', createdAt: message.receivedAt
       });
       added += 1;
@@ -3713,7 +3727,14 @@ app.get('/api/email/mailbox/oauth/:provider/callback', async (req, res) => {
   const previousConnection = actor.mailboxConnection;
   try {
     const tokens = await exchangeMailboxCode({
-      provider, code: String(req.query.code), verifier: pending.verifier, origin: publicOrigin()
+      provider,
+      code: String(req.query.code),
+      verifier: pending.verifier,
+      origin: publicOrigin(),
+      callbackParams: {
+        accountsServer: String(req.query['accounts-server'] || ''),
+        location: String(req.query.location || '')
+      }
     });
     if (!tokens.access_token || !tokens.refresh_token) throw new Error('The provider did not grant renewable mailbox access.');
     actor.mailboxConnection = {
@@ -3721,7 +3742,8 @@ app.get('/api/email/mailbox/oauth/:provider/callback', async (req, res) => {
       accessToken: encryptField(tokens.access_token), refreshToken: encryptField(tokens.refresh_token),
       accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in) || 3600) * 1000,
       connectedAt: new Date().toISOString(), lastSuccessfulSyncAt: null, lastError: '',
-      backlogCursor: '', initialSyncComplete: false
+      backlogCursor: '', initialSyncComplete: false,
+      providerMetadata: tokens.providerMetadata || {}
     };
     await syncConnectedMailbox(actor, { initial: true });
     await saveDatabaseState();
@@ -3739,17 +3761,36 @@ app.post('/api/email/mailbox/sync', async (req, res) => {
   if (!actor) return res.status(401).json({ message: 'Sign in to sync a mailbox.' });
   try {
     const result = await syncConnectedMailbox(actor);
+    await saveDatabaseState();
     res.json({ success: true, ...result, mailbox: mailboxConnectionStatus(actor) });
   } catch (error) {
     res.status(502).json({ message: `Mailbox sync failed: ${boundedText(error.message, 240)}` });
   }
 });
 
-app.delete('/api/email/mailbox', (req, res) => {
+app.delete('/api/email/mailbox', async (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to disconnect a mailbox.' });
-  delete actor.mailboxConnection;
-  res.json({ success: true });
+  const connection = actor.mailboxConnection;
+  if (!connection) return res.json({ success: true, revoked: false });
+  let revoked = false;
+  try {
+    const refreshToken = decryptField(connection.refreshToken);
+    const accessToken = decryptField(connection.accessToken);
+    const result = await revokeMailboxAccess({
+      provider: connection.provider,
+      refreshToken,
+      accessToken,
+      providerMetadata: connection.providerMetadata || {}
+    });
+    revoked = Boolean(result?.revoked);
+  } catch (error) {
+    console.warn(`${connection.provider || 'Mailbox'} remote token revocation warning: ${boundedText(error.message, 180)}`);
+  } finally {
+    delete actor.mailboxConnection;
+    await saveDatabaseState();
+  }
+  res.json({ success: true, revoked });
 });
 
 app.post('/api/email/inbound/resend', async (req, res) => {
