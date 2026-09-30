@@ -28,7 +28,18 @@
   }
 
   let emailInboxSeen=new Set();
-  const inboxButtons=item=>`<div class="actions"><button class="action-btn" data-inbox-action="read" data-id="${esc(item.id)}">${item.read?'Mark unread':'Mark read'}</button><button class="action-btn" data-inbox-action="pin" data-id="${esc(item.id)}">${item.pinned?'Unpin':'Pin'}</button><button class="action-btn" data-inbox-action="open" data-tab="${esc(item.sourceTab||'')}">Open</button><button class="action-btn" data-inbox-action="delete" data-id="${esc(item.id)}">Delete</button></div>`;
+  const mailboxProviderName=provider=>({google:'Gmail',microsoft:'Outlook / Microsoft 365',zoho:'Zoho Mail',yahoo:'Yahoo Mail'}[String(provider||'').toLowerCase()]||String(provider||'Mailbox'));
+  const mailboxNeedsSync=mailbox=>{
+    if(!mailbox?.connected)return false;
+    const last=Date.parse(mailbox.lastSyncAt||'');
+    return !Number.isFinite(last)||Date.now()-last>=60000;
+  };
+  const inboxButtons=item=>{
+    const destination=item.type==='Email'
+      ? (item.providerLink?`<a class="action-btn" href="${esc(item.providerLink)}" target="_blank" rel="noopener noreferrer">Open original</a>`:'')
+      : (item.sourceTab?`<button class="action-btn" data-inbox-action="open" data-tab="${esc(item.sourceTab)}">Open</button>`:'');
+    return `<div class="actions"><button class="action-btn" data-inbox-action="read" data-id="${esc(item.id)}">${item.read?'Mark unread':'Mark read'}</button><button class="action-btn" data-inbox-action="pin" data-id="${esc(item.id)}">${item.pinned?'Unpin':'Pin'}</button>${destination}<button class="action-btn" data-inbox-action="delete" data-id="${esc(item.id)}">Delete</button></div>`;
+  };
   const showInboxPopup=item=>{
     if(item.read||emailInboxSeen.has(item.id))return;emailInboxSeen.add(item.id);
     let stack=document.getElementById('lfNotificationStack');if(!stack){stack=document.createElement('aside');stack.id='lfNotificationStack';stack.className='lf-notification-stack';stack.setAttribute('aria-live','polite');document.body.appendChild(stack);}
@@ -37,20 +48,63 @@
     card.querySelector('[data-popup-pin]').onclick=async()=>{const next=!item.pinned;await json('/api/email/inbox/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({pinned:next})});item.pinned=next;card.classList.toggle('is-pinned',next);card.querySelector('[data-popup-pin]').textContent=next?'Unpin':'Pin';await email();};
     stack.prepend(card);
   };
+  const mailboxConnectionMarkup=(d,syncError='')=>{
+    const mailbox=d.mailbox||{connected:false};
+    const providers=d.mailboxProviders||{};
+    if(mailbox.connected){
+      const last=mailbox.lastSyncAt?new Date(mailbox.lastSyncAt).toLocaleString():'Not synced yet';
+      const status=syncError||mailbox.lastSyncStatus==='error'?'Sync needs attention':'Connected';
+      return `<div class="workspace-card"><h3>Your personal mailbox</h3><p><strong>${esc(mailboxProviderName(mailbox.provider))}</strong><br>${esc(mailbox.address||'')}</p><p><strong>Status:</strong> ${esc(status)}</p><p><strong>Last sync:</strong> ${esc(last)}</p><p class="meta">Only this Little Feet user can see this connected mailbox. Mailbox credentials and OAuth tokens stay encrypted on the server.</p>${syncError?`<p class="meta" style="color:#fca5a5;">${esc(syncError)}</p>`:''}<div class="actions"><button id="syncMailboxNow" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectMailbox" class="action-btn btn-red" type="button">Disconnect mailbox</button></div></div>`;
+    }
+    const google=providers.google?`<a class="action-btn btn-blue" href="/auth/email/google">Connect Gmail</a>`:`<button class="action-btn" type="button" disabled>Gmail unavailable</button>`;
+    const microsoft=providers.microsoft?`<a class="action-btn btn-blue" href="/auth/email/microsoft">Connect Outlook / Microsoft 365</a>`:`<button class="action-btn" type="button" disabled>Outlook unavailable</button>`;
+    return `<div class="workspace-card"><h3>Connect your personal mailbox</h3><p>Connect the email account you want this Little Feet user to receive inside the dashboard.</p><div class="actions" style="margin-bottom:12px;">${google}${microsoft}</div><form id="imapMailboxConnectForm" style="display:grid;gap:10px;"><label>Email provider<select name="provider" required><option value="zoho">Zoho Mail</option><option value="yahoo">Yahoo Mail</option></select></label><label>Mailbox email<input name="address" type="email" required autocomplete="email" value="${esc(d.address||'')}" placeholder="name@example.com"></label><label>App password<input name="appPassword" type="password" required autocomplete="new-password" maxlength="256" placeholder="Provider app password"></label><p class="meta" style="margin:0;">Zoho and Yahoo use secure IMAP over SSL. Use an app-specific password when your provider requires it; Little Feet encrypts it server-side and never sends it back to the browser.</p><button class="submit-btn" type="submit">Connect Zoho / Yahoo mailbox</button></form></div>`;
+  };
+
   async function email(){
     const host=document.getElementById('emailIntegrationContent');if(!host)return;
-    try{const [d,inbox]=await Promise.all([json('/api/email/status'),json('/api/email/inbox')]);
-      host.innerHTML=`<div class="workspace-grid"><div class="workspace-card"><h3>Connect Little Feet Email</h3><p><strong>Email channel:</strong> ${d.configured?'Available':'Not configured'}</p><p><strong>Delivery provider:</strong> ${esc(d.provider||'Not configured')}</p><p><strong>Connected account:</strong> ${esc(d.address||'No valid email')}</p><p><strong>Verification:</strong> ${d.verified?'Verified':'Not verified'}</p><p class="meta">${d.configured?'Send a verification code to prove this account owns the email address. Mailbox credentials stay on the Little Feet server and are never sent to the browser.':'Little Feet needs its server-side SMTP or email API settings before it can send the verification code.'}</p><button id="requestEmailCode" class="action-btn" type="button" ${d.configured?'':'disabled'}>Send verification code</button><form id="confirmEmailForm" style="margin-top:12px"><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="submit-btn">Connect & verify email</button></form></div><div class="workspace-card"><h3>What arrives here</h3><p>Little Feet notifications, tickets assigned to or created by you, direct messages, staff notices and school alerts appear here separately from the normal portal workspaces.</p><p class="meta">Deleting an inbox copy does not delete the original ticket, message, notice or safety record.</p></div></div><div class="email-inbox-toolbar"><h3>Little Feet Email Inbox</h3><button id="deleteAllInbox" class="action-btn" type="button">Delete all</button></div><div class="email-inbox-list">${inbox.length?inbox.map(item=>`<article class="email-inbox-item ${item.read?'':'is-unread'} ${item.pinned?'is-pinned':''}"><header><div><span class="badge-tag">${esc(item.type)}</span> <strong>${esc(item.title)}</strong></div><span class="meta">${new Date(item.createdAt).toLocaleString()}</span></header><p>${esc(item.message)}</p>${inboxButtons(item)}</article>`).join(''):'<p class="meta">No Little Feet email notifications yet.</p>'}</div>`;
+    try{
+      const d=await json('/api/email/status');
+      let inbox=null,syncError='';
+      if(mailboxNeedsSync(d.mailbox)){
+        try{
+          const synced=await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});
+          d.mailbox=synced.mailbox||d.mailbox;
+          inbox=Array.isArray(synced.inbox)?synced.inbox:null;
+        }catch(error){syncError=error.message||'Mailbox sync failed.';}
+      }
+      if(!inbox)inbox=await json('/api/email/inbox');
+
+      host.innerHTML=`<div class="workspace-grid">${mailboxConnectionMarkup(d,syncError)}<div class="workspace-card"><h3>Little Feet delivery email</h3><p><strong>Delivery channel:</strong> ${d.configured?'Available':'Not configured'}</p><p><strong>Delivery provider:</strong> ${esc(d.provider||'Not configured')}</p><p><strong>Your Little Feet account email:</strong> ${esc(d.address||'No valid email')}</p><p><strong>Address verification:</strong> ${d.verified?'Verified':'Not verified'}</p><p class="meta">${d.configured?'This verifies the address Little Feet uses for platform-generated mail. It is separate from connecting your personal inbox above.':'Little Feet needs its server-side SMTP or email API settings before it can send verification mail.'}</p><button id="requestEmailCode" class="action-btn" type="button" ${d.configured?'':'disabled'}>Send verification code</button><form id="confirmEmailForm" style="margin-top:12px"><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="submit-btn">Verify address</button></form></div><div class="workspace-card"><h3>What arrives here</h3><p><strong>EMAIL</strong> items are real messages pulled from the mailbox connected by this signed-in user.</p><p><strong>Little Feet</strong> items are platform notifications such as tickets, direct messages, staff notices, payments and alerts.</p><p class="meta">Mailbox connections are per user. A principal, teacher, parent, CRM, Accounts user or future role only sees the mailbox connected to their own Little Feet account.</p></div></div><div class="email-inbox-toolbar"><h3>Email Inbox</h3><div class="actions"><button id="refreshMailboxInbox" class="action-btn btn-green" type="button">Refresh / sync</button><button id="deleteAllInbox" class="action-btn" type="button">Delete all dashboard copies</button></div></div><div class="email-inbox-list">${inbox.length?inbox.map(item=>`<article class="email-inbox-item ${item.read?'':'is-unread'} ${item.pinned?'is-pinned':''}"><header><div><span class="badge-tag">${esc(item.type)}</span> <strong>${esc(item.title)}</strong></div><span class="meta">${new Date(item.createdAt).toLocaleString()}</span></header><p>${esc(item.message)}</p>${inboxButtons(item)}</article>`).join(''):'<p class="meta">No mailbox email or Little Feet notifications yet.</p>'}</div>`;
       inbox.forEach(showInboxPopup);
+
+      document.getElementById('imapMailboxConnectForm')?.addEventListener('submit',async e=>{
+        e.preventDefault();
+        const button=e.currentTarget.querySelector('button[type="submit"]');if(button)button.disabled=true;
+        try{
+          await json('/api/email/mailbox/imap/connect',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))});
+          emailInboxSeen.clear();await email();
+        }catch(error){alert(error.message);}finally{if(button)button.disabled=false;}
+      });
+      document.getElementById('syncMailboxNow')?.addEventListener('click',async()=>{
+        try{await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}
+      });
+      document.getElementById('refreshMailboxInbox')?.addEventListener('click',async()=>{
+        try{if(d.mailbox?.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}
+      });
+      document.getElementById('disconnectMailbox')?.addEventListener('click',async()=>{
+        if(!confirm('Disconnect this personal mailbox and remove its imported dashboard copies?'))return;
+        try{await json('/api/email/mailbox',{method:'DELETE'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}
+      });
       document.getElementById('requestEmailCode')?.addEventListener('click',async()=>{try{await json('/api/email/verification/request',{method:'POST',body:'{}'});alert('Verification code sent. It expires in 10 minutes.');}catch(e){alert(e.message);}});
       document.getElementById('confirmEmailForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/email/verification/confirm',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await email();}catch(err){alert(err.message);}});
       host.querySelectorAll('[data-inbox-action]').forEach(btn=>btn.addEventListener('click',async()=>{
         const action=btn.dataset.inboxAction,id=btn.dataset.id;if(action==='open'){if(btn.dataset.tab)window.switchTab?.(btn.dataset.tab);return;}
-        if(action==='delete'){if(!confirm('Delete this inbox item?'))return;await json('/api/email/inbox/'+encodeURIComponent(id),{method:'DELETE'});}
+        if(action==='delete'){if(!confirm('Delete this dashboard inbox item? The original provider email or Little Feet record will stay in its source system.'))return;await json('/api/email/inbox/'+encodeURIComponent(id),{method:'DELETE'});}
         else {const item=inbox.find(x=>x.id===id);await json('/api/email/inbox/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(action==='read'?{read:!item.read}:{pinned:!item.pinned})});}
         await email();
       }));
-      document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all Little Feet Email inbox items? Original tickets, messages and notices will stay in their workspaces.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
+      document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all dashboard inbox copies? Original provider emails and Little Feet records will stay in their source systems.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
     }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
   let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(()=>{if(user()?.username&&!document.hidden)email();},30000);};
