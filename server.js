@@ -3538,8 +3538,8 @@ const MAILBOX_IMAP_PROVIDERS = Object.freeze({
   yahoo: { label: 'Yahoo Mail', host: 'imap.mail.yahoo.com', port: 993 }
 });
 const ZOHO_IMAP_HOST_PATTERN = /^imap(?:pro)?\.zoho\.(?:com|eu|in|jp|com\.au|com\.cn|ae|sa)$/i;
-const GOOGLE_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/google/callback';
-const MICROSOFT_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/microsoft/callback';
+const GOOGLE_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/google/callback';
+const MICROSOFT_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/microsoft/callback';
 const ZOHO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/zoho/callback';
 const YAHOO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/yahoo/callback';
 const GOOGLE_MAILBOX_SCOPE = 'openid email https://www.googleapis.com/auth/gmail.readonly';
@@ -3561,8 +3561,8 @@ const ZOHO_ACCOUNTS_SERVERS = Object.freeze({
 const mailboxOauthFlag = name => String(process.env[name] || '').trim() === '1';
 
 const mailboxProviderAvailability = () => ({
-  google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && mailboxOauthFlag('GOOGLE_MAILBOX_OAUTH_ENABLED')),
-  microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && mailboxOauthFlag('MICROSOFT_MAILBOX_OAUTH_ENABLED')),
+  google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+  microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
   zoho: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET && mailboxOauthFlag('ZOHO_MAILBOX_OAUTH_ENABLED')),
   yahoo: Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET && mailboxOauthFlag('YAHOO_MAILBOX_OAUTH_ENABLED')),
   advancedImap: true
@@ -3886,7 +3886,7 @@ app.get('/auth/email/google', (req, res) => {
   res.redirect(url.toString());
 });
 
-app.get('/auth/email/google/callback', async (req, res) => {
+const completeGoogleMailboxOAuth = async (req, res) => {
   const actor = getSessionAccount(req);
   const expectedState = req.session?.mailboxGoogleOAuthState;
   const expectedUsername = req.session?.mailboxOAuthUsername;
@@ -3940,7 +3940,9 @@ app.get('/auth/email/google/callback', async (req, res) => {
     console.error('Gmail mailbox connection failed:', error.message);
     res.redirect('/?mailboxError=gmail-connect-failed');
   }
-});
+};
+
+app.get('/auth/email/google/callback', completeGoogleMailboxOAuth);
 
 app.get('/auth/email/microsoft', (req, res) => {
   const actor = getSessionAccount(req);
@@ -3966,7 +3968,7 @@ app.get('/auth/email/microsoft', (req, res) => {
   res.redirect(url.toString());
 });
 
-app.get('/auth/email/microsoft/callback', async (req, res) => {
+const completeMicrosoftMailboxOAuth = async (req, res) => {
   const actor = getSessionAccount(req);
   const expectedState = req.session?.mailboxMicrosoftOAuthState;
   const verifier = req.session?.mailboxMicrosoftCodeVerifier;
@@ -4023,9 +4025,9 @@ app.get('/auth/email/microsoft/callback', async (req, res) => {
     console.error('Microsoft mailbox connection failed:', error.message);
     res.redirect('/?mailboxError=microsoft-connect-failed');
   }
-});
+};
 
-
+app.get('/auth/email/microsoft/callback', completeMicrosoftMailboxOAuth);
 
 app.get('/auth/email/zoho', (req, res) => {
   const actor = getSessionAccount(req);
@@ -5819,8 +5821,11 @@ app.get('/auth/google', (req, res, next) => {
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
-app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/' }),
+app.get('/auth/google/callback',
+  (req, res, next) => {
+    if (req.session?.mailboxGoogleOAuthState) return completeGoogleMailboxOAuth(req, res);
+    passport.authenticate('google', { failureRedirect: '/' })(req, res, next);
+  },
   (req, res) => {
     const email = req.user?.email;
     const account = findAccountByUsername(email);
@@ -5895,6 +5900,7 @@ app.get('/auth/microsoft', (req, res) => {
 });
 
 app.get('/auth/microsoft/callback', async (req, res) => {
+  if (req.session?.mailboxMicrosoftOAuthState) return completeMicrosoftMailboxOAuth(req, res);
   const verifier = req.session.microsoftCodeVerifier;
   if (!microsoftSignInConfigured || req.query.error || !req.query.code || !verifier || req.query.state !== req.session.microsoftOAuthState) {
     return res.redirect('/?oauthError=microsoft-sign-in-failed');
