@@ -15,6 +15,7 @@ fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.joi
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temp, 'lib', 'yahoo-imap.js'));
 fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   schools: [{ id: 'school-alpha', name: 'Alpha School' }, { id: 'school-bravo', name: 'Bravo School' }],
   users: [
