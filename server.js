@@ -10,7 +10,7 @@ const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
-const { fetchGmailMessages, fetchMicrosoftMessages, fetchZohoMessages, zohoMailBaseForLocation, fetchImapMessages } = require('./lib/mailbox-integration');
+const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
@@ -578,6 +578,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  if (String(req.originalUrl || '').split('?')[0] === '/api/email/inbound/resend') return next();
   if (requestPayloadTooComplex(req.body)) return res.status(400).json({ message: 'Request structure is too deeply nested or complex.' });
   if (!requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
@@ -1312,6 +1313,17 @@ function applyOwnerAccountMigration() {
   console.log(`Applied owner account reset ${migrationId}; removed ${removedUsernames.size} previous account(s).`);
   return true;
 }
+function removeLegacyMailboxConnections() {
+  let removed = 0;
+  (db.users || []).forEach(account => {
+    if (!account?.mailboxConnection) return;
+    delete account.mailboxConnection;
+    removed += 1;
+  });
+  if (removed) console.log(`Removed ${removed} obsolete direct-mailbox connection(s); forwarding is now used for inbound email.`);
+  return removed;
+}
+
 function syncConfiguredPlatformOwnerAccess() {
   const ownerUsername = configuredPlatformOwnerUsername();
   let owner = ownerUsername ? db.users.find(account => normalizeUsername(account.username) === ownerUsername) : null;
@@ -1352,6 +1364,7 @@ async function initialisePersistence() {
   syncConfiguredPlatformOwnerAccess();
   migrateSchoolTenancy();
   migrateSensitiveStoredFields();
+  removeLegacyMailboxConnections();
   ensureAllLearnersHaveAccessCodes();
   syncCurrentReleaseNotes();
   await retryPendingStorageCleanup();
@@ -1582,19 +1595,8 @@ app.post('/api/signup', (req, res) => {
   res.status(201).json({ success: true, account: safeAccount });
 });
 
-const publicMailboxConnection = connection => connection ? {
-  connected: true,
-  provider: String(connection.provider || ''),
-  address: String(connection.address || ''),
-  connectedAt: connection.connectedAt || null,
-  lastSyncAt: connection.lastSyncAt || null,
-  lastSyncCount: Number(connection.lastSyncCount || 0),
-  lastSyncStatus: connection.lastSyncStatus === 'error' ? 'error' : (connection.lastSyncAt ? 'ok' : 'pending')
-} : { connected: false };
-
-const safeAccount = ({ pin, pinHash, reportSigningPinHash, mailboxConnection, ...account }) => ({
+const safeAccount = ({ pin, pinHash, reportSigningPinHash, mailboxConnection, emailForwarding, ...account }) => ({
   ...account,
-  mailbox: publicMailboxConnection(mailboxConnection),
   ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {})
 });
 const getSessionAccount = (req) => {
@@ -3532,589 +3534,128 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
   return true;
 };
 
-const GOOGLE_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/google/callback';
-const MICROSOFT_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/microsoft/callback';
-const ZOHO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/zoho/callback';
-const YAHOO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/yahoo/callback';
-const GOOGLE_MAILBOX_SCOPE = 'openid email https://www.googleapis.com/auth/gmail.readonly';
-const MICROSOFT_MAILBOX_SCOPE = 'openid profile email offline_access User.Read Mail.Read';
-const ZOHO_MAILBOX_SCOPE = 'ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ';
-const YAHOO_MAILBOX_SCOPE = 'openid profile email mail-r';
-const ZOHO_ACCOUNTS_SERVERS = Object.freeze({
-  us: 'https://accounts.zoho.com',
-  com: 'https://accounts.zoho.com',
-  eu: 'https://accounts.zoho.eu',
-  in: 'https://accounts.zoho.in',
-  au: 'https://accounts.zoho.com.au',
-  jp: 'https://accounts.zoho.jp',
-  ca: 'https://accounts.zohocloud.ca',
-  cn: 'https://accounts.zoho.com.cn',
-  ae: 'https://accounts.zoho.ae',
-  sa: 'https://accounts.zoho.sa'
+const inboundEmailDomain = () => {
+  const value = String(process.env.LF_INBOUND_EMAIL_DOMAIN || '').trim().toLowerCase().replace(/^@/, '');
+  return /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(value) && value.includes('.') ? value : '';
+};
+const inboundEmailApiKey = () => String(process.env.LF_INBOUND_EMAIL_API_KEY || process.env.LF_EMAIL_API_KEY || '').trim();
+const inboundWebhookSecret = () => String(process.env.LF_INBOUND_WEBHOOK_SECRET || '').trim();
+const inboundEmailConfigured = () => Boolean(
+  inboundEmailDomain()
+  && inboundEmailApiKey()
+  && /^whsec_[A-Za-z0-9+/=_-]+$/.test(inboundWebhookSecret())
+);
+const validForwardingAlias = value => /^lf-[a-f0-9]{24}$/.test(String(value || ''));
+const forwardingAddressFor = actor => {
+  const domain = inboundEmailDomain();
+  const alias = actor?.emailForwarding?.aliasToken;
+  return domain && validForwardingAlias(alias) ? String(alias).toLowerCase() + '@' + domain : '';
+};
+const publicForwardingStatus = actor => ({
+  configured: inboundEmailConfigured(),
+  address: forwardingAddressFor(actor),
+  createdAt: actor?.emailForwarding?.createdAt || null,
+  lastReceivedAt: actor?.emailForwarding?.lastReceivedAt || null
 });
-const mailboxProviderAvailability = () => ({
-  google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-  microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
-  zoho: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET),
-  yahoo: Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET)
+const ensureForwardingAddress = actor => {
+  if (!actor) return '';
+  if (!actor.emailForwarding || !validForwardingAlias(actor.emailForwarding.aliasToken)) {
+    actor.emailForwarding = {
+      aliasToken: 'lf-' + crypto.randomBytes(12).toString('hex'),
+      createdAt: new Date().toISOString(),
+      lastReceivedAt: null
+    };
+  }
+  return forwardingAddressFor(actor);
+};
+const normalizeEnvelopeAddress = value => {
+  const clean = String(value || '').trim().toLowerCase();
+  const bracket = /<([^<>\s]+@[^<>\s]+)>/.exec(clean);
+  return (bracket?.[1] || clean).replace(/^mailto:/, '');
+};
+const forwardingActorForRecipients = recipients => {
+  const addresses = new Set((Array.isArray(recipients) ? recipients : [])
+    .map(normalizeEnvelopeAddress)
+    .filter(Boolean));
+  return (db.users || []).find(account => {
+    const address = forwardingAddressFor(account);
+    return address && addresses.has(address);
+  }) || null;
+};
+const receivedEmailSourceId = emailId => 'resend:' + String(emailId || '').trim();
+
+app.post('/api/email/forwarding/setup', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to create your forwarding address.' });
+  if (!inboundEmailConfigured()) {
+    return res.status(503).json({ message: 'Inbound email receiving is not configured on this Little Feet server yet.' });
+  }
+  const address = ensureForwardingAddress(actor);
+  res.json({ success: true, forwarding: publicForwardingStatus(actor), address });
 });
 
-const mailboxOwnerByAddress = (address, exceptAccount = null) =>
-  db.users.find(account => account !== exceptAccount && normalizeUsername(account.mailboxConnection?.address) === normalizeUsername(address));
+app.post('/api/email/inbound/resend', async (req, res) => {
+  if (!inboundEmailConfigured()) return res.status(503).json({ message: 'Inbound email receiving is not configured.' });
 
-const mailboxSecret = value => value ? decryptField(value) : '';
-const storeMailboxSecret = value => value ? encryptField(String(value)) : '';
+  let event;
+  try {
+    event = verifyResendWebhook({
+      rawBody: req.rawBody,
+      headers: req.headers,
+      secret: inboundWebhookSecret()
+    });
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid inbound email webhook signature.' });
+  }
 
-const mailboxSourceId = (provider, address, externalId) =>
-  'mailbox:' + crypto.createHash('sha256').update([provider, normalizeUsername(address), String(externalId || '')].join('|')).digest('hex');
+  if (event?.type !== 'email.received') return res.json({ received: true, ignored: true });
 
-const addMailboxMessages = (actor, messages) => {
-  const connection = actor.mailboxConnection;
-  if (!connection) return { added: 0, total: 0 };
-  const existing = new Set(
-    (db.emailInbox || [])
-      .filter(item => emailInboxVisibleTo(item, actor) && item.type === 'Email')
-      .map(emailSourceKey)
-  );
-  const dismissed = new Set(
-    (db.emailDismissals || [])
-      .filter(item => normalizeUsername(item.username) === normalizeUsername(actor.username))
-      .map(item => item.sourceKey)
-  );
-  let added = 0;
-  for (const message of messages || []) {
-    if (!message?.externalId) continue;
-    const sourceId = mailboxSourceId(connection.provider, connection.address, message.externalId);
-    const key = 'Email:' + sourceId;
-    if (existing.has(key) || dismissed.has(key)) continue;
-    const body = String(message.body || '').trim();
-    const sender = boundedText(message.from || 'Unknown sender', 300);
+  const emailId = boundedText(event?.data?.email_id, 120);
+  if (!emailId) return res.status(400).json({ message: 'Inbound email event did not include an email id.' });
+
+  try {
+    const received = await fetchResendReceivedEmail({
+      emailId,
+      apiKey: inboundEmailApiKey()
+    });
+    const recipients = [
+      ...(Array.isArray(event?.data?.to) ? event.data.to : []),
+      ...(Array.isArray(received.to) ? received.to : []),
+      ...(Array.isArray(received.receivedFor) ? received.receivedFor : [])
+    ];
+    const actor = forwardingActorForRecipients(recipients);
+    if (!actor) return res.status(202).json({ received: true, routed: false });
+
+    const sourceId = receivedEmailSourceId(emailId);
+    const duplicate = (db.emailInbox || []).find(item =>
+      item.type === 'Email'
+      && item.sourceId === sourceId
+      && normalizeUsername(item.username) === normalizeUsername(actor.username)
+    );
+    if (duplicate) return res.json({ received: true, routed: true, duplicate: true });
+
+    const body = received.text || received.htmlText || '(No message body)';
+    const attachmentNote = received.attachmentCount
+      ? `\n\n[${received.attachmentCount} attachment${received.attachmentCount === 1 ? '' : 's'} received. Attachment viewing will be added separately.]`
+      : '';
     addEmailInboxItem(actor, {
       type: 'Email',
       sourceId,
-      title: boundedText(message.subject || '(No subject)', 200),
-      message: boundedText((sender ? 'From: ' + sender + (body ? '\n\n' : '') : '') + body, 12000),
-      sender,
-      provider: connection.provider,
-      providerLink: message.providerLink || '',
+      title: received.subject || '(No subject)',
+      message: 'From: ' + (received.from || 'Unknown sender') + '\n\n' + body + attachmentNote,
+      sender: received.from || 'Unknown sender',
+      provider: 'Forwarded email',
       sourceTab: 'emailIntegrationTab',
-      createdAt: message.receivedAt
+      createdAt: received.createdAt
     });
-    existing.add(key);
-    added += 1;
-  }
-  return { added, total: Array.isArray(messages) ? messages.length : 0 };
-};
+    ensureForwardingAddress(actor);
+    actor.emailForwarding.lastReceivedAt = received.createdAt || new Date().toISOString();
+    actor.emailForwarding.lastEmailId = emailId;
 
-const refreshGoogleMailboxAccess = async actor => {
-  const connection = actor.mailboxConnection;
-  if (!connection || connection.provider !== 'google') throw new Error('Gmail is not connected.');
-  const existingAccess = mailboxSecret(connection.accessTokenEncrypted);
-  if (existingAccess && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return existingAccess;
-  const refreshToken = mailboxSecret(connection.refreshTokenEncrypted);
-  if (!refreshToken) throw new Error('Reconnect Gmail to renew mailbox permission.');
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID || '',
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken
-    })
-  });
-  const tokens = await response.json().catch(() => ({}));
-  if (!response.ok || !tokens.access_token) throw new Error('Gmail mailbox permission needs to be reconnected.');
-  connection.accessTokenEncrypted = storeMailboxSecret(tokens.access_token);
-  connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000;
-  if (tokens.refresh_token) connection.refreshTokenEncrypted = storeMailboxSecret(tokens.refresh_token);
-  return tokens.access_token;
-};
-
-const refreshMicrosoftMailboxAccess = async actor => {
-  const connection = actor.mailboxConnection;
-  if (!connection || connection.provider !== 'microsoft') throw new Error('Microsoft mailbox is not connected.');
-  const existingAccess = mailboxSecret(connection.accessTokenEncrypted);
-  if (existingAccess && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return existingAccess;
-  const refreshToken = mailboxSecret(connection.refreshTokenEncrypted);
-  if (!refreshToken) throw new Error('Reconnect Outlook to renew mailbox permission.');
-  const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.MICROSOFT_CLIENT_ID || '',
-      client_secret: process.env.MICROSOFT_CLIENT_SECRET || '',
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      scope: MICROSOFT_MAILBOX_SCOPE
-    })
-  });
-  const tokens = await response.json().catch(() => ({}));
-  if (!response.ok || !tokens.access_token) throw new Error('Microsoft mailbox permission needs to be reconnected.');
-  connection.accessTokenEncrypted = storeMailboxSecret(tokens.access_token);
-  connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000;
-  if (tokens.refresh_token) connection.refreshTokenEncrypted = storeMailboxSecret(tokens.refresh_token);
-  return tokens.access_token;
-};
-
-
-const refreshZohoMailboxAccess = async actor => {
-  const connection = actor.mailboxConnection;
-  if (!connection || connection.provider !== 'zoho' || connection.authMode !== 'oauth') throw new Error('Zoho Mail is not connected with OAuth.');
-  const existingAccess = mailboxSecret(connection.accessTokenEncrypted);
-  if (existingAccess && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return existingAccess;
-  const refreshToken = mailboxSecret(connection.refreshTokenEncrypted);
-  const accountsServer = Object.values(ZOHO_ACCOUNTS_SERVERS).includes(connection.accountsServer) ? connection.accountsServer : '';
-  if (!refreshToken || !accountsServer) throw new Error('Reconnect Zoho Mail to renew mailbox permission.');
-  const response = await fetch(accountsServer + '/oauth/v2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.ZOHO_CLIENT_ID || '',
-      client_secret: process.env.ZOHO_CLIENT_SECRET || '',
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken
-    })
-  });
-  const tokens = await response.json().catch(() => ({}));
-  if (!response.ok || !tokens.access_token) throw new Error('Zoho Mail permission needs to be reconnected.');
-  connection.accessTokenEncrypted = storeMailboxSecret(tokens.access_token);
-  connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000;
-  if (tokens.refresh_token) connection.refreshTokenEncrypted = storeMailboxSecret(tokens.refresh_token);
-  return tokens.access_token;
-};
-
-const refreshYahooMailboxAccess = async actor => {
-  const connection = actor.mailboxConnection;
-  if (!connection || connection.provider !== 'yahoo' || connection.authMode !== 'oauth') throw new Error('Yahoo Mail is not connected with OAuth.');
-  const existingAccess = mailboxSecret(connection.accessTokenEncrypted);
-  if (existingAccess && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return existingAccess;
-  const refreshToken = mailboxSecret(connection.refreshTokenEncrypted);
-  if (!refreshToken) throw new Error('Reconnect Yahoo Mail to renew mailbox permission.');
-  const response = await fetch('https://api.login.yahoo.com/oauth2/get_token', {
-    method: 'POST',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from(String(process.env.YAHOO_CLIENT_ID || '') + ':' + String(process.env.YAHOO_CLIENT_SECRET || '')).toString('base64'),
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      redirect_uri: YAHOO_MAILBOX_CALLBACK_URL
-    })
-  });
-  const tokens = await response.json().catch(() => ({}));
-  if (!response.ok || !tokens.access_token) throw new Error('Yahoo Mail permission needs to be reconnected.');
-  connection.accessTokenEncrypted = storeMailboxSecret(tokens.access_token);
-  connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000;
-  if (tokens.refresh_token) connection.refreshTokenEncrypted = storeMailboxSecret(tokens.refresh_token);
-  return tokens.access_token;
-};
-
-const fetchMailboxMessagesForActor = async (actor, limit = 30) => {
-  const connection = actor.mailboxConnection;
-  if (!connection) return [];
-  if (connection.provider === 'google') {
-    const accessToken = await refreshGoogleMailboxAccess(actor);
-    return fetchGmailMessages({ accessToken, limit });
-  }
-  if (connection.provider === 'microsoft') {
-    const accessToken = await refreshMicrosoftMailboxAccess(actor);
-    return fetchMicrosoftMessages({ accessToken, limit });
-  }
-  if (connection.provider === 'zoho' && connection.authMode === 'oauth') {
-    const accessToken = await refreshZohoMailboxAccess(actor);
-    return fetchZohoMessages({
-      accessToken,
-      mailApiBase: connection.mailApiBase,
-      address: connection.address,
-      limit
-    });
-  }
-  if (connection.provider === 'yahoo' && connection.authMode === 'oauth') {
-    const accessToken = await refreshYahooMailboxAccess(actor);
-    return fetchImapMessages({
-      host: 'imap.mail.yahoo.com',
-      port: 993,
-      address: connection.address,
-      accessToken,
-      limit
-    });
-  }
-  throw new Error('This mailbox connection method is no longer supported. Reconnect with your email provider.');
-};
-
-const syncMailboxForActor = async (actor, { limit = 30 } = {}) => {
-  if (!actor?.mailboxConnection) return { connected: false, added: 0, total: 0 };
-  try {
-    const messages = await fetchMailboxMessagesForActor(actor, limit);
-    const result = addMailboxMessages(actor, messages);
-    actor.mailboxConnection.lastSyncAt = new Date().toISOString();
-    actor.mailboxConnection.lastSyncCount = result.total;
-    actor.mailboxConnection.lastSyncStatus = 'ok';
-    delete actor.mailboxConnection.lastSyncError;
-    return { connected: true, ...result, mailbox: publicMailboxConnection(actor.mailboxConnection) };
+    res.json({ received: true, routed: true });
   } catch (error) {
-    actor.mailboxConnection.lastSyncAt = new Date().toISOString();
-    actor.mailboxConnection.lastSyncCount = 0;
-    actor.mailboxConnection.lastSyncStatus = 'error';
-    actor.mailboxConnection.lastSyncError = boundedText(error?.message || 'Mailbox sync failed.', 240);
-    throw error;
-  }
-};
-
-app.get('/api/email/mailbox/status', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to view mailbox status.' });
-  res.json({
-    mailbox: publicMailboxConnection(actor.mailboxConnection),
-    providers: mailboxProviderAvailability()
-  });
-});
-
-app.post('/api/email/mailbox/sync', async (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to sync your mailbox.' });
-  if (!actor.mailboxConnection) return res.status(400).json({ message: 'Connect your mailbox first.' });
-  try {
-    const result = await syncMailboxForActor(actor);
-    res.json({ success: true, ...result, inbox: buildEmailInbox(actor) });
-  } catch (error) {
-    res.status(502).json({
-      message: boundedText(error?.message || 'Mailbox sync failed. Reconnect the mailbox and try again.', 240),
-      mailbox: publicMailboxConnection(actor.mailboxConnection)
-    });
-  }
-});
-
-app.delete('/api/email/mailbox', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.status(401).json({ message: 'Sign in to disconnect your mailbox.' });
-  delete actor.mailboxConnection;
-  db.emailInbox = (db.emailInbox || []).filter(item => !(item.type === 'Email' && normalizeUsername(item.username) === normalizeUsername(actor.username)));
-  db.emailDismissals = (db.emailDismissals || []).filter(item => !(normalizeUsername(item.username) === normalizeUsername(actor.username) && String(item.sourceKey || '').startsWith('Email:mailbox:')));
-  res.json({ success: true, mailbox: publicMailboxConnection(null) });
-});
-
-app.get('/auth/email/google', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.redirect('/?mailboxError=sign-in-required');
-  if (!mailboxProviderAvailability().google) return res.redirect('/?mailboxError=gmail-not-configured');
-  const state = crypto.randomBytes(24).toString('hex');
-  req.session.mailboxGoogleOAuthState = state;
-  req.session.mailboxOAuthUsername = actor.username;
-  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  url.search = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID,
-    redirect_uri: GOOGLE_MAILBOX_CALLBACK_URL,
-    response_type: 'code',
-    scope: GOOGLE_MAILBOX_SCOPE,
-    access_type: 'offline',
-    include_granted_scopes: 'true',
-    prompt: 'consent',
-    state
-  }).toString();
-  res.redirect(url.toString());
-});
-
-const completeGoogleMailboxOAuth = async (req, res) => {
-  const actor = getSessionAccount(req);
-  const expectedState = req.session?.mailboxGoogleOAuthState;
-  const expectedUsername = req.session?.mailboxOAuthUsername;
-  delete req.session.mailboxGoogleOAuthState;
-  delete req.session.mailboxOAuthUsername;
-  if (!actor || !expectedState || req.query.state !== expectedState || normalizeUsername(actor.username) !== normalizeUsername(expectedUsername) || req.query.error || !req.query.code) {
-    return res.redirect('/?mailboxError=gmail-connect-failed');
-  }
-  try {
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID || '',
-        client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
-        code: req.query.code,
-        grant_type: 'authorization_code',
-        redirect_uri: GOOGLE_MAILBOX_CALLBACK_URL
-      })
-    });
-    const tokens = await tokenResponse.json().catch(() => ({}));
-    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Gmail token exchange failed.');
-
-    const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: 'Bearer ' + tokens.access_token }
-    });
-    const profile = await profileResponse.json().catch(() => ({}));
-    const address = boundedText(profile.email, 254);
-    if (!profileResponse.ok || !looksLikeEmailAddress(address)) throw new Error('Gmail account email could not be confirmed.');
-    if (mailboxOwnerByAddress(address, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
-
-    const previousRefresh = actor.mailboxConnection?.provider === 'google' ? actor.mailboxConnection.refreshTokenEncrypted : '';
-    actor.mailboxConnection = {
-      provider: 'google',
-      authMode: 'oauth',
-      address,
-      accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
-      refreshTokenEncrypted: tokens.refresh_token ? storeMailboxSecret(tokens.refresh_token) : previousRefresh,
-      accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000,
-      connectedAt: new Date().toISOString(),
-      lastSyncAt: null,
-      lastSyncCount: 0,
-      lastSyncStatus: 'pending'
-    };
-    if (!actor.mailboxConnection.refreshTokenEncrypted) throw new Error('Gmail did not provide offline mailbox permission. Reconnect and approve access.');
-    await syncMailboxForActor(actor);
-    await saveDatabaseState();
-    scheduleReplicaSnapshot();
-    res.redirect('/?mailboxConnected=google');
-  } catch (error) {
-    console.error('Gmail mailbox connection failed:', error.message);
-    res.redirect('/?mailboxError=gmail-connect-failed');
-  }
-};
-
-app.get('/auth/email/microsoft', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.redirect('/?mailboxError=sign-in-required');
-  if (!mailboxProviderAvailability().microsoft) return res.redirect('/?mailboxError=microsoft-not-configured');
-  const state = crypto.randomBytes(24).toString('hex');
-  const verifier = crypto.randomBytes(48).toString('base64url');
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  req.session.mailboxMicrosoftOAuthState = state;
-  req.session.mailboxMicrosoftCodeVerifier = verifier;
-  req.session.mailboxOAuthUsername = actor.username;
-  const url = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
-  url.search = new URLSearchParams({
-    client_id: process.env.MICROSOFT_CLIENT_ID,
-    response_type: 'code',
-    redirect_uri: MICROSOFT_MAILBOX_CALLBACK_URL,
-    response_mode: 'query',
-    scope: MICROSOFT_MAILBOX_SCOPE,
-    state,
-    code_challenge: challenge,
-    code_challenge_method: 'S256'
-  }).toString();
-  res.redirect(url.toString());
-});
-
-const completeMicrosoftMailboxOAuth = async (req, res) => {
-  const actor = getSessionAccount(req);
-  const expectedState = req.session?.mailboxMicrosoftOAuthState;
-  const verifier = req.session?.mailboxMicrosoftCodeVerifier;
-  const expectedUsername = req.session?.mailboxOAuthUsername;
-  delete req.session.mailboxMicrosoftOAuthState;
-  delete req.session.mailboxMicrosoftCodeVerifier;
-  delete req.session.mailboxOAuthUsername;
-  if (!actor || !expectedState || !verifier || req.query.state !== expectedState || normalizeUsername(actor.username) !== normalizeUsername(expectedUsername) || req.query.error || !req.query.code) {
-    return res.redirect('/?mailboxError=microsoft-connect-failed');
-  }
-  try {
-    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.MICROSOFT_CLIENT_ID || '',
-        client_secret: process.env.MICROSOFT_CLIENT_SECRET || '',
-        grant_type: 'authorization_code',
-        code: req.query.code,
-        redirect_uri: MICROSOFT_MAILBOX_CALLBACK_URL,
-        code_verifier: verifier,
-        scope: MICROSOFT_MAILBOX_SCOPE
-      })
-    });
-    const tokens = await tokenResponse.json().catch(() => ({}));
-    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Microsoft mailbox token exchange failed.');
-
-    const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName', {
-      headers: { Authorization: 'Bearer ' + tokens.access_token }
-    });
-    const profile = await profileResponse.json().catch(() => ({}));
-    const address = boundedText(profile.mail || profile.userPrincipalName, 254);
-    if (!profileResponse.ok || !looksLikeEmailAddress(address)) throw new Error('Microsoft mailbox email could not be confirmed.');
-    if (mailboxOwnerByAddress(address, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
-
-    actor.mailboxConnection = {
-      provider: 'microsoft',
-      authMode: 'oauth',
-      address,
-      accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
-      refreshTokenEncrypted: storeMailboxSecret(tokens.refresh_token || ''),
-      accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000,
-      connectedAt: new Date().toISOString(),
-      lastSyncAt: null,
-      lastSyncCount: 0,
-      lastSyncStatus: 'pending'
-    };
-    if (!actor.mailboxConnection.refreshTokenEncrypted) throw new Error('Microsoft did not provide offline mailbox permission. Reconnect and approve access.');
-    await syncMailboxForActor(actor);
-    await saveDatabaseState();
-    scheduleReplicaSnapshot();
-    res.redirect('/?mailboxConnected=microsoft');
-  } catch (error) {
-    console.error('Microsoft mailbox connection failed:', error.message);
-    res.redirect('/?mailboxError=microsoft-connect-failed');
-  }
-};
-
-app.get('/auth/email/zoho', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.redirect('/?mailboxError=sign-in-required');
-  if (!mailboxProviderAvailability().zoho) return res.redirect('/?mailboxError=zoho-not-configured');
-  const state = crypto.randomBytes(24).toString('hex');
-  req.session.mailboxZohoOAuthState = state;
-  req.session.mailboxOAuthUsername = actor.username;
-  const url = new URL('https://accounts.zoho.com/oauth/v2/auth');
-  url.search = new URLSearchParams({
-    response_type: 'code',
-    client_id: process.env.ZOHO_CLIENT_ID,
-    scope: ZOHO_MAILBOX_SCOPE,
-    redirect_uri: ZOHO_MAILBOX_CALLBACK_URL,
-    access_type: 'offline',
-    prompt: 'consent',
-    state
-  }).toString();
-  res.redirect(url.toString());
-});
-
-app.get('/auth/email/zoho/callback', async (req, res) => {
-  const actor = getSessionAccount(req);
-  const expectedState = req.session?.mailboxZohoOAuthState;
-  const expectedUsername = req.session?.mailboxOAuthUsername;
-  delete req.session.mailboxZohoOAuthState;
-  delete req.session.mailboxOAuthUsername;
-  if (!actor || !expectedState || req.query.state !== expectedState || normalizeUsername(actor.username) !== normalizeUsername(expectedUsername) || req.query.error || !req.query.code) {
-    return res.redirect('/?mailboxError=zoho-connect-failed');
-  }
-  try {
-    const location = String(req.query.location || '').trim().toLowerCase();
-    const accountsServer = ZOHO_ACCOUNTS_SERVERS[location] || '';
-    const mailApiBase = zohoMailBaseForLocation(location);
-    if (!accountsServer || !mailApiBase) throw new Error('Unsupported Zoho data centre.');
-    const reportedAccountsServer = String(req.query['accounts-server'] || '').replace(/\/+$/, '');
-    if (reportedAccountsServer && reportedAccountsServer !== accountsServer) throw new Error('Zoho data-centre response did not match the trusted server list.');
-
-    const tokenResponse = await fetch(accountsServer + '/oauth/v2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.ZOHO_CLIENT_ID || '',
-        client_secret: process.env.ZOHO_CLIENT_SECRET || '',
-        code: req.query.code,
-        grant_type: 'authorization_code',
-        redirect_uri: ZOHO_MAILBOX_CALLBACK_URL
-      })
-    });
-    const tokens = await tokenResponse.json().catch(() => ({}));
-    if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token) throw new Error('Zoho mailbox token exchange failed.');
-
-    const accountResponse = await fetch(mailApiBase + '/api/accounts', {
-      headers: { Accept: 'application/json', Authorization: 'Zoho-oauthtoken ' + tokens.access_token }
-    });
-    const accountData = await accountResponse.json().catch(() => ({}));
-    const accounts = Array.isArray(accountData.data) ? accountData.data : [];
-    const mailbox = accounts.find(item => item?.type === 'ZOHO_ACCOUNT' && item?.enabled !== false) || accounts.find(item => item?.accountId);
-    const address = boundedText(mailbox?.primaryEmailAddress || mailbox?.mailboxAddress || mailbox?.incomingUserName || '', 254);
-    if (!accountResponse.ok || !looksLikeEmailAddress(address)) throw new Error('Zoho mailbox address could not be confirmed.');
-    if (mailboxOwnerByAddress(address, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
-
-    actor.mailboxConnection = {
-      provider: 'zoho',
-      authMode: 'oauth',
-      address,
-      accountsServer,
-      mailApiBase,
-      accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
-      refreshTokenEncrypted: storeMailboxSecret(tokens.refresh_token),
-      accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000,
-      connectedAt: new Date().toISOString(),
-      lastSyncAt: null,
-      lastSyncCount: 0,
-      lastSyncStatus: 'pending'
-    };
-    await syncMailboxForActor(actor);
-    await saveDatabaseState();
-    scheduleReplicaSnapshot();
-    res.redirect('/?mailboxConnected=zoho');
-  } catch (error) {
-    console.error('Zoho mailbox connection failed:', error.message);
-    res.redirect('/?mailboxError=zoho-connect-failed');
-  }
-});
-
-app.get('/auth/email/yahoo', (req, res) => {
-  const actor = getSessionAccount(req);
-  if (!actor) return res.redirect('/?mailboxError=sign-in-required');
-  if (!mailboxProviderAvailability().yahoo) return res.redirect('/?mailboxError=yahoo-not-configured');
-  const state = crypto.randomBytes(24).toString('hex');
-  const nonce = crypto.randomBytes(24).toString('base64url');
-  req.session.mailboxYahooOAuthState = state;
-  req.session.mailboxYahooNonce = nonce;
-  req.session.mailboxOAuthUsername = actor.username;
-  const url = new URL('https://api.login.yahoo.com/oauth2/request_auth');
-  url.search = new URLSearchParams({
-    client_id: process.env.YAHOO_CLIENT_ID,
-    redirect_uri: YAHOO_MAILBOX_CALLBACK_URL,
-    response_type: 'code',
-    scope: YAHOO_MAILBOX_SCOPE,
-    state,
-    nonce
-  }).toString();
-  res.redirect(url.toString());
-});
-
-app.get('/auth/email/yahoo/callback', async (req, res) => {
-  const actor = getSessionAccount(req);
-  const expectedState = req.session?.mailboxYahooOAuthState;
-  const expectedUsername = req.session?.mailboxOAuthUsername;
-  delete req.session.mailboxYahooOAuthState;
-  delete req.session.mailboxYahooNonce;
-  delete req.session.mailboxOAuthUsername;
-  if (!actor || !expectedState || req.query.state !== expectedState || normalizeUsername(actor.username) !== normalizeUsername(expectedUsername) || req.query.error || !req.query.code) {
-    return res.redirect('/?mailboxError=yahoo-connect-failed');
-  }
-  try {
-    const tokenResponse = await fetch('https://api.login.yahoo.com/oauth2/get_token', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Basic ' + Buffer.from(String(process.env.YAHOO_CLIENT_ID || '') + ':' + String(process.env.YAHOO_CLIENT_SECRET || '')).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: req.query.code,
-        redirect_uri: YAHOO_MAILBOX_CALLBACK_URL
-      })
-    });
-    const tokens = await tokenResponse.json().catch(() => ({}));
-    if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token) throw new Error('Yahoo mailbox token exchange failed.');
-
-    const profileResponse = await fetch('https://api.login.yahoo.com/openid/v1/userinfo', {
-      headers: { Authorization: 'Bearer ' + tokens.access_token }
-    });
-    const profile = await profileResponse.json().catch(() => ({}));
-    const address = boundedText(profile.email, 254);
-    if (!profileResponse.ok || !looksLikeEmailAddress(address)) throw new Error('Yahoo mailbox address could not be confirmed.');
-    if (mailboxOwnerByAddress(address, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
-
-    actor.mailboxConnection = {
-      provider: 'yahoo',
-      authMode: 'oauth',
-      address,
-      accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
-      refreshTokenEncrypted: storeMailboxSecret(tokens.refresh_token),
-      accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000,
-      connectedAt: new Date().toISOString(),
-      lastSyncAt: null,
-      lastSyncCount: 0,
-      lastSyncStatus: 'pending'
-    };
-    await syncMailboxForActor(actor);
-    await saveDatabaseState();
-    scheduleReplicaSnapshot();
-    res.redirect('/?mailboxConnected=yahoo');
-  } catch (error) {
-    console.error('Yahoo mailbox connection failed:', error.message);
-    res.redirect('/?mailboxError=yahoo-connect-failed');
+    console.error('Inbound email processing failed:', error.message);
+    res.status(502).json({ message: 'Inbound email could not be processed yet; the provider may retry.' });
   }
 });
 
@@ -4128,8 +3669,7 @@ app.get('/api/email/status',(req,res)=>{
     address,
     verified:Boolean(actor.emailVerifiedAt),
     verifiedAt:actor.emailVerifiedAt||null,
-    mailbox:publicMailboxConnection(actor.mailboxConnection),
-    mailboxProviders:mailboxProviderAvailability()
+    forwarding:publicForwardingStatus(actor)
   });
 });
 app.post('/api/email/verification/request',async(req,res,next)=>{
@@ -5750,7 +5290,6 @@ app.get('/auth/google', (req, res, next) => {
 
 app.get('/auth/google/callback',
   (req, res, next) => {
-    if (req.session?.mailboxGoogleOAuthState && req.query.state === req.session.mailboxGoogleOAuthState) return completeGoogleMailboxOAuth(req, res);
     passport.authenticate('google', { failureRedirect: '/' })(req, res, next);
   },
   (req, res) => {
@@ -5827,7 +5366,6 @@ app.get('/auth/microsoft', (req, res) => {
 });
 
 app.get('/auth/microsoft/callback', async (req, res) => {
-  if (req.session?.mailboxMicrosoftOAuthState && req.query.state === req.session.mailboxMicrosoftOAuthState) return completeMicrosoftMailboxOAuth(req, res);
   const verifier = req.session.microsoftCodeVerifier;
   if (!microsoftSignInConfigured || req.query.error || !req.query.code || !verifier || req.query.state !== req.session.microsoftOAuthState) {
     return res.redirect('/?oauthError=microsoft-sign-in-failed');
