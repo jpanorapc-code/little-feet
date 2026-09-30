@@ -17,6 +17,7 @@ for (const file of ['server.js','finance-automation-server.js','auth-crypto.js',
 }
 fs.mkdirSync(path.join(tmp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(tmp, 'lib', 'storage', 'object-storage.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(tmp, 'lib', 'mailbox-integration.js'));
 
 const billing = prefix => ({
   pricing:{baseMonthly:500,bundles:{5:{costPrice:0,sellingPrice:50},20:{costPrice:0,sellingPrice:150},100:{costPrice:0,sellingPrice:500}},lateFeeEnabled:false,lateFee:0},
