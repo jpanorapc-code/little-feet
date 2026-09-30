@@ -19,6 +19,9 @@ for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
+fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temp, 'lib', 'yahoo-imap.js'));
 fs.mkdirSync(path.join(temp, 'output', 'pdf'), { recursive: true });
 fs.writeFileSync(path.join(temp, 'output', 'pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'), '%PDF-1.4\npublic-test-document\n');
 fs.writeFileSync(path.join(temp, 'output', 'pdf', 'secret-export.pdf'), '%PDF-1.4\nprivate-test-document\n');

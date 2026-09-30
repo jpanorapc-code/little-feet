@@ -325,7 +325,12 @@ function showOAuthSignInMessage(error) {
     'google-not-configured': ['Google sign-in is not ready yet', 'An administrator still needs to finish the Google connection.'],
     'yahoo-not-configured': ['Yahoo sign-in is not ready yet', 'An administrator still needs to add the Yahoo connection details in Render.'],
     'microsoft-not-configured': ['Microsoft sign-in is not ready yet', 'An administrator still needs to add the Microsoft connection details in Render.'],
+    'google-sign-in-failed': ['Google sign-in could not finish', 'Please try again. If this continues, an administrator should check the Google app connection.'],
     'account-not-linked': ['Account not linked', 'This email is not linked to an approved Little Feet account. Please use your approved school, teacher, parent, principal, or district email.'],
+    'account-link-ambiguous': ['Email linked more than once', 'An administrator must remove the duplicate email alias before provider sign-in can continue.'],
+    'account-pending': ['Account approval is pending', 'Your school administrator must approve this account before provider sign-in can continue.'],
+    'oauth-email-missing': ['Provider email unavailable', 'Your provider did not return a usable email address. Check the provider account and try again.'],
+    'session-failed': ['Secure sign-in session could not start', 'Please try again. If this continues, contact your administrator.'],
     'yahoo-sign-in-failed': ['Yahoo sign-in could not finish', 'Please try again. If this continues, an administrator should check the Yahoo app connection.'],
     'microsoft-sign-in-failed': ['Microsoft sign-in could not finish', 'Please try again. If this continues, an administrator should check the Microsoft app connection.']
   };

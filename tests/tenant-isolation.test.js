@@ -23,10 +23,13 @@ fs.copyFileSync(path.join(root, 'backup.js'), path.join(temporaryDirectory, 'bac
 fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temporaryDirectory, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temporaryDirectory, 'lib', 'mailbox-integration.js'));
+fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temporaryDirectory, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temporaryDirectory, 'lib', 'mailbox-oauth.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temporaryDirectory, 'lib', 'yahoo-imap.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({
   schools,
   users: [
-    { username: 'alpha-admin', pinHash: pinHash('AlphaPass1'), name: 'Alpha Administrator', role: 'admin', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
+    { username: 'alpha-admin', pinHash: pinHash('AlphaPass1'), name: 'Alpha Administrator', role: 'admin', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', mailboxConnection: { version: 2, provider: 'google', email: 'alpha@example.test', accessToken: 'encrypted-access-token', refreshToken: 'encrypted-refresh-token', connectedAt: '2026-09-30T10:00:00.000Z', initialSyncComplete: true } },
     { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', assignedClasses: ['a1'] },
     { username: 'alpha-principal', pinHash: pinHash('PrincipalPass1'), name: 'Alpha Principal', role: 'principal', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-district', pinHash: pinHash('DistrictPass1'), name: 'Alpha District', role: 'district', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
@@ -135,6 +138,17 @@ const rawRequest = async (route) => {
     assert.equal(replacedAlphaSession.data.authenticated, false);
     assert.equal(replacedAlphaSession.data.user, null);
     alphaLogin.cookie = migratedAlphaLogin.cookie;
+    const authenticatedSession = await request('/api/auth/session', { cookie: alphaLogin.cookie });
+    assert.equal(authenticatedSession.data.authenticated, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(authenticatedSession.data.user, 'mailboxConnection'), false);
+    const anonymousMailbox = await request('/api/email/mailbox/status');
+    assert.equal(anonymousMailbox.response.status, 401);
+    const alphaMailbox = await request('/api/email/mailbox/status', { cookie: alphaLogin.cookie });
+    assert.equal(alphaMailbox.response.status, 200);
+    assert.equal(alphaMailbox.data.connected, true);
+    assert.equal(alphaMailbox.data.email, 'alpha@example.test');
+    assert.equal(Object.prototype.hasOwnProperty.call(alphaMailbox.data, 'accessToken'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(alphaMailbox.data, 'refreshToken'), false);
     const diagnostics = await request('/api/system-diagnostics', { cookie: alphaLogin.cookie });
     assert.equal(diagnostics.response.status, 200);
     assert.equal(diagnostics.data.persistence, 'read-only-replica');
