@@ -28,15 +28,9 @@
   }
 
   let emailInboxSeen=new Set();
-  const mailboxProviderName=provider=>({google:'Gmail',microsoft:'Outlook / Microsoft 365',zoho:'Zoho Mail',yahoo:'Yahoo Mail'}[String(provider||'').toLowerCase()]||String(provider||'Mailbox'));
-  const mailboxNeedsSync=mailbox=>{
-    if(!mailbox?.connected)return false;
-    const last=Date.parse(mailbox.lastSyncAt||'');
-    return !Number.isFinite(last)||Date.now()-last>=60000;
-  };
   const inboxButtons=item=>{
     const destination=item.type==='Email'
-      ? (item.providerLink?`<a class="action-btn" href="${esc(item.providerLink)}" target="_blank" rel="noopener noreferrer">Open original</a>`:'')
+      ? ''
       : (item.sourceTab?`<button class="action-btn" data-inbox-action="open" data-tab="${esc(item.sourceTab)}">Open</button>`:'');
     return `<div class="actions"><button class="action-btn" data-inbox-action="read" data-id="${esc(item.id)}">${item.read?'Mark unread':'Mark read'}</button><button class="action-btn" data-inbox-action="pin" data-id="${esc(item.id)}">${item.pinned?'Unpin':'Pin'}</button>${destination}<button class="action-btn" data-inbox-action="delete" data-id="${esc(item.id)}">Delete</button></div>`;
   };
@@ -48,65 +42,43 @@
     card.querySelector('[data-popup-pin]').onclick=async()=>{const next=!item.pinned;await json('/api/email/inbox/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({pinned:next})});item.pinned=next;card.classList.toggle('is-pinned',next);card.querySelector('[data-popup-pin]').textContent=next?'Unpin':'Pin';await email();};
     stack.prepend(card);
   };
-  const mailboxConnectionMarkup=(d,syncError='')=>{
-    const mailbox=d.mailbox||{connected:false};
-    const providers=d.mailboxProviders||{};
-    if(mailbox.connected){
-      const last=mailbox.lastSyncAt?new Date(mailbox.lastSyncAt).toLocaleString():'Not synced yet';
-      const status=syncError||mailbox.lastSyncStatus==='error'?'Sync needs attention':'Connected';
-      return `<div class="workspace-card"><h3>Your personal mailbox</h3><p><strong>${esc(mailboxProviderName(mailbox.provider))}</strong><br>${esc(mailbox.address||'')}</p><p><strong>Status:</strong> ${esc(status)}</p><p><strong>Connection:</strong> Secure provider sign-in</p><p><strong>Last sync:</strong> ${esc(last)}</p><p class="meta">Only this Little Feet user can see this connected mailbox. OAuth tokens stay encrypted on the server.</p>${syncError?`<p class="meta" style="color:#fca5a5;">${esc(syncError)}</p>`:''}<div class="actions"><button id="syncMailboxNow" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectMailbox" class="action-btn btn-red" type="button">Disconnect mailbox</button></div></div>`;
+  const forwardingMarkup=d=>{
+    const forwarding=d.forwarding||{configured:false,address:''};
+    if(!forwarding.configured){
+      return '<div class="workspace-card"><h3>Receive email in Little Feet</h3><p>Inbound email receiving is not configured on this Little Feet server yet.</p><p class="meta">Once receiving is configured, each user gets a private forwarding address here. No mailbox password or provider OAuth is required.</p></div>';
     }
-
-    const providerButton=(available,href,label)=>available
-      ? `<a class="action-btn btn-blue" href="${href}">${label}</a>`
-      : `<button class="action-btn" type="button" disabled title="Little Feet provider setup is still required">${label} · setup required</button>`;
-    const buttons=[
-      providerButton(providers.google,'/auth/email/google','Connect Gmail'),
-      providerButton(providers.microsoft,'/auth/email/microsoft','Connect Outlook / Microsoft 365'),
-      providerButton(providers.zoho,'/auth/email/zoho','Connect Zoho Mail'),
-      providerButton(providers.yahoo,'/auth/email/yahoo','Connect Yahoo Mail')
-    ].join('');
-    const providerHelp='<p class="meta">Choose your provider, sign in on its own secure page, approve read access, and Little Feet will return you here automatically. If a provider says setup required, Little Feet still needs that provider\'s OAuth application credentials configured once on the server.</p>';
-
-    return `<div class="workspace-card"><h3>Connect your personal mailbox</h3><p>Choose your email provider. Little Feet will send you to the provider\'s secure sign-in page; your email password is never entered into Little Feet.</p><div class="actions" style="margin-bottom:10px;">${buttons}</div>${providerHelp}</div>`;
+    if(!forwarding.address){
+      return '<div class="workspace-card"><h3>Receive email in Little Feet</h3><p>Create your private Little Feet forwarding address, then forward new incoming mail from your normal email provider to it.</p><p class="meta">Your normal mailbox stays the source. Little Feet receives a dashboard copy of new messages that are forwarded to your private address.</p><button id="createForwardingAddress" class="action-btn btn-green" type="button">Create my forwarding address</button></div>';
+    }
+    const last=forwarding.lastReceivedAt?new Date(forwarding.lastReceivedAt).toLocaleString():'No forwarded email received yet';
+    return `<div class="workspace-card"><h3>Receive email in Little Feet</h3><p><strong>Your private forwarding address</strong></p><div class="actions"><input id="forwardingAddress" type="text" readonly value="${esc(forwarding.address)}" style="flex:1;min-width:220px;"><button id="copyForwardingAddress" class="action-btn btn-green" type="button">Copy address</button></div><p><strong>Last received:</strong> ${esc(last)}</p><p class="meta">In Gmail, Outlook, Zoho, Yahoo or another provider that supports forwarding, forward new incoming mail to this address. Provider confirmation emails sent here will appear in the inbox below. Keep this private address out of public pages.</p></div>`;
   };
 
   async function email(){
     const host=document.getElementById('emailIntegrationContent');if(!host)return;
     try{
-      const d=await json('/api/email/status');
-      let inbox=null,syncError='';
-      if(mailboxNeedsSync(d.mailbox)){
-        try{
-          const synced=await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});
-          d.mailbox=synced.mailbox||d.mailbox;
-          inbox=Array.isArray(synced.inbox)?synced.inbox:null;
-        }catch(error){syncError=error.message||'Mailbox sync failed.';}
-      }
-      if(!inbox)inbox=await json('/api/email/inbox');
-
-      host.innerHTML=`<div class="workspace-grid">${mailboxConnectionMarkup(d,syncError)}<div class="workspace-card"><h3>Little Feet delivery email</h3><p><strong>Delivery channel:</strong> ${d.configured?'Available':'Not configured'}</p><p><strong>Delivery provider:</strong> ${esc(d.provider||'Not configured')}</p><p><strong>Your Little Feet account email:</strong> ${esc(d.address||'No valid email')}</p><p><strong>Address verification:</strong> ${d.verified?'Verified':'Not verified'}</p><p class="meta">${d.configured?'This verifies the address Little Feet uses for platform-generated mail. It is separate from connecting your personal inbox above.':'Little Feet needs its server-side SMTP or email API settings before it can send verification mail.'}</p><button id="requestEmailCode" class="action-btn" type="button" ${d.configured?'':'disabled'}>Send verification code</button><form id="confirmEmailForm" style="margin-top:12px"><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="submit-btn">Verify address</button></form></div><div class="workspace-card"><h3>What arrives here</h3><p><strong>EMAIL</strong> items are real messages pulled from the mailbox connected by this signed-in user.</p><p><strong>Little Feet</strong> items are platform notifications such as tickets, direct messages, staff notices, payments and alerts.</p><p class="meta">Mailbox connections are per user. A principal, teacher, parent, CRM, Accounts user or future role only sees the mailbox connected to their own Little Feet account.</p></div></div><div class="email-inbox-toolbar"><h3>Email Inbox</h3><div class="actions"><button id="refreshMailboxInbox" class="action-btn btn-green" type="button">Refresh / sync</button><button id="deleteAllInbox" class="action-btn" type="button">Delete all dashboard copies</button></div></div><div class="email-inbox-list">${inbox.length?inbox.map(item=>`<article class="email-inbox-item ${item.read?'':'is-unread'} ${item.pinned?'is-pinned':''}"><header><div><span class="badge-tag">${esc(item.type)}</span> <strong>${esc(item.title)}</strong></div><span class="meta">${new Date(item.createdAt).toLocaleString()}</span></header><p>${esc(item.message)}</p>${inboxButtons(item)}</article>`).join(''):'<p class="meta">No mailbox email or Little Feet notifications yet.</p>'}</div>`;
+      const [d,inbox]=await Promise.all([json('/api/email/status'),json('/api/email/inbox')]);
+      host.innerHTML=`<div class="workspace-grid">${forwardingMarkup(d)}<div class="workspace-card"><h3>Little Feet delivery email</h3><p><strong>Delivery channel:</strong> ${d.configured?'Available':'Not configured'}</p><p><strong>Delivery provider:</strong> ${esc(d.provider||'Not configured')}</p><p><strong>Your Little Feet account email:</strong> ${esc(d.address||'No valid email')}</p><p><strong>Address verification:</strong> ${d.verified?'Verified':'Not verified'}</p><p class="meta">${d.configured?'This verifies the address Little Feet uses for platform-generated mail. It is separate from receiving forwarded email.':'Little Feet needs its server-side SMTP or email API settings before it can send verification mail.'}</p><button id="requestEmailCode" class="action-btn" type="button" ${d.configured?'':'disabled'}>Send verification code</button><form id="confirmEmailForm" style="margin-top:12px"><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="submit-btn">Verify address</button></form></div><div class="workspace-card"><h3>What arrives here</h3><p><strong>EMAIL</strong> items are new messages forwarded to this user\'s private Little Feet receiving address.</p><p><strong>Little Feet</strong> items are platform notifications such as tickets, direct messages, staff notices, payments and alerts.</p><p class="meta">Forwarding addresses are private and unique per Little Feet user, so one user\'s incoming email cannot appear in another user\'s inbox.</p></div></div><div class="email-inbox-toolbar"><h3>Email Inbox</h3><div class="actions"><button id="refreshForwardedInbox" class="action-btn btn-green" type="button">Refresh</button><button id="deleteAllInbox" class="action-btn" type="button">Delete all dashboard copies</button></div></div><div class="email-inbox-list">${inbox.length?inbox.map(item=>`<article class="email-inbox-item ${item.read?'':'is-unread'} ${item.pinned?'is-pinned':''}"><header><div><span class="badge-tag">${esc(item.type)}</span> <strong>${esc(item.title)}</strong></div><span class="meta">${new Date(item.createdAt).toLocaleString()}</span></header><p>${esc(item.message)}</p>${inboxButtons(item)}</article>`).join(''):'<p class="meta">No forwarded email or Little Feet notifications yet.</p>'}</div>`;
       inbox.forEach(showInboxPopup);
 
-      document.getElementById('syncMailboxNow')?.addEventListener('click',async()=>{
-        try{await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}
+      document.getElementById('createForwardingAddress')?.addEventListener('click',async()=>{
+        try{await json('/api/email/forwarding/setup',{method:'POST',body:'{}'});await email();}catch(error){alert(error.message);}
       });
-      document.getElementById('refreshMailboxInbox')?.addEventListener('click',async()=>{
-        try{if(d.mailbox?.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}
+      document.getElementById('copyForwardingAddress')?.addEventListener('click',async()=>{
+        const input=document.getElementById('forwardingAddress'),value=input?.value||'';if(!value)return;
+        try{await navigator.clipboard.writeText(value);alert('Forwarding address copied.');}
+        catch{input?.select();document.execCommand?.('copy');alert('Forwarding address copied.');}
       });
-      document.getElementById('disconnectMailbox')?.addEventListener('click',async()=>{
-        if(!confirm('Disconnect this personal mailbox and remove its imported dashboard copies?'))return;
-        try{await json('/api/email/mailbox',{method:'DELETE'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}
-      });
+      document.getElementById('refreshForwardedInbox')?.addEventListener('click',async()=>{emailInboxSeen.clear();await email();});
       document.getElementById('requestEmailCode')?.addEventListener('click',async()=>{try{await json('/api/email/verification/request',{method:'POST',body:'{}'});alert('Verification code sent. It expires in 10 minutes.');}catch(e){alert(e.message);}});
       document.getElementById('confirmEmailForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/email/verification/confirm',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await email();}catch(err){alert(err.message);}});
       host.querySelectorAll('[data-inbox-action]').forEach(btn=>btn.addEventListener('click',async()=>{
         const action=btn.dataset.inboxAction,id=btn.dataset.id;if(action==='open'){if(btn.dataset.tab)window.switchTab?.(btn.dataset.tab);return;}
-        if(action==='delete'){if(!confirm('Delete this dashboard inbox item? The original provider email or Little Feet record will stay in its source system.'))return;await json('/api/email/inbox/'+encodeURIComponent(id),{method:'DELETE'});}
+        if(action==='delete'){if(!confirm('Delete this dashboard inbox item? The original email or Little Feet record will stay in its source system.'))return;await json('/api/email/inbox/'+encodeURIComponent(id),{method:'DELETE'});}
         else {const item=inbox.find(x=>x.id===id);await json('/api/email/inbox/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(action==='read'?{read:!item.read}:{pinned:!item.pinned})});}
         await email();
       }));
-      document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all dashboard inbox copies? Original provider emails and Little Feet records will stay in their source systems.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
+      document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all dashboard inbox copies? Original forwarded emails and Little Feet records will stay in their source systems.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
     }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
   let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(()=>{if(user()?.username&&!document.hidden)email();},30000);};
