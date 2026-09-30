@@ -57,15 +57,16 @@
       return `<div class="workspace-card"><h3>Your personal mailbox</h3><p><strong>${esc(mailboxProviderName(mailbox.provider))}</strong><br>${esc(mailbox.address||'')}</p><p><strong>Status:</strong> ${esc(status)}</p><p><strong>Connection:</strong> Secure provider sign-in</p><p><strong>Last sync:</strong> ${esc(last)}</p><p class="meta">Only this Little Feet user can see this connected mailbox. OAuth tokens stay encrypted on the server.</p>${syncError?`<p class="meta" style="color:#fca5a5;">${esc(syncError)}</p>`:''}<div class="actions"><button id="syncMailboxNow" class="action-btn btn-green" type="button">Sync now</button><button id="disconnectMailbox" class="action-btn btn-red" type="button">Disconnect mailbox</button></div></div>`;
     }
 
+    const providerButton=(available,href,label)=>available
+      ? `<a class="action-btn btn-blue" href="${href}">${label}</a>`
+      : `<button class="action-btn" type="button" disabled title="Little Feet provider setup is still required">${label} · setup required</button>`;
     const buttons=[
-      providers.google?`<a class="action-btn btn-blue" href="/auth/email/google">Connect Gmail</a>`:'',
-      providers.microsoft?`<a class="action-btn btn-blue" href="/auth/email/microsoft">Connect Outlook / Microsoft 365</a>`:'',
-      providers.zoho?`<a class="action-btn btn-blue" href="/auth/email/zoho">Connect Zoho Mail</a>`:'',
-      providers.yahoo?`<a class="action-btn btn-blue" href="/auth/email/yahoo">Connect Yahoo Mail</a>`:''
-    ].filter(Boolean).join('');
-    const providerHelp=buttons
-      ? '<p class="meta">Choose your provider, sign in on its own secure page, approve read access, and Little Feet will return you here automatically.</p>'
-      : '<p class="meta">Mailbox sign-in is temporarily unavailable because the provider connection has not been enabled on this Little Feet server.</p>';
+      providerButton(providers.google,'/auth/email/google','Connect Gmail'),
+      providerButton(providers.microsoft,'/auth/email/microsoft','Connect Outlook / Microsoft 365'),
+      providerButton(providers.zoho,'/auth/email/zoho','Connect Zoho Mail'),
+      providerButton(providers.yahoo,'/auth/email/yahoo','Connect Yahoo Mail')
+    ].join('');
+    const providerHelp='<p class="meta">Choose your provider, sign in on its own secure page, approve read access, and Little Feet will return you here automatically. If a provider says setup required, Little Feet still needs that provider\'s OAuth application credentials configured once on the server.</p>';
 
     return `<div class="workspace-card"><h3>Connect your personal mailbox</h3><p>Choose your email provider. Little Feet will send you to the provider\'s secure sign-in page; your email password is never entered into Little Feet.</p><div class="actions" style="margin-bottom:10px;">${buttons}</div>${providerHelp}</div>`;
   };
