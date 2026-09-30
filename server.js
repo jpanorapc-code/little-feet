@@ -10,7 +10,7 @@ const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
-const { fetchGmailMessages, fetchMicrosoftMessages, fetchImapMessages } = require('./lib/mailbox-integration');
+const { fetchGmailMessages, fetchMicrosoftMessages, fetchZohoMessages, zohoMailBaseForLocation, fetchImapMessages } = require('./lib/mailbox-integration');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
@@ -1585,6 +1585,7 @@ app.post('/api/signup', (req, res) => {
 const publicMailboxConnection = connection => connection ? {
   connected: true,
   provider: String(connection.provider || ''),
+  authMode: connection.authMode === 'imap' ? 'imap' : 'oauth',
   address: String(connection.address || ''),
   connectedAt: connection.connectedAt || null,
   lastSyncAt: connection.lastSyncAt || null,
@@ -3533,19 +3534,38 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
 };
 
 const MAILBOX_IMAP_PROVIDERS = Object.freeze({
-  zoho: { label: 'Zoho Mail', hosts: ['imappro.zoho.com', 'imap.zoho.com'], port: 993 },
-  yahoo: { label: 'Yahoo Mail', hosts: ['imap.mail.yahoo.com'], port: 993 }
+  zoho: { label: 'Zoho Mail', port: 993 },
+  yahoo: { label: 'Yahoo Mail', host: 'imap.mail.yahoo.com', port: 993 }
 });
+const ZOHO_IMAP_HOST_PATTERN = /^imap(?:pro)?\.zoho\.(?:com|eu|in|jp|com\.au|com\.cn|ae|sa)$/i;
 const GOOGLE_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/google/callback';
 const MICROSOFT_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/microsoft/callback';
+const ZOHO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/zoho/callback';
+const YAHOO_MAILBOX_CALLBACK_URL = 'https://littlefeet.co.za/auth/email/yahoo/callback';
 const GOOGLE_MAILBOX_SCOPE = 'openid email https://www.googleapis.com/auth/gmail.readonly';
 const MICROSOFT_MAILBOX_SCOPE = 'openid profile email offline_access User.Read Mail.Read';
+const ZOHO_MAILBOX_SCOPE = 'ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ';
+const YAHOO_MAILBOX_SCOPE = 'openid profile email mail-r';
+const ZOHO_ACCOUNTS_SERVERS = Object.freeze({
+  us: 'https://accounts.zoho.com',
+  com: 'https://accounts.zoho.com',
+  eu: 'https://accounts.zoho.eu',
+  in: 'https://accounts.zoho.in',
+  au: 'https://accounts.zoho.com.au',
+  jp: 'https://accounts.zoho.jp',
+  ca: 'https://accounts.zohocloud.ca',
+  cn: 'https://accounts.zoho.com.cn',
+  ae: 'https://accounts.zoho.ae',
+  sa: 'https://accounts.zoho.sa'
+});
+const mailboxOauthFlag = name => String(process.env[name] || '').trim() === '1';
 
 const mailboxProviderAvailability = () => ({
-  google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-  microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
-  zoho: true,
-  yahoo: true
+  google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && mailboxOauthFlag('GOOGLE_MAILBOX_OAUTH_ENABLED')),
+  microsoft: Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && mailboxOauthFlag('MICROSOFT_MAILBOX_OAUTH_ENABLED')),
+  zoho: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET && mailboxOauthFlag('ZOHO_MAILBOX_OAUTH_ENABLED')),
+  yahoo: Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET && mailboxOauthFlag('YAHOO_MAILBOX_OAUTH_ENABLED')),
+  advancedImap: true
 });
 
 const mailboxOwnerByAddress = (address, exceptAccount = null) =>
@@ -3646,6 +3666,60 @@ const refreshMicrosoftMailboxAccess = async actor => {
   return tokens.access_token;
 };
 
+
+const refreshZohoMailboxAccess = async actor => {
+  const connection = actor.mailboxConnection;
+  if (!connection || connection.provider !== 'zoho' || connection.authMode !== 'oauth') throw new Error('Zoho Mail is not connected with OAuth.');
+  const existingAccess = mailboxSecret(connection.accessTokenEncrypted);
+  if (existingAccess && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return existingAccess;
+  const refreshToken = mailboxSecret(connection.refreshTokenEncrypted);
+  const accountsServer = Object.values(ZOHO_ACCOUNTS_SERVERS).includes(connection.accountsServer) ? connection.accountsServer : '';
+  if (!refreshToken || !accountsServer) throw new Error('Reconnect Zoho Mail to renew mailbox permission.');
+  const response = await fetch(accountsServer + '/oauth/v2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.ZOHO_CLIENT_ID || '',
+      client_secret: process.env.ZOHO_CLIENT_SECRET || '',
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken
+    })
+  });
+  const tokens = await response.json().catch(() => ({}));
+  if (!response.ok || !tokens.access_token) throw new Error('Zoho Mail permission needs to be reconnected.');
+  connection.accessTokenEncrypted = storeMailboxSecret(tokens.access_token);
+  connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000;
+  if (tokens.refresh_token) connection.refreshTokenEncrypted = storeMailboxSecret(tokens.refresh_token);
+  return tokens.access_token;
+};
+
+const refreshYahooMailboxAccess = async actor => {
+  const connection = actor.mailboxConnection;
+  if (!connection || connection.provider !== 'yahoo' || connection.authMode !== 'oauth') throw new Error('Yahoo Mail is not connected with OAuth.');
+  const existingAccess = mailboxSecret(connection.accessTokenEncrypted);
+  if (existingAccess && Number(connection.accessTokenExpiresAt || 0) > Date.now() + 60_000) return existingAccess;
+  const refreshToken = mailboxSecret(connection.refreshTokenEncrypted);
+  if (!refreshToken) throw new Error('Reconnect Yahoo Mail to renew mailbox permission.');
+  const response = await fetch('https://api.login.yahoo.com/oauth2/get_token', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Basic ' + Buffer.from(String(process.env.YAHOO_CLIENT_ID || '') + ':' + String(process.env.YAHOO_CLIENT_SECRET || '')).toString('base64'),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      redirect_uri: YAHOO_MAILBOX_CALLBACK_URL
+    })
+  });
+  const tokens = await response.json().catch(() => ({}));
+  if (!response.ok || !tokens.access_token) throw new Error('Yahoo Mail permission needs to be reconnected.');
+  connection.accessTokenEncrypted = storeMailboxSecret(tokens.access_token);
+  connection.accessTokenExpiresAt = Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000;
+  if (tokens.refresh_token) connection.refreshTokenEncrypted = storeMailboxSecret(tokens.refresh_token);
+  return tokens.access_token;
+};
+
 const fetchMailboxMessagesForActor = async (actor, limit = 30) => {
   const connection = actor.mailboxConnection;
   if (!connection) return [];
@@ -3656,6 +3730,25 @@ const fetchMailboxMessagesForActor = async (actor, limit = 30) => {
   if (connection.provider === 'microsoft') {
     const accessToken = await refreshMicrosoftMailboxAccess(actor);
     return fetchMicrosoftMessages({ accessToken, limit });
+  }
+  if (connection.provider === 'zoho' && connection.authMode === 'oauth') {
+    const accessToken = await refreshZohoMailboxAccess(actor);
+    return fetchZohoMessages({
+      accessToken,
+      mailApiBase: connection.mailApiBase,
+      address: connection.address,
+      limit
+    });
+  }
+  if (connection.provider === 'yahoo' && connection.authMode === 'oauth') {
+    const accessToken = await refreshYahooMailboxAccess(actor);
+    return fetchImapMessages({
+      host: 'imap.mail.yahoo.com',
+      port: 993,
+      address: connection.address,
+      accessToken,
+      limit
+    });
   }
   const provider = MAILBOX_IMAP_PROVIDERS[connection.provider];
   if (!provider) throw new Error('This mailbox provider is not supported.');
@@ -3689,7 +3782,7 @@ const syncMailboxForActor = async (actor, { limit = 30 } = {}) => {
   }
 };
 
-const connectImapMailboxForActor = async (actor, providerName, address, password) => {
+const connectImapMailboxForActor = async (actor, providerName, address, password, requestedHost) => {
   const provider = MAILBOX_IMAP_PROVIDERS[providerName];
   if (!provider) throw new Error('Choose Zoho Mail or Yahoo Mail.');
   const cleanAddress = boundedText(address, 254);
@@ -3698,21 +3791,18 @@ const connectImapMailboxForActor = async (actor, providerName, address, password
   if (mailboxOwnerByAddress(cleanAddress, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
 
   let selectedHost = '';
-  let messages = [];
-  let lastError = null;
-  for (const host of provider.hosts) {
-    try {
-      messages = await fetchImapMessages({ host, port: provider.port, address: cleanAddress, password, limit: 30 });
-      selectedHost = host;
-      break;
-    } catch (error) {
-      lastError = error;
+  if (providerName === 'yahoo') selectedHost = provider.host;
+  else {
+    selectedHost = String(requestedHost || '').trim().toLowerCase();
+    if (!ZOHO_IMAP_HOST_PATTERN.test(selectedHost)) {
+      throw new Error('Enter the exact Zoho IMAP server shown in your Zoho Server Configuration Details.');
     }
   }
-  if (!selectedHost) throw lastError || new Error('Unable to connect to the mailbox.');
+  const messages = await fetchImapMessages({ host: selectedHost, port: provider.port, address: cleanAddress, password, limit: 30 });
 
   actor.mailboxConnection = {
     provider: providerName,
+    authMode: 'imap',
     address: cleanAddress,
     imapHost: selectedHost,
     imapPort: provider.port,
@@ -3743,7 +3833,7 @@ app.post('/api/email/mailbox/imap/connect', async (req, res, next) => {
   if (!actor) return res.status(401).json({ message: 'Sign in to connect a mailbox.' });
   try {
     const provider = String(req.body?.provider || '').trim().toLowerCase();
-    const result = await connectImapMailboxForActor(actor, provider, req.body?.address, req.body?.appPassword);
+    const result = await connectImapMailboxForActor(actor, provider, req.body?.address, req.body?.appPassword, req.body?.imapHost);
     res.json({ success: true, ...result });
   } catch (error) {
     const message = error?.message || 'Unable to connect this mailbox.';
@@ -3831,6 +3921,7 @@ app.get('/auth/email/google/callback', async (req, res) => {
     const previousRefresh = actor.mailboxConnection?.provider === 'google' ? actor.mailboxConnection.refreshTokenEncrypted : '';
     actor.mailboxConnection = {
       provider: 'google',
+      authMode: 'oauth',
       address,
       accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
       refreshTokenEncrypted: tokens.refresh_token ? storeMailboxSecret(tokens.refresh_token) : previousRefresh,
@@ -3913,6 +4004,7 @@ app.get('/auth/email/microsoft/callback', async (req, res) => {
 
     actor.mailboxConnection = {
       provider: 'microsoft',
+      authMode: 'oauth',
       address,
       accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
       refreshTokenEncrypted: storeMailboxSecret(tokens.refresh_token || ''),
@@ -3933,6 +4025,169 @@ app.get('/auth/email/microsoft/callback', async (req, res) => {
   }
 });
 
+
+
+app.get('/auth/email/zoho', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.redirect('/?mailboxError=sign-in-required');
+  if (!mailboxProviderAvailability().zoho) return res.redirect('/?mailboxError=zoho-not-configured');
+  const state = crypto.randomBytes(24).toString('hex');
+  req.session.mailboxZohoOAuthState = state;
+  req.session.mailboxOAuthUsername = actor.username;
+  const url = new URL('https://accounts.zoho.com/oauth/v2/auth');
+  url.search = new URLSearchParams({
+    response_type: 'code',
+    client_id: process.env.ZOHO_CLIENT_ID,
+    scope: ZOHO_MAILBOX_SCOPE,
+    redirect_uri: ZOHO_MAILBOX_CALLBACK_URL,
+    access_type: 'offline',
+    prompt: 'consent',
+    state
+  }).toString();
+  res.redirect(url.toString());
+});
+
+app.get('/auth/email/zoho/callback', async (req, res) => {
+  const actor = getSessionAccount(req);
+  const expectedState = req.session?.mailboxZohoOAuthState;
+  const expectedUsername = req.session?.mailboxOAuthUsername;
+  delete req.session.mailboxZohoOAuthState;
+  delete req.session.mailboxOAuthUsername;
+  if (!actor || !expectedState || req.query.state !== expectedState || normalizeUsername(actor.username) !== normalizeUsername(expectedUsername) || req.query.error || !req.query.code) {
+    return res.redirect('/?mailboxError=zoho-connect-failed');
+  }
+  try {
+    const location = String(req.query.location || '').trim().toLowerCase();
+    const accountsServer = ZOHO_ACCOUNTS_SERVERS[location] || '';
+    const mailApiBase = zohoMailBaseForLocation(location);
+    if (!accountsServer || !mailApiBase) throw new Error('Unsupported Zoho data centre.');
+    const reportedAccountsServer = String(req.query['accounts-server'] || '').replace(/\/+$/, '');
+    if (reportedAccountsServer && reportedAccountsServer !== accountsServer) throw new Error('Zoho data-centre response did not match the trusted server list.');
+
+    const tokenResponse = await fetch(accountsServer + '/oauth/v2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.ZOHO_CLIENT_ID || '',
+        client_secret: process.env.ZOHO_CLIENT_SECRET || '',
+        code: req.query.code,
+        grant_type: 'authorization_code',
+        redirect_uri: ZOHO_MAILBOX_CALLBACK_URL
+      })
+    });
+    const tokens = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token) throw new Error('Zoho mailbox token exchange failed.');
+
+    const accountResponse = await fetch(mailApiBase + '/api/accounts', {
+      headers: { Accept: 'application/json', Authorization: 'Zoho-oauthtoken ' + tokens.access_token }
+    });
+    const accountData = await accountResponse.json().catch(() => ({}));
+    const accounts = Array.isArray(accountData.data) ? accountData.data : [];
+    const mailbox = accounts.find(item => item?.type === 'ZOHO_ACCOUNT' && item?.enabled !== false) || accounts.find(item => item?.accountId);
+    const address = boundedText(mailbox?.primaryEmailAddress || mailbox?.mailboxAddress || mailbox?.incomingUserName || '', 254);
+    if (!accountResponse.ok || !looksLikeEmailAddress(address)) throw new Error('Zoho mailbox address could not be confirmed.');
+    if (mailboxOwnerByAddress(address, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
+
+    actor.mailboxConnection = {
+      provider: 'zoho',
+      authMode: 'oauth',
+      address,
+      accountsServer,
+      mailApiBase,
+      accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
+      refreshTokenEncrypted: storeMailboxSecret(tokens.refresh_token),
+      accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000,
+      connectedAt: new Date().toISOString(),
+      lastSyncAt: null,
+      lastSyncCount: 0,
+      lastSyncStatus: 'pending'
+    };
+    await syncMailboxForActor(actor);
+    await saveDatabaseState();
+    scheduleReplicaSnapshot();
+    res.redirect('/?mailboxConnected=zoho');
+  } catch (error) {
+    console.error('Zoho mailbox connection failed:', error.message);
+    res.redirect('/?mailboxError=zoho-connect-failed');
+  }
+});
+
+app.get('/auth/email/yahoo', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.redirect('/?mailboxError=sign-in-required');
+  if (!mailboxProviderAvailability().yahoo) return res.redirect('/?mailboxError=yahoo-not-configured');
+  const state = crypto.randomBytes(24).toString('hex');
+  const nonce = crypto.randomBytes(24).toString('base64url');
+  req.session.mailboxYahooOAuthState = state;
+  req.session.mailboxYahooNonce = nonce;
+  req.session.mailboxOAuthUsername = actor.username;
+  const url = new URL('https://api.login.yahoo.com/oauth2/request_auth');
+  url.search = new URLSearchParams({
+    client_id: process.env.YAHOO_CLIENT_ID,
+    redirect_uri: YAHOO_MAILBOX_CALLBACK_URL,
+    response_type: 'code',
+    scope: YAHOO_MAILBOX_SCOPE,
+    state,
+    nonce
+  }).toString();
+  res.redirect(url.toString());
+});
+
+app.get('/auth/email/yahoo/callback', async (req, res) => {
+  const actor = getSessionAccount(req);
+  const expectedState = req.session?.mailboxYahooOAuthState;
+  const expectedUsername = req.session?.mailboxOAuthUsername;
+  delete req.session.mailboxYahooOAuthState;
+  delete req.session.mailboxYahooNonce;
+  delete req.session.mailboxOAuthUsername;
+  if (!actor || !expectedState || req.query.state !== expectedState || normalizeUsername(actor.username) !== normalizeUsername(expectedUsername) || req.query.error || !req.query.code) {
+    return res.redirect('/?mailboxError=yahoo-connect-failed');
+  }
+  try {
+    const tokenResponse = await fetch('https://api.login.yahoo.com/oauth2/get_token', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(String(process.env.YAHOO_CLIENT_ID || '') + ':' + String(process.env.YAHOO_CLIENT_SECRET || '')).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: req.query.code,
+        redirect_uri: YAHOO_MAILBOX_CALLBACK_URL
+      })
+    });
+    const tokens = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token) throw new Error('Yahoo mailbox token exchange failed.');
+
+    const profileResponse = await fetch('https://api.login.yahoo.com/openid/v1/userinfo', {
+      headers: { Authorization: 'Bearer ' + tokens.access_token }
+    });
+    const profile = await profileResponse.json().catch(() => ({}));
+    const address = boundedText(profile.email, 254);
+    if (!profileResponse.ok || !looksLikeEmailAddress(address)) throw new Error('Yahoo mailbox address could not be confirmed.');
+    if (mailboxOwnerByAddress(address, actor)) throw new Error('That mailbox is already connected to another Little Feet account.');
+
+    actor.mailboxConnection = {
+      provider: 'yahoo',
+      authMode: 'oauth',
+      address,
+      accessTokenEncrypted: storeMailboxSecret(tokens.access_token),
+      refreshTokenEncrypted: storeMailboxSecret(tokens.refresh_token),
+      accessTokenExpiresAt: Date.now() + Math.max(60, Number(tokens.expires_in || 3600)) * 1000,
+      connectedAt: new Date().toISOString(),
+      lastSyncAt: null,
+      lastSyncCount: 0,
+      lastSyncStatus: 'pending'
+    };
+    await syncMailboxForActor(actor);
+    await saveDatabaseState();
+    scheduleReplicaSnapshot();
+    res.redirect('/?mailboxConnected=yahoo');
+  } catch (error) {
+    console.error('Yahoo mailbox connection failed:', error.message);
+    res.redirect('/?mailboxError=yahoo-connect-failed');
+  }
+});
 
 const emailActor = req => getSessionAccount(req);
 app.get('/api/email/status',(req,res)=>{
