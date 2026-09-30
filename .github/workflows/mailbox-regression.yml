@@ -1,4 +1,4 @@
-name: Mailbox Regression
+name: Inbound Email Regression
 
 on:
   push:
@@ -34,9 +34,9 @@ jobs:
         run: npm ci
       - name: Check server syntax
         run: node --check server.js
-      - name: Check mailbox frontend syntax
+      - name: Check email integration frontend syntax
         run: node --check assets/workplace-extended.js
-      - name: Run mailbox provider regression
+      - name: Run inbound forwarding regression
         run: node tests/mailbox-integration.test.js
       - name: Run web quality regression
         run: node tests/web-quality.test.js
