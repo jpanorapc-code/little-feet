@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v30-email-forwarding';
+const CACHE_NAME = 'little-feet-shell-v31-mailbox-sync';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',

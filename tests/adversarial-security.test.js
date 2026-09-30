@@ -19,6 +19,8 @@ for (const file of ['server.js','finance-automation-server.js','auth-crypto.js',
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
+fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
 fs.mkdirSync(path.join(temp, 'assets'), { recursive: true });
 for (const file of ['mobile-pwa.js','curriculum-frameworks.js','education-stages.js','finance-automation.js']) {
   fs.copyFileSync(path.join(root, 'assets', file), path.join(temp, 'assets', file));

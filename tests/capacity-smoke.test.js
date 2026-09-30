@@ -27,6 +27,8 @@ fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory,
 fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temporaryDirectory, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temporaryDirectory, 'lib', 'mailbox-integration.js'));
+fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temporaryDirectory, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temporaryDirectory, 'lib', 'mailbox-oauth.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({ schools, users, students, learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {} }));
 
 const child = spawn(process.execPath, ['server.js'], { cwd: temporaryDirectory, env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test' }, stdio: ['ignore', 'ignore', 'pipe'] });

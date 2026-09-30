@@ -11,7 +11,7 @@ This report distinguishes tested evidence from external work that still requires
 ## Current launch-readiness decision
 
 - **VERIFIED:** local application regression, role authorization, tenant isolation, restart persistence, bounded imports, private-file lifecycle, browser runtime, responsive layout, dependency audit, secret-history scan, capacity smoke testing, production Cloudflare R2 configuration, a live private upload/retrieval, the one-account owner cutover, an isolated coordinated PostgreSQL + R2 recovery rehearsal, scheduled production monitoring, GitHub CI for the deployed audit head, and observed Render deployment health.
-- **UNVERIFIED:** production SMTP delivery was configured by the owner but was not independently resent during this continuation; complete Google/Microsoft OAuth login, production PostgreSQL query plans, browser streaming of very large XLSX files, and manual testing on representative physical devices remain unverified.
+- **UNVERIFIED:** production SMTP delivery was configured by the owner but was not independently resent during this continuation; live Google/Microsoft sign-in and mailbox authorization, production PostgreSQL query plans, browser streaming of very large XLSX files, and manual testing on representative physical devices remain unverified.
 - **BLOCKED / NOT APPLICABLE:** no SMS provider or automatic payment provider is configured, so live SMS and payment-webhook delivery cannot be validated. Independent penetration testing, POPIA operational review, and representative physical-device testing require external people or devices.
 - **FAILED:** none in the final local suite recorded below.
 
@@ -118,8 +118,10 @@ The browser still parses XLSX files locally with SheetJS before batching. Very l
 - Import request sizes, persistent job history, and rejected-row samples are bounded.
 - The existing PostgreSQL indexes on school and collection ownership were retained.
 - The production PostgreSQL session pool is now capped at six connections and defaults to five. This keeps two briefly overlapping Render instances below the provider's 15-client session-mode limit during rolling deployments and leaves capacity for the isolated recovery job.
+- The Email workspace now supports real read-only Google Gmail and Microsoft Outlook mailbox connections. OAuth authorization uses state plus PKCE, renewable provider tokens are encrypted with the server field-encryption key, connections are owned by the exact signed-in Little Feet user, and provider message IDs prevent duplicates. The first request imports 100 inbox messages by default. Each later check imports up to 50 newest messages plus one bounded 50-message backlog page until the current inbox has been covered. While the Email workspace is open, it checks every 60 seconds. Existing provider forwarding remains available for Zoho, Yahoo, and other providers without a supported mailbox API.
+- Provider HTTP exchanges, Gmail/Graph response conversion, refresh-token handling, UI/server route wiring, inbox deduplication rules, and token redaction were covered by automated regression checks. **Live authorization remains UNVERIFIED** until the production Google project enables Gmail API with the `gmail.readonly` consent scope and the production Microsoft app enables delegated `Mail.Read` plus `offline_access`; both applications must register the callback URLs documented in `.env.example`.
 
-Capacity smoke result: 1,500 school tenants, two 1,000-learner schools, and 500 sustained requests at up to 90 concurrent connections passed in 5,381 ms on the final local test host. This is a smoke measurement, not a production load guarantee.
+Capacity smoke result: 1,500 school tenants, two 1,000-learner schools, and 500 sustained requests at up to 90 concurrent connections passed in 5,010 ms on the final local test host. This is a smoke measurement, not a production load guarantee.
 
 The Render service now uses the 0.5 CPU / 512 MiB paid instance selected by the owner. Production capacity remains subject to real traffic and provider limits.
 
@@ -151,7 +153,7 @@ Production monitoring is also **VERIFIED**: `.github/workflows/production-monito
 
 ## Tests executed from the final local code state
 
-- `npm test`: passed all 22 scripted regression stages, including route connections, authentication migration, inbound email forwarding, tenant isolation, security, replica restore, one-time owner reset, storage lifecycle, imports, cinematic navigation, web quality, adversarial entry points, authorization matrix, Render metadata, finance, preferences, and legal notices.
+- `npm test`: passed all 24 scripted regression stages, including route connections, authentication migration, OAuth identity matching, inbound email forwarding, mailbox OAuth/provider conversion, tenant isolation, security, replica restore, one-time owner reset, storage lifecycle, imports, cinematic navigation, web quality, adversarial entry points, authorization matrix, Render metadata, finance, preferences, and legal notices.
 - Owner-account migration: two prior accounts were replaced with one administrator, both prior credentials were rejected, the new credential authenticated, and restart/idempotency behavior passed using test-only credentials.
 - Subscription activation: signed payment notification, Basic-to-Plus activation, existing-session refresh, 30-day access date, duplicate provider-event protection, tenant isolation, school-plan activation, and paid-status display passed.
 - Private storage lifecycle: upload, validate, persist, retrieve, cross-tenant denial, replace, old-object denial, restart persistence, staff-account cleanup, related-post cleanup, and malicious filename handling passed.
@@ -169,7 +171,7 @@ CI status: the final branch must pass GitHub `verify` before merge; the result w
 ## Manual and external validation still required
 
 1. Inspect representative production PostgreSQL query plans under controlled load.
-2. Independently revalidate SMTP delivery and complete Google/Microsoft OAuth login with real provider accounts. No SMS provider exists to test.
+2. Independently revalidate SMTP delivery, register both mailbox callback URLs, approve the documented read-only mailbox scopes, and complete Google/Microsoft sign-in and mailbox authorization with real provider accounts. No SMS provider exists to test.
 3. Validate a signed payment webhook only after an automatic payment provider is selected and configured. The tested administrator-reconciled bank-transfer path remains available.
 4. Test representative physical Android, iOS, tablet, desktop, and accessibility-assistive devices.
 5. Run independent security review/penetration testing and confirm POPIA operational procedures with the responsible organization.
