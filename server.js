@@ -2120,6 +2120,20 @@ const runAdminSelfTest = async actor => {
   }
   addCheck('public.secret_boundary', findings.some(item => item.check === 'public.secret_boundary') ? 'failed' : 'passed', `${publicScanned} public source files scanned for server-only secrets and database URLs.`);
 
+  try {
+    const { auditRouteConnections } = require('./scripts/audit-route-connections');
+    const routeAudit = auditRouteConnections(__dirname);
+    const hasBrokenRoute = routeAudit.unmatched.length > 0;
+    addCheck('frontend.route_connections', hasBrokenRoute ? 'failed' : 'passed', String(routeAudit.calls.length) + ' literal frontend API call(s) checked against ' + String(routeAudit.routes.length) + ' registered API route(s).');
+    for (const call of routeAudit.unmatched.slice(0, 100)) {
+      addFinding('error', 'routing', 'frontend.route_connections', 'No matching server route for ' + call.method + ' ' + call.route + '.', 'The deployed frontend contains an API call that does not match any registered server endpoint, so that action can fail at runtime.', call.file, call.line || null, null, 'Restore the matching server route or correct the frontend API path/method.');
+    }
+  } catch (error) {
+    const location = errorSourceLocation(error);
+    addCheck('frontend.route_connections', 'failed', 'The deployed frontend/server route audit could not run.');
+    addFinding('error', 'routing', 'frontend.route_connections', 'The API route connection audit could not complete.', redactSensitiveLogText(error.message), location.source, location.line, location.column, 'Verify scripts/audit-route-connections.js is present and readable in the deployed build.');
+  }
+
   const runtimeSourceFiles = ['server.js', 'finance-automation-server.js', 'backup.js', ...publicFiles.filter(name => name.startsWith('assets/'))];
   const executionRules = [
     { pattern: /\beval\s*\(/, severity: 'error', category: 'security', check: 'source.dynamic_code_execution', issue: 'eval() is present in deployed application source.', why: 'eval() can execute strings as code and expands the impact of injection bugs.', recommendation: 'Replace eval() with explicit parsing or normal function calls.' },
@@ -2133,7 +2147,7 @@ const runAdminSelfTest = async actor => {
   }
   addCheck('source.dynamic_code_execution', findings.some(item => item.check === 'source.dynamic_code_execution') ? 'failed' : 'passed', 'Deployed first-party JavaScript checked for eval() and new Function().');
 
-  for (const relative of ['server.js', 'finance-automation-server.js']) {
+  for (const relative of [...new Set(runtimeSourceFiles)]) {
     try {
       const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
       const bypassRules = [{
@@ -2146,7 +2160,7 @@ const runAdminSelfTest = async actor => {
       findings.push(...scanSourceMatches(relative, content, bypassRules));
     } catch {}
   }
-  addCheck('logging.centralization', findings.some(item => item.check === 'logging.centralization') ? 'attention' : 'passed', 'Server runtime source checked for direct console logging bypasses.');
+  addCheck('logging.centralization', findings.some(item => item.check === 'logging.centralization') ? 'attention' : 'passed', 'First-party server and browser runtime source checked for direct console logging bypasses.');
 
   const visibleErrors = (db.systemErrors || []).filter(entry => systemErrorVisibleTo(entry, actor) && entry.status === 'open');
   addCheck('faults.open', visibleErrors.length ? 'attention' : 'passed', visibleErrors.length ? `${visibleErrors.length} unresolved persistent fault(s) exist.` : 'No unresolved persistent faults.');
