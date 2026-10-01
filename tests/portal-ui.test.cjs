@@ -143,7 +143,7 @@ async function main() {
         '/api/purchase-requests',
         '/api/staff/qualifications'
       ];
-      const sessionOwnedEndpoints = [...summaryEndpoints, '/api/accounts', '/api/approvals', '/api/staff/meetings'];
+      const sessionOwnedEndpoints = [...summaryEndpoints, '/api/accounts', '/api/approvals', '/api/staff/meetings', '/api/executive-overview'];
 
       // Reproduce the production failure mode: restore an already-authenticated session
       // during page load, when old delayed window.load initializers used to stack.
@@ -154,6 +154,9 @@ async function main() {
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.locator('#dashboardSection').waitFor({ state: 'visible' });
       await page.waitForTimeout(1200);
+      await page.locator('#executiveHomeOverview').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#executiveHomeOverview [data-executive-chart]').count(), 4, 'Executive Home should render four live chart cards');
+      assert.ok((apiRequestCounts.get('/api/executive-overview') || 0) <= 1, `Executive Home overview should use one aggregate request, saw ${apiRequestCounts.get('/api/executive-overview') || 0}`);
 
       for (const endpoint of summaryEndpoints) {
         const count = apiRequestCounts.get(endpoint) || 0;
