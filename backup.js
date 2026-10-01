@@ -58,6 +58,8 @@ let inspectServerFaults = [];
 let inspectDiagnostics = null;
 let inspectSelfTestResult = null;
 let inspectAutoRefreshTimer = null;
+let inspectRefreshPromise = null;
+const INSPECT_AUTO_REFRESH_MS = 60 * 1000;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
 let learnerCodeExportRows = [];
@@ -1187,34 +1189,51 @@ function renderInspectDashboard() {
   }
 }
 
-async function loadInspectDashboard({ silent = false } = {}) {
-  if (!canUseInspectDashboard() || !document.getElementById('inspectTab')) return;
-  const statusNode = document.getElementById('inspectGeneratedAt');
-  if (!silent && statusNode) statusNode.textContent = 'Refreshing…';
+async function loadInspectDashboard({ silent = false, automatic = false } = {}) {
+  if (!canUseInspectDashboard() || !document.getElementById('inspectTab')) return false;
+  if (automatic && document.hidden) return false;
+  if (inspectRefreshPromise) return inspectRefreshPromise;
+
+  const refreshJob = (async () => {
+    if (automatic && !await ensureAuthenticatedSession()) return false;
+    const expectedUsername = currentUser?.username || '';
+    const statusNode = document.getElementById('inspectGeneratedAt');
+    if (!silent && statusNode) statusNode.textContent = 'Refreshing…';
+    try {
+      const [logsResponse, diagnosticsResponse, errorsResponse] = await Promise.all([
+        fetch(`/api/system-logs?${inspectFilterParams().toString()}`),
+        fetch('/api/system-diagnostics'),
+        fetch('/api/system-errors')
+      ]);
+      const [logsPayload, diagnosticsPayload, errorsPayload] = await Promise.all([
+        logsResponse.json().catch(() => ({})),
+        diagnosticsResponse.json().catch(() => ({})),
+        errorsResponse.json().catch(() => [])
+      ]);
+      if (!logsResponse.ok) throw new Error(logsPayload.message || 'Unable to load structured logs.');
+      if (!diagnosticsResponse.ok) throw new Error(diagnosticsPayload.message || 'Unable to load diagnostics.');
+      if (!errorsResponse.ok) throw new Error(errorsPayload?.message || 'Unable to load persistent faults.');
+      if (!currentUser || currentUser.username !== expectedUsername) return false;
+      inspectStructuredLogPayload = logsPayload;
+      inspectDiagnostics = diagnosticsPayload;
+      inspectServerFaults = Array.isArray(errorsPayload) ? errorsPayload : [];
+      latestServerDiagnostics = inspectDiagnostics;
+      latestServerErrors = inspectServerFaults;
+      renderInspectDashboard();
+      return true;
+    } catch (error) {
+      if (statusNode) statusNode.textContent = 'Refresh failed';
+      const rows = document.getElementById('inspectLogRows');
+      if (rows) rows.innerHTML = `<tr><td colspan="9">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load the logging dashboard.'))}</td></tr>`;
+      return false;
+    }
+  })();
+
+  inspectRefreshPromise = refreshJob;
   try {
-    const [logsResponse, diagnosticsResponse, errorsResponse] = await Promise.all([
-      fetch(`/api/system-logs?${inspectFilterParams().toString()}`),
-      fetch('/api/system-diagnostics'),
-      fetch('/api/system-errors')
-    ]);
-    const [logsPayload, diagnosticsPayload, errorsPayload] = await Promise.all([
-      logsResponse.json().catch(() => ({})),
-      diagnosticsResponse.json().catch(() => ({})),
-      errorsResponse.json().catch(() => [])
-    ]);
-    if (!logsResponse.ok) throw new Error(logsPayload.message || 'Unable to load structured logs.');
-    if (!diagnosticsResponse.ok) throw new Error(diagnosticsPayload.message || 'Unable to load diagnostics.');
-    if (!errorsResponse.ok) throw new Error(errorsPayload?.message || 'Unable to load persistent faults.');
-    inspectStructuredLogPayload = logsPayload;
-    inspectDiagnostics = diagnosticsPayload;
-    inspectServerFaults = Array.isArray(errorsPayload) ? errorsPayload : [];
-    latestServerDiagnostics = inspectDiagnostics;
-    latestServerErrors = inspectServerFaults;
-    renderInspectDashboard();
-  } catch (error) {
-    if (statusNode) statusNode.textContent = 'Refresh failed';
-    const rows = document.getElementById('inspectLogRows');
-    if (rows) rows.innerHTML = `<tr><td colspan="9">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load the logging dashboard.'))}</td></tr>`;
+    return await refreshJob;
+  } finally {
+    if (inspectRefreshPromise === refreshJob) inspectRefreshPromise = null;
   }
 }
 
@@ -1235,10 +1254,11 @@ function toggleInspectAutoRefresh() {
     return;
   }
   inspectAutoRefreshTimer = window.setInterval(() => {
-    if (currentUser && document.getElementById('inspectTab')?.classList.contains('active')) loadInspectDashboard({ silent: true });
-  }, 15000);
-  if (button) button.textContent = 'Auto-refresh: 15s';
-  loadInspectDashboard({ silent: true });
+    if (!currentUser || document.hidden || !document.getElementById('inspectTab')?.classList.contains('active') || inspectRefreshPromise) return;
+    void loadInspectDashboard({ silent: true, automatic: true });
+  }, INSPECT_AUTO_REFRESH_MS);
+  if (button) button.textContent = 'Auto-refresh: 60s';
+  void loadInspectDashboard({ silent: true, automatic: true });
 }
 
 async function inspectTraceRequest(encodedRequestId) {
