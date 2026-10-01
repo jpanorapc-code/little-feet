@@ -999,7 +999,9 @@ app.use('/api', (req, res, next) => {
     .digest('hex');
   const now = Date.now();
   const previous = recentPostFingerprints.get(fingerprint);
-  if (previous && now - previous.startedAt < DUPLICATE_POST_WINDOW_MS) {
+  const duplicateStillActive = previous && !previous.completedAt && now - previous.startedAt < 60 * 1000;
+  const duplicateRecentlyCompleted = previous?.completedAt && now - previous.completedAt < DUPLICATE_POST_WINDOW_MS;
+  if (duplicateStillActive || duplicateRecentlyCompleted) {
     res.setHeader('Retry-After', '2');
     return res.status(409).json({
       message: 'This action is already being processed. Please wait a moment before trying again.',
@@ -1007,7 +1009,7 @@ app.use('/api', (req, res, next) => {
     });
   }
 
-  const entry = { startedAt: now };
+  const entry = { startedAt: now, completedAt: null };
   recentPostFingerprints.set(fingerprint, entry);
   res.on('finish', () => {
     if (recentPostFingerprints.get(fingerprint) !== entry) return;
@@ -1016,7 +1018,9 @@ app.use('/api', (req, res, next) => {
   });
 
   for (const [key, value] of recentPostFingerprints) {
-    if (now - value.startedAt >= DUPLICATE_POST_WINDOW_MS) recentPostFingerprints.delete(key);
+    const staleActive = !value.completedAt && now - value.startedAt >= 60 * 1000;
+    const staleCompleted = value.completedAt && now - value.completedAt >= DUPLICATE_POST_WINDOW_MS;
+    if (staleActive || staleCompleted) recentPostFingerprints.delete(key);
     if (recentPostFingerprints.size <= 5000) break;
   }
   while (recentPostFingerprints.size > 5000) {
