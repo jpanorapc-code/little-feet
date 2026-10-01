@@ -1809,15 +1809,32 @@ const learnerRecordsVisibleTo = (records, actor) => {
   }
   return schoolRecords;
 };
+const errorSourceLocation = error => {
+  const stack = String(error?.stack || '').split('\n').slice(1);
+  for (const frame of stack) {
+    const match = frame.match(/(?:\(|\s)([^()\s]+\.js):(\d+):(\d+)\)?/);
+    if (!match) continue;
+    const absolute = match[1].startsWith('file://') ? match[1].slice(7) : match[1];
+    const relative = path.relative(__dirname, absolute);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) continue;
+    return { source: relative.replaceAll('\\', '/'), line: Number(match[2]), column: Number(match[3]) };
+  }
+  return { source: '', line: null, column: null };
+};
+
 const recordSystemError = (error, req = null, extra = {}) => {
   if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
   const actor = req ? getSessionAccount(req) : null;
   const route = String(extra.route || req?.originalUrl || '').split('?')[0].slice(0, 240);
+  const location = extra.source
+    ? { source: boundedText(extra.source, 240), line: Number(extra.line) || null, column: Number(extra.column) || null }
+    : errorSourceLocation(error);
   const entry = {
     id: crypto.randomUUID(), requestId: req?.requestId || '', schoolId: actor ? accountSchoolId(actor) : '',
     method: String(req?.method || extra.method || 'SYSTEM').slice(0, 12),
     route,
     name: String(extra.name || error?.name || 'Error').slice(0, 80), message: redactSensitiveLogText(error?.message || 'Unknown server error'),
+    source: location.source, line: location.line, column: location.column,
     severity: extra.severity || 'error', status: 'open', createdAt: new Date().toISOString()
   };
   db.systemErrors.unshift(entry);
@@ -1834,6 +1851,9 @@ const recordSystemError = (error, req = null, extra = {}) => {
     status: Number(error?.status) || 500,
     result: 'fault_recorded',
     code: entry.name,
+    source: entry.source,
+    line: entry.line,
+    column: entry.column,
     message: entry.message
   });
   return entry;
@@ -1962,6 +1982,9 @@ app.post('/api/system/client-log', (req, res) => {
     route: page,
     result: 'reported',
     code,
+    source,
+    line,
+    column,
     message,
     details
   });
@@ -1978,7 +2001,7 @@ app.post('/api/system/client-log', (req, res) => {
     if (!duplicate) {
       const clientError = new Error(message);
       clientError.name = code;
-      recordSystemError(clientError, req, { severity: 'error', route: page, name: code });
+      recordSystemError(clientError, req, { severity: 'error', route: page, name: code, source, line, column });
     }
   }
   res.status(201).json({ success: true, logId: logged.id, requestId: req.requestId });
