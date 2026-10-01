@@ -1680,6 +1680,39 @@
     .guide-records-table th:nth-child(3), .guide-records-table td:nth-child(3) { width:59%; }
     .guide-records-table .guide-records-alt { background:rgba(45,212,191,.06); }
     .guide-records-note { margin:12px 0 0 !important; font-size:.82rem; line-height:1.5; }
+    #inspectTab .inspect-log-table { table-layout:auto; min-width:1220px !important; }
+    #inspectTab .inspect-log-table th:nth-child(1), #inspectTab .inspect-log-table td:nth-child(1) { width:160px; }
+    #inspectTab .inspect-log-table th:nth-child(2), #inspectTab .inspect-log-table td:nth-child(2) { width:104px; }
+    #inspectTab .inspect-log-table th:nth-child(3), #inspectTab .inspect-log-table td:nth-child(3) { width:240px; }
+    #inspectTab .inspect-log-table th:nth-child(4), #inspectTab .inspect-log-table td:nth-child(4) { width:190px; }
+    #inspectTab .inspect-log-table th:nth-child(5), #inspectTab .inspect-log-table td:nth-child(5) { width:250px; }
+    #inspectTab .inspect-log-table th:nth-child(6), #inspectTab .inspect-log-table td:nth-child(6) { width:82px; }
+    #inspectTab .inspect-log-table th:nth-child(7), #inspectTab .inspect-log-table td:nth-child(7) { width:100px; }
+    #inspectTab .inspect-log-table th:nth-child(8), #inspectTab .inspect-log-table td:nth-child(8) { width:120px; }
+    #inspectTab .inspect-log-table th:nth-child(9), #inspectTab .inspect-log-table td:nth-child(9) { width:136px; min-width:136px; }
+    #inspectTab .inspect-trace-button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:auto !important;
+      min-width:96px;
+      min-height:40px;
+      padding:8px 14px;
+      font-size:.90rem !important;
+      font-weight:800;
+      line-height:1.15;
+      white-space:nowrap !important;
+      overflow-wrap:normal !important;
+      word-break:keep-all !important;
+    }
+    #inspectTab .inspect-trace-id {
+      display:block;
+      margin-top:7px;
+      font-size:.80rem;
+      line-height:1.35;
+      white-space:nowrap;
+      color:var(--text-muted);
+    }
     #guideTab .guide-link-card { font-size:.92rem; }
     #guideTab .guide-link-card p { font-size:.90rem; line-height:1.55; }
     @media (max-width:760px) {
@@ -5952,6 +5985,7 @@
               <button type="button" id="inspectRunSiteTestButton" class="action-btn btn-green" onclick="runInspectSiteTest()">Run full site test</button>
               <button type="button" class="action-btn btn-blue" onclick="downloadInspectReport()">Download JSON report</button>
               <button type="button" class="action-btn btn-blue" onclick="openDebugReport()">Browser debug report</button>
+              <button type="button" id="inspectClearHistoryButton" class="action-btn btn-red" onclick="clearInspectHistory()">Clear Inspect history</button>
             </div>
           </section>
 
@@ -5982,7 +6016,7 @@
           <section class="workspace-card" style="margin-bottom:16px;">
             <div class="card-header-bar"><h3>Structured request &amp; event stream</h3><span id="inspectLogCount" class="meta">0 shown</span></div>
             <div style="overflow:auto;max-height:620px;">
-              <table class="guide-records-table" style="min-width:1050px;">
+              <table class="guide-records-table inspect-log-table">
                 <thead><tr><th>Time</th><th>Severity</th><th>Event</th><th>User / school</th><th>Request</th><th>Status</th><th>Duration</th><th>Result</th><th>Trace</th></tr></thead>
                 <tbody id="inspectLogRows"><tr><td colspan="9">Loading structured logs…</td></tr></tbody>
               </table>
@@ -6001,6 +6035,34 @@
         <div class="card">
           <div class="card-header-bar"><h2>🔐 Learner Code Register</h2><span class="badge-tag info">SCHOOL CONTROLLED</span></div>
           <p style="color:var(--text-muted);margin-bottom:12px;line-height:1.55;">Each printed handout carries a code tied to one learner. Administrators can issue, replace, or scrap an old code and review its status. Principals can print a prepared handout only.</p>
+          <div class="workspace-card" data-roles="admin" style="margin:0 0 14px;padding:14px;">
+            <div class="card-header-bar"><h3>Generate learner codes</h3><span class="badge-tag info">REAL LEARNER REGISTER</span></div>
+            <p style="color:var(--text-muted);line-height:1.55;margin:0 0 12px;">Generate or retrieve the real active Little Feet code for a learner already registered at this school. Existing active codes are reused instead of silently invalidating a printed family form.</p>
+            <div class="workspace-grid">
+              <label>Learner name<input id="learnerCodeGenerateName" list="learnerCodeNameOptions" maxlength="160" autocomplete="off" placeholder="Enter the learner name"></label>
+              <datalist id="learnerCodeNameOptions"></datalist>
+              <label>Grade / Class <span style="font-weight:normal;">(recommended for duplicate names)</span><input id="learnerCodeGenerateClass" maxlength="120" autocomplete="off" placeholder="e.g. Grade 3A"></label>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="action-btn btn-green" onclick="generateSingleLearnerCode()">Generate code &amp; add to export</button>
+              <button type="button" class="action-btn btn-blue" onclick="downloadStagedLearnerCodes('xlsx')">Download staged Excel</button>
+              <button type="button" class="action-btn btn-blue" onclick="downloadStagedLearnerCodes('csv')">Download staged CSV</button>
+              <button type="button" class="action-btn btn-red" onclick="clearStagedLearnerCodes()">Clear staged list</button>
+            </div>
+            <div id="learnerCodeGenerateResult" class="meta" style="margin-top:10px;">No code generated in this browser session yet.</div>
+            <div id="learnerCodeExportPreview" class="record-list" style="margin-top:10px;"></div>
+
+            <hr style="border:0;border-top:1px solid var(--border-color);margin:18px 0;">
+            <h3 style="margin-bottom:6px;">Mass generate from Excel / CSV</h3>
+            <p style="color:var(--text-muted);line-height:1.55;margin:0 0 10px;">Upload a file with a <strong>Learner Name</strong> column and, where needed, a <strong>Grade / Class</strong> column. Little Feet matches each row to the real school learner register, generates any missing secure codes, and writes the code beside the learner in the downloaded file. Unknown or ambiguous names are marked instead of being guessed.</p>
+            <input id="learnerCodeBulkFile" type="file" accept=".xlsx,.xls,.csv" aria-label="Upload learner names for access-code generation">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="action-btn btn-blue" onclick="downloadLearnerCodeGeneratorTemplate()">Download blank template</button>
+              <button type="button" class="action-btn btn-green" onclick="generateLearnerCodesFromSpreadsheet('xlsx')">Generate codes &amp; download Excel</button>
+              <button type="button" class="action-btn btn-blue" onclick="generateLearnerCodesFromSpreadsheet('csv')">Generate codes &amp; download CSV</button>
+            </div>
+            <div id="learnerCodeBulkStatus" class="meta" style="margin-top:10px;">No spreadsheet processed yet.</div>
+          </div>
           <div class="workspace-card" data-roles="admin" style="margin:0 0 14px;padding:12px;"><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;"><div><strong>Teacher-view check</strong><p class="meta" style="margin:4px 0 0;">Teachers see a learner and whether a school code is issued — never the code itself.</p></div><button type="button" class="action-btn btn-blue" onclick="toggleLearnerCodeTeacherPreview()">Preview teacher view</button></div><div id="learnerCodeTeacherPreview" class="record-list hidden" style="margin-top:12px;"></div></div>
           <label for="learnerCodeSearch" class="sr-only">Find a learner in the code register</label><input id="learnerCodeSearch" type="search" placeholder="Find a learner, class, or parent" oninput="renderLearnerAccessCodes()" style="margin:0 0 14px;">
           <div id="learnerCodeList" class="record-list"><p style="font-size:.84rem;color:var(--text-muted);">Loading learner code forms…</p></div>
@@ -6351,7 +6413,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261001-session-aware-polling-v1" defer></script>
+  <script src="backup.js?v=20261001-learner-code-tools-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20260930-user-switch-v2" defer></script>
   <script src="/assets/staff-work.js?v=20260930-accounts-full-v1" defer></script>

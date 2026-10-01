@@ -531,6 +531,45 @@ const login = async (username, pin, suppliedCookie = '') => {
     assert.equal(adminCodes.response.status, 200);
     assert.equal(adminCodes.data[0].accessCode, issuedCode);
 
+    const batchCodes = await request('/api/learner-access-codes/generate-batch', {
+      method: 'POST',
+      cookie: alphaAdmin.cookie,
+      originHeader: origin,
+      body: {
+        learners: [
+          { learnerName: 'Alpha Learner', className: 'Grade 1' },
+          { learnerName: 'Missing Learner', className: 'Grade 1' }
+        ]
+      }
+    });
+    assert.equal(batchCodes.response.status, 200);
+    assert.equal(batchCodes.data.results[0].status, 'existing');
+    assert.equal(batchCodes.data.results[0].accessCode, issuedCode);
+    assert.equal(batchCodes.data.results[1].status, 'not_found');
+    assert.equal(batchCodes.data.results[1].accessCode, undefined);
+
+    const repeatedBatchCodes = await request('/api/learner-access-codes/generate-batch', {
+      method: 'POST',
+      cookie: alphaAdmin.cookie,
+      originHeader: origin,
+      body: {
+        learners: [
+          { learnerName: 'Alpha Learner', className: 'Grade 1' },
+          { learnerName: 'Missing Learner', className: 'Grade 1' }
+        ]
+      }
+    });
+    assert.equal(repeatedBatchCodes.response.status, 200);
+    assert.equal(repeatedBatchCodes.data.results[0].accessCode, issuedCode);
+
+    const principalBatchCodes = await request('/api/learner-access-codes/generate-batch', {
+      method: 'POST',
+      cookie: alphaPrincipal.cookie,
+      originHeader: origin,
+      body: { learners: [{ learnerName: 'Alpha Learner', className: 'Grade 1' }] }
+    });
+    assert.equal(principalBatchCodes.response.status, 403);
+
     const principalCodes = await request('/api/learner-access-codes', { cookie: alphaPrincipal.cookie });
     assert.equal(principalCodes.response.status, 200);
     assert.equal(principalCodes.data[0].accessCode, null);
@@ -545,6 +584,25 @@ const login = async (username, pin, suppliedCookie = '') => {
 
     const parentCodes = await request('/api/learner-access-codes', { cookie: alphaParent.cookie });
     assert.equal(parentCodes.response.status, 403);
+
+    const principalInspectClear = await request('/api/system-inspect-history', {
+      method: 'DELETE',
+      cookie: alphaPrincipal.cookie,
+      originHeader: origin
+    });
+    assert.equal(principalInspectClear.response.status, 403);
+
+    const adminInspectClear = await request('/api/system-inspect-history', {
+      method: 'DELETE',
+      cookie: alphaAdmin.cookie,
+      originHeader: origin
+    });
+    assert.equal(adminInspectClear.response.status, 200);
+    assert.equal(adminInspectClear.data.success, true);
+
+    const codesAfterInspectClear = await request('/api/learner-access-codes', { cookie: alphaAdmin.cookie });
+    assert.equal(codesAfterInspectClear.response.status, 200);
+    assert.equal(codesAfterInspectClear.data[0].accessCode, issuedCode, 'Clearing Inspect history must not delete learner-code business records.');
 
     // 12. Signed webhook boundary: unsigned/forged bodies fail, valid bodies apply once,
     // and a replay is idempotent rather than duplicating money.

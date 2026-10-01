@@ -900,6 +900,7 @@ const db = {
   emailInbox: [],
   emailDismissals: [],
   accountMigrations: {},
+  diagnosticMigrations: {},
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
@@ -1043,6 +1044,7 @@ const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/finance/recurring-runs',
   '/api/finance/reconciliation/apply',
   '/api/students/import',
+  '/api/learner-access-codes/generate-batch',
   '/api/attendance/toggle'
 ]);
 const duplicatePostIsHandledByRoute = requestPath =>
@@ -1436,6 +1438,22 @@ function ensureBootstrapAdministrator() {
     createdAt: new Date().toISOString()
   });
 }
+const DIAGNOSTIC_HISTORY_RESET_ID = 'inspect-clean-slate-20261001-v1';
+function applyDiagnosticHistoryResetMigration() {
+  if (!db.diagnosticMigrations || typeof db.diagnosticMigrations !== 'object' || Array.isArray(db.diagnosticMigrations)) db.diagnosticMigrations = {};
+  if (db.diagnosticMigrations[DIAGNOSTIC_HISTORY_RESET_ID]) return false;
+  if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
+  const removedPersistentFaults = db.systemErrors.length;
+  const removedRuntimeLogs = structuredLogger.clear();
+  db.systemErrors = [];
+  db.diagnosticMigrations[DIAGNOSTIC_HISTORY_RESET_ID] = {
+    appliedAt: new Date().toISOString(),
+    removedPersistentFaults,
+    removedRuntimeLogs
+  };
+  return true;
+}
+
 function applyOwnerAccountMigration() {
   if (process.env.LF_OWNER_RESET_ALL_ACCOUNTS !== '1') return false;
   const migrationId = String(process.env.LF_OWNER_ACCOUNT_RESET_ID || '').trim().slice(0, 120);
@@ -1528,6 +1546,7 @@ async function initialisePersistence() {
   else openStateDatabase();
   const restoredFromDatabase = await loadDatabaseState();
   if (!restoredFromDatabase) loadReplicaSnapshot();
+  const diagnosticHistoryResetApplied = applyDiagnosticHistoryResetMigration();
   const ownerAccountResetApplied = applyOwnerAccountMigration();
   ensureBootstrapAdministrator();
   syncConfiguredPlatformOwnerAccess();
@@ -1538,6 +1557,13 @@ async function initialisePersistence() {
   syncCurrentReleaseNotes();
   await retryPendingStorageCleanup();
   await saveDatabaseState();
+  if (diagnosticHistoryResetApplied) {
+    logStructured('info', 'inspection.history_reset_applied', {
+      category: 'migration',
+      result: 'completed',
+      message: 'Previous Inspect diagnostic history was cleared for the centralized logging clean slate.'
+    });
+  }
   if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
   writeReplicaSnapshot();
 }
@@ -1948,6 +1974,51 @@ app.get('/api/system-logs', (req, res) => {
     oldestAt: visibleLogs[visibleLogs.length - 1]?.timestamp || null
   };
   res.json({ summary, logs: filtered, generatedAt: new Date().toISOString() });
+});
+
+app.delete('/api/system-inspect-history', async (req, res, next) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+
+  const platformWide = hasPlatformAccess(actor);
+  const schoolId = accountSchoolId(actor);
+  const beforeFaults = Array.isArray(db.systemErrors) ? db.systemErrors : [];
+  const removedPersistentFaults = platformWide
+    ? beforeFaults.length
+    : beforeFaults.filter(entry => entry.schoolId === schoolId).length;
+
+  db.systemErrors = platformWide
+    ? []
+    : beforeFaults.filter(entry => entry.schoolId !== schoolId);
+
+  const removedRuntimeLogs = structuredLogger.clear(entry =>
+    platformWide || (entry.schoolId && entry.schoolId === schoolId)
+  );
+
+  try {
+    await saveDatabaseState();
+    req.persistenceCommitted = true;
+    logStructured('info', 'inspection.history_cleared', {
+      category: 'error-management',
+      requestId: req.requestId,
+      user: actor.username,
+      role: actor.role,
+      schoolId,
+      schoolName: actor.schoolName || '',
+      method: req.method,
+      route: req.path,
+      result: 'completed',
+      details: `Removed ${removedPersistentFaults} persistent faults and ${removedRuntimeLogs} structured log entries.`
+    });
+    return res.json({
+      success: true,
+      removedPersistentFaults,
+      removedRuntimeLogs,
+      scope: platformWide ? 'platform' : 'school'
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.get('/api/system-logs/trace/:requestId', (req, res) => {
@@ -5815,6 +5886,66 @@ app.post('/api/learner-access-codes', (req, res) => {
   if (db.learnerAccessCodes.some(entry => entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor))) return res.status(409).json({ message: 'This learner already has an active code. Regenerate it instead.' });
   ensureLearnerAccessCode(actor, learner);
   res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) });
+});
+
+app.post('/api/learner-access-codes/generate-batch', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !isAdminLike(actor)) return res.status(403).json({ message: 'Only an administrator can generate learner access codes.' });
+
+  const requested = Array.isArray(req.body?.learners) ? req.body.learners : [];
+  if (!requested.length) return res.status(400).json({ message: 'Add at least one learner name before generating codes.' });
+  if (requested.length > 500) return res.status(400).json({ message: 'Generate up to 500 learner codes per secure batch.' });
+
+  const schoolLearners = tenantRecords(db.students, actor);
+  const results = requested.map((row, index) => {
+    const inputName = boundedText(row?.learnerName, 160);
+    const inputClass = boundedText(row?.className, 120);
+    if (!inputName) {
+      return { index, inputName, inputClass, status: 'invalid', message: 'Learner name is required.' };
+    }
+
+    let matches = schoolLearners.filter(learner => normalizeComparableText(learner.studentName) === normalizeComparableText(inputName));
+    if (inputClass) {
+      matches = matches.filter(learner => normalizeComparableText(learner.className) === normalizeComparableText(inputClass));
+    }
+
+    if (!matches.length) {
+      return { index, inputName, inputClass, status: 'not_found', message: 'No learner in this school matches that name and class.' };
+    }
+    if (matches.length > 1) {
+      return { index, inputName, inputClass, status: 'ambiguous', message: 'More than one learner matches. Add the Grade / Class value to identify the correct learner.' };
+    }
+
+    const learner = matches[0];
+    const learnerKey = learnerRecordKey(learner);
+    let codeRecord = db.learnerAccessCodes.find(entry =>
+      entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor)
+    );
+    const existed = Boolean(codeRecord);
+    if (!codeRecord) codeRecord = ensureLearnerAccessCode(actor, learner);
+
+    return {
+      index,
+      inputName,
+      inputClass,
+      status: existed ? 'existing' : 'generated',
+      learnerKey,
+      learnerName: learner.studentName,
+      className: learner.className || '',
+      parentName: learner.parentName || '',
+      accessCode: decryptField(codeRecord.codeEncrypted),
+      issuedAt: codeRecord.issuedAt || null,
+      message: existed ? 'Existing active code reused.' : 'New secure learner code generated.'
+    };
+  });
+
+  res.json({
+    success: true,
+    generated: results.filter(item => item.status === 'generated').length,
+    existing: results.filter(item => item.status === 'existing').length,
+    unmatched: results.filter(item => !['generated', 'existing'].includes(item.status)).length,
+    results
+  });
 });
 
 app.post('/api/learner-access-codes/:id/replace', (req, res) => {
