@@ -1127,7 +1127,7 @@ function renderInspectDashboard() {
         <td data-label="Status">${entry.status ? escapeWorkspaceText(entry.status) : '—'}</td>
         <td data-label="Duration">${entry.durationMs === null || entry.durationMs === undefined ? '—' : `${Number(entry.durationMs).toFixed(1)} ms`}</td>
         <td data-label="Result">${escapeWorkspaceText(entry.result || '—')}</td>
-        <td data-label="Trace">${requestId ? `<button type="button" class="action-btn btn-blue" onclick="inspectTraceRequest('${encodedRequestId}')">Trace</button><br><span class="meta">${escapeWorkspaceText(requestId.slice(0, 12))}…</span>` : '<span class="meta">No request ID</span>'}</td>
+        <td data-label="Trace">${requestId ? `<button type="button" class="action-btn btn-blue inspect-trace-button" onclick="inspectTraceRequest('${encodedRequestId}')">Trace</button><span class="inspect-trace-id">${escapeWorkspaceText(requestId.slice(0, 12))}…</span>` : '<span class="meta">No request ID</span>'}</td>
       </tr>`;
     }).join('') : '<tr><td colspan="9">No structured log entries match these filters.</td></tr>';
   }
@@ -1140,7 +1140,7 @@ function renderInspectDashboard() {
       const actions = fault.status === 'resolved'
         ? '<span class="badge-tag info">RESOLVED</span>'
         : `<button type="button" class="action-btn btn-blue" onclick="updateSystemErrorStatus('${encodedId}','acknowledged')">Acknowledge</button><button type="button" class="action-btn btn-green" onclick="updateSystemErrorStatus('${encodedId}','resolved')">Resolve</button>`;
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(fault.name || 'Error')} · ${escapeWorkspaceText(fault.status || 'open')}</strong><p style="margin-top:4px;">${escapeWorkspaceText(fault.message || 'No message')}</p><span class="meta">${escapeWorkspaceText(fault.method || 'SYSTEM')} ${escapeWorkspaceText(fault.route || '')} · ${escapeWorkspaceText(inspectDateTime(fault.createdAt))}${fault.source ? ` · ${escapeWorkspaceText(fault.source)}${fault.line ? `:${Number(fault.line)}${fault.column ? `:${Number(fault.column)}` : ''}` : ''}` : ''}${fault.updatedBy ? ` · updated by ${escapeWorkspaceText(fault.updatedBy)}` : ''}</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;">${fault.requestId ? `<button type="button" class="action-btn btn-blue" onclick="inspectTraceRequest('${encodedRequestId}')">Trace request</button>` : ''}${actions}</div></div>`;
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(fault.name || 'Error')} · ${escapeWorkspaceText(fault.status || 'open')}</strong><p style="margin-top:4px;">${escapeWorkspaceText(fault.message || 'No message')}</p><span class="meta">${escapeWorkspaceText(fault.method || 'SYSTEM')} ${escapeWorkspaceText(fault.route || '')} · ${escapeWorkspaceText(inspectDateTime(fault.createdAt))}${fault.source ? ` · ${escapeWorkspaceText(fault.source)}${fault.line ? `:${Number(fault.line)}${fault.column ? `:${Number(fault.column)}` : ''}` : ''}` : ''}${fault.updatedBy ? ` · updated by ${escapeWorkspaceText(fault.updatedBy)}` : ''}</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;">${fault.requestId ? `<button type="button" class="action-btn btn-blue inspect-trace-button" onclick="inspectTraceRequest('${encodedRequestId}')">Trace request</button>` : ''}${actions}</div></div>`;
     }).join('') : '<p class="meta">No persistent server faults have been recorded.</p>';
   }
 }
