@@ -94,4 +94,6 @@ jobs:
         run: node tests/responsive-layout.test.cjs
 
       - name: Ambient background interaction regression
+        env:
+          LF_BROWSER_CHANNEL: chrome
         run: node tests/ambient-background.test.cjs
