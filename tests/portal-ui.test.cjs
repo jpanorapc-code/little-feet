@@ -62,6 +62,18 @@ async function main() {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await context.route('https://**', route => route.abort());
     const page = await context.newPage();
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.__littleFeetFetchStacks = [];
+      window.fetch = (...args) => {
+        const input = args[0];
+        const url = typeof input === 'string' ? input : (input?.url || '');
+        if (String(url).includes('/api/staff/tasks')) {
+          window.__littleFeetFetchStacks.push({ url:String(url), stack:new Error('Little Feet fetch trace').stack || '' });
+        }
+        return nativeFetch(...args);
+      };
+    });
     const errors = [];
     const failedApi = [];
     const apiRequestCounts = new Map();
@@ -141,7 +153,11 @@ async function main() {
       await page.waitForTimeout(1200);
 
       for (const endpoint of summaryEndpoints) {
-        assert.ok((apiRequestCounts.get(endpoint) || 0) <= 2, `Session restore duplicated ${endpoint}: ${apiRequestCounts.get(endpoint) || 0} calls`);
+        const count = apiRequestCounts.get(endpoint) || 0;
+        const trace = endpoint === '/api/staff/tasks' && count > 2
+          ? await page.evaluate(() => window.__littleFeetFetchStacks || [])
+          : [];
+        assert.ok(count <= 2, `Session restore duplicated ${endpoint}: ${count} calls\n${JSON.stringify(trace, null, 2)}`);
       }
 
       // Repeated session-ready notifications in the same session must reuse the
