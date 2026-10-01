@@ -900,6 +900,7 @@ const db = {
   emailInbox: [],
   emailDismissals: [],
   accountMigrations: {},
+  diagnosticMigrations: {},
   staffNotices: [],
   meetingMinutes: [],
   maintenanceOrders: [],
@@ -1436,6 +1437,22 @@ function ensureBootstrapAdministrator() {
     createdAt: new Date().toISOString()
   });
 }
+const DIAGNOSTIC_HISTORY_RESET_ID = 'inspect-clean-slate-20261001-v1';
+function applyDiagnosticHistoryResetMigration() {
+  if (!db.diagnosticMigrations || typeof db.diagnosticMigrations !== 'object' || Array.isArray(db.diagnosticMigrations)) db.diagnosticMigrations = {};
+  if (db.diagnosticMigrations[DIAGNOSTIC_HISTORY_RESET_ID]) return false;
+  if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
+  const removedPersistentFaults = db.systemErrors.length;
+  const removedRuntimeLogs = structuredLogger.clear();
+  db.systemErrors = [];
+  db.diagnosticMigrations[DIAGNOSTIC_HISTORY_RESET_ID] = {
+    appliedAt: new Date().toISOString(),
+    removedPersistentFaults,
+    removedRuntimeLogs
+  };
+  return true;
+}
+
 function applyOwnerAccountMigration() {
   if (process.env.LF_OWNER_RESET_ALL_ACCOUNTS !== '1') return false;
   const migrationId = String(process.env.LF_OWNER_ACCOUNT_RESET_ID || '').trim().slice(0, 120);
@@ -1528,6 +1545,7 @@ async function initialisePersistence() {
   else openStateDatabase();
   const restoredFromDatabase = await loadDatabaseState();
   if (!restoredFromDatabase) loadReplicaSnapshot();
+  const diagnosticHistoryResetApplied = applyDiagnosticHistoryResetMigration();
   const ownerAccountResetApplied = applyOwnerAccountMigration();
   ensureBootstrapAdministrator();
   syncConfiguredPlatformOwnerAccess();
@@ -1538,6 +1556,13 @@ async function initialisePersistence() {
   syncCurrentReleaseNotes();
   await retryPendingStorageCleanup();
   await saveDatabaseState();
+  if (diagnosticHistoryResetApplied) {
+    logStructured('info', 'inspection.history_reset_applied', {
+      category: 'migration',
+      result: 'completed',
+      message: 'Previous Inspect diagnostic history was cleared for the centralized logging clean slate.'
+    });
+  }
   if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
   writeReplicaSnapshot();
 }
@@ -1948,6 +1973,51 @@ app.get('/api/system-logs', (req, res) => {
     oldestAt: visibleLogs[visibleLogs.length - 1]?.timestamp || null
   };
   res.json({ summary, logs: filtered, generatedAt: new Date().toISOString() });
+});
+
+app.delete('/api/system-inspect-history', async (req, res, next) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+
+  const platformWide = hasPlatformAccess(actor);
+  const schoolId = accountSchoolId(actor);
+  const beforeFaults = Array.isArray(db.systemErrors) ? db.systemErrors : [];
+  const removedPersistentFaults = platformWide
+    ? beforeFaults.length
+    : beforeFaults.filter(entry => entry.schoolId === schoolId).length;
+
+  db.systemErrors = platformWide
+    ? []
+    : beforeFaults.filter(entry => entry.schoolId !== schoolId);
+
+  const removedRuntimeLogs = structuredLogger.clear(entry =>
+    platformWide || (entry.schoolId && entry.schoolId === schoolId)
+  );
+
+  try {
+    await saveDatabaseState();
+    req.persistenceCommitted = true;
+    logStructured('info', 'inspection.history_cleared', {
+      category: 'error-management',
+      requestId: req.requestId,
+      user: actor.username,
+      role: actor.role,
+      schoolId,
+      schoolName: actor.schoolName || '',
+      method: req.method,
+      route: req.path,
+      result: 'completed',
+      details: `Removed ${removedPersistentFaults} persistent faults and ${removedRuntimeLogs} structured log entries.`
+    });
+    return res.json({
+      success: true,
+      removedPersistentFaults,
+      removedRuntimeLogs,
+      scope: platformWide ? 'platform' : 'school'
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.get('/api/system-logs/trace/:requestId', (req, res) => {
