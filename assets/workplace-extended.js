@@ -33,15 +33,21 @@
   const saveNotificationPreferences=value=>localStorage.setItem(notificationPreferenceKey(),JSON.stringify(value));
   const ensureNotificationStack=()=>{
     let stack=document.getElementById('lfNotificationStack');
-    if(stack)return stack;
-    stack=document.createElement('aside');stack.id='lfNotificationStack';stack.className='lf-notification-stack';stack.setAttribute('aria-label','Email notifications');
-    stack.innerHTML='<div class="lf-notification-controls"><button class="action-btn" type="button" data-notification-collapse aria-expanded="true">▾ Emails</button><button class="action-btn" type="button" data-notification-dnd></button><button class="action-btn" type="button" data-notification-close-all>Close all</button></div><div class="lf-notification-items" aria-live="polite"></div>';
+    const dock=document.getElementById('navUserPanel');
+    if(stack){
+      if(dock&&stack.parentElement!==dock)dock.appendChild(stack);
+      return stack;
+    }
+    stack=document.createElement('aside');stack.id='lfNotificationStack';stack.className='lf-notification-stack is-collapsed';stack.setAttribute('aria-label','Email notifications');
+    stack.innerHTML='<div class="lf-notification-controls"><button class="action-btn" type="button" data-notification-collapse aria-expanded="false">▸ Emails</button><button class="action-btn" type="button" data-notification-dnd></button><button class="action-btn" type="button" data-notification-close-all>Close all</button></div><div class="lf-notification-items" aria-live="polite"></div>';
     const preferences=notificationPreferences();
+    const collapse=stack.querySelector('[data-notification-collapse]');
     const dnd=stack.querySelector('[data-notification-dnd]');dnd.textContent=preferences.dnd?'Do not disturb: On':'Do not disturb: Off';dnd.classList.toggle('is-active',Boolean(preferences.dnd));
-    stack.querySelector('[data-notification-collapse]').onclick=event=>{const collapsed=stack.classList.toggle('is-collapsed');event.currentTarget.textContent=collapsed?'▸ Emails':'▾ Emails';event.currentTarget.setAttribute('aria-expanded',String(!collapsed));};
-    dnd.onclick=()=>{const current=notificationPreferences(),next=!current.dnd;saveNotificationPreferences({...current,dnd:next});dnd.textContent=next?'Do not disturb: On':'Do not disturb: Off';dnd.classList.toggle('is-active',next);if(next){stack.querySelector('.lf-notification-items').replaceChildren();stack.classList.add('is-collapsed');stack.querySelector('[data-notification-collapse]').textContent='▸ Emails';}};
-    stack.querySelector('[data-notification-close-all]').onclick=()=>{stack.querySelector('.lf-notification-items').replaceChildren();stack.classList.add('is-collapsed');stack.querySelector('[data-notification-collapse]').textContent='▸ Emails';};
-    document.body.appendChild(stack);return stack;
+    const setCollapsed=collapsed=>{stack.classList.toggle('is-collapsed',collapsed);collapse.textContent=collapsed?'▸ Emails':'▾ Emails';collapse.setAttribute('aria-expanded',String(!collapsed));};
+    collapse.onclick=()=>setCollapsed(!stack.classList.contains('is-collapsed'));
+    dnd.onclick=()=>{const current=notificationPreferences(),next=!current.dnd;saveNotificationPreferences({...current,dnd:next});dnd.textContent=next?'Do not disturb: On':'Do not disturb: Off';dnd.classList.toggle('is-active',next);if(next){stack.querySelector('.lf-notification-items').replaceChildren();setCollapsed(true);}};
+    stack.querySelector('[data-notification-close-all]').onclick=()=>{stack.querySelector('.lf-notification-items').replaceChildren();setCollapsed(true);};
+    (dock||document.body).appendChild(stack);return stack;
   };
   const inboxButtons=item=>{
     const destination=item.type==='Email'
@@ -53,6 +59,8 @@
   const showInboxPopup=item=>{
     if(item.read||emailInboxSeen.has(item.id))return;emailInboxSeen.add(item.id);
     const stack=ensureNotificationStack();if(notificationPreferences().dnd)return;
+    stack.classList.remove('is-collapsed');
+    const collapse=stack.querySelector('[data-notification-collapse]');if(collapse){collapse.textContent='▾ Emails';collapse.setAttribute('aria-expanded','true');}
     const card=document.createElement('article');card.className='lf-notification-popup'+(item.pinned?' is-pinned':'');card.dataset.id=item.id;card.innerHTML=`<header><strong>${esc(item.title)}</strong><span class="badge-tag">${esc(item.type)}</span></header><p>${esc(item.message)}</p><div class="actions"><button class="action-btn" data-popup-pin>${item.pinned?'Unpin':'Pin'}</button><button class="action-btn" data-popup-close>Close</button></div>`;
     card.querySelector('[data-popup-close]').onclick=()=>card.remove();
     card.querySelector('[data-popup-pin]').onclick=async()=>{const next=!item.pinned;await json('/api/email/inbox/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({pinned:next})});item.pinned=next;card.classList.toggle('is-pinned',next);card.querySelector('[data-popup-pin]').textContent=next?'Unpin':'Pin';await email();};
