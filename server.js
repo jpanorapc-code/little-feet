@@ -1812,15 +1812,30 @@ const learnerRecordsVisibleTo = (records, actor) => {
 const recordSystemError = (error, req = null, extra = {}) => {
   if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
   const actor = req ? getSessionAccount(req) : null;
+  const route = String(extra.route || req?.originalUrl || '').split('?')[0].slice(0, 240);
   const entry = {
     id: crypto.randomUUID(), requestId: req?.requestId || '', schoolId: actor ? accountSchoolId(actor) : '',
     method: String(req?.method || extra.method || 'SYSTEM').slice(0, 12),
-    route: String(req?.originalUrl || extra.route || '').split('?')[0].slice(0, 240),
-    name: String(error?.name || 'Error').slice(0, 80), message: redactSensitiveLogText(error?.message || 'Unknown server error'),
+    route,
+    name: String(extra.name || error?.name || 'Error').slice(0, 80), message: redactSensitiveLogText(error?.message || 'Unknown server error'),
     severity: extra.severity || 'error', status: 'open', createdAt: new Date().toISOString()
   };
   db.systemErrors.unshift(entry);
   if (db.systemErrors.length > 5000) db.systemErrors.length = 5000;
+  logStructured(entry.severity, 'system.error', {
+    category: 'error',
+    requestId: entry.requestId,
+    user: actor?.username || '',
+    role: actor?.role || '',
+    schoolId: entry.schoolId,
+    schoolName: actor?.schoolName || '',
+    method: entry.method,
+    route: entry.route,
+    status: Number(error?.status) || 500,
+    result: 'fault_recorded',
+    code: entry.name,
+    message: entry.message
+  });
   return entry;
 };
 
@@ -1852,23 +1867,138 @@ app.get('/api/system-diagnostics', (req, res) => {
   });
 });
 
+const structuredLogVisibleTo = (entry, actor) =>
+  Boolean(actor && (hasPlatformAccess(actor) || !entry.schoolId || entry.schoolId === accountSchoolId(actor)));
+const systemErrorVisibleTo = (entry, actor) =>
+  Boolean(actor && (hasPlatformAccess(actor) || !entry.schoolId || entry.schoolId === accountSchoolId(actor)));
+const structuredStatusMatches = (status, filter) => {
+  if (!filter) return true;
+  if (/^[1-5]xx$/i.test(filter)) return Math.floor(Number(status || 0) / 100) === Number(filter[0]);
+  return Number(status) === Number(filter);
+};
+
 app.get('/api/system-errors', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const schoolId = accountSchoolId(actor);
-  res.json((db.systemErrors || []).filter(entry => !entry.schoolId || entry.schoolId === schoolId).slice(0, 250));
+  res.json((db.systemErrors || []).filter(entry => systemErrorVisibleTo(entry, actor)).slice(0, 250));
+});
+
+app.get('/api/system-logs', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+
+  const severity = boundedText(req.query?.severity, 20).toLowerCase();
+  const method = boundedText(req.query?.method, 12).toUpperCase();
+  const status = boundedText(req.query?.status, 8).toLowerCase();
+  const requestId = boundedText(req.query?.requestId, 100);
+  const user = boundedText(req.query?.user, 160).toLowerCase();
+  const event = boundedText(req.query?.event, 120).toLowerCase();
+  const search = boundedText(req.query?.search, 160).toLowerCase();
+  const limit = Math.max(25, Math.min(1000, Number(req.query?.limit) || 250));
+  const visibleLogs = structuredLogger.list().filter(entry => structuredLogVisibleTo(entry, actor));
+  const recentCutoff = Date.now() - 15 * 60 * 1000;
+  const recent = visibleLogs.filter(entry => Date.parse(entry.timestamp) >= recentCutoff);
+  const filtered = visibleLogs.filter(entry => {
+    if (severity && entry.severity !== severity) return false;
+    if (method && entry.method !== method) return false;
+    if (status && !structuredStatusMatches(entry.status, status)) return false;
+    if (requestId && entry.requestId !== requestId) return false;
+    if (user && !String(entry.user || '').toLowerCase().includes(user)) return false;
+    if (event && !String(entry.event || '').toLowerCase().includes(event)) return false;
+    if (search) {
+      const haystack = [entry.event, entry.category, entry.route, entry.result, entry.code, entry.message, entry.details, entry.user, entry.requestId].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  }).slice(0, limit);
+  const summary = {
+    captured: visibleLogs.length,
+    displayed: filtered.length,
+    last15Minutes: recent.length,
+    errors: recent.filter(entry => entry.severity === 'error').length,
+    warnings: recent.filter(entry => entry.severity === 'warn').length,
+    serverErrors: recent.filter(entry => Number(entry.status) >= 500).length,
+    deniedOrLimited: recent.filter(entry => [401, 403, 429].includes(Number(entry.status))).length,
+    slowRequests: recent.filter(entry => entry.event === 'http.request' && Number(entry.durationMs) >= structuredLogger.slowRequestMs).length,
+    uniqueUsers: new Set(recent.map(entry => entry.user).filter(Boolean)).size,
+    maxEntries: structuredLogger.maxEntries,
+    slowRequestMs: structuredLogger.slowRequestMs,
+    newestAt: visibleLogs[0]?.timestamp || null,
+    oldestAt: visibleLogs[visibleLogs.length - 1]?.timestamp || null
+  };
+  res.json({ summary, logs: filtered, generatedAt: new Date().toISOString() });
+});
+
+app.get('/api/system-logs/trace/:requestId', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const requestId = boundedText(req.params.requestId, 100);
+  if (!requestId) return res.status(400).json({ message: 'A request ID is required.' });
+  const logs = structuredLogger.findByRequestId(requestId).filter(entry => structuredLogVisibleTo(entry, actor));
+  const errors = (db.systemErrors || []).filter(entry => entry.requestId === requestId && systemErrorVisibleTo(entry, actor));
+  if (!logs.length && !errors.length) return res.status(404).json({ message: 'No trace was found for this request ID.' });
+  res.json({ requestId, logs, errors });
+});
+
+app.post('/api/system/client-log', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in before sending browser diagnostics.' });
+  const severity = ['info', 'warn', 'error'].includes(String(req.body?.severity || '').toLowerCase()) ? String(req.body.severity).toLowerCase() : 'error';
+  const code = boundedText(req.body?.code || 'CLIENT_ERROR', 100);
+  const page = boundedText(req.body?.page || '/', 200).split('?')[0];
+  const source = boundedText(req.body?.source || '', 220).split('?')[0];
+  const message = boundedText(req.body?.message || 'Browser diagnostic event', 500);
+  const line = Number.isFinite(Number(req.body?.line)) ? Number(req.body.line) : null;
+  const column = Number.isFinite(Number(req.body?.column)) ? Number(req.body.column) : null;
+  const details = [source ? `Source ${source}` : '', line ? `Line ${line}${column ? `:${column}` : ''}` : ''].filter(Boolean).join(' · ');
+  const logged = logStructured(severity, 'client.error', {
+    category: 'browser',
+    requestId: req.requestId,
+    user: actor.username,
+    role: actor.role,
+    schoolId: accountSchoolId(actor),
+    schoolName: actor.schoolName || '',
+    method: 'CLIENT',
+    route: page,
+    result: 'reported',
+    code,
+    message,
+    details
+  });
+
+  const persistentCodes = new Set(['WEB_RUNTIME_ERROR', 'WEB_PROMISE_ERROR', 'WEB_RESOURCE_ERROR']);
+  if (severity === 'error' && persistentCodes.has(code)) {
+    const duplicateCutoff = Date.now() - 5 * 60 * 1000;
+    const duplicate = (db.systemErrors || []).some(entry =>
+      entry.name === code
+      && entry.schoolId === accountSchoolId(actor)
+      && entry.message === redactSensitiveLogText(message)
+      && Date.parse(entry.createdAt || '') >= duplicateCutoff
+    );
+    if (!duplicate) {
+      const clientError = new Error(message);
+      clientError.name = code;
+      recordSystemError(clientError, req, { severity: 'error', route: page, name: code });
+    }
+  }
+  res.status(201).json({ success: true, logId: logged.id, requestId: req.requestId });
 });
 
 app.patch('/api/system-errors/:id', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const entry = (db.systemErrors || []).find(item => item.id === req.params.id && (!item.schoolId || item.schoolId === accountSchoolId(actor)));
+  const entry = (db.systemErrors || []).find(item => item.id === req.params.id && systemErrorVisibleTo(item, actor));
   if (!entry) return res.status(404).json({ message: 'System error report not found.' });
   const status = String(req.body?.status || 'acknowledged').toLowerCase();
   if (!['acknowledged', 'resolved'].includes(status)) return res.status(400).json({ message: 'Choose acknowledged or resolved.' });
   entry.status = status;
   entry.updatedAt = new Date().toISOString();
   entry.updatedBy = actor.username;
+  logStructured('info', 'system.error_status_changed', {
+    category: 'error-management', requestId: req.requestId, user: actor.username, role: actor.role,
+    schoolId: accountSchoolId(actor), schoolName: actor.schoolName || '', method: req.method, route: req.path,
+    result: status, code: entry.name, message: `Error report ${entry.id} marked ${status}.`
+  });
   res.json({ success: true, entry });
 });
 
@@ -5811,7 +5941,6 @@ app.use((req, res, next) => {
 // Wildcard Catch-All (Serves Frontend)
 app.use((error, req, res, _next) => {
   const report = recordSystemError(error, req);
-  console.error(`[${report.requestId || report.id}] ${report.method} ${report.route}: ${report.message}`);
   if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
   scheduleReplicaSnapshot();
   res.status(Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500).json({
