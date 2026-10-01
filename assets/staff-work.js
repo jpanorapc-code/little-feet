@@ -64,6 +64,6 @@
     await render().catch(err=>{const r=document.getElementById('staffWorkContent');if(r)r.innerHTML='<p>'+esc(err.message)+'</p>';});
   };
   window.refreshStaffWork=init;
-  document.addEventListener('littlefeet:session-ready',init);
-  window.addEventListener('load',()=>setTimeout(init,250));
+  if(typeof window.registerLittleFeetWorkspace==='function') window.registerLittleFeetWorkspace('staff-work',init);
+  else document.addEventListener('littlefeet:session-ready',init);
 })();
