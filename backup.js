@@ -964,6 +964,222 @@ function clearDebugReport() {
   updateDebugModePanel();
 }
 
+function canUseInspectDashboard() {
+  return Boolean(currentUser && (isFullAccessUser(currentUser) || currentUser.role === 'staff'));
+}
+
+function inspectFilterParams() {
+  const params = new URLSearchParams({ limit: '500' });
+  const fields = [
+    ['severity', 'inspectFilterSeverity'],
+    ['status', 'inspectFilterStatus'],
+    ['method', 'inspectFilterMethod'],
+    ['user', 'inspectFilterUser'],
+    ['event', 'inspectFilterEvent'],
+    ['requestId', 'inspectFilterRequestId'],
+    ['search', 'inspectFilterSearch']
+  ];
+  fields.forEach(([key, id]) => {
+    const value = String(document.getElementById(id)?.value || '').trim();
+    if (value) params.set(key, value);
+  });
+  return params;
+}
+
+function inspectDateTime(value) {
+  const parsed = new Date(value || '');
+  return Number.isNaN(parsed.getTime()) ? 'Unknown time' : parsed.toLocaleString();
+}
+
+function inspectSeverityBadge(severity) {
+  const level = String(severity || 'info').toLowerCase();
+  if (level === 'error') return '<span class="badge-tag urgent">ERROR</span>';
+  if (level === 'warn') return '<span class="badge-tag urgent">WARN</span>';
+  if (level === 'debug') return '<span class="badge-tag">DEBUG</span>';
+  return '<span class="badge-tag info">INFO</span>';
+}
+
+function renderInspectDashboard() {
+  const payload = inspectStructuredLogPayload || { summary: {}, logs: [] };
+  const summary = payload.summary || {};
+  const faults = Array.isArray(inspectServerFaults) ? inspectServerFaults : [];
+  const diagnostics = inspectDiagnostics;
+  const setText = (id, value) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = String(value ?? '—');
+  };
+
+  setText('inspectRuntimeStatus', diagnostics?.status ? String(diagnostics.status).replaceAll('-', ' ').toUpperCase() : 'UNAVAILABLE');
+  setText('inspectRequestCount', summary.last15Minutes ?? 0);
+  setText('inspectErrorCount', summary.errors ?? 0);
+  setText('inspectWarningCount', summary.warnings ?? 0);
+  setText('inspectSlowCount', summary.slowRequests ?? 0);
+  setText('inspectOpenFaultCount', faults.filter(fault => fault.status === 'open').length);
+  setText('inspectGeneratedAt', payload.generatedAt ? `Updated ${inspectDateTime(payload.generatedAt)}` : 'Not loaded');
+
+  const diagnosticsSummary = document.getElementById('inspectDiagnosticsSummary');
+  if (diagnosticsSummary) {
+    if (!diagnostics) {
+      diagnosticsSummary.textContent = 'Live server diagnostics are unavailable.';
+    } else {
+      diagnosticsSummary.innerHTML = [
+        `<strong>Persistence:</strong> ${escapeWorkspaceText(diagnostics.persistence || 'unknown')}`,
+        `<strong>Active requests:</strong> ${Number(diagnostics.activeRequests || 0)}`,
+        `<strong>Accounts:</strong> ${Number(diagnostics.records?.accounts || 0)}`,
+        `<strong>Learners:</strong> ${Number(diagnostics.records?.learners || 0)}`,
+        `<strong>Attendance:</strong> ${Number(diagnostics.records?.attendance || 0)}`,
+        `<strong>Payments:</strong> ${Number(diagnostics.records?.payments || 0)}`,
+        `<strong>Open faults:</strong> ${Number(diagnostics.records?.openErrors || 0)}`,
+        `<strong>Logger capacity:</strong> ${Number(summary.maxEntries || 0)} · slow ≥ ${Number(summary.slowRequestMs || 0)} ms`
+      ].join(' &nbsp;·&nbsp; ');
+    }
+  }
+
+  const logs = Array.isArray(payload.logs) ? payload.logs : [];
+  setText('inspectLogCount', `${logs.length} shown · ${Number(summary.captured || 0)} captured in this runtime`);
+  const logRows = document.getElementById('inspectLogRows');
+  if (logRows) {
+    logRows.innerHTML = logs.length ? logs.map(entry => {
+      const requestId = String(entry.requestId || '');
+      const encodedRequestId = encodeURIComponent(requestId);
+      const userContext = entry.user
+        ? `<strong>${escapeWorkspaceText(entry.user)}</strong><br><span class="meta">${escapeWorkspaceText(entry.role || 'account')}${entry.schoolName ? ` · ${escapeWorkspaceText(entry.schoolName)}` : ''}</span>`
+        : '<span class="meta">System / unauthenticated</span>';
+      const eventDetail = [entry.code, entry.message, entry.details].filter(Boolean).map(escapeWorkspaceText).join(' · ');
+      return `<tr>
+        <td data-label="Time">${escapeWorkspaceText(inspectDateTime(entry.timestamp))}</td>
+        <td data-label="Severity">${inspectSeverityBadge(entry.severity)}</td>
+        <td data-label="Event"><strong>${escapeWorkspaceText(entry.event || 'event')}</strong>${eventDetail ? `<br><span class="meta">${eventDetail}</span>` : ''}</td>
+        <td data-label="User / school">${userContext}</td>
+        <td data-label="Request"><strong>${escapeWorkspaceText(entry.method || '—')}</strong> ${escapeWorkspaceText(entry.route || '—')}</td>
+        <td data-label="Status">${entry.status ? escapeWorkspaceText(entry.status) : '—'}</td>
+        <td data-label="Duration">${entry.durationMs === null || entry.durationMs === undefined ? '—' : `${Number(entry.durationMs).toFixed(1)} ms`}</td>
+        <td data-label="Result">${escapeWorkspaceText(entry.result || '—')}</td>
+        <td data-label="Trace">${requestId ? `<button type="button" class="action-btn btn-blue" onclick="inspectTraceRequest('${encodedRequestId}')">Trace</button><br><span class="meta">${escapeWorkspaceText(requestId.slice(0, 12))}…</span>` : '<span class="meta">No request ID</span>'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="9">No structured log entries match these filters.</td></tr>';
+  }
+
+  const faultRows = document.getElementById('inspectFaultRows');
+  if (faultRows) {
+    faultRows.innerHTML = faults.length ? faults.slice(0, 100).map(fault => {
+      const encodedId = encodeURIComponent(fault.id);
+      const encodedRequestId = encodeURIComponent(fault.requestId || '');
+      const actions = fault.status === 'resolved'
+        ? '<span class="badge-tag info">RESOLVED</span>'
+        : `<button type="button" class="action-btn btn-blue" onclick="updateSystemErrorStatus('${encodedId}','acknowledged')">Acknowledge</button><button type="button" class="action-btn btn-green" onclick="updateSystemErrorStatus('${encodedId}','resolved')">Resolve</button>`;
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(fault.name || 'Error')} · ${escapeWorkspaceText(fault.status || 'open')}</strong><p style="margin-top:4px;">${escapeWorkspaceText(fault.message || 'No message')}</p><span class="meta">${escapeWorkspaceText(fault.method || 'SYSTEM')} ${escapeWorkspaceText(fault.route || '')} · ${escapeWorkspaceText(inspectDateTime(fault.createdAt))}${fault.updatedBy ? ` · updated by ${escapeWorkspaceText(fault.updatedBy)}` : ''}</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;">${fault.requestId ? `<button type="button" class="action-btn btn-blue" onclick="inspectTraceRequest('${encodedRequestId}')">Trace request</button>` : ''}${actions}</div></div>`;
+    }).join('') : '<p class="meta">No persistent server faults have been recorded.</p>';
+  }
+}
+
+async function loadInspectDashboard({ silent = false } = {}) {
+  if (!canUseInspectDashboard() || !document.getElementById('inspectTab')) return;
+  const statusNode = document.getElementById('inspectGeneratedAt');
+  if (!silent && statusNode) statusNode.textContent = 'Refreshing…';
+  try {
+    const [logsResponse, diagnosticsResponse, errorsResponse] = await Promise.all([
+      fetch(`/api/system-logs?${inspectFilterParams().toString()}`),
+      fetch('/api/system-diagnostics'),
+      fetch('/api/system-errors')
+    ]);
+    const [logsPayload, diagnosticsPayload, errorsPayload] = await Promise.all([
+      logsResponse.json().catch(() => ({})),
+      diagnosticsResponse.json().catch(() => ({})),
+      errorsResponse.json().catch(() => [])
+    ]);
+    if (!logsResponse.ok) throw new Error(logsPayload.message || 'Unable to load structured logs.');
+    if (!diagnosticsResponse.ok) throw new Error(diagnosticsPayload.message || 'Unable to load diagnostics.');
+    if (!errorsResponse.ok) throw new Error(errorsPayload?.message || 'Unable to load persistent faults.');
+    inspectStructuredLogPayload = logsPayload;
+    inspectDiagnostics = diagnosticsPayload;
+    inspectServerFaults = Array.isArray(errorsPayload) ? errorsPayload : [];
+    latestServerDiagnostics = inspectDiagnostics;
+    latestServerErrors = inspectServerFaults;
+    renderInspectDashboard();
+  } catch (error) {
+    if (statusNode) statusNode.textContent = 'Refresh failed';
+    const rows = document.getElementById('inspectLogRows');
+    if (rows) rows.innerHTML = `<tr><td colspan="9">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load the logging dashboard.'))}</td></tr>`;
+  }
+}
+
+function clearInspectFilters() {
+  ['inspectFilterSeverity','inspectFilterStatus','inspectFilterMethod','inspectFilterUser','inspectFilterEvent','inspectFilterRequestId','inspectFilterSearch'].forEach(id => {
+    const field = document.getElementById(id);
+    if (field) field.value = '';
+  });
+  loadInspectDashboard();
+}
+
+function toggleInspectAutoRefresh() {
+  const button = document.getElementById('inspectAutoRefreshToggle');
+  if (inspectAutoRefreshTimer) {
+    window.clearInterval(inspectAutoRefreshTimer);
+    inspectAutoRefreshTimer = null;
+    if (button) button.textContent = 'Auto-refresh: Off';
+    return;
+  }
+  inspectAutoRefreshTimer = window.setInterval(() => {
+    if (currentUser && document.getElementById('inspectTab')?.classList.contains('active')) loadInspectDashboard({ silent: true });
+  }, 15000);
+  if (button) button.textContent = 'Auto-refresh: 15s';
+  loadInspectDashboard({ silent: true });
+}
+
+async function inspectTraceRequest(encodedRequestId) {
+  if (!canUseInspectDashboard()) return;
+  const requestId = decodeURIComponent(encodedRequestId || '');
+  if (!requestId) return;
+  try {
+    const response = await fetch(`/api/system-logs/trace/${encodeURIComponent(requestId)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to trace this request.');
+    const logs = Array.isArray(data.logs) ? data.logs : [];
+    const errors = Array.isArray(data.errors) ? data.errors : [];
+    const timeline = logs.length ? logs.slice().reverse().map(entry => `<div class="item-row"><div><strong>${escapeWorkspaceText(entry.event)} · ${escapeWorkspaceText(entry.severity)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(entry.method || '')} ${escapeWorkspaceText(entry.route || '')}${entry.status ? ` · HTTP ${escapeWorkspaceText(entry.status)}` : ''}${entry.durationMs !== null && entry.durationMs !== undefined ? ` · ${Number(entry.durationMs).toFixed(1)} ms` : ''}</p><span class="meta">${escapeWorkspaceText(entry.message || entry.details || entry.result || '')}<br>${escapeWorkspaceText(inspectDateTime(entry.timestamp))}</span></div></div>`).join('') : '<p class="meta">No runtime log entries were found.</p>';
+    const faultHistory = errors.length ? errors.map(error => `<div class="item-row"><div><strong>${escapeWorkspaceText(error.name)} · ${escapeWorkspaceText(error.status)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(error.message)}</p><span class="meta">${escapeWorkspaceText(inspectDateTime(error.createdAt))}</span></div></div>`).join('') : '<p class="meta">No persistent fault is attached to this request.</p>';
+    openModal('Request trace', `<p class="meta" style="word-break:break-all;">Request ID: <strong>${escapeWorkspaceText(requestId)}</strong></p><h3>Timeline</h3>${timeline}<h3 style="margin-top:16px;">Persistent faults</h3>${faultHistory}`);
+  } catch (error) {
+    alert(safeUserFacingError(error, 'Unable to trace this request.'));
+  }
+}
+
+async function updateSystemErrorStatus(encodedId, status) {
+  if (!canUseInspectDashboard()) return;
+  const id = decodeURIComponent(encodedId || '');
+  if (!id) return;
+  try {
+    const response = await fetch(`/api/system-errors/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to update this fault.');
+    await loadInspectDashboard({ silent: true });
+  } catch (error) {
+    alert(safeUserFacingError(error, 'Unable to update this fault.'));
+  }
+}
+
+async function downloadInspectReport() {
+  if (!canUseInspectDashboard()) return;
+  if (!inspectStructuredLogPayload || !inspectDiagnostics) await loadInspectDashboard({ silent: true });
+  const report = {
+    generatedAt: new Date().toISOString(),
+    diagnostics: inspectDiagnostics,
+    structuredLogs: inspectStructuredLogPayload,
+    persistentFaults: inspectServerFaults,
+    browserDebugEvents: debugEvents
+  };
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+  link.download = `LittleFeet_Inspect_Report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 function closeModal() {
   visitorScannerStream?.getTracks().forEach(track => track.stop());
   visitorScannerStream = null;
