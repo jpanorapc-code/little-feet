@@ -2,6 +2,16 @@
 
 const crypto = require('node:crypto');
 
+
+const fs = require('node:fs');
+
+const index = fs.readFileSync('index.html', 'utf8');
+const inlineBlocks = [...index.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(match => match[1]);
+inlineBlocks.forEach((block, index) => {
+  const sha256 = crypto.createHash('sha256').update(Buffer.from(block, 'utf8')).digest('base64');
+  console.log(JSON.stringify({ name: `inline-script-${index}`, bytes: Buffer.byteLength(block), sha256: `sha256-${sha256}` }));
+});
+
 const targets = [
   ['leaflet-css', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'],
   ['markercluster-css', 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css'],
