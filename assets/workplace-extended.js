@@ -128,7 +128,7 @@
       document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all dashboard inbox copies? Original forwarded emails and Little Feet records will stay in their source systems.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
     }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
-  let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(async()=>{if(!user()?.username||document.hidden||!document.getElementById('emailIntegrationContent'))return;try{const status=await json('/api/email/mailbox/status');if(status.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});await email();}catch{}},60000);};
+  let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(async()=>{if(!user()?.username||document.hidden||!document.getElementById('emailIntegrationTab')?.classList.contains('active'))return;try{const sessionOk=await window.ensureLittleFeetAuthenticatedSession?.();if(sessionOk===false)return;const status=await json('/api/email/mailbox/status');if(status.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});await email();}catch{}},300000);};
 
   const load=()=>{qualifications();kpiHistory();development();email();startEmailPoll();};
   document.addEventListener('littlefeet:session-ready',load);

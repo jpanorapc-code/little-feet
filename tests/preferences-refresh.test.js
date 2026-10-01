@@ -18,8 +18,11 @@ assert.doesNotMatch(page, /<option value="sasl"/i);
 assert.match(page, /South African Sign Language \(SASL\) is an official language/);
 assert.match(page, /Text translation is not a substitute for signed content/);
 
-for (const value of ['0','auto','5000','10000','30000','60000','300000','900000','1800000','3600000','7200000','86400000']) {
+for (const value of ['0','auto','300000','900000','1800000','3600000','7200000','86400000']) {
   assert.match(page, new RegExp('<option value="' + value + '">'));
+}
+for (const value of ['5000','10000','30000','60000']) {
+  assert.doesNotMatch(page, new RegExp('<option value="' + value + '">'));
 }
 assert.match(page, /onclick="refreshDashboardSafely\(\)"/);
 assert.match(page, /Passwords, PINs, one-time codes, signatures and files are never stored/);
@@ -37,10 +40,10 @@ assert.match(preferences, /current-password','new-password','one-time-code/);
 assert.match(preferences, /SENSITIVE_FIELD/);
 assert.match(preferences, /MAX_DRAFT_VALUE = 5000/);
 assert.match(preferences, /serialized\.length > 250000/);
-assert.match(preferences, /saveDashboardDrafts\(\);[\s\S]*Promise\.resolve\(window\.loadAllData\?\.\(\)\)[\s\S]*window\.loadWorkspaceOnDemand\?\.\(activeTab\)/);
+assert.match(preferences, /saveDashboardDrafts\(\);[\s\S]*Promise\.resolve\(window\.refreshActiveWorkspace\?\.\(activeTab\)\)/);
 assert.match(preferences, /Date\.now\(\) - lastDraftEditAt < 4000/);
-assert.match(preferences, /FAST_TABS\.has\(tabId\) \? 30000 : 120000/);
-assert.match(preferences, /allowed = new Set\(\[5000,10000,30000,60000,300000,900000,1800000,3600000,7200000,86400000\]\)/);
+assert.match(preferences, /FAST_TABS\.has\(tabId\) \? 120000 : 300000/);
+assert.match(preferences, /allowed = new Set\(\[300000,900000,1800000,3600000,7200000,86400000\]\)/);
 assert.match(preferences, /window\.addEventListener\('beforeunload', saveDashboardDrafts\)/);
 
 assert.match(client, /lf_user_preferences_\$\{encodeURIComponent\(currentUser\.username\)\}/);
@@ -49,8 +52,9 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v35-paused-artwork-fix/);
-assert.match(serviceWorker, /preferences-enhancements\.js\?v=20260925-preferences-v2/);
+assert.match(serviceWorker, /little-feet-shell-v36-api-refresh-flood/);
+assert.match(serviceWorker, /backup\.js\?v=20261001-api-refresh-flood-v1/);
+assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
 
 assert.match(page, /id="loginLanguagePreference"/);
 assert.match(preferences, /function setLoginLanguage\(language\)/);

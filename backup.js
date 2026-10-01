@@ -36,7 +36,19 @@ let pendingLearnerImport = [];
 let pendingLearnerImportId = '';
 let portalTourIndex = 0;
 let portalTourTimer = null;
-let releaseNotesRefreshTimer = null;
+let portalBackgroundRefreshTimer = null;
+let portalBackgroundRefreshInFlight = false;
+const PORTAL_BACKGROUND_REFRESH_MS = 2 * 60 * 1000;
+const portalRefreshJobs = new Map();
+function runPortalRefreshJob(key, task) {
+  const existing = portalRefreshJobs.get(key);
+  if (existing) return existing;
+  const job = Promise.resolve().then(task).finally(() => {
+    if (portalRefreshJobs.get(key) === job) portalRefreshJobs.delete(key);
+  });
+  portalRefreshJobs.set(key, job);
+  return job;
+}
 let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
@@ -85,8 +97,9 @@ function expireClientSessionFromServer() {
   dashboardRefreshTimer = null;
   if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
   schoolStatusTimer = null;
-  if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
-  releaseNotesRefreshTimer = null;
+  if (portalBackgroundRefreshTimer) window.clearInterval(portalBackgroundRefreshTimer);
+  portalBackgroundRefreshTimer = null;
+  portalBackgroundRefreshInFlight = false;
   if (inspectAutoRefreshTimer) window.clearInterval(inspectAutoRefreshTimer);
   inspectAutoRefreshTimer = null;
   if (alertMonitorId) window.clearInterval(alertMonitorId);
@@ -763,11 +776,24 @@ async function loadReleaseNotes() {
   } catch { board.classList.add('hidden'); }
 }
 
-function startReleaseNotesMonitor() {
-  if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
-  releaseNotesRefreshTimer = window.setInterval(() => {
-    if (currentUser && !document.hidden) loadReleaseNotes();
-  }, 60 * 1000);
+async function runPortalBackgroundRefresh() {
+  if (portalBackgroundRefreshInFlight || !currentUser || document.hidden) return false;
+  portalBackgroundRefreshInFlight = true;
+  try {
+    if (!await ensureAuthenticatedSession()) return false;
+    await Promise.allSettled([
+      runPortalRefreshJob('tickets', () => loadTickets(true)),
+      runPortalRefreshJob('broadcasts', () => loadBroadcasts())
+    ]);
+    return true;
+  } finally {
+    portalBackgroundRefreshInFlight = false;
+  }
+}
+
+function startPortalBackgroundRefresh() {
+  if (portalBackgroundRefreshTimer) window.clearInterval(portalBackgroundRefreshTimer);
+  portalBackgroundRefreshTimer = window.setInterval(runPortalBackgroundRefresh, PORTAL_BACKGROUND_REFRESH_MS);
 }
 
 function dismissReleaseNotes(id) {
@@ -1450,12 +1476,7 @@ function applyUserPreferences() {
   applyProfileIcon();
   if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
   dashboardRefreshTimer = null;
-  if (window.configureDashboardAutoRefresh) {
-    window.configureDashboardAutoRefresh(preferences.refresh || '0');
-  } else {
-    const interval = Number(preferences.refresh || 0);
-    if (interval > 0) dashboardRefreshTimer = setInterval(() => { if (currentUser && !document.hidden) loadAllData(); }, interval);
-  }
+  if (window.configureDashboardAutoRefresh) window.configureDashboardAutoRefresh(preferences.refresh || '0');
 }
 
 function saveUserPreferences() {
@@ -1517,17 +1538,11 @@ function setupSession() {
   loadAllData();
   window.setTimeout(() => window.restoreDashboardDrafts?.(), 120);
   document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
-  startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
-  alertMonitorId = setInterval(async () => {
-    if (!currentUser || document.hidden) return;
-    if (await ensureAuthenticatedSession()) loadBroadcasts();
-  }, 30000);
+  alertMonitorId = null;
   if (ticketMonitorId) clearInterval(ticketMonitorId);
-  ticketMonitorId = setInterval(async () => {
-    if (!currentUser || document.hidden) return;
-    if (await ensureAuthenticatedSession()) loadTickets(true);
-  }, 20000);
+  ticketMonitorId = null;
+  startPortalBackgroundRefresh();
 }
 
 function applyRolePermissions(role) {
@@ -1611,8 +1626,9 @@ function logout() {
   clearTimeout(wallpaperIdleTimer);
   if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
   schoolStatusTimer = null;
-  if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
-  releaseNotesRefreshTimer = null;
+  if (portalBackgroundRefreshTimer) window.clearInterval(portalBackgroundRefreshTimer);
+  portalBackgroundRefreshTimer = null;
+  portalBackgroundRefreshInFlight = false;
   if (inspectAutoRefreshTimer) window.clearInterval(inspectAutoRefreshTimer);
   inspectAutoRefreshTimer = null;
   inspectStructuredLogPayload = null;
@@ -1704,11 +1720,11 @@ function switchTab(tabId, btn) {
 }
 
 function loadWorkspaceOnDemand(tabId) {
-  if (!currentUser) return;
+  if (!currentUser) return Promise.resolve([]);
   const loaders = {
     scheduleTab: [loadSchedules], worksheetsTab: [loadWorksheets], badgesTab: [loadBadges],
-    attendanceTab: [loadAttendance], ticketsTab: [loadTickets, loadTicketAssignees],
-    broadcastsTab: [loadBroadcasts], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
+    attendanceTab: [loadAttendance], ticketsTab: [() => runPortalRefreshJob('tickets', () => loadTickets()), loadTicketAssignees],
+    broadcastsTab: [() => runPortalRefreshJob('broadcasts', () => loadBroadcasts())], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
     registryTab: [loadRegistry, loadLearnerAccessCodes],
     accountsTab: [loadAccounts],
     financeTab: [loadSubscriptionBillingOverview, () => window.loadFinanceAutomationOverview?.()], parentPaymentsTab: [loadParentPayments, loadParentSubscription],
@@ -1719,7 +1735,7 @@ function loadWorkspaceOnDemand(tabId) {
     inspectTab: [loadInspectDashboard],
     progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords), () => window.loadCurriculumRecords?.()]
   };
-  (loaders[tabId] || []).forEach(load => Promise.resolve().then(load).catch(() => {}));
+  return Promise.allSettled((loaders[tabId] || []).map(load => Promise.resolve().then(load)));
 }
 
 function setupWallpaperMode() {
@@ -2034,22 +2050,36 @@ async function startHealthMonitor() {
 }
 
 async function loadAllData() {
-  // Verify the server-side session before automatic or repeated protected reads.
-  // This prevents an already-open browser tab from polling protected APIs after
-  // a deploy, server restart, logout elsewhere, or normal session expiry.
+  // Initial/session refresh only. Background timers must not call this function.
   if (!await ensureAuthenticatedSession()) return false;
-
-  // Prioritise what is visible at sign-in. The rest loads when its workspace
-  // opens, avoiding a burst of 30+ requests on every login.
-  loadAcademicTerm();
-  loadPosts();
-  loadTickets();
-  loadBroadcasts();
-  loadReleaseNotes();
-  loadHouseholdSwitcher();
-  loadStickyNotes();
+  await Promise.allSettled([
+    loadAcademicTerm(),
+    loadPosts(),
+    runPortalRefreshJob('tickets', () => loadTickets()),
+    runPortalRefreshJob('broadcasts', () => loadBroadcasts()),
+    loadReleaseNotes(),
+    loadHouseholdSwitcher(),
+    loadStickyNotes()
+  ]);
   return true;
 }
+
+async function refreshActiveWorkspace(tabId = document.querySelector('#dashboardSection .tab-content.active')?.id || 'homeTab') {
+  if (!await ensureAuthenticatedSession()) return false;
+  if (tabId === 'homeTab') {
+    await Promise.allSettled([
+      loadAcademicTerm(),
+      loadPosts(),
+      loadReleaseNotes(),
+      loadHouseholdSwitcher(),
+      loadStickyNotes()
+    ]);
+    return true;
+  }
+  await loadWorkspaceOnDemand(tabId);
+  return true;
+}
+window.refreshActiveWorkspace = refreshActiveWorkspace;
 
 async function loadHouseholdSwitcher() {
   const box = document.getElementById('householdSwitcher');
