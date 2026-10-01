@@ -24,6 +24,7 @@ fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'storage'), { recursive: true 
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temporaryDirectory, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temporaryDirectory, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temporaryDirectory, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'structured-logger.js'), path.join(temporaryDirectory, 'lib', 'structured-logger.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temporaryDirectory, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temporaryDirectory, 'lib', 'yahoo-imap.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temporaryDirectory, 'lib', 'yahoo-smtp.js'));
