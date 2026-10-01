@@ -950,8 +950,23 @@ function sanitiseDebugText(value) {
   return String(value || 'No additional detail').replace(/(password|pin|token)\s*[:=]\s*\S+/gi, '$1: [redacted]').slice(0, 600);
 }
 
+const INSPECT_BROWSER_CLEAN_SLATE_ID = 'inspect-clean-slate-20261001-v1';
+function applyBrowserDiagnosticHistoryReset() {
+  const markerKey = 'lf_inspect_clean_slate_id';
+  if (sessionStorage.getItem(markerKey) === INSPECT_BROWSER_CLEAN_SLATE_ID) return;
+  debugEvents = [];
+  sessionStorage.removeItem('lf_debug_events');
+  sessionStorage.removeItem('lf_pending_support_error');
+  [...Array(sessionStorage.length).keys()]
+    .map(index => sessionStorage.key(index))
+    .filter(key => key && key.startsWith('lf_error_'))
+    .forEach(key => sessionStorage.removeItem(key));
+  sessionStorage.setItem(markerKey, INSPECT_BROWSER_CLEAN_SLATE_ID);
+}
+
 function configureDebugMode() {
   const isAdmin = isFullAccessUser();
+  if (isAdmin) applyBrowserDiagnosticHistoryReset();
   debugModeEnabled = isAdmin && localStorage.getItem('lf_admin_debug_mode') === 'true';
   if (isAdmin) {
     try { debugEvents = JSON.parse(sessionStorage.getItem('lf_debug_events') || '[]'); } catch { debugEvents = []; }
