@@ -984,6 +984,7 @@ const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/auth/logout',
   '/api/email/inbound/resend',
   '/api/payments/webhook',
+  '/api/payments/reconcile',
   '/api/students/import',
   '/api/attendance/toggle'
 ]);
