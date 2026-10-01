@@ -544,6 +544,59 @@ const writeSchoolSearchCache = (key, data, now = Date.now()) => {
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
 app.use(compression({ threshold: 1024 }));
+const STRUCTURED_LOG_QUIET_READ_ROUTES = new Set([
+  '/api/health',
+  '/api/ready',
+  '/api/keepalive',
+  '/api/system-status',
+  '/api/system-diagnostics',
+  '/api/system-errors',
+  '/api/system-logs'
+]);
+app.use((req, res, next) => {
+  req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
+  req.structuredLogStartedAt = process.hrtime.bigint();
+  res.setHeader('X-Request-Id', req.requestId);
+
+  let requestLogWritten = false;
+  const writeRequestLog = (closedEarly = false) => {
+    if (requestLogWritten || !req.path.startsWith('/api/')) return;
+    requestLogWritten = true;
+    const route = String(req.originalUrl || req.path || '').split('?')[0].slice(0, 240);
+    if (req.method === 'GET' && STRUCTURED_LOG_QUIET_READ_ROUTES.has(route)) return;
+
+    const durationMs = Number(process.hrtime.bigint() - req.structuredLogStartedAt) / 1e6;
+    let actor = null;
+    try { actor = getSessionAccount(req); } catch { actor = null; }
+    const status = closedEarly && !res.writableEnded ? 499 : Number(res.statusCode || 200);
+    const securityStatus = [401, 403, 429].includes(status);
+    const severity = status >= 500 ? 'error'
+      : securityStatus || [409, 413, 415, 422].includes(status) || durationMs >= structuredLogger.slowRequestMs ? 'warn'
+      : 'info';
+    const result = closedEarly && !res.writableEnded ? 'client_closed'
+      : status >= 500 ? 'server_error'
+      : status >= 400 ? 'client_error'
+      : 'success';
+
+    logStructured(severity, 'http.request', {
+      category: securityStatus ? 'security' : 'request',
+      requestId: req.requestId,
+      user: actor?.username || '',
+      role: actor?.role || '',
+      schoolId: actor ? accountSchoolId(actor) : '',
+      schoolName: actor?.schoolName || '',
+      method: req.method,
+      route,
+      status,
+      durationMs,
+      result,
+      details: durationMs >= structuredLogger.slowRequestMs ? 'Slow request threshold exceeded.' : ''
+    });
+  };
+  res.on('finish', () => writeRequestLog(false));
+  res.on('close', () => writeRequestLog(true));
+  next();
+});
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
   const hasBody = Number(req.get('content-length') || 0) > 0 || Boolean(req.get('transfer-encoding'));
@@ -552,8 +605,6 @@ app.use('/api', (req, res, next) => {
   return res.status(415).json({ message: 'Unsupported request body type. Use JSON or URL-encoded form data.' });
 });
 app.use((req, res, next) => {
-  req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
-  res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-DNS-Prefetch-Control', 'off');
