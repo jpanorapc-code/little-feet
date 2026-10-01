@@ -5887,6 +5887,66 @@ app.post('/api/learner-access-codes', (req, res) => {
   res.status(201).json({ success: true, learner: learnerAccessCodeView(learner, actor, { includeCode: true, includeHistory: true }) });
 });
 
+app.post('/api/learner-access-codes/generate-batch', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !isAdminLike(actor)) return res.status(403).json({ message: 'Only an administrator can generate learner access codes.' });
+
+  const requested = Array.isArray(req.body?.learners) ? req.body.learners : [];
+  if (!requested.length) return res.status(400).json({ message: 'Add at least one learner name before generating codes.' });
+  if (requested.length > 500) return res.status(400).json({ message: 'Generate up to 500 learner codes per secure batch.' });
+
+  const schoolLearners = tenantRecords(db.students, actor);
+  const results = requested.map((row, index) => {
+    const inputName = boundedText(row?.learnerName, 160);
+    const inputClass = boundedText(row?.className, 120);
+    if (!inputName) {
+      return { index, inputName, inputClass, status: 'invalid', message: 'Learner name is required.' };
+    }
+
+    let matches = schoolLearners.filter(learner => normalizeComparableText(learner.studentName) === normalizeComparableText(inputName));
+    if (inputClass) {
+      matches = matches.filter(learner => normalizeComparableText(learner.className) === normalizeComparableText(inputClass));
+    }
+
+    if (!matches.length) {
+      return { index, inputName, inputClass, status: 'not_found', message: 'No learner in this school matches that name and class.' };
+    }
+    if (matches.length > 1) {
+      return { index, inputName, inputClass, status: 'ambiguous', message: 'More than one learner matches. Add the Grade / Class value to identify the correct learner.' };
+    }
+
+    const learner = matches[0];
+    const learnerKey = learnerRecordKey(learner);
+    let codeRecord = db.learnerAccessCodes.find(entry =>
+      entry.learnerKey === learnerKey && entry.status === 'active' && recordInSchool(entry, actor)
+    );
+    const existed = Boolean(codeRecord);
+    if (!codeRecord) codeRecord = ensureLearnerAccessCode(actor, learner);
+
+    return {
+      index,
+      inputName,
+      inputClass,
+      status: existed ? 'existing' : 'generated',
+      learnerKey,
+      learnerName: learner.studentName,
+      className: learner.className || '',
+      parentName: learner.parentName || '',
+      accessCode: decryptField(codeRecord.codeEncrypted),
+      issuedAt: codeRecord.issuedAt || null,
+      message: existed ? 'Existing active code reused.' : 'New secure learner code generated.'
+    };
+  });
+
+  res.json({
+    success: true,
+    generated: results.filter(item => item.status === 'generated').length,
+    existing: results.filter(item => item.status === 'existing').length,
+    unmatched: results.filter(item => !['generated', 'existing'].includes(item.status)).length,
+    results
+  });
+});
+
 app.post('/api/learner-access-codes/:id/replace', (req, res) => {
   const actor = findLearnerAccessCodeActor(req);
   if (!actor || !isAdminLike(actor)) return res.status(403).json({ message: 'Only an administrator can replace learner access codes.' });
