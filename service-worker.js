@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v39-executive-home';
+const CACHE_NAME = 'little-feet-shell-v40-penguin-avatars';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -10,7 +10,8 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-aurora-stars-4k.svg',
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
-  '/backup.js?v=20261001-executive-home-v1',
+  '/assets/profile/penguin-profile-avatars.png?v=20261002-penguin-avatars-v1',
+  '/backup.js?v=20261002-penguin-avatars-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
