@@ -43,7 +43,8 @@
     const file = input?.files?.[0];
     if (!file || !preview) return alert('Choose an SA-SAMS Excel or CSV learner/parent export first.');
     if (typeof XLSX === 'undefined') return alert('The spreadsheet reader is still loading. Please try again in a moment.');
-    const fileError = typeof validateSpreadsheetFile === 'function' ? validateSpreadsheetFile(file, 50 * 1024 * 1024) : null;
+    const schoolIntegrationMaxBytes = Number(window.LITTLE_FEET_SCHOOL_INTEGRATION_MAX_BYTES) || (50 * 1024 * 1024);
+    const fileError = typeof validateSpreadsheetFile === 'function' ? validateSpreadsheetFile(file, schoolIntegrationMaxBytes) : null;
     if (fileError) return alert(fileError);
 
     const reader = new FileReader();
@@ -65,7 +66,9 @@
       } catch (error) {
         pendingSaSamsRows = [];
         pendingSaSamsImportId = '';
-        preview.textContent = error.message || 'This SA-SAMS export could not be read.';
+        preview.textContent = typeof window.safeUserFacingError === 'function'
+          ? window.safeUserFacingError(error, 'This SA-SAMS export could not be read.')
+          : 'This SA-SAMS export could not be read.';
         if (typeof logAppError === 'function') logAppError('ERR_SASAMS_IMPORT_400', error.message || 'SA-SAMS import parse failed.');
       }
     };
