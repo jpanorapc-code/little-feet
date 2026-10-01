@@ -1044,6 +1044,7 @@ const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/finance/recurring-runs',
   '/api/finance/reconciliation/apply',
   '/api/students/import',
+  '/api/learner-access-codes/generate-batch',
   '/api/attendance/toggle'
 ]);
 const duplicatePostIsHandledByRoute = requestPath =>
