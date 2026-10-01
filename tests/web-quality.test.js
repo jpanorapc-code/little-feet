@@ -16,6 +16,15 @@ const ambientBackground = fs.readFileSync(path.join(root, 'assets', 'ambient-bac
 const preferencesEnhancements = fs.readFileSync(path.join(root, 'assets', 'preferences-enhancements.js'), 'utf8');
 const myDay = fs.readFileSync(path.join(root, 'assets', 'my-day.js'), 'utf8');
 const workplaceExtended = fs.readFileSync(path.join(root, 'assets', 'workplace-extended.js'), 'utf8');
+const startupWorkspaces = Object.freeze({
+  approvals: fs.readFileSync(path.join(root, 'assets', 'approvals.js'), 'utf8'),
+  maintenance: fs.readFileSync(path.join(root, 'assets', 'maintenance.js'), 'utf8'),
+  'meeting-minutes': fs.readFileSync(path.join(root, 'assets', 'meeting-minutes.js'), 'utf8'),
+  'purchase-requests': fs.readFileSync(path.join(root, 'assets', 'purchase-requests.js'), 'utf8'),
+  'resource-booking': fs.readFileSync(path.join(root, 'assets', 'resource-booking.js'), 'utf8'),
+  'staff-notices': fs.readFileSync(path.join(root, 'assets', 'staff-notices.js'), 'utf8'),
+  'staff-work': fs.readFileSync(path.join(root, 'assets', 'staff-work.js'), 'utf8')
+});
 const envExample = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
 const curriculum = fs.readFileSync(path.join(root, 'assets', 'curriculum-frameworks.js'), 'utf8');
 const auroraWallpaper = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-aurora-stars-4k.svg'), 'utf8');
@@ -36,7 +45,10 @@ assert.match(page, /<option value="crm">CRM<\/option>/);
 assert.match(page, /<option value="school_accounts">School Accounts<\/option>/);
 assert.match(page, /<option value="accounts">Little Feet Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
-assert.match(page, /backup\.js\?v=20261001-inspect-refresh-v1/);
+assert.match(page, /backup\.js\?v=20261001-startup-dedupe-v1/);
+for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests','workplace-extended']) {
+  assert.match(page, new RegExp('assets/' + asset + '\\.js\\?v=20261001-startup-dedupe-v1'));
+}
 assert.match(page, /id="accountResetLoginWaitButton"/);
 assert.match(page, /Reset 10-minute login wait/);
 assert.match(client, /async function resetSelectedAccountLoginWait\(\)/);
@@ -56,11 +68,11 @@ assert.match(client, /if \(!response\.ok\) throw new Error\(accounts\?\.message 
 assert.match(client, /reset-login-lockout/);
 assert.match(server, /const clearLoginLockoutForAccount = account =>/);
 assert.match(server, /app\.post\('\/api\/accounts\/:username\/reset-login-lockout'/);
-assert.match(page, /my-day\.js\?v=20260930-user-switch-v2/);
+assert.match(page, /my-day\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(page, /data-my-day-nav="true"/);
 assert.match(page, /onclick="switchTab\('myDayTab', this\)"/);
 assert.match(page, /id="myDayTab" class="tab-content" data-roles="teacher,principal,admin,staff"/);
-assert.match(page, /workplace-extended\.js\?v=20261001-api-refresh-flood-v1/);
+assert.match(page, /workplace-extended\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(workplaceExtended, /Delivery provider:/);
 assert.match(workplaceExtended, /Connect Google Gmail/);
 assert.match(workplaceExtended, /Connect Microsoft Outlook/);
@@ -78,7 +90,7 @@ assert.match(workplaceExtended, /Do not disturb: Off/);
 assert.match(workplaceExtended, /Close all/);
 assert.match(workplaceExtended, /navUserPanel/);
 assert.match(workplaceExtended, /lf-notification-stack is-collapsed/);
-assert.match(page, /workplace-extended\.js\?v=20261001-api-refresh-flood-v1/);
+assert.match(page, /workplace-extended\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(page, /\.lf-notification-stack\{position:relative/);
 assert.match(workplaceExtended, /data-inbox-action="reply"/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/connect\/google/);
@@ -127,10 +139,13 @@ assert.doesNotMatch(envExample, /MAILBOX_OAUTH/);
 assert.match(envExample, /LF_SMTP_PORT=465/);
 assert.match(envExample, /LF_SMTP_USERNAME=/);
 assert.match(envExample, /LF_SMTP_PASSWORD=/);
-assert.match(myDay, /document\.addEventListener\('littlefeet:session-ready', start\)/);
 assert.match(myDay, /new MutationObserver\(queueRepair\)/);
-assert.match(myDay, /window\.addEventListener\('pageshow', start\)/);
-assert.match(myDay, /visibilitychange/);
+assert.match(myDay, /registerLittleFeetWorkspace\('my-day', start\)/);
+assert.match(myDay, /let attentionRefreshPromise = null/);
+assert.match(myDay, /attentionRefreshSessionKey === sessionKey/);
+assert.match(myDay, /window\.refreshMyDayAttention = loadAttention/);
+assert.doesNotMatch(myDay, /window\.addEventListener\('pageshow', start\)/);
+assert.doesNotMatch(myDay, /visibilitychange', \(\) => \{ if \(!document\.hidden\) start\(\); \}\)/);
 assert.match(myDay, /tab\?\.dataset\.myDayReady === 'true'/);
 assert.match(myDay, /tab\.dataset\.myDayUser = userKey/);
 assert.match(myDay, /tab\.dataset\.myDayUser !== userKey/);
@@ -189,7 +204,7 @@ assert.match(page, /onclick="openPopiaPrivacyNotice\(\)"/);
 assert.match(page, /onclick="openTermsOfService\(\)"/);
 assert.doesNotMatch(page, /class="login-context"/);
 assert.doesNotMatch(page, /class="login-trust-row"/);
-assert.match(page, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
+assert.match(page, /preferences-enhancements\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(page, /onclick="openPopiaPrivacyNotice\(\)">Privacy &amp; POPIA Notice/);
 assert.match(page, /onclick="openTermsOfService\(\)">Terms of Service/);
 assert.match(page, /NCF Birth–4/);
@@ -230,7 +245,7 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20261001-inspect-refresh-v1/);
+assert.match(page, /backup\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(page, /id="stickyNoteForm"/);
 assert.doesNotMatch(page, /onsubmit="saveStickyNote\(event\)"/);
 assert.match(client, /function bindStickyNoteForm\(\)/);
@@ -408,7 +423,7 @@ assert.doesNotMatch(server, /console\.(?:log|warn|error)\(/);
 assert.doesNotMatch(client, /console\.(?:log|warn|error)\(/);
 assert.doesNotMatch(ambientBackground, /console\.(?:log|info|warn|error|debug)\(/);
 assert.match(ambientBackground, /AMBIENT_VIDEO_AUTOPLAY_BLOCKED/);
-assert.match(page, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
+assert.match(page, /preferences-enhancements\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);
 assert.match(client, /window\.ensureLittleFeetAuthenticatedSession = ensureAuthenticatedSession/);
 assert.match(client, /if \(!await ensureAuthenticatedSession\(\)\) return false/);
@@ -419,6 +434,19 @@ assert.doesNotMatch(client, /startReleaseNotesMonitor\(/);
 assert.match(client, /const PORTAL_BACKGROUND_REFRESH_MS = 2 \* 60 \* 1000/);
 assert.match(client, /function startPortalBackgroundRefresh\(\)/);
 assert.match(client, /function runPortalRefreshJob\(key, task\)/);
+assert.match(client, /let workspaceSessionEpoch = 0/);
+assert.match(client, /const workspaceInitializers = new Map\(\)/);
+assert.match(client, /window\.registerLittleFeetWorkspace = \(name, initialize\) =>/);
+assert.match(client, /function resetWorkspaceLoads\(\)/);
+assert.match(client, /runPortalRefreshJob\('workspace:' \+ sessionKey \+ ':' \+ tabId/);
+assert.match(client, /currentUser = null;[\s\S]{0,80}resetWorkspaceLoads\(\)/);
+for (const [name, source] of Object.entries(startupWorkspaces)) {
+  assert.match(source, new RegExp("registerLittleFeetWorkspace\\('" + name.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\assert.match(client, /function runPortalRefreshJob\(key, task\)/);') + "'"));
+  assert.doesNotMatch(source, /window\.addEventListener\('load',\(\)=>setTimeout\(init,/);
+}
+assert.match(startupWorkspaces['staff-notices'], /form\.dataset\.bound='1'/);
+assert.match(workplaceExtended, /registerLittleFeetWorkspace\('workplace-extended',load\)/);
+assert.doesNotMatch(workplaceExtended, /if\(user\(\)\?\.username\)load\(\)/);
 assert.match(client, /runPortalRefreshJob\('tickets', \(\) => loadTickets\(true\)\)/);
 assert.match(client, /runPortalRefreshJob\('broadcasts', \(\) => loadBroadcasts\(\)\)/);
 assert.match(client, /window\.refreshActiveWorkspace = refreshActiveWorkspace/);
