@@ -4525,8 +4525,10 @@ function normalizedSpreadsheetHeader(value) {
 }
 
 function learnerCodeSpreadsheetHeaders(rows) {
+  const reserved = new Set(['learneraccesscode', 'codestatus']);
   const headers = [];
   rows.forEach(row => Object.keys(row || {}).forEach(key => {
+    if (reserved.has(normalizedSpreadsheetHeader(key))) return;
     if (!headers.includes(key)) headers.push(key);
   }));
   const learnerAliases = new Set(['learnername', 'studentname', 'childname', 'name']);
