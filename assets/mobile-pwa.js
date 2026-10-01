@@ -68,7 +68,7 @@
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch(error => {
-        console.warn('Little Feet service worker registration failed:', error.message);
+        void window.reportLittleFeetClientLog?.({ severity: 'warn', code: 'PWA_SERVICE_WORKER_FAILED', message: error.message || 'Service worker registration failed.', source: 'assets/mobile-pwa.js' });
       });
     });
   }
