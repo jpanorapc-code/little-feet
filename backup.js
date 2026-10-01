@@ -39,6 +39,16 @@ let portalTourTimer = null;
 let portalBackgroundRefreshTimer = null;
 let portalBackgroundRefreshInFlight = false;
 const PORTAL_BACKGROUND_REFRESH_MS = 2 * 60 * 1000;
+const portalRefreshJobs = new Map();
+function runPortalRefreshJob(key, task) {
+  const existing = portalRefreshJobs.get(key);
+  if (existing) return existing;
+  const job = Promise.resolve().then(task).finally(() => {
+    if (portalRefreshJobs.get(key) === job) portalRefreshJobs.delete(key);
+  });
+  portalRefreshJobs.set(key, job);
+  return job;
+}
 let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
@@ -771,7 +781,10 @@ async function runPortalBackgroundRefresh() {
   portalBackgroundRefreshInFlight = true;
   try {
     if (!await ensureAuthenticatedSession()) return false;
-    await Promise.allSettled([loadTickets(true), loadBroadcasts()]);
+    await Promise.allSettled([
+      runPortalRefreshJob('tickets', () => loadTickets(true)),
+      runPortalRefreshJob('broadcasts', () => loadBroadcasts())
+    ]);
     return true;
   } finally {
     portalBackgroundRefreshInFlight = false;
@@ -1710,8 +1723,8 @@ function loadWorkspaceOnDemand(tabId) {
   if (!currentUser) return Promise.resolve([]);
   const loaders = {
     scheduleTab: [loadSchedules], worksheetsTab: [loadWorksheets], badgesTab: [loadBadges],
-    attendanceTab: [loadAttendance], ticketsTab: [loadTickets, loadTicketAssignees],
-    broadcastsTab: [loadBroadcasts], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
+    attendanceTab: [loadAttendance], ticketsTab: [() => runPortalRefreshJob('tickets', () => loadTickets()), loadTicketAssignees],
+    broadcastsTab: [() => runPortalRefreshJob('broadcasts', () => loadBroadcasts())], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
     registryTab: [loadRegistry, loadLearnerAccessCodes],
     accountsTab: [loadAccounts],
     financeTab: [loadSubscriptionBillingOverview, () => window.loadFinanceAutomationOverview?.()], parentPaymentsTab: [loadParentPayments, loadParentSubscription],
@@ -2042,8 +2055,8 @@ async function loadAllData() {
   await Promise.allSettled([
     loadAcademicTerm(),
     loadPosts(),
-    loadTickets(),
-    loadBroadcasts(),
+    runPortalRefreshJob('tickets', () => loadTickets()),
+    runPortalRefreshJob('broadcasts', () => loadBroadcasts()),
     loadReleaseNotes(),
     loadHouseholdSwitcher(),
     loadStickyNotes()
