@@ -137,7 +137,7 @@ const resolveRenderDeployReleaseNote = async () => {
       };
       return renderDeployReleaseNote;
     } catch (error) {
-      console.warn('Render deploy release metadata lookup failed:', error.message);
+      logStructured('warn', 'deploy.metadata_lookup_failed', { category: 'deployment', message: error.message });
       return renderDeployFallbackNote();
     } finally {
       clearTimeout(timeout);
@@ -153,8 +153,8 @@ const CURRENT_RELEASE_NOTES = Object.freeze([
     publishedAt: '2026-09-27T15:00:00.000+02:00'
   })
 ]);
-if (!fieldEncryptionConfigured) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
-if (!sessionSecretConfigured) console.warn('Using a development session secret. Set SESSION_SECRET before production.');
+if (!fieldEncryptionConfigured) logStructured('warn', 'config.development_field_key', { category: 'configuration', message: 'Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.' });
+if (!sessionSecretConfigured) logStructured('warn', 'config.development_session_secret', { category: 'configuration', message: 'Using a development session secret. Set SESSION_SECRET before production.' });
 // Usernames and email addresses are identifiers, not secrets. Store their display
 // casing, but compare a trimmed, case-insensitive value at every authentication boundary.
 const normalizeUsername = (value) => String(value || '').trim().toLocaleLowerCase('en-US');
@@ -738,7 +738,7 @@ app.use((req, res, next) => {
         await releaseMutationLock();
         originalJson(body);
       }).catch(async error => {
-        console.error('Refusing to acknowledge an unpersisted mutation:', error.message);
+        logStructured('error', 'persistence.mutation_commit_failed', { category: 'persistence', requestId: req.requestId, method: req.method, route: String(req.originalUrl || '').split('?')[0], status: 503, result: 'not_persisted', message: error.message });
         await loadDatabaseState().catch(() => {});
         await releaseMutationLock();
         if (!res.headersSent) {
@@ -964,7 +964,7 @@ class PostgresSessionStore extends session.Store {
     super();
     this.cleanupTimer = setInterval(() => {
       if (postgresPool) postgresPool.query('DELETE FROM little_feet_sessions WHERE expires_at <= NOW()').catch(error => {
-        console.error('Session cleanup failed:', error.message);
+        logStructured('error', 'session.cleanup_failed', { category: 'session', message: error.message });
       });
     }, 15 * 60 * 1000);
     this.cleanupTimer.unref?.();
@@ -1288,7 +1288,7 @@ async function loadDatabaseState() {
       const result = await postgresPool.query('SELECT payload FROM little_feet_app_state WHERE state_key = $1', ['primary']);
       return result.rowCount ? applySavedState(result.rows[0].payload) : false;
     } catch (error) {
-      console.error('Unable to load PostgreSQL application state:', error.message);
+      logStructured('error', 'persistence.postgres_load_failed', { category: 'persistence', message: error.message });
       throw error;
     }
   }
@@ -1298,7 +1298,7 @@ async function loadDatabaseState() {
     if (!row) return false;
     return applySavedState(JSON.parse(row.payload));
   } catch (error) {
-    console.error('Unable to load SQLite application state:', error.message);
+    logStructured('error', 'persistence.sqlite_load_failed', { category: 'persistence', message: error.message });
     return false;
   }
 }
@@ -1344,7 +1344,7 @@ async function saveDatabaseState() {
         postgresPersistenceSnapshot = nextSnapshot;
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
-        console.error('Unable to save normalized PostgreSQL state:', error.message);
+        logStructured('error', 'persistence.postgres_save_failed', { category: 'persistence', message: error.message });
         throw error;
       } finally {
         client.release();
@@ -1362,7 +1362,7 @@ async function saveDatabaseState() {
         updated_at = excluded.updated_at
     `).run('primary', JSON.stringify(db), new Date().toISOString());
   } catch (error) {
-    console.error('Unable to save SQLite application state:', error.message);
+    logStructured('error', 'persistence.sqlite_save_failed', { category: 'persistence', message: error.message });
     throw error;
   }
 }
@@ -1403,7 +1403,7 @@ function loadReplicaSnapshot() {
     const saved = JSON.parse(fs.readFileSync(replicaFile, 'utf8'));
     if (applySavedState(saved)) replicaSnapshotVersion = snapshotVersion;
   } catch (error) {
-    console.error('Unable to load standby snapshot:', error.message);
+    logStructured('error', 'replica.snapshot_load_failed', { category: 'replica', message: error.message });
   }
 }
 function writeReplicaSnapshot() {
@@ -1413,7 +1413,7 @@ function writeReplicaSnapshot() {
     fs.writeFileSync(stagingFile, JSON.stringify({ ...db, replicatedAt: new Date().toISOString() }), 'utf8');
     fs.renameSync(stagingFile, replicaFile);
   } catch (error) {
-    console.error('Unable to write standby snapshot:', error.message);
+    logStructured('error', 'replica.snapshot_write_failed', { category: 'replica', message: error.message });
   }
 }
 function ensureBootstrapAdministrator() {
@@ -1421,7 +1421,7 @@ function ensureBootstrapAdministrator() {
   const username = String(process.env.LF_BOOTSTRAP_ADMIN_USERNAME || '').trim();
   const pin = String(process.env.LF_BOOTSTRAP_ADMIN_PIN || '');
   if (!username || !pin) {
-    console.warn('No administrator account exists. Set LF_BOOTSTRAP_ADMIN_USERNAME and LF_BOOTSTRAP_ADMIN_PIN to create the first real school administrator.');
+    logStructured('warn', 'bootstrap.admin_missing', { category: 'configuration', message: 'No administrator account exists. Set LF_BOOTSTRAP_ADMIN_USERNAME and LF_BOOTSTRAP_ADMIN_PIN to create the first real school administrator.' });
     return;
   }
   db.users.push({
@@ -1477,7 +1477,7 @@ function applyOwnerAccountMigration() {
     createdAt: new Date().toISOString()
   }];
   db.accountMigrations[migrationId] = { appliedAt: new Date().toISOString(), ownerUsername: username, removedAccounts: removedUsernames.size };
-  console.log(`Applied owner account reset ${migrationId}; removed ${removedUsernames.size} previous account(s).`);
+  logStructured('info', 'account.owner_reset_applied', { category: 'migration', result: 'completed', details: `Migration ${migrationId}; removed ${removedUsernames.size} previous account(s).` });
   return true;
 }
 function removeLegacyMailboxConnections() {
@@ -1488,7 +1488,7 @@ function removeLegacyMailboxConnections() {
     delete account.mailboxConnection;
     removed += 1;
   });
-  if (removed) console.log(`Removed ${removed} obsolete mailbox connection record(s).`);
+  if (removed) logStructured('info', 'mailbox.legacy_connections_removed', { category: 'migration', result: 'completed', details: `Removed ${removed} obsolete mailbox connection record(s).` });
   return removed;
 }
 
@@ -1618,7 +1618,7 @@ app.post('/api/login', (req, res) => {
     if (sourceLocked || usernameLocked) {
       if (matchedAccount && usernameLocked) {
         void sendLoginLockoutEmail(matchedAccount).catch(error => {
-          console.error('Login lockout email failed:', redactSensitiveLogText(error.message));
+          logStructured('error', 'auth.lockout_email_failed', { category: 'authentication', requestId: req.requestId, user: matchedAccount?.username || '', role: matchedAccount?.role || '', schoolId: matchedAccount ? accountSchoolId(matchedAccount) : '', schoolName: matchedAccount?.schoolName || '', method: req.method, route: req.path, message: error.message });
         });
       }
       const retryAfterSeconds = Math.ceil(LOGIN_COOLDOWN_MS / 1000);
@@ -1660,7 +1660,7 @@ app.get('/api/keepalive', async (_req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
   } catch (error) {
-    console.error('Keepalive database probe failed:', error.message);
+    logStructured('error', 'health.keepalive_probe_failed', { category: 'health', message: error.message, result: 'failed' });
     res.status(503).json({ status: 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
   }
 });
@@ -2766,7 +2766,7 @@ app.get('/api/schools/search', async (req, res) => {
       writeSchoolSearchCache(cacheKey, { results: publicResults });
     } catch (error) {
       liveSearchAvailable = false;
-      console.warn('School-name search fallback unavailable:', error.message);
+      logStructured('warn', 'school_search.fallback_unavailable', { category: 'integration', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     }
   }
 
@@ -2873,7 +2873,7 @@ app.get('/api/nearby-schools', async (req, res) => {
       writeSchoolSearchCache(cacheKey, data);
       res.json(data);
     } catch (fallbackError) {
-      console.error('Nearby school search failed:', error.message, '| fallback failed:', fallbackError.message);
+      logStructured('error', 'school_search.nearby_failed', { category: 'integration', requestId: req.requestId, method: req.method, route: req.path, message: error.message, details: `Fallback: ${fallbackError.message}` });
       res.status(502).json({ message: 'Live school data is temporarily unavailable. Please try again shortly.' });
     }
   }
@@ -2922,7 +2922,7 @@ app.post('/api/schools/enrich', async (req, res) => {
       mapsUrl: place.googleMapsUri || ''
     });
   } catch (error) {
-    console.error('School enrichment failed:', error.message);
+    logStructured('error', 'school_search.enrichment_failed', { category: 'integration', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Verified public-school lookup is temporarily unavailable. Please try again later.' });
   }
 });
@@ -3849,7 +3849,7 @@ const syncConnectedMailbox = async (actor, { initial = false } = {}) => {
     connection.lastError = '';
     return { added, skipped: false, email: connection.email, lastSyncAt: connection.lastSuccessfulSyncAt };
   } catch (error) {
-    console.error('Mailbox sync provider error:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.provider_sync_failed', { category: 'mailbox', message: error.message });
     connection.lastError = 'Mailbox sync is temporarily unavailable. Please try again.';
     throw error;
   }
@@ -3874,7 +3874,7 @@ app.get('/api/email/mailbox/connect/:provider', (req, res) => {
     };
     req.session.save(error => res.redirect(error ? '/?mailboxError=session-failed' : authorization.url));
   } catch (error) {
-    console.error('Mailbox authorization setup failed:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.authorization_setup_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?mailboxError=mailbox-connection-failed');
   }
 });
@@ -3914,7 +3914,7 @@ const completeMailboxOAuth = async (req, res, provider) => {
   } catch (error) {
     if (previousConnection) actor.mailboxConnection = previousConnection;
     else delete actor.mailboxConnection;
-    console.error(`${provider} mailbox connection failed:`, error.message);
+    logStructured('error', 'mailbox.connection_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, details: `Provider ${provider}`, message: error.message });
     return res.redirect('/?mailboxError=mailbox-connection-failed');
   }
 };
@@ -3932,7 +3932,7 @@ app.post('/api/email/mailbox/sync', async (req, res) => {
     await saveDatabaseState();
     res.json({ success: true, ...result, mailbox: mailboxConnectionStatus(actor) });
   } catch (error) {
-    console.error('Mailbox sync request failed:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.sync_request_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Mailbox sync is temporarily unavailable. Please try again.' });
   }
 });
@@ -3950,7 +3950,7 @@ app.post('/api/email/mailbox/send', async (req, res) => {
     await saveDatabaseState();
     res.status(201).json({ success: true, provider: result.provider, id: result.id || '', sentAt: actor.mailboxConnection.lastSentAt });
   } catch (error) {
-    console.error('Mailbox send failed:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.send_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Email could not be sent right now. Please try again.' });
   }
 });
@@ -3972,7 +3972,7 @@ app.delete('/api/email/mailbox', async (req, res) => {
     });
     revoked = Boolean(result?.revoked);
   } catch (error) {
-    console.warn(`${connection.provider || 'Mailbox'} remote token revocation warning: ${boundedText(error.message, 180)}`);
+    logStructured('warn', 'mailbox.token_revocation_warning', { category: 'mailbox', details: `Provider ${connection.provider || 'Mailbox'}`, message: error.message });
   } finally {
     delete actor.mailboxConnection;
     await saveDatabaseState();
@@ -4040,7 +4040,7 @@ app.post('/api/email/inbound/resend', async (req, res) => {
 
     res.json({ received: true, routed: true });
   } catch (error) {
-    console.error('Inbound email processing failed:', error.message);
+    logStructured('error', 'mailbox.inbound_processing_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Inbound email could not be processed yet; the provider may retry.' });
   }
 });
@@ -5734,7 +5734,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
     establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'));
   } catch (error) {
-    console.error('Yahoo sign-in failed:', error.message);
+    logStructured('error', 'oauth.yahoo_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=yahoo-sign-in-failed');
   }
 });
@@ -5792,7 +5792,7 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
     establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'));
   } catch (error) {
-    console.error('Microsoft sign-in failed:', error.message);
+    logStructured('error', 'oauth.microsoft_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=microsoft-sign-in-failed');
   }
 });
@@ -5829,9 +5829,9 @@ app.get(/(.*)/, (req, res) => {
 // Start Server
 persistenceReady.then(() => {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    logStructured('info', 'server.started', { category: 'runtime', result: 'listening', details: `Port ${PORT}` });
   });
 }).catch(error => {
-  console.error('Database startup failed:', error.message);
+  logStructured('error', 'server.startup_failed', { category: 'runtime', result: 'failed', message: error.message });
   process.exit(1);
 });
