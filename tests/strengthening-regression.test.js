@@ -108,6 +108,23 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(saved.data.record.framework, 'NCF Birth–4');
     assert.equal(saved.data.record.area, 'ELDA 3 · Communication');
 
+    const duplicateSaved = await request('/api/modules/curriculum', {
+      method: 'POST', cookie: teacher.cookie, body: {
+        framework: 'NCF Birth–4', area: 'ELDA 3 · Communication', learnerName: 'Alpha Learner',
+        observation: 'Uses words and gestures to explain a play idea to a peer.', evidenceReference: 'Learning file 1'
+      }
+    });
+    assert.equal(duplicateSaved.response.status, 409);
+    assert.match(duplicateSaved.data.message, /already being processed/i);
+
+    const oversizedStandardImport = await request('/api/schedules/import', {
+      method: 'POST', cookie: teacher.cookie, body: {
+        schedules: [{ studentName: 'Alpha Learner', dayOfWeek: 'Monday', timeSlot: '08:00 - 09:00', activity: 'x'.repeat(5 * 1024 * 1024) }]
+      }
+    });
+    assert.equal(oversizedStandardImport.response.status, 413);
+    assert.match(oversizedStandardImport.data.message, /School Integration/i);
+
     const curriculum = await request('/api/modules/curriculum', { cookie: admin.cookie });
     assert.equal(curriculum.response.status, 200);
     assert.equal(curriculum.data.length, 1);
