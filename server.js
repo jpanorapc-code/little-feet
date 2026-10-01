@@ -2007,6 +2007,199 @@ app.post('/api/system/client-log', (req, res) => {
   res.status(201).json({ success: true, logId: logged.id, requestId: req.requestId });
 });
 
+const sourceFinding = (severity, category, check, issue, why, source = '', line = null, column = null, recommendation = '') => ({
+  id: crypto.randomUUID(), severity, category, check, issue, why, source, line, column, recommendation
+});
+const sourceLineNumber = (content, offset) => content.slice(0, Math.max(0, offset)).split('\n').length;
+const scanSourceMatches = (sourceName, content, rules) => {
+  const findings = [];
+  for (const rule of rules) {
+    const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : rule.pattern.flags + 'g';
+    const regex = new RegExp(rule.pattern.source, flags);
+    let match;
+    while ((match = regex.exec(content))) {
+      findings.push(sourceFinding(rule.severity, rule.category, rule.check, rule.issue, rule.why, sourceName, sourceLineNumber(content, match.index), null, rule.recommendation));
+      if (!match[0].length) regex.lastIndex += 1;
+      if (findings.length >= 100) return findings;
+    }
+  }
+  return findings;
+};
+
+const runAdminSelfTest = async actor => {
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+  const checks = [];
+  const findings = [];
+  const addCheck = (name, status, detail) => checks.push({ name, status, detail });
+  const addFinding = (...args) => findings.push(sourceFinding(...args));
+
+  const readiness = runtimeReadiness();
+  const readinessReasons = {
+    database: 'The production database connection is not configured.',
+    durableSessions: 'Sessions cannot be stored durably without the production database.',
+    fieldEncryption: 'The field-encryption key is missing.',
+    sessionSecret: 'The secure session secret is missing.',
+    secureCookies: 'Secure-cookie enforcement is not active outside production mode.',
+    bootstrapAccount: 'No administrator account currently exists.',
+    privateObjectStorage: 'Private object storage is not configured.',
+    storageCleanupHealthy: 'At least one object-storage cleanup job requires attention.'
+  };
+  for (const [name, passed] of Object.entries(readiness.checks)) {
+    addCheck(`readiness.${name}`, passed ? 'passed' : 'failed', passed ? 'Configured and available.' : readinessReasons[name]);
+    if (!passed) addFinding('error', 'configuration', `readiness.${name}`, readinessReasons[name], 'This production-readiness requirement is currently false in the running application.', 'runtime configuration', null, null, 'Correct the production configuration or resolve the unhealthy storage job.');
+  }
+
+  try {
+    if (postgresPool) await postgresPool.query('SELECT 1');
+    else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
+    else throw new Error('No active database adapter is available.');
+    addCheck('database.probe', 'passed', 'A live database SELECT 1 probe succeeded.');
+  } catch (error) {
+    addCheck('database.probe', 'failed', 'Database probe failed.');
+    const location = errorSourceLocation(error);
+    addFinding('error', 'persistence', 'database.probe', 'The live database probe failed.', redactSensitiveLogText(error.message), location.source, location.line, location.column, 'Inspect the database connection and Render database availability.');
+  }
+
+  const indexPath = path.join(__dirname, 'index.html');
+  let indexSource = '';
+  try {
+    indexSource = fs.readFileSync(indexPath, 'utf8');
+    const references = [];
+    const collect = regex => {
+      let match;
+      while ((match = regex.exec(indexSource))) references.push({ raw: match[1], offset: match.index });
+    };
+    collect(/(?:src|href)=["']([^"']+)["']/gi);
+    collect(/url\(\s*["']?([^"'\)]+)["']?\s*\)/gi);
+    const checked = new Set();
+    for (const reference of references) {
+      const raw = String(reference.raw || '').trim();
+      if (!raw || raw.startsWith('#') || /^(?:https?:|data:|blob:|mailto:|tel:|javascript:)/i.test(raw)) continue;
+      const local = raw.split(/[?#]/)[0].replace(/^\//, '');
+      if (!local || local.startsWith('api/') || local.startsWith('auth/') || !/\.[a-z0-9]{1,8}$/i.test(local)) continue;
+      if (local.includes('..')) {
+        addFinding('error', 'security', 'frontend.asset_reference', 'A public asset reference contains parent-directory traversal.', 'A deployed page should never reference a static file through .. path traversal.', 'index.html', sourceLineNumber(indexSource, reference.offset), null, 'Replace it with a normal same-origin asset path.');
+        continue;
+      }
+      if (checked.has(local)) continue;
+      checked.add(local);
+      if (!fs.existsSync(path.join(__dirname, local))) {
+        addFinding('error', 'frontend', 'frontend.asset_reference', `Missing deployed asset: ${local}`, 'index.html references a local file that does not exist in the deployed build, which can cause broken UI, scripts, images or styles.', 'index.html', sourceLineNumber(indexSource, reference.offset), null, 'Restore the referenced file or correct the index.html reference.');
+      }
+    }
+    addCheck('frontend.asset_references', findings.some(item => item.check === 'frontend.asset_reference') ? 'failed' : 'passed', `${checked.size} local deployed asset references checked.`);
+  } catch (error) {
+    const location = errorSourceLocation(error);
+    addCheck('frontend.asset_references', 'failed', 'Could not inspect index.html.');
+    addFinding('error', 'frontend', 'frontend.asset_references', 'The deployed page could not be inspected.', redactSensitiveLogText(error.message), location.source, location.line, location.column, 'Verify that index.html exists and is readable in the deployed application.');
+  }
+
+  const publicFiles = ['index.html', 'backup.js'];
+  try {
+    const assetDir = path.join(__dirname, 'assets');
+    for (const entry of fs.readdirSync(assetDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.js')) publicFiles.push(`assets/${entry.name}`);
+    }
+  } catch {}
+  const publicThreatRules = [
+    { pattern: /\bprocess\.env\b/, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'Server environment access appears in public client source.', why: 'Public browser code must never depend on or expose server environment variables.', recommendation: 'Move this logic to a server-only module.' },
+    { pattern: /\b(?:DATABASE_URL|SESSION_SECRET|LF_FIELD_ENCRYPTION_KEY|LF_SMTP_PASSWORD|GOOGLE_CLIENT_SECRET|MICROSOFT_CLIENT_SECRET|R2_SECRET_ACCESS_KEY)\b/, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'A server-only secret/configuration name appears in public client source.', why: 'Server-only configuration identifiers in public code can expose implementation details and increase accidental secret-leak risk.', recommendation: 'Remove the server-only reference from public source.' },
+    { pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'Private-key material appears in public client source.', why: 'Private keys must never be shipped to a browser.', recommendation: 'Remove and rotate the exposed key immediately.' },
+    { pattern: /\b(?:postgres(?:ql)?|mongodb(?:\+srv)?)\:\/\//i, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'A database connection URL appears in public client source.', why: 'Database connection strings belong only on the server.', recommendation: 'Remove the connection string from public files and rotate credentials if they were real.' }
+  ];
+  let publicScanned = 0;
+  for (const relative of publicFiles) {
+    try {
+      const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
+      publicScanned += 1;
+      findings.push(...scanSourceMatches(relative, content, publicThreatRules));
+    } catch (error) {
+      addFinding('warn', 'frontend', 'public.source_scan', `Could not inspect public source file ${relative}.`, redactSensitiveLogText(error.message), relative, null, null, 'Verify the deployed file exists and is readable.');
+    }
+  }
+  addCheck('public.secret_boundary', findings.some(item => item.check === 'public.secret_boundary') ? 'failed' : 'passed', `${publicScanned} public source files scanned for server-only secrets and database URLs.`);
+
+  const runtimeSourceFiles = ['server.js', 'finance-automation-server.js', 'backup.js', ...publicFiles.filter(name => name.startsWith('assets/'))];
+  const executionRules = [
+    { pattern: /\beval\s*\(/, severity: 'error', category: 'security', check: 'source.dynamic_code_execution', issue: 'eval() is present in deployed application source.', why: 'eval() can execute strings as code and expands the impact of injection bugs.', recommendation: 'Replace eval() with explicit parsing or normal function calls.' },
+    { pattern: /\bnew\s+Function\s*\(/, severity: 'error', category: 'security', check: 'source.dynamic_code_execution', issue: 'new Function() is present in deployed application source.', why: 'Dynamic code construction can turn untrusted strings into executable code.', recommendation: 'Replace dynamic function creation with explicit application logic.' }
+  ];
+  for (const relative of [...new Set(runtimeSourceFiles)]) {
+    try {
+      const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
+      findings.push(...scanSourceMatches(relative, content, executionRules));
+    } catch {}
+  }
+  addCheck('source.dynamic_code_execution', findings.some(item => item.check === 'source.dynamic_code_execution') ? 'failed' : 'passed', 'Deployed first-party JavaScript checked for eval() and new Function().');
+
+  for (const relative of ['server.js', 'finance-automation-server.js']) {
+    try {
+      const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
+      const bypassRules = [{
+        pattern: /\bconsole\.(?:log|warn|error)\s*\(/,
+        severity: 'warn', category: 'logging', check: 'logging.centralization',
+        issue: 'A server console call bypasses the centralized structured logger.',
+        why: 'Direct console output cannot be filtered and traced consistently in the Inspect dashboard.',
+        recommendation: 'Route this event through logStructured().'
+      }];
+      findings.push(...scanSourceMatches(relative, content, bypassRules));
+    } catch {}
+  }
+  addCheck('logging.centralization', findings.some(item => item.check === 'logging.centralization') ? 'attention' : 'passed', 'Server runtime source checked for direct console logging bypasses.');
+
+  const visibleErrors = (db.systemErrors || []).filter(entry => systemErrorVisibleTo(entry, actor) && entry.status === 'open');
+  addCheck('faults.open', visibleErrors.length ? 'attention' : 'passed', visibleErrors.length ? `${visibleErrors.length} unresolved persistent fault(s) exist.` : 'No unresolved persistent faults.');
+  visibleErrors.slice(0, 25).forEach(error => addFinding(
+    'warn', 'fault-history', 'faults.open',
+    `${error.name || 'Error'} remains ${error.status || 'open'}.`,
+    error.message || 'A runtime fault was recorded and has not yet been resolved.',
+    error.source || error.route || '', error.line || null, error.column || null,
+    error.requestId ? `Trace request ${error.requestId} in Inspect & Logs, fix the cause, then mark the fault resolved.` : 'Review the fault, fix the cause, then mark it resolved.'
+  ));
+
+  const recentCutoff = Date.now() - 15 * 60 * 1000;
+  const visibleLogs = structuredLogger.list().filter(entry => structuredLogVisibleTo(entry, actor) && Date.parse(entry.timestamp) >= recentCutoff);
+  const serverErrors = visibleLogs.filter(entry => Number(entry.status) >= 500);
+  const denied = visibleLogs.filter(entry => [401, 403].includes(Number(entry.status)));
+  const limited = visibleLogs.filter(entry => Number(entry.status) === 429);
+  const slow = visibleLogs.filter(entry => entry.event === 'http.request' && Number(entry.durationMs) >= structuredLogger.slowRequestMs);
+  addCheck('traffic.server_errors', serverErrors.length ? 'attention' : 'passed', `${serverErrors.length} HTTP 5xx response(s) in the last 15 minutes.`);
+  if (serverErrors.length) addFinding('warn', 'runtime', 'traffic.server_errors', `${serverErrors.length} server-error response(s) were recorded recently.`, 'HTTP 5xx responses mean a request reached the server but the server could not complete it successfully.', '', null, null, 'Filter Inspect logs to 5xx and trace the affected Request IDs.');
+  addCheck('traffic.access_denied', denied.length >= 10 ? 'attention' : 'passed', `${denied.length} HTTP 401/403 response(s) in the last 15 minutes.`);
+  if (denied.length >= 10) addFinding('warn', 'security', 'traffic.access_denied', 'A burst of access-denied responses was detected.', 'Repeated 401/403 responses can come from a broken client permission flow or from unauthorised probing.', '', null, null, 'Filter logs to 4xx, review users/routes and confirm the traffic is expected.');
+  addCheck('traffic.rate_limited', limited.length >= 5 ? 'attention' : 'passed', `${limited.length} HTTP 429 response(s) in the last 15 minutes.`);
+  if (limited.length >= 5) addFinding('warn', 'security', 'traffic.rate_limited', 'Repeated rate limiting was triggered.', 'A client is sending requests faster than the configured safety limit; this can be accidental retry behaviour or abusive automation.', '', null, null, 'Filter logs to HTTP 429 and identify the affected route/account pattern.');
+  addCheck('performance.slow_requests', slow.length >= 5 ? 'attention' : 'passed', `${slow.length} request(s) exceeded ${structuredLogger.slowRequestMs} ms in the last 15 minutes.`);
+  if (slow.length >= 5) addFinding('warn', 'performance', 'performance.slow_requests', 'Multiple slow requests were detected.', 'Repeated slow API calls can indicate database pressure, an external integration delay, or an expensive application path.', '', null, null, 'Sort the Inspect stream by route/request and investigate the slowest repeated path.');
+
+  const errors = findings.filter(item => item.severity === 'error').length;
+  const warnings = findings.filter(item => item.severity === 'warn').length;
+  const completedAt = new Date().toISOString();
+  const result = {
+    runId: crypto.randomUUID(), startedAt, completedAt, durationMs: Date.now() - startedMs,
+    status: errors ? 'failed' : warnings ? 'attention' : 'passed',
+    summary: { checks: checks.length, passed: checks.filter(check => check.status === 'passed').length, attention: checks.filter(check => check.status === 'attention').length, failed: checks.filter(check => check.status === 'failed').length, errors, warnings },
+    checks, findings
+  };
+  logStructured(errors ? 'error' : warnings ? 'warn' : 'info', 'system.self_test_completed', {
+    category: 'diagnostics', user: actor.username, role: actor.role, schoolId: accountSchoolId(actor), schoolName: actor.schoolName || '',
+    result: result.status, details: `${result.summary.checks} checks; ${errors} error finding(s); ${warnings} warning finding(s).`
+  });
+  return result;
+};
+
+app.post('/api/system-self-test', async (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  try {
+    res.json(await runAdminSelfTest(actor));
+  } catch (error) {
+    recordSystemError(error, req, { severity: 'error', name: 'SELF_TEST_FAILURE' });
+    res.status(500).json({ message: 'The site self-test could not complete. The failure was recorded for inspection.', requestId: req.requestId });
+  }
+});
+
 app.patch('/api/system-errors/:id', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
