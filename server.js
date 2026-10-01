@@ -13,6 +13,7 @@ const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-stor
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
 const { createStructuredLogger, redactSensitiveLogText } = require('./lib/structured-logger');
+const { runProductionSafeSiteInspection } = require('./lib/site-inspector');
 const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, sendMailboxMessage, revokeMailboxAccess } = require('./lib/mailbox-oauth');
 
 const app = express();
@@ -37,6 +38,7 @@ const structuredLogger = createStructuredLogger({
   slowRequestMs: Number(process.env.LF_SLOW_REQUEST_MS) || 1500
 });
 const logStructured = (severity, event, fields = {}) => structuredLogger.emit(severity, event, fields);
+let siteInspectionActive = false;
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
 const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
@@ -1947,6 +1949,38 @@ app.get('/api/system-logs', (req, res) => {
     oldestAt: visibleLogs[visibleLogs.length - 1]?.timestamp || null
   };
   res.json({ summary, logs: filtered, generatedAt: new Date().toISOString() });
+});
+
+app.post('/api/system-site-test', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  if (siteInspectionActive) return res.status(409).json({ message: 'A site inspection is already running. Please wait for it to finish.' });
+
+  siteInspectionActive = true;
+  const startedAt = Date.now();
+  logStructured('info', 'inspection.site_test_started', {
+    category: 'inspection', requestId: req.requestId, user: actor.username, role: actor.role,
+    schoolId: accountSchoolId(actor), schoolName: actor.schoolName || '', method: req.method, route: req.path, result: 'running'
+  });
+  try {
+    const report = runProductionSafeSiteInspection(__dirname, {
+      productionConfigurationErrors,
+      systemErrors: (db.systemErrors || []).filter(entry => systemErrorVisibleTo(entry, actor))
+    });
+    const severity = report.summary.critical || report.summary.errors ? 'error' : report.summary.warnings ? 'warn' : 'info';
+    logStructured(severity, 'inspection.site_test_completed', {
+      category: 'inspection', requestId: req.requestId, user: actor.username, role: actor.role,
+      schoolId: accountSchoolId(actor), schoolName: actor.schoolName || '', method: req.method, route: req.path,
+      durationMs: Date.now() - startedAt, result: report.summary.passed ? 'passed' : 'faults_found',
+      details: `Critical ${report.summary.critical}; errors ${report.summary.errors}; warnings ${report.summary.warnings}; files ${report.summary.filesChecked}.`
+    });
+    return res.json(report);
+  } catch (error) {
+    recordSystemError(error, req, { severity: 'error', route: req.path, name: 'SITE_INSPECTION_FAILED' });
+    return res.status(500).json({ message: 'The site inspection could not complete. The failure was recorded for tracing.', requestId: req.requestId });
+  } finally {
+    siteInspectionActive = false;
+  }
 });
 
 app.get('/api/system-logs/trace/:requestId', (req, res) => {
