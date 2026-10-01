@@ -307,10 +307,10 @@
   function activeRefreshInterval(preference) {
     if (preference === 'auto') {
       const tabId = document.querySelector('#dashboardSection .tab-content.active')?.id || 'homeTab';
-      return FAST_TABS.has(tabId) ? 30000 : 120000;
+      return FAST_TABS.has(tabId) ? 120000 : 300000;
     }
     const parsed = Number(preference);
-    const allowed = new Set([5000,10000,30000,60000,300000,900000,1800000,3600000,7200000,86400000]);
+    const allowed = new Set([300000,900000,1800000,3600000,7200000,86400000]);
     return allowed.has(parsed) ? parsed : 0;
   }
 
@@ -321,9 +321,8 @@
     try {
       saveDashboardDrafts();
       const activeTab = document.querySelector('#dashboardSection .tab-content.active')?.id || 'homeTab';
-      const refreshed = await Promise.resolve(window.loadAllData?.());
+      const refreshed = await Promise.resolve(window.refreshActiveWorkspace?.(activeTab));
       if (refreshed === false) return false;
-      window.loadWorkspaceOnDemand?.(activeTab);
       const syncTag = document.getElementById('liveSyncTag');
       if (syncTag) syncTag.textContent = 'Last synced: Just now';
       [50, 350, 1200].forEach(delay => window.setTimeout(restoreDashboardDrafts, delay));
@@ -350,7 +349,11 @@
   }
 
   function configureDashboardAutoRefresh(preference) {
-    scheduleDashboardRefresh(String(preference || '0'));
+    const raw = String(preference || '0');
+    const normalized = ['5000','10000','30000','60000'].includes(raw) ? 'auto' : raw;
+    const field = document.getElementById('refreshPreference');
+    if (field && field.value !== normalized) field.value = normalized;
+    scheduleDashboardRefresh(normalized);
   }
 
   function stopDashboardAutoRefresh() {
