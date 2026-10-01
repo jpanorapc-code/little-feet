@@ -5192,6 +5192,7 @@
         <ul class="sidebar-links">
         <li data-roles="teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('lookupTab', this)">Learner Search</button></li>
         <li data-roles="admin,staff"><button type="button" class="nav-btn" onclick="switchTab('accountsTab', this)">Account Management</button></li>
+        <li data-roles="admin,staff"><button type="button" class="nav-btn" onclick="switchTab('inspectTab', this)"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><span>Inspect &amp; Logs</span></button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('learnerCodesTab', this)">Learner Code Forms</button></li>
         <li data-roles="principal,admin"><button type="button" class="nav-btn" onclick="switchTab('dataImportTab', this)">Import School Data</button></li>
         <li data-roles="parent,teacher,principal,district,admin,crm,accounts,school_accounts,support"><button type="button" class="nav-btn" onclick="switchTab('guideTab', this)">Help &amp; Guide</button></li>
@@ -5925,6 +5926,69 @@
         </div>
       </div>
 
+      <div id="inspectTab" class="tab-content" data-roles="admin,staff">
+        <div class="card">
+          <div class="card-header-bar">
+            <h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg></span><span>Inspect &amp; Structured Logs</span></h2>
+            <span class="badge-tag urgent">ADMIN DIAGNOSTICS</span>
+          </div>
+          <p style="color:var(--text-muted);line-height:1.6;margin-bottom:16px;">Trace Little Feet requests and faults from one place. Logs contain request IDs, account and school context, route, status, duration and outcome. Request bodies, passwords, PINs, session cookies and access tokens are not recorded.</p>
+
+          <div class="workspace-grid" style="margin-bottom:16px;">
+            <div class="workspace-card"><span class="meta">Runtime status</span><strong id="inspectRuntimeStatus" style="display:block;margin-top:5px;font-size:1.08rem;">Loading…</strong></div>
+            <div class="workspace-card"><span class="meta">Requests · last 15 min</span><strong id="inspectRequestCount" style="display:block;margin-top:5px;font-size:1.08rem;">—</strong></div>
+            <div class="workspace-card"><span class="meta">Errors · last 15 min</span><strong id="inspectErrorCount" style="display:block;margin-top:5px;font-size:1.08rem;">—</strong></div>
+            <div class="workspace-card"><span class="meta">Warnings · last 15 min</span><strong id="inspectWarningCount" style="display:block;margin-top:5px;font-size:1.08rem;">—</strong></div>
+            <div class="workspace-card"><span class="meta">Slow requests</span><strong id="inspectSlowCount" style="display:block;margin-top:5px;font-size:1.08rem;">—</strong></div>
+            <div class="workspace-card"><span class="meta">Open persistent faults</span><strong id="inspectOpenFaultCount" style="display:block;margin-top:5px;font-size:1.08rem;">—</strong></div>
+          </div>
+
+          <section class="workspace-card" style="margin-bottom:16px;">
+            <div class="card-header-bar"><h3>Live system doctor</h3><span id="inspectGeneratedAt" class="meta">Not loaded</span></div>
+            <div id="inspectDiagnosticsSummary" class="meta">Loading diagnostics…</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+              <button type="button" class="action-btn btn-green" onclick="loadInspectDashboard()">Refresh now</button>
+              <button type="button" id="inspectAutoRefreshToggle" class="action-btn btn-blue" onclick="toggleInspectAutoRefresh()">Auto-refresh: Off</button>
+              <button type="button" class="action-btn btn-blue" onclick="downloadInspectReport()">Download JSON report</button>
+              <button type="button" class="action-btn btn-blue" onclick="openDebugReport()">Browser debug report</button>
+            </div>
+          </section>
+
+          <section class="workspace-card" style="margin-bottom:16px;">
+            <div class="card-header-bar"><h3>Trace filters</h3><span class="meta">Use a Request ID for an exact end-to-end trace.</span></div>
+            <div class="workspace-grid">
+              <label>Severity<select id="inspectFilterSeverity"><option value="">All severities</option><option value="error">Error</option><option value="warn">Warning</option><option value="info">Info</option><option value="debug">Debug</option></select></label>
+              <label>Status<select id="inspectFilterStatus"><option value="">All statuses</option><option value="5xx">5xx server errors</option><option value="4xx">4xx client/security</option><option value="403">403 denied</option><option value="429">429 rate limited</option><option value="2xx">2xx success</option></select></label>
+              <label>Method<select id="inspectFilterMethod"><option value="">All methods</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>CLIENT</option><option>SYSTEM</option></select></label>
+              <label>User / account<input id="inspectFilterUser" autocomplete="off" placeholder="username or email"></label>
+              <label>Event<input id="inspectFilterEvent" autocomplete="off" placeholder="e.g. http.request"></label>
+              <label>Request ID<input id="inspectFilterRequestId" autocomplete="off" placeholder="Paste request ID"></label>
+              <label style="grid-column:1/-1;">Search logs<input id="inspectFilterSearch" autocomplete="off" placeholder="Route, event, result, code or message"></label>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+              <button type="button" class="action-btn btn-green" onclick="loadInspectDashboard()">Apply filters</button>
+              <button type="button" class="action-btn btn-blue" onclick="clearInspectFilters()">Clear filters</button>
+            </div>
+          </section>
+
+          <section class="workspace-card" style="margin-bottom:16px;">
+            <div class="card-header-bar"><h3>Structured request &amp; event stream</h3><span id="inspectLogCount" class="meta">0 shown</span></div>
+            <div style="overflow:auto;max-height:620px;">
+              <table class="guide-records-table" style="min-width:1050px;">
+                <thead><tr><th>Time</th><th>Severity</th><th>Event</th><th>User / school</th><th>Request</th><th>Status</th><th>Duration</th><th>Result</th><th>Trace</th></tr></thead>
+                <tbody id="inspectLogRows"><tr><td colspan="9">Loading structured logs…</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="workspace-card">
+            <div class="card-header-bar"><h3>Persistent fault history</h3><span class="meta">Survives normal server restarts and deploys.</span></div>
+            <p class="meta" style="margin:0 0 10px;">Server faults and qualifying browser runtime errors remain here until reviewed. Acknowledging or resolving a fault does not delete its history.</p>
+            <div id="inspectFaultRows" class="record-list"><p class="meta">Loading fault history…</p></div>
+          </section>
+        </div>
+      </div>
+
       <div id="learnerCodesTab" class="tab-content" data-roles="principal,admin">
         <div class="card">
           <div class="card-header-bar"><h2>🔐 Learner Code Register</h2><span class="badge-tag info">SCHOOL CONTROLLED</span></div>
@@ -6279,7 +6343,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20260930-accounts-full-v1" defer></script>
+  <script src="backup.js?v=20261001-inspect-logs-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20260930-user-switch-v2" defer></script>
   <script src="/assets/staff-work.js?v=20260930-accounts-full-v1" defer></script>
