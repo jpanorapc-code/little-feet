@@ -1,0 +1,22 @@
+name: Vendor integrity capture
+
+on:
+  push:
+    branches:
+      - security/immuniweb-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hashes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Capture pinned vendor hashes
+        run: node scripts/capture-vendor-integrity.js
