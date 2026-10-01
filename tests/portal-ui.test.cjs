@@ -130,6 +130,20 @@ async function main() {
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
+      // Profile avatars are a device-local preference: selecting one must not
+      // create any API traffic, and the transparent penguin must survive reload.
+      await page.locator('.nav-btn[onclick="switchTab(\'settingsTab\', this)"]').click();
+      await page.locator('#settingsTab').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('.profile-icon-choice').count(), 8, 'Settings should expose eight penguin profile avatars');
+      await page.waitForTimeout(150);
+      const requestsBeforeAvatar = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+      await page.locator('.profile-icon-choice[data-profile-icon="lady"]').click();
+      await page.waitForTimeout(100);
+      const requestsAfterAvatar = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+      assert.equal(requestsAfterAvatar, requestsBeforeAvatar, 'Changing profile avatar must not call the API');
+      assert.equal(await page.locator('#userAvatar .profile-avatar-lady').count(), 1, 'Selected penguin should render in the top bar');
+      assert.equal(await page.locator('#userAvatar').evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'Top-bar avatar background should remain transparent');
+
       const summaryEndpoints = [
         '/api/tickets',
         '/api/broadcasts',
@@ -155,6 +169,7 @@ async function main() {
       await page.locator('#dashboardSection').waitFor({ state: 'visible' });
       await page.waitForTimeout(1200);
       await page.locator('#executiveHomeOverview').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#userAvatar .profile-avatar-lady').count(), 1, 'Penguin profile choice should persist after authenticated reload');
       assert.equal(await page.locator('#executiveHomeOverview [data-executive-chart]').count(), 4, 'Executive Home should render four live chart cards');
       assert.ok((apiRequestCounts.get('/api/executive-overview') || 0) <= 1, `Executive Home overview should use one aggregate request, saw ${apiRequestCounts.get('/api/executive-overview') || 0}`);
 
