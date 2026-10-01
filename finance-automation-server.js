@@ -6,7 +6,7 @@ function registerFinanceAutomation(app, deps) {
     findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
     dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
     applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
-    scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess
+    scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
   } = deps;
 
   const financeActor = req => {
@@ -581,7 +581,7 @@ function registerFinanceAutomation(app, deps) {
 
   if (persistenceReady?.then) {
     persistenceReady.then(() => {
-      void runDueRecurringRules().catch(error => console.error('Recurring finance automation failed:', error.message));
+      void runDueRecurringRules().catch(error => logStructured?.('error', 'finance.recurring_automation_failed', { category: 'finance', message: error.message }));
       const timer = setInterval(() => {
         void runDueRecurringRules().catch(error => console.error('Recurring finance automation failed:', error.message));
       }, 6 * 60 * 60 * 1000);
