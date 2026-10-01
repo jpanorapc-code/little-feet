@@ -22,7 +22,9 @@ try {
   assert.equal(metadata.fullCommitSha, head);
   assert.equal(metadata.updateLineCount, Math.max(1, messageLines.length));
   assert.match(metadata.version, /^1\.0(?:\.\d+)?$/);
-  assert.doesNotMatch(metadata.summary, /Render|Git commit|update line/i);
+  const infrastructureReleaseText = /\b(?:Render (?:deploy(?:ment)?|service)|Git commit|update line)\b/i;
+  assert.doesNotMatch(metadata.summary, infrastructureReleaseText);
+  assert.doesNotMatch('Render live executive Home charts', infrastructureReleaseText);
 
   for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json', '.littlefeet-release-baseline']) {
     fs.copyFileSync(path.join(root, file), path.join(temp, file));
