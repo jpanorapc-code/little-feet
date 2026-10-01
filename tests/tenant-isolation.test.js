@@ -26,6 +26,7 @@ fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temporaryDirectory, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temporaryDirectory, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temporaryDirectory, 'lib', 'yahoo-imap.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temporaryDirectory, 'lib', 'yahoo-smtp.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({
   schools,
   users: [
@@ -143,6 +144,10 @@ const rawRequest = async (route) => {
     assert.equal(Object.prototype.hasOwnProperty.call(authenticatedSession.data.user, 'mailboxConnection'), false);
     const anonymousMailbox = await request('/api/email/mailbox/status');
     assert.equal(anonymousMailbox.response.status, 401);
+    const anonymousSend = await request('/api/email/mailbox/send', { method: 'POST', body: { to: 'person@example.test', subject: 'Test', text: 'Body' } });
+    assert.equal(anonymousSend.response.status, 401);
+    const unconnectedSend = await request('/api/email/mailbox/send', { method: 'POST', cookie: bravoLogin.cookie, body: { to: 'person@example.test', subject: 'Test', text: 'Body' } });
+    assert.equal(unconnectedSend.response.status, 409);
     const alphaMailbox = await request('/api/email/mailbox/status', { cookie: alphaLogin.cookie });
     assert.equal(alphaMailbox.response.status, 200);
     assert.equal(alphaMailbox.data.connected, true);

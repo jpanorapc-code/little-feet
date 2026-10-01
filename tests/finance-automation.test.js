@@ -21,6 +21,7 @@ fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(tmp,
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(tmp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(tmp, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(tmp, 'lib', 'yahoo-imap.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(tmp, 'lib', 'yahoo-smtp.js'));
 
 const billing = prefix => ({
   pricing:{baseMonthly:500,bundles:{5:{costPrice:0,sellingPrice:50},20:{costPrice:0,sellingPrice:150},100:{costPrice:0,sellingPrice:500}},lateFeeEnabled:false,lateFee:0},

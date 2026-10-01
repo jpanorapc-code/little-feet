@@ -22,6 +22,7 @@ fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temp, 'lib', 'yahoo-imap.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temp, 'lib', 'yahoo-smtp.js'));
 
 fs.mkdirSync(path.join(temp, 'output', 'pdf'), { recursive: true });
 fs.writeFileSync(path.join(temp, 'output', 'pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'), '%PDF-1.4\npublic-test-document\n');

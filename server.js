@@ -12,7 +12,7 @@ const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
-const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, revokeMailboxAccess } = require('./lib/mailbox-oauth');
+const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, sendMailboxMessage, revokeMailboxAccess } = require('./lib/mailbox-oauth');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
@@ -3769,6 +3769,23 @@ app.post('/api/email/mailbox/sync', async (req, res) => {
     res.json({ success: true, ...result, mailbox: mailboxConnectionStatus(actor) });
   } catch (error) {
     res.status(502).json({ message: `Mailbox sync failed: ${boundedText(error.message, 240)}` });
+  }
+});
+
+app.post('/api/email/mailbox/send', async (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to send mailbox email.' });
+  if (!actor.mailboxConnection) return res.status(409).json({ message: 'Connect a mailbox before sending email.' });
+  const to = boundedText(req.body?.to, 254), subject = boundedText(req.body?.subject, 300), text = boundedText(req.body?.text, 20000);
+  if (!to || !subject || !text) return res.status(400).json({ message: 'Recipient, subject and message are required.' });
+  try {
+    const accessToken = await mailboxAccessToken(actor);
+    const result = await sendMailboxMessage({ provider: actor.mailboxConnection.provider, accessToken, from: actor.mailboxConnection.email, to, subject, text, providerMetadata: actor.mailboxConnection.providerMetadata || {} });
+    actor.mailboxConnection.lastSentAt = new Date().toISOString();
+    await saveDatabaseState();
+    res.status(201).json({ success: true, provider: result.provider, id: result.id || '', sentAt: actor.mailboxConnection.lastSentAt });
+  } catch (error) {
+    res.status(502).json({ message: `Email could not be sent: ${boundedText(error.message, 240)}` });
   }
 });
 
