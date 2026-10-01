@@ -38,6 +38,10 @@ let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
 let latestServerErrors = [];
+let inspectStructuredLogPayload = null;
+let inspectServerFaults = [];
+let inspectDiagnostics = null;
+let inspectAutoRefreshTimer = null;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
 let visitorScannerStream = null;
@@ -609,6 +613,10 @@ function routeErrorToHelpdesk(error) {
   const enrichedError = { ...error, message: diagnosticMessage, originalMessage: redactedCrossOriginError ? error.message : undefined };
   captureDebugEvent({ category: 'Browser runtime', ...enrichedError });
   const details = `${error.code}: ${diagnosticMessage}${error.source ? `\nSource: ${error.source}` : ''}${error.line ? `\nLine: ${error.line}${error.column ? `, column ${error.column}` : ''}` : ''}${safeStack ? `\nStack: ${safeStack}` : ''}`;
+  if (currentUser) void reportClientStructuredLog({
+    severity: 'error', code: error.code || 'WEB_RUNTIME_ERROR', message: diagnosticMessage,
+    source: error.source || '', line: error.line || null, column: error.column || null, page: window.location.pathname
+  });
   console.error(details);
   if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
   sessionStorage.setItem(`lf_error_${details}`, '1');
@@ -828,8 +836,18 @@ if (signupForm) {
 }
 
 // Diagnostic Error Log Index
+function reportClientStructuredLog({ severity = 'warn', code = 'CLIENT_EVENT', message = '', source = '', line = null, column = null, page = window.location.pathname } = {}) {
+  if (!currentUser) return Promise.resolve(null);
+  return fetch('/api/system/client-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ severity, code, message, source, line, column, page })
+  }).catch(() => null);
+}
+
 function logAppError(code, reason) {
   captureDebugEvent({ category: 'Application', code, message: reason });
+  void reportClientStructuredLog({ severity: 'warn', code, message: reason });
   const errItem = { code, reason, timestamp: new Date().toLocaleTimeString() };
   errorLog.unshift(errItem);
 
@@ -1283,6 +1301,7 @@ function loadWorkspaceOnDemand(tabId) {
     visitorMeetingTab: [loadVisitorMeetingRecipients, loadVisitorMeetings],
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
     notesTab: [loadStickyNotes],
+    inspectTab: [loadInspectDashboard],
     progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords), () => window.loadCurriculumRecords?.()]
   };
   (loaders[tabId] || []).forEach(load => Promise.resolve().then(load).catch(() => {}));
@@ -1716,7 +1735,7 @@ async function loadAcademicTerm() {
       updateSchoolDayStatus();
     }
   } catch (err) {
-    console.error('Failed to load academic term.');
+    logAppError('ERR_TERM_LOAD', 'Failed to load academic term.');
   }
 }
 
@@ -1909,7 +1928,6 @@ async function loadSchoolProximityMap() {
         ? `${nearbySchools.length} recent school results shown - live refresh will retry next time`
         : `${nearbySchools.length} live education facilities found within 20 km`;
     } catch (error) {
-      console.error(error);
       status.getContainer().textContent = 'Live school search unavailable. Please try again shortly.';
       logAppError('ERR_MAP_SCHOOLS', 'Unable to load live nearby school data.');
     }
