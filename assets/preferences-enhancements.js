@@ -321,7 +321,8 @@
     try {
       saveDashboardDrafts();
       const activeTab = document.querySelector('#dashboardSection .tab-content.active')?.id || 'homeTab';
-      await Promise.resolve(window.loadAllData?.());
+      const refreshed = await Promise.resolve(window.loadAllData?.());
+      if (refreshed === false) return false;
       window.loadWorkspaceOnDemand?.(activeTab);
       const syncTag = document.getElementById('liveSyncTag');
       if (syncTag) syncTag.textContent = 'Last synced: Just now';
@@ -339,6 +340,10 @@
     if (!interval) return;
     refreshTimer = window.setTimeout(async () => {
       await refreshDashboardSafely();
+      if (!currentAccount()) {
+        refreshTimer = null;
+        return;
+      }
       const currentPreference = document.getElementById('refreshPreference')?.value || preference;
       scheduleDashboardRefresh(currentPreference);
     }, interval);
