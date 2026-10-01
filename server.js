@@ -2398,7 +2398,7 @@ registerFinanceAutomation(app, {
   findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
   dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
   applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
-  scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess
+  scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
 });
 
 app.get('/api/parent-payments/parents', (req, res) => {
