@@ -548,6 +548,20 @@ const login = async (username, pin, suppliedCookie = '') => {
     assert.equal(batchCodes.data.results[1].status, 'not_found');
     assert.equal(batchCodes.data.results[1].accessCode, undefined);
 
+    const repeatedBatchCodes = await request('/api/learner-access-codes/generate-batch', {
+      method: 'POST',
+      cookie: alphaAdmin.cookie,
+      originHeader: origin,
+      body: {
+        learners: [
+          { learnerName: 'Alpha Learner', className: 'Grade 1' },
+          { learnerName: 'Missing Learner', className: 'Grade 1' }
+        ]
+      }
+    });
+    assert.equal(repeatedBatchCodes.response.status, 200);
+    assert.equal(repeatedBatchCodes.data.results[0].accessCode, issuedCode);
+
     const principalBatchCodes = await request('/api/learner-access-codes/generate-batch', {
       method: 'POST',
       cookie: alphaPrincipal.cookie,
@@ -585,6 +599,10 @@ const login = async (username, pin, suppliedCookie = '') => {
     });
     assert.equal(adminInspectClear.response.status, 200);
     assert.equal(adminInspectClear.data.success, true);
+
+    const codesAfterInspectClear = await request('/api/learner-access-codes', { cookie: alphaAdmin.cookie });
+    assert.equal(codesAfterInspectClear.response.status, 200);
+    assert.equal(codesAfterInspectClear.data[0].accessCode, issuedCode, 'Clearing Inspect history must not delete learner-code business records.');
 
     // 12. Signed webhook boundary: unsigned/forged bodies fail, valid bodies apply once,
     // and a replay is idempotent rather than duplicating money.
