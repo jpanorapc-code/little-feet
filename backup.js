@@ -1655,18 +1655,54 @@ function openAlertsTab() {
 const toBase64 = file => new Promise((resolve, reject) => {
   const maxBytes = 5 * 1024 * 1024;
   if (file.size > maxBytes) {
+    setFileLimitWarning(file, `⚠ File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB. Attachments are limited to 5 MB. Compress it or use a smaller file.`);
     reject(new Error('This file is larger than 5 MB. Compress it or use a smaller file so the school database remains fast.'));
     return;
   }
+  setFileLimitWarning(file, '');
   const reader = new FileReader();
   reader.readAsDataURL(file);
   reader.onload = () => resolve(reader.result);
   reader.onerror = error => reject(error);
 });
+function fileInputForFile(file) {
+  return [...document.querySelectorAll('input[type="file"]')].find(input => input.files?.[0] === file) || null;
+}
+
+function setFileLimitWarning(file, message = '') {
+  const input = fileInputForFile(file);
+  if (!input) return;
+  const warningId = `${input.id || 'file'}LimitWarning`;
+  let warning = document.getElementById(warningId);
+  if (!warning) {
+    warning = document.createElement('div');
+    warning.id = warningId;
+    warning.setAttribute('role', 'alert');
+    warning.setAttribute('aria-live', 'assertive');
+    warning.style.cssText = 'display:none;margin:7px 0 10px;padding:9px 11px;border:1px solid #f59e0b;border-radius:7px;background:rgba(245,158,11,.12);color:var(--text-dark);font-size:.82rem;font-weight:700;line-height:1.45;';
+    input.insertAdjacentElement('afterend', warning);
+  }
+  warning.textContent = message;
+  warning.style.display = message ? 'block' : 'none';
+}
+
 const validateSpreadsheetFile = (file, maxBytes = STANDARD_SPREADSHEET_MAX_BYTES) => {
   const extension = String(file?.name || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '';
-  if (!['.xlsx', '.xls', '.csv'].includes(extension)) return 'Use an XLSX, XLS, or CSV spreadsheet.';
-  if (file.size > maxBytes) return `This spreadsheet exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`;
+  if (!['.xlsx', '.xls', '.csv'].includes(extension)) {
+    setFileLimitWarning(file, '');
+    return 'Use an XLSX, XLS, or CSV spreadsheet.';
+  }
+  if (file.size > maxBytes) {
+    const limitMb = Math.round(maxBytes / 1024 / 1024);
+    const actualMb = Math.max(0.1, file.size / 1024 / 1024).toFixed(1);
+    const schoolIntegration = maxBytes === SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES;
+    const message = schoolIntegration
+      ? `⚠ File too large: ${actualMb} MB. School Integration accepts up to ${limitMb} MB per spreadsheet. Split the school export into smaller approved files.`
+      : `⚠ File too large: ${actualMb} MB. This import accepts up to ${limitMb} MB. Large learner/school-register files must use School Integration; otherwise split or reduce the file.`;
+    setFileLimitWarning(file, message);
+    return message.replace(/^⚠\s*/, '');
+  }
+  setFileLimitWarning(file, '');
   return '';
 };
 
