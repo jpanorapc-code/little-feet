@@ -12,6 +12,7 @@ const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
+const { createStructuredLogger, redactSensitiveLogText } = require('./lib/structured-logger');
 const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, sendMailboxMessage, revokeMailboxAccess } = require('./lib/mailbox-oauth');
 
 const app = express();
@@ -31,6 +32,11 @@ const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_B
 const STANDARD_IMPORT_MAX_BODY_BYTES = 5 * 1024 * 1024;
 const DUPLICATE_POST_WINDOW_MS = 5 * 1000;
 const recentPostFingerprints = new Map();
+const structuredLogger = createStructuredLogger({
+  maxEntries: Number(process.env.LF_STRUCTURED_LOG_MAX_ENTRIES) || 5000,
+  slowRequestMs: Number(process.env.LF_SLOW_REQUEST_MS) || 1500
+});
+const logStructured = (severity, event, fields = {}) => structuredLogger.emit(severity, event, fields);
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
 const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
@@ -444,10 +450,6 @@ const ensureAllLearnersHaveAccessCodes = () => {
     });
   });
 };
-const redactSensitiveLogText = value => String(value || '')
-  .replace(/\b(authorization|password|passwd|pin|token|secret|api[_ -]?key)\b\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
-  .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
-  .slice(0, 500);
 const safeHttpsUrl = value => {
   const raw = String(value || '').trim();
   if (!raw) return '';
