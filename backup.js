@@ -41,6 +41,7 @@ let latestServerErrors = [];
 let inspectStructuredLogPayload = null;
 let inspectServerFaults = [];
 let inspectDiagnostics = null;
+let inspectSelfTestResult = null;
 let inspectAutoRefreshTimer = null;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
@@ -1045,7 +1046,8 @@ function renderInspectDashboard() {
       const userContext = entry.user
         ? `<strong>${escapeWorkspaceText(entry.user)}</strong><br><span class="meta">${escapeWorkspaceText(entry.role || 'account')}${entry.schoolName ? ` · ${escapeWorkspaceText(entry.schoolName)}` : ''}</span>`
         : '<span class="meta">System / unauthenticated</span>';
-      const eventDetail = [entry.code, entry.message, entry.details].filter(Boolean).map(escapeWorkspaceText).join(' · ');
+      const sourceLocation = entry.source ? `${entry.source}${entry.line ? `:${entry.line}${entry.column ? `:${entry.column}` : ''}` : ''}` : '';
+      const eventDetail = [entry.code, entry.message, entry.details, sourceLocation].filter(Boolean).map(escapeWorkspaceText).join(' · ');
       return `<tr>
         <td data-label="Time">${escapeWorkspaceText(inspectDateTime(entry.timestamp))}</td>
         <td data-label="Severity">${inspectSeverityBadge(entry.severity)}</td>
@@ -1068,7 +1070,7 @@ function renderInspectDashboard() {
       const actions = fault.status === 'resolved'
         ? '<span class="badge-tag info">RESOLVED</span>'
         : `<button type="button" class="action-btn btn-blue" onclick="updateSystemErrorStatus('${encodedId}','acknowledged')">Acknowledge</button><button type="button" class="action-btn btn-green" onclick="updateSystemErrorStatus('${encodedId}','resolved')">Resolve</button>`;
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(fault.name || 'Error')} · ${escapeWorkspaceText(fault.status || 'open')}</strong><p style="margin-top:4px;">${escapeWorkspaceText(fault.message || 'No message')}</p><span class="meta">${escapeWorkspaceText(fault.method || 'SYSTEM')} ${escapeWorkspaceText(fault.route || '')} · ${escapeWorkspaceText(inspectDateTime(fault.createdAt))}${fault.updatedBy ? ` · updated by ${escapeWorkspaceText(fault.updatedBy)}` : ''}</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;">${fault.requestId ? `<button type="button" class="action-btn btn-blue" onclick="inspectTraceRequest('${encodedRequestId}')">Trace request</button>` : ''}${actions}</div></div>`;
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(fault.name || 'Error')} · ${escapeWorkspaceText(fault.status || 'open')}</strong><p style="margin-top:4px;">${escapeWorkspaceText(fault.message || 'No message')}</p><span class="meta">${escapeWorkspaceText(fault.method || 'SYSTEM')} ${escapeWorkspaceText(fault.route || '')} · ${escapeWorkspaceText(inspectDateTime(fault.createdAt))}${fault.source ? ` · ${escapeWorkspaceText(fault.source)}${fault.line ? `:${Number(fault.line)}${fault.column ? `:${Number(fault.column)}` : ''}` : ''}` : ''}${fault.updatedBy ? ` · updated by ${escapeWorkspaceText(fault.updatedBy)}` : ''}</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;">${fault.requestId ? `<button type="button" class="action-btn btn-blue" onclick="inspectTraceRequest('${encodedRequestId}')">Trace request</button>` : ''}${actions}</div></div>`;
     }).join('') : '<p class="meta">No persistent server faults have been recorded.</p>';
   }
 }
@@ -1163,6 +1165,60 @@ async function updateSystemErrorStatus(encodedId, status) {
   }
 }
 
+function renderInspectSelfTest() {
+  const status = document.getElementById('inspectSelfTestStatus');
+  const summary = document.getElementById('inspectSelfTestSummary');
+  const findings = document.getElementById('inspectSelfTestFindings');
+  const result = inspectSelfTestResult;
+  if (!status || !summary || !findings) return;
+  if (!result) {
+    status.textContent = 'Not run';
+    summary.textContent = 'Press “Run full site test” to inspect the current deployment.';
+    findings.innerHTML = '';
+    return;
+  }
+  status.textContent = `${String(result.status || 'unknown').toUpperCase()} · ${Number(result.durationMs || 0)} ms · ${inspectDateTime(result.completedAt)}`;
+  summary.innerHTML = `<strong>${Number(result.summary?.checks || 0)} checks</strong> · ${Number(result.summary?.passed || 0)} passed · ${Number(result.summary?.attention || 0)} attention · ${Number(result.summary?.failed || 0)} failed · ${Number(result.summary?.errors || 0)} error finding(s) · ${Number(result.summary?.warnings || 0)} warning finding(s)`;
+  const rows = Array.isArray(result.findings) ? result.findings : [];
+  findings.innerHTML = rows.length ? rows.map(finding => {
+    const location = finding.source ? `${finding.source}${finding.line ? `:${finding.line}${finding.column ? `:${finding.column}` : ''}` : ''}` : 'Runtime / no source line';
+    return `<div class="item-row"><div><strong>${escapeWorkspaceText(String(finding.severity || '').toUpperCase())} · ${escapeWorkspaceText(finding.issue || 'Finding')}</strong><p style="margin-top:5px;"><strong>Why:</strong> ${escapeWorkspaceText(finding.why || 'No additional explanation was produced.')}</p><span class="meta">${escapeWorkspaceText(finding.category || 'diagnostic')} · ${escapeWorkspaceText(finding.check || '')}<br><strong>Location:</strong> ${escapeWorkspaceText(location)}${finding.recommendation ? `<br><strong>Next:</strong> ${escapeWorkspaceText(finding.recommendation)}` : ''}</span></div></div>`;
+  }).join('') : '<div class="record-empty-state"><span><strong>No faults or threat indicators found by this run.</strong><span>The deployed checks completed without producing any findings.</span></span></div>';
+}
+
+async function runInspectSiteTest() {
+  if (!canUseInspectDashboard()) return;
+  const button = document.getElementById('inspectRunSiteTestButton');
+  const status = document.getElementById('inspectSelfTestStatus');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Running real checks…';
+  }
+  if (status) status.textContent = 'Running…';
+  try {
+    const response = await fetch('/api/system-self-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'The site test could not complete.');
+    inspectSelfTestResult = result;
+    renderInspectSelfTest();
+    await loadInspectDashboard({ silent: true });
+  } catch (error) {
+    inspectSelfTestResult = null;
+    if (status) status.textContent = 'Test failed to run';
+    const findings = document.getElementById('inspectSelfTestFindings');
+    if (findings) findings.innerHTML = `<div class="item-row"><strong>Site test could not complete</strong><p>${escapeWorkspaceText(safeUserFacingError(error, 'The automated site test could not complete.'))}</p></div>`;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Run full site test';
+    }
+  }
+}
+
 async function downloadInspectReport() {
   if (!canUseInspectDashboard()) return;
   if (!inspectStructuredLogPayload || !inspectDiagnostics) await loadInspectDashboard({ silent: true });
@@ -1171,6 +1227,7 @@ async function downloadInspectReport() {
     diagnostics: inspectDiagnostics,
     structuredLogs: inspectStructuredLogPayload,
     persistentFaults: inspectServerFaults,
+    siteSelfTest: inspectSelfTestResult,
     browserDebugEvents: debugEvents
   };
   const link = document.createElement('a');
@@ -1427,6 +1484,7 @@ function logout() {
   inspectStructuredLogPayload = null;
   inspectServerFaults = [];
   inspectDiagnostics = null;
+  inspectSelfTestResult = null;
   currentUser = null;
   exitWallpaperMode();
   stopWindtLegacyNote();
