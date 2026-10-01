@@ -1660,6 +1660,167 @@
       color:var(--text-light);
     }
 
+    /* Executive Home: live management summary. Data is rendered from one aggregate API. */
+    .executive-home-overview { margin-bottom:18px; }
+    .executive-home-overview .executive-overview-header {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+    .executive-home-overview .executive-overview-header h2 { margin:0 0 4px; }
+    .executive-home-overview .executive-overview-header .meta { display:block; line-height:1.45; }
+    .executive-kpi-grid {
+      display:grid;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px;
+      margin-bottom:16px;
+    }
+    .executive-kpi {
+      min-width:0;
+      padding:13px 14px;
+      border:1px solid rgba(103,199,216,.22);
+      border-radius:12px;
+      background:rgba(5,25,45,.36);
+    }
+    .executive-kpi span {
+      display:block;
+      color:var(--text-muted);
+      font-size:.72rem;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .executive-kpi strong {
+      display:block;
+      margin-top:6px;
+      color:var(--text-light);
+      font-size:clamp(1.2rem,1.8vw,1.7rem);
+      line-height:1.05;
+      overflow-wrap:anywhere;
+    }
+    .executive-kpi small {
+      display:block;
+      margin-top:5px;
+      color:var(--text-muted);
+      font-size:.72rem;
+      line-height:1.35;
+    }
+    .executive-chart-grid {
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+    }
+    .executive-chart-card {
+      min-width:0;
+      padding:14px;
+      border:1px solid rgba(103,199,216,.20);
+      border-radius:13px;
+      background:rgba(7,29,49,.48);
+    }
+    .executive-chart-card h3 { margin:0; font-size:1rem; }
+    .executive-chart-card > p {
+      margin:4px 0 12px;
+      color:var(--text-muted);
+      font-size:.78rem;
+      line-height:1.4;
+    }
+    .executive-chart-body {
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-height:150px;
+    }
+    .executive-pie {
+      position:relative;
+      flex:0 0 132px;
+      width:132px;
+      height:132px;
+      border-radius:50%;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 8px 22px rgba(0,8,20,.22);
+    }
+    .executive-pie::after {
+      content:"";
+      position:absolute;
+      inset:27px;
+      border-radius:50%;
+      background:rgba(8,31,52,.96);
+      box-shadow:0 0 0 1px rgba(103,199,216,.16);
+    }
+    .executive-pie-center {
+      position:absolute;
+      inset:34px;
+      z-index:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      color:var(--text-light);
+      font-size:.86rem;
+      font-weight:900;
+      line-height:1.15;
+    }
+    .executive-chart-legend {
+      display:grid;
+      gap:6px;
+      min-width:0;
+      flex:1;
+    }
+    .executive-legend-row {
+      display:grid;
+      grid-template-columns:10px minmax(0,1fr) auto;
+      align-items:center;
+      gap:7px;
+      min-width:0;
+      color:var(--text-muted);
+      font-size:.75rem;
+      line-height:1.25;
+    }
+    .executive-legend-swatch {
+      width:9px;
+      height:9px;
+      border-radius:999px;
+    }
+    .executive-legend-row strong {
+      color:var(--text-light);
+      font-size:.75rem;
+      white-space:nowrap;
+    }
+    .executive-chart-empty {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:132px;
+      width:100%;
+      padding:16px;
+      border:1px dashed rgba(103,199,216,.20);
+      border-radius:12px;
+      color:var(--text-muted);
+      font-size:.80rem;
+      text-align:center;
+    }
+    .executive-chart-link {
+      width:100%;
+      margin-top:12px;
+      min-height:36px;
+      padding:7px 10px;
+      font-size:.76rem;
+    }
+    @media (max-width:1180px) {
+      .executive-kpi-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .executive-chart-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media (max-width:680px) {
+      .executive-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .executive-chart-grid { grid-template-columns:1fr; }
+      .executive-chart-body { min-height:138px; }
+      .executive-pie { flex-basis:116px; width:116px; height:116px; }
+      .executive-pie::after { inset:24px; }
+      .executive-pie-center { inset:30px; font-size:.78rem; }
+    }
+
     /* Home/readability pass: cap long reading lines and keep content comfortably sized. */
     #homeTab > .portal-welcome-banner,
     #homeTab > .card,
@@ -5257,8 +5418,9 @@
             <section id="roleHomePanel" class="role-home-panel" aria-live="polite"></section>
           </div>
         </section>
+        <section id="executiveHomeOverview" class="card executive-home-overview hidden" aria-live="polite"></section>
         <div id="householdSwitcher" class="card hidden" style="margin-bottom:20px;"></div>
-        <section class="card role-admin school-setup-card" data-roles="admin" style="margin-bottom:18px;">
+        <section id="schoolSetupCard" class="card role-admin school-setup-card" data-roles="admin" style="margin-bottom:18px;">
           <div class="card-header-bar"><h2>School setup checklist</h2><span class="badge-tag info">ADMIN</span></div>
           <p class="school-setup-intro">Complete these essentials in order before inviting families and staff.</p>
           <div class="workspace-grid school-setup-grid">
@@ -6413,7 +6575,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261001-startup-dedupe-v1" defer></script>
+  <script src="backup.js?v=20261001-executive-home-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/staff-work.js?v=20261001-startup-dedupe-v1" defer></script>

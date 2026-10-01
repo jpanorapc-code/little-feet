@@ -90,6 +90,7 @@ let inspectDiagnostics = null;
 let inspectSelfTestResult = null;
 let inspectAutoRefreshTimer = null;
 let inspectRefreshPromise = null;
+let executiveHomeOverviewPromise = null;
 const INSPECT_AUTO_REFRESH_MS = 60 * 1000;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
@@ -1666,7 +1667,141 @@ function renderRoleHomePanel() {
   const experience = experiences[currentUser.role] || experiences.parent;
   panel.classList.add('mascot-role-home');
   panel.innerHTML = `<div class="role-home-content"><div><span class="portal-welcome-kicker">YOUR LITTLE FEET WORKSPACE</span><h1>${escapeWorkspaceText(experience.title)}</h1><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
+  const setupCard = document.getElementById('schoolSetupCard');
+  if (setupCard && currentUser.platformAccess) setupCard.classList.add('hidden');
 }
+
+
+
+const EXECUTIVE_CHART_COLORS = Object.freeze(['#5eead4', '#38bdf8', '#fbbf24', '#a78bfa', '#fb7185', '#34d399', '#f97316']);
+const formatExecutiveInteger = value => new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 0 }).format(Number(value || 0));
+const formatExecutiveCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(Number(value || 0));
+const formatExecutiveCompactCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0));
+
+function executiveChartMarkup({ title, description, items = [], format = 'integer', workspaceId, actionLabel }) {
+  const safeItems = (Array.isArray(items) ? items : [])
+    .map(item => ({ label: String(item?.label || ''), value: Number(item?.value || 0) }))
+    .filter(item => item.label && Number.isFinite(item.value) && item.value > 0);
+  const total = safeItems.reduce((sum, item) => sum + item.value, 0);
+  const formatter = format === 'currency' ? formatExecutiveCurrency : formatExecutiveInteger;
+  if (!total) {
+    return `<article class="executive-chart-card" data-executive-chart="${escapeWorkspaceText(title)}">
+      <h3>${escapeWorkspaceText(title)}</h3>
+      <p>${escapeWorkspaceText(description)}</p>
+      <div class="executive-chart-empty">No live records to chart yet.</div>
+      <button type="button" class="action-btn btn-blue executive-chart-link" onclick="openWorkspace('${workspaceId}')">${escapeWorkspaceText(actionLabel)}</button>
+    </article>`;
+  }
+  let cursor = 0;
+  const segments = safeItems.map((item, index) => {
+    const start = (cursor / total) * 100;
+    cursor += item.value;
+    const end = (cursor / total) * 100;
+    return `${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]} ${start.toFixed(3)}% ${end.toFixed(3)}%`;
+  }).join(', ');
+  const centerValue = format === 'currency' ? formatExecutiveCompactCurrency(total) : formatExecutiveInteger(total);
+  const legend = safeItems.map((item, index) => `<div class="executive-legend-row">
+    <span class="executive-legend-swatch" style="background:${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]};"></span>
+    <span>${escapeWorkspaceText(item.label)}</span>
+    <strong>${escapeWorkspaceText(formatter(item.value))}</strong>
+  </div>`).join('');
+  return `<article class="executive-chart-card" data-executive-chart="${escapeWorkspaceText(title)}">
+    <h3>${escapeWorkspaceText(title)}</h3>
+    <p>${escapeWorkspaceText(description)}</p>
+    <div class="executive-chart-body">
+      <div class="executive-pie" role="img" aria-label="${escapeWorkspaceText(title)} total ${escapeWorkspaceText(formatter(total))}" style="background:conic-gradient(${segments});">
+        <span class="executive-pie-center">${escapeWorkspaceText(centerValue)}</span>
+      </div>
+      <div class="executive-chart-legend">${legend}</div>
+    </div>
+    <button type="button" class="action-btn btn-blue executive-chart-link" onclick="openWorkspace('${workspaceId}')">${escapeWorkspaceText(actionLabel)}</button>
+  </article>`;
+}
+
+function renderExecutiveHomeOverview(payload) {
+  const root = document.getElementById('executiveHomeOverview');
+  if (!root || currentUser?.role !== 'admin') return;
+  const kpis = payload?.kpis || {};
+  const charts = payload?.charts || {};
+  const reviewCount = (Array.isArray(charts.reviews) ? charts.reviews : []).reduce((sum, item) => sum + Number(item?.value || 0), 0);
+  const scopeLabel = payload?.scope === 'platform' ? 'Company-wide live overview' : 'School live overview';
+  const generatedAt = payload?.generatedAt ? new Date(payload.generatedAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : 'now';
+  const reviewRating = Number.isFinite(Number(kpis.averageReviewRating)) ? `${Number(kpis.averageReviewRating).toFixed(2)}/5` : '—';
+  const outstanding = formatExecutiveCurrency(kpis.outstandingBalance);
+  const arrears = formatExecutiveCurrency(kpis.arrears);
+  const openFaults = Number(kpis.openFaults || 0);
+
+  const kpiCards = [
+    ['Schools', formatExecutiveInteger(kpis.schools), payload?.scope === 'platform' ? 'Active platform schools' : 'Current school scope'],
+    ['Learners', formatExecutiveInteger(kpis.learners), 'Live learner records'],
+    ['Accounts', formatExecutiveInteger(kpis.accounts), 'Visible active accounts'],
+    ['Needs attention', formatExecutiveInteger(kpis.openAttention), 'High-level work queues'],
+    ['Outstanding', outstanding, Number(kpis.arrears || 0) > 0 ? `${arrears} currently in arrears` : 'No current arrears'],
+    ['Avg review', reviewRating, reviewCount ? `${formatExecutiveInteger(reviewCount)} performance review records` : 'No review records yet']
+  ];
+
+  root.innerHTML = `<div class="executive-overview-header">
+    <div>
+      <h2>Executive overview</h2>
+      <span class="meta">${escapeWorkspaceText(scopeLabel)} · updated ${escapeWorkspaceText(generatedAt)} · open system faults: ${formatExecutiveInteger(openFaults)}</span>
+    </div>
+    <button type="button" class="action-btn btn-blue" onclick="loadExecutiveHomeOverview()">Refresh overview</button>
+  </div>
+  <div class="executive-kpi-grid">
+    ${kpiCards.map(([label, value, detail]) => `<div class="executive-kpi"><span>${escapeWorkspaceText(label)}</span><strong>${escapeWorkspaceText(value)}</strong><small>${escapeWorkspaceText(detail)}</small></div>`).join('')}
+  </div>
+  <div class="executive-chart-grid">
+    ${executiveChartMarkup({ title:'Account mix', description:'How visible accounts are distributed by role.', items:charts.accounts, workspaceId:'accountsTab', actionLabel:'Open accounts' })}
+    ${executiveChartMarkup({ title:'Operational attention', description:'Current work that still needs action, without duplicating My Day.', items:charts.attention, workspaceId:'myDayTab', actionLabel:'Open My Day' })}
+    ${executiveChartMarkup({ title:'Fee collection', description:'Collected versus outstanding parent-fee value.', items:charts.finance, format:'currency', workspaceId:'parentPaymentsTab', actionLabel:'Open parent payments' })}
+    ${executiveChartMarkup({ title:'Performance reviews', description:'Current review workflow status across staff records.', items:charts.reviews, workspaceId:'staffWorkTab', actionLabel:'Open staff work' })}
+  </div>`;
+  root.classList.remove('hidden');
+
+  const setupCard = document.getElementById('schoolSetupCard');
+  if (setupCard) {
+    const shouldHideSetup = currentUser.platformAccess === true || payload?.setup?.complete === true || payload?.setup?.show === false;
+    setupCard.classList.toggle('hidden', shouldHideSetup);
+  }
+}
+
+async function loadExecutiveHomeOverview({ silent = false } = {}) {
+  const root = document.getElementById('executiveHomeOverview');
+  if (!root) return false;
+  if (!currentUser || currentUser.role !== 'admin') {
+    root.classList.add('hidden');
+    return false;
+  }
+  if (executiveHomeOverviewPromise) return executiveHomeOverviewPromise;
+  const expectedSession = workspaceSessionKey();
+  if (!silent && !root.children.length) {
+    root.innerHTML = '<div class="executive-overview-header"><div><h2>Executive overview</h2><span class="meta">Loading live management data…</span></div></div>';
+    root.classList.remove('hidden');
+  }
+  const job = (async () => {
+    try {
+      const response = await fetch('/api/executive-overview', { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Unable to load the executive overview.');
+      if (!currentUser || workspaceSessionKey() !== expectedSession) return false;
+      renderExecutiveHomeOverview(payload);
+      return true;
+    } catch (error) {
+      if (!silent && root) {
+        root.innerHTML = `<div class="executive-overview-header"><div><h2>Executive overview</h2><span class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Executive overview is temporarily unavailable.'))}</span></div><button type="button" class="action-btn btn-blue" onclick="loadExecutiveHomeOverview()">Try again</button></div>`;
+        root.classList.remove('hidden');
+      }
+      return false;
+    }
+  })();
+  executiveHomeOverviewPromise = job;
+  try {
+    return await job;
+  } finally {
+    if (executiveHomeOverviewPromise === job) executiveHomeOverviewPromise = null;
+  }
+}
+window.loadExecutiveHomeOverview = loadExecutiveHomeOverview;
 
 function logout() {
   const signingOutUsername = currentUser?.username || '';
@@ -1686,6 +1821,7 @@ function logout() {
   inspectServerFaults = [];
   inspectDiagnostics = null;
   inspectSelfTestResult = null;
+  executiveHomeOverviewPromise = null;
   serverSessionValidatedAt = 0;
   sessionValidationPromise = null;
   currentUser = null;
@@ -2115,7 +2251,8 @@ async function loadAllData() {
     runPortalRefreshJob('broadcasts', () => loadBroadcasts()),
     loadReleaseNotes(),
     loadHouseholdSwitcher(),
-    loadStickyNotes()
+    loadStickyNotes(),
+    runPortalRefreshJob('executive-home', () => loadExecutiveHomeOverview({ silent: true }))
   ]);
   return true;
 }
@@ -2128,7 +2265,8 @@ async function refreshActiveWorkspace(tabId = document.querySelector('#dashboard
       loadPosts(),
       loadReleaseNotes(),
       loadHouseholdSwitcher(),
-      loadStickyNotes()
+      loadStickyNotes(),
+      runPortalRefreshJob('executive-home', () => loadExecutiveHomeOverview({ silent: true }))
     ]);
     return true;
   }

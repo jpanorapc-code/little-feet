@@ -4698,6 +4698,124 @@ app.post('/api/approvals/:type/:id', (req, res) => {
   res.status(400).json({ message: 'Unsupported approval type.' });
 });
 
+// Executive Home overview: one aggregate request keeps the CEO dashboard live
+// without duplicating the per-workspace API fan-out used by My Day.
+app.get('/api/executive-overview', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+
+  const platformWide = hasPlatformAccess(actor);
+  const scoped = records => platformWide ? (Array.isArray(records) ? records.slice() : []) : tenantRecords(records, actor);
+  const visibleAccounts = platformWide
+    ? (db.users || []).slice()
+    : (db.users || []).filter(account => !PLATFORM_INTERNAL_ROLES.has(account.role) && isSameSchool(actor, account));
+
+  const schools = platformWide
+    ? (db.schools || []).filter(school => school.status !== 'deleted')
+    : (db.schools || []).filter(school => school.id === accountSchoolId(actor));
+  const learners = scoped(db.students);
+  const tasks = scoped(db.staffTasks);
+  const leave = scoped(db.staffLeave);
+  const cover = scoped(db.teacherCover);
+  const maintenance = scoped(db.maintenanceOrders);
+  const purchases = scoped(db.purchaseRequests);
+  const tickets = scoped(db.tickets);
+  const reviews = scoped(db.performanceReviews);
+  const payments = scoped(db.parentPayments);
+  const consents = scoped(db.consentRecords);
+
+  const groupedCount = (records, select) => {
+    const counts = new Map();
+    records.forEach(record => {
+      const key = select(record);
+      if (!key) return;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return counts;
+  };
+  const chartRows = (counts, preferredOrder = []) => {
+    const order = new Map(preferredOrder.map((label, index) => [label, index]));
+    return [...counts.entries()]
+      .filter(([, value]) => Number(value) > 0)
+      .map(([label, value]) => ({ label, value: Number(value) }))
+      .sort((first, second) => {
+        const firstOrder = order.has(first.label) ? order.get(first.label) : 999;
+        const secondOrder = order.has(second.label) ? order.get(second.label) : 999;
+        return firstOrder - secondOrder || second.value - first.value || first.label.localeCompare(second.label);
+      });
+  };
+
+  const accountGroups = groupedCount(visibleAccounts, account => {
+    if (account.role === 'parent') return 'Parents';
+    if (account.role === 'teacher') return 'Teachers';
+    if (['admin', 'principal'].includes(account.role)) return 'Leadership';
+    if (account.role === 'school_accounts') return 'School accounts';
+    if (PLATFORM_INTERNAL_ROLES.has(account.role)) return 'Little Feet team';
+    if (account.role === 'district') return 'District';
+    return 'Other';
+  });
+
+  const attentionCounts = new Map([
+    ['Open tasks', tasks.filter(item => item.status !== 'Completed').length],
+    ['Pending leave', leave.filter(item => item.status === 'Pending').length],
+    ['Cover needed', cover.filter(item => item.status === 'Needs Cover').length],
+    ['Maintenance', maintenance.filter(item => item.status !== 'Completed').length],
+    ['Purchases', purchases.filter(item => item.status === 'Pending').length],
+    ['Open tickets', tickets.filter(item => item.status !== 'Completed').length]
+  ]);
+  const openAttention = [...attentionCounts.values()].reduce((sum, value) => sum + Number(value || 0), 0);
+
+  const reviewCounts = groupedCount(reviews, item => ['Draft', 'Shared', 'Acknowledged'].includes(item.status) ? item.status : 'Other');
+  const ratedReviews = reviews.map(item => Number(item.averageRating)).filter(Number.isFinite);
+  const averageReviewRating = ratedReviews.length
+    ? Number((ratedReviews.reduce((sum, rating) => sum + rating, 0) / ratedReviews.length).toFixed(2))
+    : null;
+
+  const paymentFinancials = payments.map(record => parentPaymentFinancials(record));
+  const financeSummary = parentPaymentSummary(payments);
+  const financeCounts = new Map([
+    ['Collected', cents(financeSummary.paidAmount)],
+    ['Outstanding', cents(financeSummary.balance)]
+  ]);
+
+  const openFaults = (db.systemErrors || []).filter(entry =>
+    entry.status === 'open' && (platformWide || !entry.schoolId || entry.schoolId === accountSchoolId(actor))
+  ).length;
+
+  let setup = { show: false, complete: true, steps: {} };
+  if (!platformWide && actor.role === 'admin') {
+    const steps = {
+      learners: learners.length > 0,
+      people: visibleAccounts.some(account => ['parent', 'teacher', 'principal', 'school_accounts'].includes(account.role)),
+      consent: consents.length > 0,
+      finance: billingPaymentConfigured(subscriptionBillingState(actor).payment) || payments.length > 0
+    };
+    setup = { show: !Object.values(steps).every(Boolean), complete: Object.values(steps).every(Boolean), steps };
+  }
+
+  res.json({
+    scope: platformWide ? 'platform' : 'school',
+    generatedAt: new Date().toISOString(),
+    kpis: {
+      schools: schools.length,
+      learners: learners.length,
+      accounts: visibleAccounts.length,
+      openAttention,
+      outstandingBalance: cents(financeSummary.balance),
+      arrears: cents(financeSummary.arrears),
+      averageReviewRating,
+      openFaults
+    },
+    charts: {
+      accounts: chartRows(accountGroups, ['Parents', 'Teachers', 'Leadership', 'School accounts', 'Little Feet team', 'District', 'Other']),
+      attention: chartRows(attentionCounts, ['Open tasks', 'Pending leave', 'Cover needed', 'Maintenance', 'Purchases', 'Open tickets']),
+      finance: chartRows(financeCounts, ['Collected', 'Outstanding']),
+      reviews: chartRows(reviewCounts, ['Draft', 'Shared', 'Acknowledged', 'Other'])
+    },
+    setup
+  });
+});
+
 // Staff performance reviews / KPI
 const KPI_RATINGS = new Set([1, 2, 3, 4, 5]);
 app.get('/api/staff/performance-reviews', (req, res) => {
