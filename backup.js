@@ -59,7 +59,8 @@ function safeUserFacingError(error, fallback = 'Unable to complete this action. 
   const message = String(error?.message || '').trim().slice(0, 240);
   if (!message || /[\r\n]/.test(message)) return fallback;
   const internalPattern = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|EvalError|SQLITE|PostgreSQL|ECONN\w*|ENOTFOUND|EAI_AGAIN|fetch failed|Failed to fetch|NetworkError|AbortError|invalid_client|invalid_grant|access_token|refresh_token|client_secret|node_modules|stack trace|unexpected token|cannot read (?:properties|property)|undefined is not)\b/i;
-  if (internalPattern.test(message) || /(?:^|\s)at\s+\S+\s*\(/.test(message)) return fallback;
+  const safePrefix = /^(?:Unable|Please|Choose|Select|Only|Sign in|Connect|No\b|This\b|The\b|Your\b|A\b|An\b|Invalid|Unsupported|Live|Verified|School|Payment|Mailbox|Email|Import|Book|Attendance|Schedule|Account|Recipient|Donation|Subscription|Too many|Authorised|Use\b|Set\b|Add\b|Create\b|Delete\b|Permanently|Sticky note|Provider sign-in|Parent|Management|Request|Large|Split exports)/i;
+  if (internalPattern.test(message) || /(?:^|\s)at\s+\S+\s*\(/.test(message) || !safePrefix.test(message)) return fallback;
   return message;
 }
 window.safeUserFacingError = safeUserFacingError;
