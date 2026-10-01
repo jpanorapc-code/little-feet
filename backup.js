@@ -49,6 +49,37 @@ function runPortalRefreshJob(key, task) {
   portalRefreshJobs.set(key, job);
   return job;
 }
+// Keep startup ownership in one place: deferred modules can register before or
+// after session restoration, but each initializes only once for that session.
+let workspaceSessionEpoch = 0;
+const workspaceInitializers = new Map();
+function workspaceSessionKey() {
+  return currentUser ? JSON.stringify([workspaceSessionEpoch, currentUser.username, currentUser.schoolId, currentUser.role]) : '';
+}
+function resetWorkspaceLoads() {
+  workspaceSessionEpoch += 1;
+  workspaceInitializers.clear();
+  portalRefreshJobs.clear();
+}
+window.getLittleFeetWorkspaceSessionKey = workspaceSessionKey;
+window.registerLittleFeetWorkspace = (name, initialize) => {
+  const start = () => {
+    const sessionKey = workspaceSessionKey();
+    if (!sessionKey) return Promise.resolve();
+    const key = sessionKey + ':' + name;
+    if (workspaceInitializers.has(key)) return workspaceInitializers.get(key);
+    const job = Promise.resolve().then(() => {
+      if (workspaceSessionKey() === sessionKey) return initialize();
+    }).catch(error => {
+      if (workspaceInitializers.get(key) === job) workspaceInitializers.delete(key);
+      void window.reportLittleFeetClientLog?.({ severity: 'warn', code: 'WORKSPACE_INIT_FAILED', message: error?.message || 'Workspace initialization failed.' });
+    });
+    workspaceInitializers.set(key, job);
+    return job;
+  };
+  document.addEventListener('littlefeet:session-ready', start);
+  void start();
+};
 let debugModeEnabled = false;
 let debugEvents = [];
 let latestServerDiagnostics = null;
@@ -110,6 +141,7 @@ function expireClientSessionFromServer() {
   ticketMonitorId = null;
   serverSessionValidatedAt = 0;
   currentUser = null;
+  resetWorkspaceLoads();
   knownTicketIds = new Set();
   ticketsLoaded = false;
   inspectStructuredLogPayload = null;
@@ -965,8 +997,7 @@ function logAppError(code, reason) {
 let modalReturnFocus = null;
 
 function openModal(title, contentHtml) {
-  const modal = document.getElementById('appModal');
-  modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const modal = document.getElementById('appModal');  modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = contentHtml;
   document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
@@ -1658,6 +1689,8 @@ function logout() {
   serverSessionValidatedAt = 0;
   sessionValidationPromise = null;
   currentUser = null;
+  resetWorkspaceLoads();
+  document.dispatchEvent(new CustomEvent('littlefeet:session-ended'));
   exitWallpaperMode();
   stopWindtLegacyNote();
   if (alertMonitorId) { clearInterval(alertMonitorId); alertMonitorId = null; }
@@ -1753,9 +1786,13 @@ function loadWorkspaceOnDemand(tabId) {
     safeguardingTab: [loadConsentRecords, loadPickupRecords],
     notesTab: [loadStickyNotes],
     inspectTab: [loadInspectDashboard],
-    progressTab: [() => ['portfolio', 'reports'].forEach(loadWorkspaceRecords), () => window.loadCurriculumRecords?.()]
+    progressTab: [() => Promise.allSettled(['portfolio', 'reports'].map(loadWorkspaceRecords)), () => window.loadCurriculumRecords?.()]
   };
-  return Promise.allSettled((loaders[tabId] || []).map(load => Promise.resolve().then(load)));
+  const sessionKey = workspaceSessionKey();
+  return runPortalRefreshJob('workspace:' + sessionKey + ':' + tabId, () => {
+    if (workspaceSessionKey() !== sessionKey) return [];
+    return Promise.allSettled((loaders[tabId] || []).map(load => Promise.resolve().then(load)));
+  });
 }
 
 function setupWallpaperMode() {
@@ -1959,8 +1996,7 @@ async function resetCustomWallpaper() {
 
 function openWorkspace(tabId) {
   const navButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes(`'${tabId}'`));
-  if (!navButton || navButton.closest('li')?.classList.contains('hidden')) {
-    alert('This workspace is not available for your account. Please contact your school administrator if you need access.');
+  if (!navButton || navButton.closest('li')?.classList.contains('hidden')) {    alert('This workspace is not available for your account. Please contact your school administrator if you need access.');
     return;
   }
   switchTab(tabId, navButton);
@@ -2959,8 +2995,7 @@ if (analyticsSearchForm) {
     const studentName = inputEl.value.trim();
 
     try {
-      const res = await fetch(`/api/analytics/${encodeURIComponent(studentName)}?username=${encodeURIComponent(currentUser?.username || '')}`);
-      const data = await res.json();
+      const res = await fetch(`/api/analytics/${encodeURIComponent(studentName)}?username=${encodeURIComponent(currentUser?.username || '')}`);      const data = await res.json();
       if (!res.ok) return alert(data.message || 'Unable to load analytics for this learner.');
 
       if (!data.totalAssessments) {
@@ -3959,8 +3994,7 @@ async function createDonationIntent(event) {
     const response = await fetch('/api/donations/intents', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ amount: form.elements.amount.value, donorName: form.elements.donorName.value, donorEmail: form.elements.donorEmail.value }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to prepare the donation.');
-    const payment = result.payment;
-    const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
+    const payment = result.payment;    const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
     openModal('Donation ready', `<p style="margin:0 0 10px;">Thank you for supporting Little Feet.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Donation: ${formatSubscriptionMoney(result.donation.amount)}</strong><br>Reference: <strong>${escapeWorkspaceText(result.donation.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the contribution can be matched correctly.</p>`);
     renderCapitecPayMeQr(payment);
   } catch (error) { alert(safeUserFacingError(error, 'Unable to prepare the donation.')); }
@@ -4959,8 +4993,7 @@ async function openLearnerLinkPicker() {
       return `<label style="display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--border-color);border-radius:8px;cursor:pointer;"><input type="checkbox" name="linkedLearners" class="learner-link-choice" value="${escapeWorkspaceText(name)}" ${selected.has(name.toLocaleLowerCase()) ? 'checked' : ''}><span><strong>${escapeWorkspaceText(name)}</strong><br><span class="meta">${escapeWorkspaceText(learner.className || 'Class not recorded')}</span></span></label>`;
     }).join('');
     openModal('Choose linked learners', `<p style="margin:0 0 12px;color:var(--text-muted);">Select up to four children for this parent account.</p><div id="learnerLinkChoices" style="display:grid;gap:8px;max-height:46vh;overflow:auto;">${options}</div><button type="button" class="submit-btn" style="margin-top:14px;" onclick="saveLearnerLinks()">Save linked learners</button>`);
-  } catch {
-    alert('Unable to load learner records. Please try again.');
+  } catch {    alert('Unable to load learner records. Please try again.');
   }
 }
 
