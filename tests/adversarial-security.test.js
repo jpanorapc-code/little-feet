@@ -22,6 +22,7 @@ fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temp, 'lib', 'yahoo-imap.js'));
+fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temp, 'lib', 'yahoo-smtp.js'));
 fs.mkdirSync(path.join(temp, 'assets'), { recursive: true });
 for (const file of ['mobile-pwa.js','curriculum-frameworks.js','education-stages.js','finance-automation.js']) {
   fs.copyFileSync(path.join(root, 'assets', file), path.join(temp, 'assets', file));

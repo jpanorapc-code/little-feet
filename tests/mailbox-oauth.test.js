@@ -11,6 +11,7 @@ const {
   fetchMicrosoftMailbox,
   fetchZohoMailbox,
   fetchYahooMailbox,
+  sendMailboxMessage,
   revokeMailboxAccess
 } = require('../lib/mailbox-oauth');
 
@@ -35,7 +36,8 @@ const env = {
   const googleAuthorization = createAuthorization({ provider: 'google', origin: 'https://littlefeet.co.za', env });
   const googleUrl = new URL(googleAuthorization.url);
   assert.equal(googleUrl.searchParams.get('access_type'), 'offline');
-  assert.equal(googleUrl.searchParams.get('scope'), 'https://www.googleapis.com/auth/gmail.readonly');
+  assert.match(googleUrl.searchParams.get('scope'), /gmail\.readonly/);
+  assert.match(googleUrl.searchParams.get('scope'), /gmail\.send/);
   assert.equal(googleUrl.searchParams.has('openid'), false);
   assert.ok(googleAuthorization.state.length >= 32 && googleAuthorization.verifier.length >= 43);
 
@@ -178,6 +180,33 @@ const env = {
   assert.equal(yahoo.email, 'yahoo@example.com');
   assert.equal(yahoo.messages[0].id, '42:9');
   assert.equal(yahoo.nextCursor, '42:8');
+
+  const googleSent = await sendMailboxMessage({ provider: 'google', accessToken: 'token', from: 'owner@example.com', to: 'person@example.com', subject: 'Hello', text: 'Message body', fetchImpl: async (url, options) => {
+    assert.equal(String(url), 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+    assert.equal(options.method, 'POST');
+    const payload = JSON.parse(options.body);assert.match(Buffer.from(payload.raw, 'base64url').toString('utf8'), /Subject: Hello/);
+    return { ok: true, json: async () => ({ id: 'gmail-sent-1' }) };
+  }});
+  assert.equal(googleSent.id, 'gmail-sent-1');
+
+  await sendMailboxMessage({ provider: 'microsoft', accessToken: 'token', from: 'owner@example.com', to: 'person@example.com', subject: 'Hello', text: 'Message body', fetchImpl: async (url, options) => {
+    assert.equal(String(url), 'https://graph.microsoft.com/v1.0/me/sendMail');
+    assert.equal(JSON.parse(options.body).message.toRecipients[0].emailAddress.address, 'person@example.com');
+    return { ok: true, json: async () => ({}) };
+  }});
+
+  await sendMailboxMessage({ provider: 'zoho', accessToken: 'token', from: 'owner@example.com', to: 'person@example.com', subject: 'Hello', text: 'Message body', providerMetadata: { accountsServer: 'https://accounts.zoho.eu', mailApiBase: 'https://mail.zoho.eu' }, fetchImpl: async (url, options) => {
+    if (String(url).endsWith('/api/accounts')) return { ok: true, json: async () => ({ data: [{ accountId: 'za1', enabled: true }] }) };
+    assert.equal(String(url), 'https://mail.zoho.eu/api/accounts/za1/messages');
+    assert.equal(JSON.parse(options.body).toAddress, 'person@example.com');
+    return { ok: true, json: async () => ({ data: { messageId: 'zoho-sent-1' } }) };
+  }});
+
+  await sendMailboxMessage({ provider: 'yahoo', accessToken: 'token', from: 'owner@example.com', to: 'person@example.com', subject: 'Hello', text: 'Message body', yahooSmtpImpl: async options => {
+    assert.equal(options.to, 'person@example.com');return { id: 'yahoo-sent-1' };
+  }});
+
+  await assert.rejects(sendMailboxMessage({ provider: 'google', accessToken: 'token', from: 'owner@example.com', to: 'bad-address', subject: 'Hello', text: 'Message body' }), /valid recipient/);
 
   let revokedUrl = '';
   await revokeMailboxAccess({
