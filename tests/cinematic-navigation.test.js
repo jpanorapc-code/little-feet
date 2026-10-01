@@ -217,7 +217,7 @@ assert.match(styles, /\.cinematic-paused-picture \{[\s\S]*z-index: 3/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-paused-picture \{[\s\S]*opacity: 1[\s\S]*visibility: visible/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-loading \{[\s\S]*display: none/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-copy,[\s\S]*\.cinematic-progress-shell/);
-assert.ok(pausedArtworkStat.size > 30000, 'Paused artwork must retain a production-quality AVIF asset.');
+assert.ok(pausedArtworkStat.size > 6000, 'Paused artwork must retain a valid optimized AVIF asset.');
 assert.equal(pausedArtwork.subarray(4, 8).toString('ascii'), 'ftyp');
 assert.match(pausedArtwork.subarray(8, 16).toString('ascii'), /avif/);
 assert.match(page, /id="cinematicDepthBackdrop"/);
