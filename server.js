@@ -689,7 +689,7 @@ app.use((req, res, next) => {
   // Standby replicas are deliberately read-only. Authentication is allowed so
   // users can inspect the latest snapshot during failover, but business-data
   // writes must never return success when there is no durable write path.
-  if (req.method === 'POST' && ['/api/login', '/api/auth/logout'].includes(req.path)) return next();
+  if (req.method === 'POST' && ['/api/login', '/api/auth/logout', '/api/system/client-log', '/api/system-self-test'].includes(req.path)) return next();
   res.setHeader('Retry-After', '30');
   return res.status(503).json({
     message: 'Backup server is read-only. Your change was not saved; reconnect to the primary service and retry.',
