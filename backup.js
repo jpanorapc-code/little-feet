@@ -1289,6 +1289,42 @@ async function runInspectSiteTest() {
   }
 }
 
+async function clearInspectHistory() {
+  if (!canUseInspectDashboard()) return;
+  const confirmed = confirm('Clear Inspect diagnostic history? This removes structured logs, persistent fault history, and this browser session’s debug events. Learner, finance, ticket, import, security/audit, and other business records are not deleted.');
+  if (!confirmed) return;
+
+  const button = document.getElementById('inspectClearHistoryButton');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Clearing…';
+  }
+  try {
+    const response = await fetch('/api/system-inspect-history', { method: 'DELETE' });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || 'Unable to clear Inspect history.');
+
+    debugEvents = [];
+    sessionStorage.removeItem('lf_debug_events');
+    latestServerErrors = [];
+    inspectStructuredLogPayload = null;
+    inspectServerFaults = [];
+    inspectDiagnostics = null;
+    inspectSelfTestResult = null;
+    renderInspectSelfTest();
+    updateDebugModePanel();
+    await loadInspectDashboard({ silent: true });
+    alert(`Inspect history cleared. Removed ${Number(result.removedPersistentFaults || 0)} persistent fault(s) and ${Number(result.removedRuntimeLogs || 0)} structured log entr${Number(result.removedRuntimeLogs || 0) === 1 ? 'y' : 'ies'}. New events will start from this clean slate.`);
+  } catch (error) {
+    alert(safeUserFacingError(error, 'Unable to clear Inspect history.'));
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Clear Inspect history';
+    }
+  }
+}
+
 async function downloadInspectReport() {
   if (!canUseInspectDashboard()) return;
   if (!inspectStructuredLogPayload || !inspectDiagnostics) await loadInspectDashboard({ silent: true });
