@@ -551,21 +551,29 @@ app.use((req, res, next) => {
   res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('Origin-Agent-Cluster', '?1');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), payment=(), usb=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
+    "frame-src 'none'",
     "form-action 'self'",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://unpkg.com",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    "connect-src 'self'"
+    "media-src 'self' blob:",
+    "manifest-src 'self'",
+    "worker-src 'self' blob:",
+    "connect-src 'self'",
+    "upgrade-insecure-requests",
+    "block-all-mixed-content"
   ].join('; '));
   if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
@@ -737,14 +745,33 @@ app.get('/favicon.ico', (req, res) => {
 });
 
 const browserVendorSources = Object.freeze({
-  'xlsx.js': 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-  'qrcode.js': 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
-  'leaflet.js': 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'leaflet-markercluster.js': 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
-  'three.module.js': 'https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js',
-  'three.core.js': 'https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.core.js'
+  'xlsx.js': Object.freeze({
+    url: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    sha256: 'sha256-yVBhl8r4CaB1tt7h2g02+xnacVj/6KiOewyWxdhiPJk='
+  }),
+  'qrcode.js': Object.freeze({
+    url: 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+    sha256: 'sha256-xUHvBjJ4hahBW8qN9gceFBibSFUzbe9PNttUvehITzY='
+  }),
+  'leaflet.js': Object.freeze({
+    url: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+    sha256: 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
+  }),
+  'leaflet-markercluster.js': Object.freeze({
+    url: 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
+    sha256: 'sha256-Hk4dIpcqOSb0hZjgyvFOP+cEmDXUKKNE/tT542ZbNQg='
+  }),
+  'three.module.js': Object.freeze({
+    url: 'https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js',
+    sha256: 'sha256-kFIELWdssP3B3f7+GTBT80t6wFE6YW/axFNdSZh4Euo='
+  }),
+  'three.core.js': Object.freeze({
+    url: 'https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.core.js',
+    sha256: 'sha256-nt3gArBmqaBWdqYSf2dzW2K685m96lKfL34xZX2naeY='
+  })
 });
 const browserVendorCache = new Map();
+const vendorSha256 = buffer => `sha256-${crypto.createHash('sha256').update(buffer).digest('base64')}`;
 app.get('/vendor/:asset', async (req, res, next) => {
   const source = browserVendorSources[req.params.asset];
   if (!source) return res.status(404).end();
@@ -754,9 +781,14 @@ app.get('/vendor/:asset', async (req, res, next) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
-        const response = await fetch(source, { signal: controller.signal, redirect: 'follow' });
+        const response = await fetch(source.url, { signal: controller.signal, redirect: 'follow' });
         if (!response.ok) throw new Error(`Vendor download failed with HTTP ${response.status}`);
-        script = await response.text();
+        const downloaded = Buffer.from(await response.arrayBuffer());
+        const actualHash = vendorSha256(downloaded);
+        if (actualHash !== source.sha256) {
+          throw new Error(`Vendor integrity check failed for ${req.params.asset}`);
+        }
+        script = downloaded.toString('utf8');
       } finally {
         clearTimeout(timeout);
       }
@@ -766,7 +798,7 @@ app.get('/vendor/:asset', async (req, res, next) => {
       browserVendorCache.set(req.params.asset, script);
     }
     res.type('application/javascript');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
     res.send(script);
   } catch (error) {
     error.status = 502;
