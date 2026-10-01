@@ -58,7 +58,7 @@ assert.match(page, /my-day\.js\?v=20260930-user-switch-v2/);
 assert.match(page, /data-my-day-nav="true"/);
 assert.match(page, /onclick="switchTab\('myDayTab', this\)"/);
 assert.match(page, /id="myDayTab" class="tab-content" data-roles="teacher,principal,admin,staff"/);
-assert.match(page, /workplace-extended\.js\?v=20261001-mailbox-compose-v1/);
+assert.match(page, /workplace-extended\.js\?v=20261001-notification-dock-v1/);
 assert.match(workplaceExtended, /Delivery provider:/);
 assert.match(workplaceExtended, /Connect Google Gmail/);
 assert.match(workplaceExtended, /Connect Microsoft Outlook/);
