@@ -983,15 +983,21 @@ const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/login',
   '/api/auth/logout',
   '/api/email/inbound/resend',
+  '/api/email/mailbox/sync',
   '/api/payments/webhook',
   '/api/payments/reconcile',
+  '/api/finance/recurring-runs',
+  '/api/finance/reconciliation/apply',
   '/api/students/import',
   '/api/attendance/toggle'
 ]);
+const duplicatePostIsHandledByRoute = requestPath =>
+  DUPLICATE_POST_EXEMPT_PATHS.has(requestPath)
+  || /^\/api\/finance\/payroll\/runs\/[^/]+\/approve$/.test(requestPath);
 app.use('/api', (req, res, next) => {
   if (req.method !== 'POST') return next();
   const requestPath = String(req.originalUrl || '').split('?')[0];
-  if (DUPLICATE_POST_EXEMPT_PATHS.has(requestPath)) return next();
+  if (duplicatePostIsHandledByRoute(requestPath)) return next();
 
   const actorKey = normalizeUsername(req.session?.littleFeetUser?.username || '') || String(req.ip || 'anonymous');
   const bodyHash = crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex');
