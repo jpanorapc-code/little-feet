@@ -48,6 +48,7 @@ let inspectSelfTestResult = null;
 let inspectAutoRefreshTimer = null;
 let connectedSignInProviders = {};
 let learnerAccessCodeRecords = [];
+let learnerCodeExportRows = [];
 let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let windtLegacyAudio = null;
@@ -4348,6 +4349,251 @@ async function loadAccounts() {
   }
 }
 
+function renderLearnerCodeNameOptions() {
+  const list = document.getElementById('learnerCodeNameOptions');
+  if (!list) return;
+  list.innerHTML = learnerAccessCodeRecords.map(record =>
+    `<option value="${escapeWorkspaceText(record.learnerName || '')}" label="${escapeWorkspaceText(record.className || 'Class not recorded')}"></option>`
+  ).join('');
+}
+
+function learnerCodeResultLabel(status) {
+  return ({
+    generated: 'New code generated',
+    existing: 'Existing active code reused',
+    not_found: 'Learner not found',
+    ambiguous: 'Multiple learners match — add Grade / Class',
+    invalid: 'Learner name required'
+  })[status] || 'Unable to generate code';
+}
+
+function stageLearnerCodeResults(results) {
+  (Array.isArray(results) ? results : []).forEach(result => {
+    if (!['generated', 'existing'].includes(result.status) || !result.accessCode || !result.learnerKey) return;
+    const row = {
+      learnerKey: result.learnerKey,
+      learnerName: result.learnerName || result.inputName || '',
+      accessCode: result.accessCode,
+      className: result.className || '',
+      parentName: result.parentName || '',
+      status: learnerCodeResultLabel(result.status),
+      issuedAt: result.issuedAt || ''
+    };
+    const existingIndex = learnerCodeExportRows.findIndex(item => item.learnerKey === row.learnerKey);
+    if (existingIndex >= 0) learnerCodeExportRows[existingIndex] = row;
+    else learnerCodeExportRows.push(row);
+  });
+  renderLearnerCodeExportPreview();
+}
+
+function renderLearnerCodeExportPreview() {
+  const preview = document.getElementById('learnerCodeExportPreview');
+  if (!preview) return;
+  if (!learnerCodeExportRows.length) {
+    preview.innerHTML = '<p class="meta">No learner codes are staged for export yet.</p>';
+    return;
+  }
+  preview.innerHTML = `<div class="item-row" style="display:block;"><strong>${learnerCodeExportRows.length} learner code${learnerCodeExportRows.length === 1 ? '' : 's'} staged for export</strong><div style="overflow:auto;margin-top:8px;"><table><thead><tr><th>Learner</th><th>Code</th><th>Class</th><th>Status</th></tr></thead><tbody>${learnerCodeExportRows.slice(-20).map(row => `<tr><td>${escapeWorkspaceText(row.learnerName)}</td><td><strong style="letter-spacing:.06em;">${escapeWorkspaceText(row.accessCode)}</strong></td><td>${escapeWorkspaceText(row.className || 'Not recorded')}</td><td>${escapeWorkspaceText(row.status)}</td></tr>`).join('')}</tbody></table></div>${learnerCodeExportRows.length > 20 ? '<p class="meta">Showing the latest 20 staged rows. The download contains the full staged list.</p>' : ''}</div>`;
+}
+
+async function requestLearnerCodeGeneration(rows) {
+  if (!isFullAccessUser()) throw new Error('Only an administrator can generate learner access codes.');
+  const requested = Array.isArray(rows) ? rows : [];
+  if (!requested.length) return [];
+  const results = [];
+  const chunkSize = 500;
+  for (let offset = 0; offset < requested.length; offset += chunkSize) {
+    const response = await fetch('/api/learner-access-codes/generate-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ learners: requested.slice(offset, offset + chunkSize) })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || 'Unable to generate learner access codes.');
+    results.push(...(Array.isArray(payload.results) ? payload.results : []));
+  }
+  return results;
+}
+
+async function generateSingleLearnerCode() {
+  if (!isFullAccessUser()) return alert('Only an administrator can generate learner access codes.');
+  const nameField = document.getElementById('learnerCodeGenerateName');
+  const classField = document.getElementById('learnerCodeGenerateClass');
+  const resultBox = document.getElementById('learnerCodeGenerateResult');
+  const learnerName = String(nameField?.value || '').trim();
+  const className = String(classField?.value || '').trim();
+  if (!learnerName) return alert('Enter the learner name first.');
+
+  try {
+    if (resultBox) resultBox.textContent = 'Matching the learner and generating the secure code…';
+    const [result] = await requestLearnerCodeGeneration([{ learnerName, className }]);
+    if (!result) throw new Error('No learner-code result was returned.');
+    if (!['generated', 'existing'].includes(result.status)) {
+      if (resultBox) resultBox.innerHTML = `<strong>${escapeWorkspaceText(learnerCodeResultLabel(result.status))}</strong> · ${escapeWorkspaceText(result.message || 'Check the learner name and class.')}`;
+      return;
+    }
+    stageLearnerCodeResults([result]);
+    if (resultBox) resultBox.innerHTML = `<strong>${escapeWorkspaceText(result.learnerName)}</strong> · <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(result.accessCode)}</strong> · ${escapeWorkspaceText(learnerCodeResultLabel(result.status))}`;
+    if (nameField) nameField.value = '';
+    if (classField) classField.value = '';
+    await loadLearnerAccessCodes();
+    playDingSound();
+  } catch (error) {
+    if (resultBox) resultBox.textContent = safeUserFacingError(error, 'Unable to generate this learner code.');
+  }
+}
+
+function learnerCodeSheetRows(rows = learnerCodeExportRows) {
+  return rows.map(row => ({
+    'Learner Name': row.learnerName || '',
+    'Learner Access Code': row.accessCode || '',
+    'Grade / Class': row.className || '',
+    'Parent / Guardian': row.parentName || '',
+    'Code Status': row.status || '',
+    'Issued At': row.issuedAt || ''
+  }));
+}
+
+function downloadLearnerCodeRows(rows, format, filenameBase) {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
+  if (!rows.length) return alert('There are no learner codes to export yet.');
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  if (format === 'csv') {
+    const csv = XLSX.utils.sheet_to_csv(worksheet);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    link.download = `${filenameBase}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    return;
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Learner codes');
+  XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
+}
+
+function downloadStagedLearnerCodes(format = 'xlsx') {
+  downloadLearnerCodeRows(
+    learnerCodeSheetRows(),
+    format,
+    `LittleFeet_Learner_Codes_${new Date().toISOString().slice(0, 10)}`
+  );
+}
+
+function clearStagedLearnerCodes() {
+  learnerCodeExportRows = [];
+  renderLearnerCodeExportPreview();
+  const resultBox = document.getElementById('learnerCodeGenerateResult');
+  if (resultBox) resultBox.textContent = 'No code generated in this browser session yet.';
+}
+
+function downloadLearnerCodeGeneratorTemplate() {
+  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
+  const worksheet = XLSX.utils.aoa_to_sheet([['Learner Name', 'Grade / Class']]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Learner names');
+  XLSX.writeFile(workbook, 'LittleFeet_Learner_Code_Generator_Template.xlsx');
+}
+
+function readLearnerCodeSpreadsheet(file) {
+  return new Promise((resolve, reject) => {
+    const fileError = validateSpreadsheetFile(file, STANDARD_SPREADSHEET_MAX_BYTES);
+    if (fileError) return reject(new Error(fileError));
+    if (typeof XLSX === 'undefined') return reject(new Error('The spreadsheet tool is still loading. Please try again in a moment.'));
+    const reader = new FileReader();
+    reader.onload = event => {
+      try {
+        const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sourceRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }).filter(row =>
+          Object.values(row || {}).some(value => String(value || '').trim())
+        );
+        if (!sourceRows.length) throw new Error('The spreadsheet does not contain any learner rows.');
+        if (sourceRows.length > 100000) throw new Error('This spreadsheet contains more than 100,000 rows. Split it into smaller school-approved files.');
+        resolve(sourceRows);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = () => reject(new Error('The spreadsheet could not be read.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function normalizedSpreadsheetHeader(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function learnerCodeSpreadsheetHeaders(rows) {
+  const headers = [];
+  rows.forEach(row => Object.keys(row || {}).forEach(key => {
+    if (!headers.includes(key)) headers.push(key);
+  }));
+  const learnerAliases = new Set(['learnername', 'studentname', 'childname', 'name']);
+  const nameHeader = headers.find(header => learnerAliases.has(normalizedSpreadsheetHeader(header))) || null;
+  const outputHeaders = [];
+  headers.forEach(header => {
+    outputHeaders.push(header);
+    if (header === nameHeader) outputHeaders.push('Learner Access Code', 'Code Status');
+  });
+  if (!nameHeader) outputHeaders.push('Learner Access Code', 'Code Status');
+  return { headers, outputHeaders };
+}
+
+async function generateLearnerCodesFromSpreadsheet(format = 'xlsx') {
+  if (!isFullAccessUser()) return alert('Only an administrator can generate learner access codes.');
+  const input = document.getElementById('learnerCodeBulkFile');
+  const status = document.getElementById('learnerCodeBulkStatus');
+  const file = input?.files?.[0];
+  if (!file) return alert('Choose an Excel or CSV learner-name file first.');
+
+  try {
+    if (status) status.textContent = 'Reading learner names…';
+    const sourceRows = await readLearnerCodeSpreadsheet(file);
+    const requests = sourceRows.map(row => ({
+      learnerName: importValue(row, ['learnername', 'studentname', 'childname', 'name']),
+      className: importValue(row, ['gradeclass', 'classname', 'class', 'grade'])
+    }));
+    if (status) status.textContent = `Matching ${requests.length} learner row${requests.length === 1 ? '' : 's'} to the real school register…`;
+    const results = await requestLearnerCodeGeneration(requests);
+    const { outputHeaders } = learnerCodeSpreadsheetHeaders(sourceRows);
+    const enrichedRows = sourceRows.map((row, index) => {
+      const result = results[index] || { status: 'invalid', message: 'No result returned.' };
+      return {
+        ...row,
+        'Learner Access Code': result.accessCode || '',
+        'Code Status': learnerCodeResultLabel(result.status)
+      };
+    });
+    stageLearnerCodeResults(results);
+
+    const worksheet = XLSX.utils.json_to_sheet(enrichedRows, { header: outputHeaders });
+    const generated = results.filter(result => result.status === 'generated').length;
+    const existing = results.filter(result => result.status === 'existing').length;
+    const unmatched = results.length - generated - existing;
+    const filenameBase = `LittleFeet_Learner_Codes_${new Date().toISOString().slice(0, 10)}`;
+
+    if (format === 'csv') {
+      const csv = XLSX.utils.sheet_to_csv(worksheet);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      link.download = `${filenameBase}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } else {
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Learner codes');
+      XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
+    }
+
+    if (status) status.innerHTML = `<strong>${generated + existing} matched</strong> · ${generated} new code${generated === 1 ? '' : 's'} generated · ${existing} existing code${existing === 1 ? '' : 's'} reused · ${unmatched} row${unmatched === 1 ? '' : 's'} need attention. The downloaded file keeps every source row and places <strong>Learner Access Code</strong> immediately after the learner-name column.`;
+    await loadLearnerAccessCodes();
+    playDingSound();
+  } catch (error) {
+    if (status) status.textContent = safeUserFacingError(error, 'Unable to generate learner codes from this spreadsheet.');
+  }
+}
+
 async function loadLearnerAccessCodes() {
   const list = document.getElementById('learnerCodeList');
   if (!list || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
@@ -4356,6 +4602,8 @@ async function loadLearnerAccessCodes() {
     const records = await response.json();
     if (!response.ok) throw new Error(records.message || 'Unable to load learner code forms.');
     learnerAccessCodeRecords = records;
+    renderLearnerCodeNameOptions();
+    renderLearnerCodeExportPreview();
     if (!records.length) {
       list.innerHTML = '<p style="font-size:.84rem;color:var(--text-muted);">No learners are available yet. Import or register learners first.</p>';
       return;
