@@ -1680,6 +1680,39 @@
     .guide-records-table th:nth-child(3), .guide-records-table td:nth-child(3) { width:59%; }
     .guide-records-table .guide-records-alt { background:rgba(45,212,191,.06); }
     .guide-records-note { margin:12px 0 0 !important; font-size:.82rem; line-height:1.5; }
+    #inspectTab .inspect-log-table { table-layout:auto; min-width:1220px !important; }
+    #inspectTab .inspect-log-table th:nth-child(1), #inspectTab .inspect-log-table td:nth-child(1) { width:160px; }
+    #inspectTab .inspect-log-table th:nth-child(2), #inspectTab .inspect-log-table td:nth-child(2) { width:104px; }
+    #inspectTab .inspect-log-table th:nth-child(3), #inspectTab .inspect-log-table td:nth-child(3) { width:240px; }
+    #inspectTab .inspect-log-table th:nth-child(4), #inspectTab .inspect-log-table td:nth-child(4) { width:190px; }
+    #inspectTab .inspect-log-table th:nth-child(5), #inspectTab .inspect-log-table td:nth-child(5) { width:250px; }
+    #inspectTab .inspect-log-table th:nth-child(6), #inspectTab .inspect-log-table td:nth-child(6) { width:82px; }
+    #inspectTab .inspect-log-table th:nth-child(7), #inspectTab .inspect-log-table td:nth-child(7) { width:100px; }
+    #inspectTab .inspect-log-table th:nth-child(8), #inspectTab .inspect-log-table td:nth-child(8) { width:120px; }
+    #inspectTab .inspect-log-table th:nth-child(9), #inspectTab .inspect-log-table td:nth-child(9) { width:136px; min-width:136px; }
+    #inspectTab .inspect-trace-button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:auto !important;
+      min-width:96px;
+      min-height:40px;
+      padding:8px 14px;
+      font-size:.90rem !important;
+      font-weight:800;
+      line-height:1.15;
+      white-space:nowrap !important;
+      overflow-wrap:normal !important;
+      word-break:keep-all !important;
+    }
+    #inspectTab .inspect-trace-id {
+      display:block;
+      margin-top:7px;
+      font-size:.80rem;
+      line-height:1.35;
+      white-space:nowrap;
+      color:var(--text-muted);
+    }
     #guideTab .guide-link-card { font-size:.92rem; }
     #guideTab .guide-link-card p { font-size:.90rem; line-height:1.55; }
     @media (max-width:760px) {
@@ -5982,7 +6015,7 @@
           <section class="workspace-card" style="margin-bottom:16px;">
             <div class="card-header-bar"><h3>Structured request &amp; event stream</h3><span id="inspectLogCount" class="meta">0 shown</span></div>
             <div style="overflow:auto;max-height:620px;">
-              <table class="guide-records-table" style="min-width:1050px;">
+              <table class="guide-records-table inspect-log-table">
                 <thead><tr><th>Time</th><th>Severity</th><th>Event</th><th>User / school</th><th>Request</th><th>Status</th><th>Duration</th><th>Result</th><th>Trace</th></tr></thead>
                 <tbody id="inspectLogRows"><tr><td colspan="9">Loading structured logs…</td></tr></tbody>
               </table>
@@ -6351,7 +6384,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261001-session-aware-polling-v1" defer></script>
+  <script src="backup.js?v=20261001-inspect-trace-ui-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20260930-user-switch-v2" defer></script>
   <script src="/assets/staff-work.js?v=20260930-accounts-full-v1" defer></script>
