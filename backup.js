@@ -416,7 +416,7 @@ function upgradeLegacyIcons() {
     heading.innerHTML = `${svg(iconFor(text))}<span>${text.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '')}</span>`;
   });
   document.querySelectorAll('.profile-icon-choice').forEach(button => {
-    if (button.querySelector('.ui-icon')) return;
+    if (button.querySelector('.ui-icon, .profile-avatar-image')) return;
     const value = button.dataset.profileIcon || button.textContent.trim();
     button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${iconFor(value)}"></use></svg>`;
   });
@@ -1462,15 +1462,38 @@ function toggleDarkMode() {
 }
 
 let dashboardRefreshTimer = null;
-const profileIcons = ['👤', '🧑‍🏫', '👨‍👩‍👧', '🏫', '🌟', '🌱', '🐾', '📚', '🎨', '🏆'];
-const profileIconNames = {
-  '👤': 'user', '🧑‍🏫': 'academics', '👨‍👩‍👧': 'users', '🏫': 'home', '🌟': 'award',
-  '🌱': 'growth', '🐾': 'heart-star', '📚': 'book', '🎨': 'palette', '🏆': 'medal'
-};
+const profileIcons = ['classic', 'lady', 'tough', 'cute', 'happy', 'cool', 'boss', 'smart-lady'];
+const profileIconLabels = Object.freeze({
+  classic: 'Classic',
+  lady: 'Lady',
+  tough: 'Tough',
+  cute: 'Cute',
+  happy: 'Happy',
+  cool: 'Cool',
+  boss: 'Boss',
+  'smart-lady': 'Smart Lady'
+});
+const legacyProfileIconMap = Object.freeze({
+  '👤': 'classic',
+  '🧑‍🏫': 'smart-lady',
+  '👨‍👩‍👧': 'cute',
+  '🏫': 'boss',
+  '🌟': 'happy',
+  '🌱': 'classic',
+  '🐾': 'cute',
+  '📚': 'smart-lady',
+  '🎨': 'lady',
+  '🏆': 'boss'
+});
+
+function normalizeProfileIcon(icon) {
+  const migrated = legacyProfileIconMap[icon] || icon;
+  return profileIcons.includes(migrated) ? migrated : profileIcons[0];
+}
 
 function profileIconMarkup(icon) {
-  const iconName = profileIconNames[icon] || 'user';
-  return `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${iconName}"></use></svg>`;
+  const selectedIcon = normalizeProfileIcon(icon);
+  return `<span class="profile-avatar-image profile-avatar-${selectedIcon}" aria-hidden="true"></span>`;
 }
 
 function getProfileIconStorageKey() {
@@ -1479,11 +1502,12 @@ function getProfileIconStorageKey() {
 }
 
 function applyProfileIcon(icon = localStorage.getItem(getProfileIconStorageKey()) || profileIcons[0]) {
-  const selectedIcon = profileIcons.includes(icon) ? icon : profileIcons[0];
+  const selectedIcon = normalizeProfileIcon(icon);
+  if (icon !== selectedIcon) localStorage.setItem(getProfileIconStorageKey(), selectedIcon);
   const avatar = document.getElementById('userAvatar');
   if (avatar) {
     avatar.innerHTML = profileIconMarkup(selectedIcon);
-    avatar.title = currentUser?.name || currentUser?.username || 'Profile';
+    avatar.title = `${profileIconLabels[selectedIcon]} · ${currentUser?.name || currentUser?.username || 'Profile'}`;
   }
   document.querySelectorAll('.profile-icon-choice').forEach(button => {
     const selected = button.dataset.profileIcon === selectedIcon;
@@ -1493,9 +1517,10 @@ function applyProfileIcon(icon = localStorage.getItem(getProfileIconStorageKey()
 }
 
 function selectProfileIcon(icon) {
-  if (!profileIcons.includes(icon)) return;
-  localStorage.setItem(getProfileIconStorageKey(), icon);
-  applyProfileIcon(icon);
+  const selectedIcon = normalizeProfileIcon(icon);
+  if (!profileIcons.includes(selectedIcon)) return;
+  localStorage.setItem(getProfileIconStorageKey(), selectedIcon);
+  applyProfileIcon(selectedIcon);
 }
 
 function userPreferencesStorageKey() {
