@@ -1,4 +1,7 @@
 let currentUser = null;
+let serverSessionValidatedAt = 0;
+let sessionValidationPromise = null;
+const SESSION_VALIDATION_TTL_MS = 2500;
 const LITTLE_FEET_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
 const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.role === 'crm' || user.role === 'accounts' || user.platformAccess === true));
 const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role || ''));
@@ -69,6 +72,73 @@ function safeUserFacingError(error, fallback = 'Unable to complete this action. 
   return message;
 }
 window.safeUserFacingError = safeUserFacingError;
+
+function markServerSessionValidated() {
+  serverSessionValidatedAt = Date.now();
+}
+
+function expireClientSessionFromServer() {
+  if (!currentUser) return;
+  window.stopDashboardAutoRefresh?.();
+  if (dashboardRefreshTimer) window.clearInterval(dashboardRefreshTimer);
+  dashboardRefreshTimer = null;
+  if (schoolStatusTimer) window.clearInterval(schoolStatusTimer);
+  schoolStatusTimer = null;
+  if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
+  releaseNotesRefreshTimer = null;
+  if (inspectAutoRefreshTimer) window.clearInterval(inspectAutoRefreshTimer);
+  inspectAutoRefreshTimer = null;
+  if (alertMonitorId) window.clearInterval(alertMonitorId);
+  alertMonitorId = null;
+  if (ticketMonitorId) window.clearInterval(ticketMonitorId);
+  ticketMonitorId = null;
+  serverSessionValidatedAt = 0;
+  currentUser = null;
+  knownTicketIds = new Set();
+  ticketsLoaded = false;
+  inspectStructuredLogPayload = null;
+  inspectServerFaults = [];
+  inspectDiagnostics = null;
+  inspectSelfTestResult = null;
+  document.getElementById('dashboardSection')?.classList.add('hidden');
+  document.getElementById('authSection')?.classList.remove('hidden');
+  document.body.classList.remove('portal-active');
+  document.getElementById('stickyNotesOverlay')?.replaceChildren();
+  document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
+  document.getElementById('stickyNotesLauncher')?.classList.add('hidden');
+  document.dispatchEvent(new CustomEvent('littlefeet:session-ended', { detail: { reason: 'server-session-ended' } }));
+  window.setTimeout(() => openModal('Session ended', '<p style="margin:0;line-height:1.6;">Your secure Little Feet session ended. Please sign in again to continue.</p>'), 0);
+}
+
+async function ensureAuthenticatedSession({ force = false } = {}) {
+  if (!currentUser) return false;
+  if (!force && Date.now() - serverSessionValidatedAt <= SESSION_VALIDATION_TTL_MS) return true;
+  if (sessionValidationPromise) return sessionValidationPromise;
+
+  const expectedUsername = currentUser.username;
+  sessionValidationPromise = (async () => {
+    try {
+      const response = await fetch('/api/auth/session', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (currentUser?.username !== expectedUsername) return false;
+      if (response.ok && data.authenticated && data.user) {
+        currentUser = data.user;
+        markServerSessionValidated();
+        return true;
+      }
+      if (response.ok || response.status === 401 || response.status === 403) expireClientSessionFromServer();
+      return false;
+    } catch {
+      // A temporary network failure must not destroy the local session or drafts.
+      return false;
+    } finally {
+      sessionValidationPromise = null;
+    }
+  })();
+  return sessionValidationPromise;
+}
+
+window.ensureLittleFeetAuthenticatedSession = ensureAuthenticatedSession;
 
 document.addEventListener('submit', event => {
   const form = event.target;
@@ -1357,6 +1427,7 @@ function openSelectedWorkspace() {
 }
 
 function setupSession() {
+  markServerSessionValidated();
   loadPortalAudioPreference();
   applyRolePermissions(currentUser.role);
   ['reportSigningUsername', 'reportTeacherUsername', 'parentReportUsername'].forEach(id => {
@@ -1391,9 +1462,15 @@ function setupSession() {
   document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
   startReleaseNotesMonitor();
   if (alertMonitorId) clearInterval(alertMonitorId);
-  alertMonitorId = setInterval(() => { if (currentUser && !document.hidden) loadBroadcasts(); }, 30000);
+  alertMonitorId = setInterval(async () => {
+    if (!currentUser || document.hidden) return;
+    if (await ensureAuthenticatedSession()) loadBroadcasts();
+  }, 30000);
   if (ticketMonitorId) clearInterval(ticketMonitorId);
-  ticketMonitorId = setInterval(() => { if (currentUser && !document.hidden) loadTickets(true); }, 20000);
+  ticketMonitorId = setInterval(async () => {
+    if (!currentUser || document.hidden) return;
+    if (await ensureAuthenticatedSession()) loadTickets(true);
+  }, 20000);
 }
 
 function applyRolePermissions(role) {
@@ -1485,6 +1562,8 @@ function logout() {
   inspectServerFaults = [];
   inspectDiagnostics = null;
   inspectSelfTestResult = null;
+  serverSessionValidatedAt = 0;
+  sessionValidationPromise = null;
   currentUser = null;
   exitWallpaperMode();
   stopWindtLegacyNote();
@@ -1898,6 +1977,11 @@ async function startHealthMonitor() {
 }
 
 async function loadAllData() {
+  // Verify the server-side session before automatic or repeated protected reads.
+  // This prevents an already-open browser tab from polling protected APIs after
+  // a deploy, server restart, logout elsewhere, or normal session expiry.
+  if (!await ensureAuthenticatedSession()) return false;
+
   // Prioritise what is visible at sign-in. The rest loads when its workspace
   // opens, avoiding a burst of 30+ requests on every login.
   loadAcademicTerm();
@@ -1907,6 +1991,7 @@ async function loadAllData() {
   loadReleaseNotes();
   loadHouseholdSwitcher();
   loadStickyNotes();
+  return true;
 }
 
 async function loadHouseholdSwitcher() {

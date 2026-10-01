@@ -551,7 +551,8 @@ const STRUCTURED_LOG_QUIET_READ_ROUTES = new Set([
   '/api/system-status',
   '/api/system-diagnostics',
   '/api/system-errors',
-  '/api/system-logs'
+  '/api/system-logs',
+  '/api/auth/session'
 ]);
 app.use((req, res, next) => {
   req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
