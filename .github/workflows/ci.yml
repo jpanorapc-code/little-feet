@@ -48,6 +48,9 @@ jobs:
           node --check scripts/write-deploy-release.js
           node --check scripts/audit-route-connections.js
 
+      - name: Whole-project integrity audit
+        run: npm run audit:project
+
       - name: Full regression suite
         run: npm test
 
@@ -62,3 +65,33 @@ jobs:
 
       - name: Diff hygiene
         run: git diff --check HEAD^ HEAD || git diff --check
+
+  browser-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install browser test runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Portal role and navigation regression
+        run: node tests/portal-ui.test.cjs
+
+      - name: Responsive layout regression
+        run: node tests/responsive-layout.test.cjs
+
+      - name: Ambient background interaction regression
+        run: node tests/ambient-background.test.cjs
