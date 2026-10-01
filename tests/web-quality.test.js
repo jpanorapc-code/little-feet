@@ -12,6 +12,7 @@ const checklist = fs.readFileSync(path.join(root, 'VIDEO_REVIEW_CHECKLIST.md'), 
 const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 const mobilePwa = fs.readFileSync(path.join(root, 'assets', 'mobile-pwa.js'), 'utf8');
+const ambientBackground = fs.readFileSync(path.join(root, 'assets', 'ambient-background.js'), 'utf8');
 const myDay = fs.readFileSync(path.join(root, 'assets', 'my-day.js'), 'utf8');
 const workplaceExtended = fs.readFileSync(path.join(root, 'assets', 'workplace-extended.js'), 'utf8');
 const envExample = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
@@ -363,5 +364,7 @@ assert.match(server, /traffic\.rate_limited/);
 assert.match(server, /performance\.slow_requests/);
 assert.doesNotMatch(server, /console\.(?:log|warn|error)\(/);
 assert.doesNotMatch(client, /console\.(?:log|warn|error)\(/);
+assert.doesNotMatch(ambientBackground, /console\.(?:log|info|warn|error|debug)\(/);
+assert.match(ambientBackground, /AMBIENT_VIDEO_AUTOPLAY_BLOCKED/);
 
 console.log('Web quality regression test passed.');
