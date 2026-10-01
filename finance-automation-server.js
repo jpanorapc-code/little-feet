@@ -583,7 +583,7 @@ function registerFinanceAutomation(app, deps) {
     persistenceReady.then(() => {
       void runDueRecurringRules().catch(error => logStructured?.('error', 'finance.recurring_automation_failed', { category: 'finance', message: error.message }));
       const timer = setInterval(() => {
-        void runDueRecurringRules().catch(error => console.error('Recurring finance automation failed:', error.message));
+        void runDueRecurringRules().catch(error => logStructured?.('error', 'finance.recurring_automation_failed', { category: 'finance', message: error.message }));
       }, 6 * 60 * 60 * 1000);
       timer.unref?.();
     }).catch(() => {});
