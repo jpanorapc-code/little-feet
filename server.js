@@ -2151,7 +2151,7 @@ const runAdminSelfTest = async actor => {
     try {
       const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
       const bypassRules = [{
-        pattern: /\bconsole\.(?:log|warn|error)\s*\(/,
+        pattern: /\bconsole\.(?:log|info|warn|error|debug)\s*\(/,
         severity: 'warn', category: 'logging', check: 'logging.centralization',
         issue: 'A server console call bypasses the centralized structured logger.',
         why: 'Direct console output cannot be filtered and traced consistently in the Inspect dashboard.',
