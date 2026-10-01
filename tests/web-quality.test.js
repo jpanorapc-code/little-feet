@@ -353,7 +353,7 @@ assert.match(client, /window\.reportLittleFeetClientLog = reportClientStructured
 assert.match(server, /createStructuredLogger/);
 assert.match(server, /app\.get\('\/api\/system-logs'/);
 assert.match(server, /app\.get\('\/api\/system-logs\/trace\/:requestId'/);
-assert.match(server, /app\.post\('\/api\/system\/client-log'|app\.post\('\/api\/system\/client-log'/);
+assert.match(server, /app\.post\('\/api\/system\/client-log'/);
 assert.match(server, /app\.post\('\/api\/system-self-test'/);
 assert.match(server, /const runAdminSelfTest = async actor =>/);
 assert.match(server, /public\.secret_boundary/);
