@@ -5067,6 +5067,86 @@
     .email-inbox-item header{display:flex;justify-content:space-between;gap:10px}.email-inbox-item .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
     .email-compose-card{grid-column:1/-1}.email-compose-card form{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(220px,1.3fr);gap:12px}.email-compose-card form label:nth-of-type(3),.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1/-1}.email-compose-card textarea{resize:vertical}
     @media(max-width:640px){#authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 42px}#authSection .login-background-compact{grid-column:1/-1;width:100%!important;min-width:0!important}.lf-notification-stack{top:72px;right:8px;bottom:8px;width:calc(100vw - 16px)}.lf-notification-controls{grid-template-columns:1fr 1fr}.lf-notification-controls [data-notification-close-all]{grid-column:1/-1}.email-inbox-item header{flex-direction:column}.email-compose-card form{grid-template-columns:1fr}.email-compose-card form label,.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1}}
+
+    /* Little Feet penguin profile avatars: transparent cutouts blend into the portal chrome. */
+    .profile-icon-picker {
+      grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+      gap:10px !important;
+    }
+    .profile-icon-choice {
+      display:flex !important;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      min-height:94px !important;
+      padding:8px 6px !important;
+      overflow:hidden;
+    }
+    .profile-avatar-image {
+      display:block;
+      width:64px;
+      height:64px;
+      flex:0 0 64px;
+      background-image:url('/assets/profile/penguin-profile-avatars.png?v=20261002-penguin-avatars-v1');
+      background-repeat:no-repeat;
+      background-size:400% 200%;
+      filter:drop-shadow(0 2px 4px rgba(0,0,0,.30));
+      pointer-events:none;
+    }
+    .profile-avatar-classic { background-position:0% 0%; }
+    .profile-avatar-lady { background-position:33.333% 0%; }
+    .profile-avatar-tough { background-position:66.667% 0%; }
+    .profile-avatar-cute { background-position:100% 0%; }
+    .profile-avatar-happy { background-position:0% 100%; }
+    .profile-avatar-cool { background-position:33.333% 100%; }
+    .profile-avatar-boss { background-position:66.667% 100%; }
+    .profile-avatar-smart-lady { background-position:100% 100%; }
+    .profile-icon-label {
+      display:block;
+      max-width:100%;
+      overflow:hidden;
+      color:var(--text-muted);
+      font-size:.66rem;
+      font-weight:800;
+      line-height:1.1;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      pointer-events:none;
+    }
+    .profile-icon-choice:hover .profile-icon-label,
+    .profile-icon-choice:focus-visible .profile-icon-label,
+    .profile-icon-choice.is-selected .profile-icon-label { color:var(--text-light); }
+    .profile-icon-choice.is-selected .profile-avatar-image {
+      filter:drop-shadow(0 0 7px rgba(94,234,212,.62)) drop-shadow(0 2px 4px rgba(0,0,0,.28));
+    }
+    .user-avatar {
+      width:30px !important;
+      height:30px !important;
+      flex:0 0 30px;
+      overflow:visible;
+      border-radius:0 !important;
+      background:transparent !important;
+      color:inherit;
+    }
+    .user-avatar .profile-avatar-image {
+      width:30px;
+      height:30px;
+      flex-basis:30px;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,.36));
+    }
+    @media (max-width:480px) {
+      .profile-icon-picker { grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:7px !important; }
+      .profile-icon-choice { min-height:78px !important; padding:6px 3px !important; }
+      .profile-icon-choice .profile-avatar-image { width:50px; height:50px; flex-basis:50px; }
+      .profile-icon-label { font-size:.58rem; }
+    }
+    @media (max-width:360px) {
+      .profile-icon-picker { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+      .profile-icon-choice { min-height:86px !important; }
+      .profile-icon-choice .profile-avatar-image { width:56px; height:56px; flex-basis:56px; }
+      .profile-icon-label { font-size:.64rem; }
+    }
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
@@ -6441,7 +6521,7 @@
         <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-operations"></use></svg></span><span>Personal settings</span></h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
           <p style="color:var(--text-muted);margin-bottom:16px;">These settings are saved on this device for the signed-in account.</p>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Profile icon</h3><p>Choose the icon shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="👤" aria-label="Person" title="Person" onclick="selectProfileIcon(this.dataset.profileIcon)">👤</button><button type="button" class="profile-icon-choice" data-profile-icon="🧑‍🏫" aria-label="Educator" title="Educator" onclick="selectProfileIcon(this.dataset.profileIcon)">🧑‍🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="👨‍👩‍👧" aria-label="Family" title="Family" onclick="selectProfileIcon(this.dataset.profileIcon)">👨‍👩‍👧</button><button type="button" class="profile-icon-choice" data-profile-icon="🏫" aria-label="School" title="School" onclick="selectProfileIcon(this.dataset.profileIcon)">🏫</button><button type="button" class="profile-icon-choice" data-profile-icon="🌟" aria-label="Star" title="Star" onclick="selectProfileIcon(this.dataset.profileIcon)">🌟</button><button type="button" class="profile-icon-choice" data-profile-icon="🌱" aria-label="Seedling" title="Seedling" onclick="selectProfileIcon(this.dataset.profileIcon)">🌱</button><button type="button" class="profile-icon-choice" data-profile-icon="🐾" aria-label="Little feet" title="Little feet" onclick="selectProfileIcon(this.dataset.profileIcon)">🐾</button><button type="button" class="profile-icon-choice" data-profile-icon="📚" aria-label="Books" title="Books" onclick="selectProfileIcon(this.dataset.profileIcon)">📚</button><button type="button" class="profile-icon-choice" data-profile-icon="🎨" aria-label="Creative arts" title="Creative arts" onclick="selectProfileIcon(this.dataset.profileIcon)">🎨</button><button type="button" class="profile-icon-choice" data-profile-icon="🏆" aria-label="Achievement" title="Achievement" onclick="selectProfileIcon(this.dataset.profileIcon)">🏆</button></div></div>
+            <div class="workspace-card"><h3>Profile icon</h3><p>Choose your Little Feet penguin shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your penguin profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="classic" aria-label="Classic penguin" title="Classic penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-classic" aria-hidden="true"></span><span class="profile-icon-label">Classic</span></button><button type="button" class="profile-icon-choice" data-profile-icon="lady" aria-label="Lady penguin" title="Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-lady" aria-hidden="true"></span><span class="profile-icon-label">Lady</span></button><button type="button" class="profile-icon-choice" data-profile-icon="tough" aria-label="Tough penguin" title="Tough penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-tough" aria-hidden="true"></span><span class="profile-icon-label">Tough</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cute" aria-label="Cute penguin" title="Cute penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-cute" aria-hidden="true"></span><span class="profile-icon-label">Cute</span></button><button type="button" class="profile-icon-choice" data-profile-icon="happy" aria-label="Happy penguin" title="Happy penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-happy" aria-hidden="true"></span><span class="profile-icon-label">Happy</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cool" aria-label="Cool penguin" title="Cool penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-cool" aria-hidden="true"></span><span class="profile-icon-label">Cool</span></button><button type="button" class="profile-icon-choice" data-profile-icon="boss" aria-label="Boss penguin" title="Boss penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-boss" aria-hidden="true"></span><span class="profile-icon-label">Boss</span></button><button type="button" class="profile-icon-choice" data-profile-icon="smart-lady" aria-label="Smart Lady penguin" title="Smart Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-smart-lady" aria-hidden="true"></span><span class="profile-icon-label">Smart Lady</span></button></div></div>
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. Core navigation and settings are translated; untranslated workspace text safely falls back to English.</p><select id="languagePreference" data-no-draft onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans</option><option value="zu">isiZulu</option><option value="xh">isiXhosa</option><option value="nso">Sepedi</option><option value="st">Sesotho</option><option value="tn">Setswana</option><option value="ss">siSwati</option><option value="ve">Tshivenda</option><option value="ts">itsonga</option><option value="nr">isiNdebele</option></select><p class="meta" style="margin-top:8px;">South African Sign Language (SASL) is an official language. Text translation is not a substitute for signed content, so SASL accessibility content is tracked separately rather than shown as a fake text translation.</p></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without hammering the API. Smart refresh updates only the active workspace and pauses while this tab is hidden.</p><select id="refreshPreference" data-no-draft onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="auto">Auto (smart · 2–5 minutes)</option><option value="300000">Every 5 minutes</option><option value="900000">Every 15 minutes</option><option value="1800000">Every 30 minutes</option><option value="3600000">Every hour</option><option value="7200000">Every 2 hours</option><option value="86400000">Every day</option></select><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="action-btn btn-blue" onclick="refreshDashboardSafely()">Refresh now safely</button></div><p class="meta" style="margin-top:8px;">Draft protection uses this browser tab only. Passwords, PINs, one-time codes, signatures and files are never stored in the draft checkpoint.</p></div>
             <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute penguin calls, alerts, wallpaper audio and other optional Little Feet sounds. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
@@ -6575,7 +6655,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261001-executive-home-v1" defer></script>
+  <script src="backup.js?v=20261002-penguin-avatars-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/staff-work.js?v=20261001-startup-dedupe-v1" defer></script>
