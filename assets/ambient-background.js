@@ -38,7 +38,7 @@
     video.dataset.playbackState = 'error';
     button.textContent = 'Background unavailable';
     button.disabled = true;
-    console.warn('Background video unavailable; showing the poster.');
+    /* Poster fallback is expected when background video is unavailable. */
   });
   document.addEventListener('visibilitychange', sync);
   reducedMotion.addEventListener('change', sync);
