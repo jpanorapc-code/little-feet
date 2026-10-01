@@ -340,6 +340,7 @@ assert.match(server, /'\/api\/book-register\/import'/);
 assert.match(server, /Large school-register imports must use School Integration/);
 assert.match(server, /const DUPLICATE_POST_WINDOW_MS = 5 \* 1000/);
 assert.match(server, /This action is already being processed/);
+assert.match(server, /'\/api\/learner-access-codes\/generate-batch'/);
 assert.doesNotMatch(server, /Mailbox sync failed: \$\{boundedText\(error\.message/);
 assert.doesNotMatch(server, /Email could not be sent: \$\{boundedText\(error\.message/);
 
@@ -358,6 +359,9 @@ assert.match(client, /class="inspect-trace-id"/);
 assert.match(page, /id="inspectClearHistoryButton"/);
 assert.match(page, /Clear Inspect history/);
 assert.match(client, /async function clearInspectHistory\(\)/);
+assert.match(client, /const INSPECT_BROWSER_CLEAN_SLATE_ID = 'inspect-clean-slate-20261001-v1'/);
+assert.match(client, /function applyBrowserDiagnosticHistoryReset\(\)/);
+assert.match(client, /sessionStorage\.removeItem\('lf_pending_support_error'\)/);
 assert.match(client, /fetch\('\/api\/system-inspect-history', \{ method: 'DELETE' \}\)/);
 assert.match(server, /app\.delete\('\/api\/system-inspect-history'/);
 assert.match(server, /DIAGNOSTIC_HISTORY_RESET_ID = 'inspect-clean-slate-20261001-v1'/);
