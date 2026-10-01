@@ -19,6 +19,7 @@ fs.mkdirSync(path.join(tmp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(tmp, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(tmp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(tmp, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'structured-logger.js'), path.join(tmp, 'lib', 'structured-logger.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(tmp, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(tmp, 'lib', 'yahoo-imap.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(tmp, 'lib', 'yahoo-smtp.js'));

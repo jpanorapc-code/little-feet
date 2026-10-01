@@ -149,7 +149,7 @@
     } catch (error) {
       // My Day is an optional dashboard summary. A transient/offline API failure
       // must not become an unhandled promise rejection or break the signed-in UI.
-      console.warn('[My Day] Unable to load dashboard summary endpoint:', url, error);
+      void window.reportLittleFeetClientLog?.({ severity: 'warn', code: 'MY_DAY_SUMMARY_FAILED', message: error?.message || 'Unable to load dashboard summary endpoint.', source: 'assets/my-day.js' });
       return null;
     }
   };

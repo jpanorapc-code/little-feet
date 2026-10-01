@@ -18,6 +18,9 @@ fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
+fs.copyFileSync(path.join(root, 'lib', 'structured-logger.js'), path.join(temp, 'lib', 'structured-logger.js'));
+fs.mkdirSync(path.join(temp, 'scripts'), { recursive: true });
+fs.copyFileSync(path.join(root, 'scripts', 'audit-route-connections.js'), path.join(temp, 'scripts', 'audit-route-connections.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-oauth.js'), path.join(temp, 'lib', 'mailbox-oauth.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temp, 'lib', 'yahoo-imap.js'));
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temp, 'lib', 'yahoo-smtp.js'));
@@ -97,6 +100,38 @@ const request = async (route, { method = 'GET', body, cookie } = {}) => {
     assert.equal(admin.response.status, 200);
     assert.equal(teacher.response.status, 200);
     assert.equal(parent.response.status, 200);
+
+    const adminLogs = await request('/api/system-logs', { cookie: admin.cookie });
+    assert.equal(adminLogs.response.status, 200);
+    assert.equal(Array.isArray(adminLogs.data.logs), true);
+    assert.equal(typeof adminLogs.data.summary.captured, 'number');
+
+    const teacherLogs = await request('/api/system-logs', { cookie: teacher.cookie });
+    assert.equal(teacherLogs.response.status, 403);
+
+    const clientDiagnostic = await request('/api/system/client-log', {
+      method: 'POST', cookie: admin.cookie, body: {
+        severity: 'warn', code: 'REGRESSION_CLIENT_DIAGNOSTIC',
+        message: 'Regression diagnostic event', source: 'backup.js', line: 123, column: 4, page: '/dashboard'
+      }
+    });
+    assert.equal(clientDiagnostic.response.status, 201);
+    assert.ok(clientDiagnostic.data.requestId);
+
+    const filteredLogs = await request('/api/system-logs?search=REGRESSION_CLIENT_DIAGNOSTIC', { cookie: admin.cookie });
+    assert.equal(filteredLogs.response.status, 200);
+    assert.ok(filteredLogs.data.logs.some(entry =>
+      entry.code === 'REGRESSION_CLIENT_DIAGNOSTIC'
+      && entry.source === 'backup.js'
+      && entry.line === 123
+    ));
+
+    const siteTest = await request('/api/system-self-test', { method: 'POST', cookie: admin.cookie, body: {} });
+    assert.equal(siteTest.response.status, 200);
+    assert.equal(Array.isArray(siteTest.data.checks), true);
+    assert.equal(Array.isArray(siteTest.data.findings), true);
+    assert.ok(siteTest.data.summary.checks > 0);
+    assert.ok(siteTest.data.checks.some(check => check.name === 'database.probe'));
 
     const saved = await request('/api/modules/curriculum', {
       method: 'POST', cookie: teacher.cookie, body: {

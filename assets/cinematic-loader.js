@@ -12,7 +12,7 @@
     stage.classList.remove('is-ready');
     const loading = stage.querySelector('.cinematic-loading');
     if (loading) loading.textContent = message;
-    if (error) console.error('Little Feet cinematic failed to load:', error);
+    if (error) void window.reportLittleFeetClientLog?.({ severity: 'error', code: 'CINEMATIC_LOAD_FAILED', message: error.message || 'Little Feet cinematic failed to load.', source: 'assets/cinematic-loader.js' });
   };
 
   const start = () => {

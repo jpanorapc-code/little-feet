@@ -845,7 +845,7 @@ function initCinematicJourney() {
     journey.classList.add('cinematic-fallback');
     stage.dataset.cinematicFallback = 'webgl-renderer-unavailable';
     stage.querySelector('.cinematic-loading').textContent = '3D unavailable · cinematic controls remain available';
-    console.error('Little Feet cinematic WebGL renderer unavailable:', rendererError);
+    void window.reportLittleFeetClientLog?.({ severity: 'error', code: 'CINEMATIC_WEBGL_UNAVAILABLE', message: rendererError?.message || 'Little Feet cinematic WebGL renderer unavailable.', source: 'assets/cinematic.js' });
     return;
   }
   stage.dataset.cinematicFallback = '';
@@ -1174,7 +1174,7 @@ function initCinematicJourney() {
         return buffer;
       })
       .catch(error => {
-        console.warn('Little Feet penguin call audio unavailable.', error);
+        void window.reportLittleFeetClientLog?.({ severity: 'warn', code: 'CINEMATIC_AUDIO_UNAVAILABLE', message: error?.message || 'Little Feet penguin call audio unavailable.', source: 'assets/cinematic.js' });
         stage.dataset.penguinCallAudio = 'unavailable';
         return null;
       })
@@ -2106,7 +2106,7 @@ function initCinematicJourney() {
         stage.classList.add('is-ready');
       }
     } catch (error) {
-      console.error('Little Feet cinematic render failed:', error);
+      void window.reportLittleFeetClientLog?.({ severity: 'error', code: 'CINEMATIC_RENDER_FAILED', message: error?.message || 'Little Feet cinematic render failed.', source: 'assets/cinematic.js' });
       failToFallback('3D could not render · cinematic controls remain available');
     }
   };

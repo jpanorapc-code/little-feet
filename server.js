@@ -12,6 +12,7 @@ const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
+const { createStructuredLogger, redactSensitiveLogText } = require('./lib/structured-logger');
 const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, sendMailboxMessage, revokeMailboxAccess } = require('./lib/mailbox-oauth');
 
 const app = express();
@@ -31,6 +32,11 @@ const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_B
 const STANDARD_IMPORT_MAX_BODY_BYTES = 5 * 1024 * 1024;
 const DUPLICATE_POST_WINDOW_MS = 5 * 1000;
 const recentPostFingerprints = new Map();
+const structuredLogger = createStructuredLogger({
+  maxEntries: Number(process.env.LF_STRUCTURED_LOG_MAX_ENTRIES) || 5000,
+  slowRequestMs: Number(process.env.LF_SLOW_REQUEST_MS) || 1500
+});
+const logStructured = (severity, event, fields = {}) => structuredLogger.emit(severity, event, fields);
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
 const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
@@ -131,7 +137,7 @@ const resolveRenderDeployReleaseNote = async () => {
       };
       return renderDeployReleaseNote;
     } catch (error) {
-      console.warn('Render deploy release metadata lookup failed:', error.message);
+      logStructured('warn', 'deploy.metadata_lookup_failed', { category: 'deployment', message: error.message });
       return renderDeployFallbackNote();
     } finally {
       clearTimeout(timeout);
@@ -147,8 +153,8 @@ const CURRENT_RELEASE_NOTES = Object.freeze([
     publishedAt: '2026-09-27T15:00:00.000+02:00'
   })
 ]);
-if (!fieldEncryptionConfigured) console.warn('Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.');
-if (!sessionSecretConfigured) console.warn('Using a development session secret. Set SESSION_SECRET before production.');
+if (!fieldEncryptionConfigured) logStructured('warn', 'config.development_field_key', { category: 'configuration', message: 'Using a development field-encryption key. Set LF_FIELD_ENCRYPTION_KEY before production.' });
+if (!sessionSecretConfigured) logStructured('warn', 'config.development_session_secret', { category: 'configuration', message: 'Using a development session secret. Set SESSION_SECRET before production.' });
 // Usernames and email addresses are identifiers, not secrets. Store their display
 // casing, but compare a trimmed, case-insensitive value at every authentication boundary.
 const normalizeUsername = (value) => String(value || '').trim().toLocaleLowerCase('en-US');
@@ -444,10 +450,6 @@ const ensureAllLearnersHaveAccessCodes = () => {
     });
   });
 };
-const redactSensitiveLogText = value => String(value || '')
-  .replace(/\b(authorization|password|passwd|pin|token|secret|api[_ -]?key)\b\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
-  .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
-  .slice(0, 500);
 const safeHttpsUrl = value => {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -542,6 +544,59 @@ const writeSchoolSearchCache = (key, data, now = Date.now()) => {
 // Middleware for parsing JSON & URL-encoded bodies (supports Base64 media files)
 app.disable('x-powered-by');
 app.use(compression({ threshold: 1024 }));
+const STRUCTURED_LOG_QUIET_READ_ROUTES = new Set([
+  '/api/health',
+  '/api/ready',
+  '/api/keepalive',
+  '/api/system-status',
+  '/api/system-diagnostics',
+  '/api/system-errors',
+  '/api/system-logs'
+]);
+app.use((req, res, next) => {
+  req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
+  req.structuredLogStartedAt = process.hrtime.bigint();
+  res.setHeader('X-Request-Id', req.requestId);
+
+  let requestLogWritten = false;
+  const writeRequestLog = (closedEarly = false) => {
+    if (requestLogWritten || !req.path.startsWith('/api/')) return;
+    requestLogWritten = true;
+    const route = String(req.originalUrl || req.path || '').split('?')[0].slice(0, 240);
+    if (req.method === 'GET' && STRUCTURED_LOG_QUIET_READ_ROUTES.has(route)) return;
+
+    const durationMs = Number(process.hrtime.bigint() - req.structuredLogStartedAt) / 1e6;
+    let actor = null;
+    try { actor = getSessionAccount(req); } catch { actor = null; }
+    const status = closedEarly && !res.writableEnded ? 499 : Number(res.statusCode || 200);
+    const securityStatus = [401, 403, 429].includes(status);
+    const severity = status >= 500 ? 'error'
+      : securityStatus || [409, 413, 415, 422].includes(status) || durationMs >= structuredLogger.slowRequestMs ? 'warn'
+      : 'info';
+    const result = closedEarly && !res.writableEnded ? 'client_closed'
+      : status >= 500 ? 'server_error'
+      : status >= 400 ? 'client_error'
+      : 'success';
+
+    logStructured(severity, 'http.request', {
+      category: securityStatus ? 'security' : 'request',
+      requestId: req.requestId,
+      user: actor?.username || '',
+      role: actor?.role || '',
+      schoolId: actor ? accountSchoolId(actor) : '',
+      schoolName: actor?.schoolName || '',
+      method: req.method,
+      route,
+      status,
+      durationMs,
+      result,
+      details: durationMs >= structuredLogger.slowRequestMs ? 'Slow request threshold exceeded.' : ''
+    });
+  };
+  res.on('finish', () => writeRequestLog(false));
+  res.on('close', () => writeRequestLog(true));
+  next();
+});
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
   const hasBody = Number(req.get('content-length') || 0) > 0 || Boolean(req.get('transfer-encoding'));
@@ -550,8 +605,6 @@ app.use('/api', (req, res, next) => {
   return res.status(415).json({ message: 'Unsupported request body type. Use JSON or URL-encoded form data.' });
 });
 app.use((req, res, next) => {
-  req.requestId = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 100);
-  res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-DNS-Prefetch-Control', 'off');
@@ -636,7 +689,7 @@ app.use((req, res, next) => {
   // Standby replicas are deliberately read-only. Authentication is allowed so
   // users can inspect the latest snapshot during failover, but business-data
   // writes must never return success when there is no durable write path.
-  if (req.method === 'POST' && ['/api/login', '/api/auth/logout'].includes(req.path)) return next();
+  if (req.method === 'POST' && ['/api/login', '/api/auth/logout', '/api/system/client-log', '/api/system-self-test'].includes(req.path)) return next();
   res.setHeader('Retry-After', '30');
   return res.status(503).json({
     message: 'Backup server is read-only. Your change was not saved; reconnect to the primary service and retry.',
@@ -685,7 +738,7 @@ app.use((req, res, next) => {
         await releaseMutationLock();
         originalJson(body);
       }).catch(async error => {
-        console.error('Refusing to acknowledge an unpersisted mutation:', error.message);
+        logStructured('error', 'persistence.mutation_commit_failed', { category: 'persistence', requestId: req.requestId, method: req.method, route: String(req.originalUrl || '').split('?')[0], status: 503, result: 'not_persisted', message: error.message });
         await loadDatabaseState().catch(() => {});
         await releaseMutationLock();
         if (!res.headersSent) {
@@ -911,7 +964,7 @@ class PostgresSessionStore extends session.Store {
     super();
     this.cleanupTimer = setInterval(() => {
       if (postgresPool) postgresPool.query('DELETE FROM little_feet_sessions WHERE expires_at <= NOW()').catch(error => {
-        console.error('Session cleanup failed:', error.message);
+        logStructured('error', 'session.cleanup_failed', { category: 'session', message: error.message });
       });
     }, 15 * 60 * 1000);
     this.cleanupTimer.unref?.();
@@ -1235,7 +1288,7 @@ async function loadDatabaseState() {
       const result = await postgresPool.query('SELECT payload FROM little_feet_app_state WHERE state_key = $1', ['primary']);
       return result.rowCount ? applySavedState(result.rows[0].payload) : false;
     } catch (error) {
-      console.error('Unable to load PostgreSQL application state:', error.message);
+      logStructured('error', 'persistence.postgres_load_failed', { category: 'persistence', message: error.message });
       throw error;
     }
   }
@@ -1245,7 +1298,7 @@ async function loadDatabaseState() {
     if (!row) return false;
     return applySavedState(JSON.parse(row.payload));
   } catch (error) {
-    console.error('Unable to load SQLite application state:', error.message);
+    logStructured('error', 'persistence.sqlite_load_failed', { category: 'persistence', message: error.message });
     return false;
   }
 }
@@ -1291,7 +1344,7 @@ async function saveDatabaseState() {
         postgresPersistenceSnapshot = nextSnapshot;
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
-        console.error('Unable to save normalized PostgreSQL state:', error.message);
+        logStructured('error', 'persistence.postgres_save_failed', { category: 'persistence', message: error.message });
         throw error;
       } finally {
         client.release();
@@ -1309,7 +1362,7 @@ async function saveDatabaseState() {
         updated_at = excluded.updated_at
     `).run('primary', JSON.stringify(db), new Date().toISOString());
   } catch (error) {
-    console.error('Unable to save SQLite application state:', error.message);
+    logStructured('error', 'persistence.sqlite_save_failed', { category: 'persistence', message: error.message });
     throw error;
   }
 }
@@ -1350,7 +1403,7 @@ function loadReplicaSnapshot() {
     const saved = JSON.parse(fs.readFileSync(replicaFile, 'utf8'));
     if (applySavedState(saved)) replicaSnapshotVersion = snapshotVersion;
   } catch (error) {
-    console.error('Unable to load standby snapshot:', error.message);
+    logStructured('error', 'replica.snapshot_load_failed', { category: 'replica', message: error.message });
   }
 }
 function writeReplicaSnapshot() {
@@ -1360,7 +1413,7 @@ function writeReplicaSnapshot() {
     fs.writeFileSync(stagingFile, JSON.stringify({ ...db, replicatedAt: new Date().toISOString() }), 'utf8');
     fs.renameSync(stagingFile, replicaFile);
   } catch (error) {
-    console.error('Unable to write standby snapshot:', error.message);
+    logStructured('error', 'replica.snapshot_write_failed', { category: 'replica', message: error.message });
   }
 }
 function ensureBootstrapAdministrator() {
@@ -1368,7 +1421,7 @@ function ensureBootstrapAdministrator() {
   const username = String(process.env.LF_BOOTSTRAP_ADMIN_USERNAME || '').trim();
   const pin = String(process.env.LF_BOOTSTRAP_ADMIN_PIN || '');
   if (!username || !pin) {
-    console.warn('No administrator account exists. Set LF_BOOTSTRAP_ADMIN_USERNAME and LF_BOOTSTRAP_ADMIN_PIN to create the first real school administrator.');
+    logStructured('warn', 'bootstrap.admin_missing', { category: 'configuration', message: 'No administrator account exists. Set LF_BOOTSTRAP_ADMIN_USERNAME and LF_BOOTSTRAP_ADMIN_PIN to create the first real school administrator.' });
     return;
   }
   db.users.push({
@@ -1424,7 +1477,7 @@ function applyOwnerAccountMigration() {
     createdAt: new Date().toISOString()
   }];
   db.accountMigrations[migrationId] = { appliedAt: new Date().toISOString(), ownerUsername: username, removedAccounts: removedUsernames.size };
-  console.log(`Applied owner account reset ${migrationId}; removed ${removedUsernames.size} previous account(s).`);
+  logStructured('info', 'account.owner_reset_applied', { category: 'migration', result: 'completed', details: `Migration ${migrationId}; removed ${removedUsernames.size} previous account(s).` });
   return true;
 }
 function removeLegacyMailboxConnections() {
@@ -1435,7 +1488,7 @@ function removeLegacyMailboxConnections() {
     delete account.mailboxConnection;
     removed += 1;
   });
-  if (removed) console.log(`Removed ${removed} obsolete mailbox connection record(s).`);
+  if (removed) logStructured('info', 'mailbox.legacy_connections_removed', { category: 'migration', result: 'completed', details: `Removed ${removed} obsolete mailbox connection record(s).` });
   return removed;
 }
 
@@ -1565,7 +1618,7 @@ app.post('/api/login', (req, res) => {
     if (sourceLocked || usernameLocked) {
       if (matchedAccount && usernameLocked) {
         void sendLoginLockoutEmail(matchedAccount).catch(error => {
-          console.error('Login lockout email failed:', redactSensitiveLogText(error.message));
+          logStructured('error', 'auth.lockout_email_failed', { category: 'authentication', requestId: req.requestId, user: matchedAccount?.username || '', role: matchedAccount?.role || '', schoolId: matchedAccount ? accountSchoolId(matchedAccount) : '', schoolName: matchedAccount?.schoolName || '', method: req.method, route: req.path, message: error.message });
         });
       }
       const retryAfterSeconds = Math.ceil(LOGIN_COOLDOWN_MS / 1000);
@@ -1607,7 +1660,7 @@ app.get('/api/keepalive', async (_req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
   } catch (error) {
-    console.error('Keepalive database probe failed:', error.message);
+    logStructured('error', 'health.keepalive_probe_failed', { category: 'health', message: error.message, result: 'failed' });
     res.status(503).json({ status: 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
   }
 });
@@ -1756,18 +1809,53 @@ const learnerRecordsVisibleTo = (records, actor) => {
   }
   return schoolRecords;
 };
+const errorSourceLocation = error => {
+  const stack = String(error?.stack || '').split('\n').slice(1);
+  for (const frame of stack) {
+    const match = frame.match(/(?:\(|\s)([^()\s]+\.js):(\d+):(\d+)\)?/);
+    if (!match) continue;
+    const absolute = match[1].startsWith('file://') ? match[1].slice(7) : match[1];
+    const relative = path.relative(__dirname, absolute);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) continue;
+    return { source: relative.replaceAll('\\', '/'), line: Number(match[2]), column: Number(match[3]) };
+  }
+  return { source: '', line: null, column: null };
+};
+
 const recordSystemError = (error, req = null, extra = {}) => {
   if (!Array.isArray(db.systemErrors)) db.systemErrors = [];
   const actor = req ? getSessionAccount(req) : null;
+  const route = String(extra.route || req?.originalUrl || '').split('?')[0].slice(0, 240);
+  const location = extra.source
+    ? { source: boundedText(extra.source, 240), line: Number(extra.line) || null, column: Number(extra.column) || null }
+    : errorSourceLocation(error);
   const entry = {
     id: crypto.randomUUID(), requestId: req?.requestId || '', schoolId: actor ? accountSchoolId(actor) : '',
     method: String(req?.method || extra.method || 'SYSTEM').slice(0, 12),
-    route: String(req?.originalUrl || extra.route || '').split('?')[0].slice(0, 240),
-    name: String(error?.name || 'Error').slice(0, 80), message: redactSensitiveLogText(error?.message || 'Unknown server error'),
+    route,
+    name: String(extra.name || error?.name || 'Error').slice(0, 80), message: redactSensitiveLogText(error?.message || 'Unknown server error'),
+    source: location.source, line: location.line, column: location.column,
     severity: extra.severity || 'error', status: 'open', createdAt: new Date().toISOString()
   };
   db.systemErrors.unshift(entry);
   if (db.systemErrors.length > 5000) db.systemErrors.length = 5000;
+  logStructured(entry.severity, 'system.error', {
+    category: 'error',
+    requestId: entry.requestId,
+    user: actor?.username || '',
+    role: actor?.role || '',
+    schoolId: entry.schoolId,
+    schoolName: actor?.schoolName || '',
+    method: entry.method,
+    route: entry.route,
+    status: Number(error?.status) || 500,
+    result: 'fault_recorded',
+    code: entry.name,
+    source: entry.source,
+    line: entry.line,
+    column: entry.column,
+    message: entry.message
+  });
   return entry;
 };
 
@@ -1799,23 +1887,348 @@ app.get('/api/system-diagnostics', (req, res) => {
   });
 });
 
+const structuredLogVisibleTo = (entry, actor) =>
+  Boolean(actor && (hasPlatformAccess(actor) || !entry.schoolId || entry.schoolId === accountSchoolId(actor)));
+const systemErrorVisibleTo = (entry, actor) =>
+  Boolean(actor && (hasPlatformAccess(actor) || !entry.schoolId || entry.schoolId === accountSchoolId(actor)));
+const structuredStatusMatches = (status, filter) => {
+  if (!filter) return true;
+  if (/^[1-5]xx$/i.test(filter)) return Math.floor(Number(status || 0) / 100) === Number(filter[0]);
+  return Number(status) === Number(filter);
+};
+
 app.get('/api/system-errors', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const schoolId = accountSchoolId(actor);
-  res.json((db.systemErrors || []).filter(entry => !entry.schoolId || entry.schoolId === schoolId).slice(0, 250));
+  res.json((db.systemErrors || []).filter(entry => systemErrorVisibleTo(entry, actor)).slice(0, 250));
+});
+
+app.get('/api/system-logs', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+
+  const severity = boundedText(req.query?.severity, 20).toLowerCase();
+  const method = boundedText(req.query?.method, 12).toUpperCase();
+  const status = boundedText(req.query?.status, 8).toLowerCase();
+  const requestId = boundedText(req.query?.requestId, 100);
+  const user = boundedText(req.query?.user, 160).toLowerCase();
+  const event = boundedText(req.query?.event, 120).toLowerCase();
+  const search = boundedText(req.query?.search, 160).toLowerCase();
+  const limit = Math.max(25, Math.min(1000, Number(req.query?.limit) || 250));
+  const visibleLogs = structuredLogger.list().filter(entry => structuredLogVisibleTo(entry, actor));
+  const recentCutoff = Date.now() - 15 * 60 * 1000;
+  const recent = visibleLogs.filter(entry => Date.parse(entry.timestamp) >= recentCutoff);
+  const filtered = visibleLogs.filter(entry => {
+    if (severity && entry.severity !== severity) return false;
+    if (method && entry.method !== method) return false;
+    if (status && !structuredStatusMatches(entry.status, status)) return false;
+    if (requestId && entry.requestId !== requestId) return false;
+    if (user && !String(entry.user || '').toLowerCase().includes(user)) return false;
+    if (event && !String(entry.event || '').toLowerCase().includes(event)) return false;
+    if (search) {
+      const haystack = [entry.event, entry.category, entry.route, entry.result, entry.code, entry.message, entry.details, entry.user, entry.requestId].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  }).slice(0, limit);
+  const summary = {
+    captured: visibleLogs.length,
+    displayed: filtered.length,
+    last15Minutes: recent.length,
+    errors: recent.filter(entry => entry.severity === 'error').length,
+    warnings: recent.filter(entry => entry.severity === 'warn').length,
+    serverErrors: recent.filter(entry => Number(entry.status) >= 500).length,
+    deniedOrLimited: recent.filter(entry => [401, 403, 429].includes(Number(entry.status))).length,
+    slowRequests: recent.filter(entry => entry.event === 'http.request' && Number(entry.durationMs) >= structuredLogger.slowRequestMs).length,
+    uniqueUsers: new Set(recent.map(entry => entry.user).filter(Boolean)).size,
+    maxEntries: structuredLogger.maxEntries,
+    slowRequestMs: structuredLogger.slowRequestMs,
+    newestAt: visibleLogs[0]?.timestamp || null,
+    oldestAt: visibleLogs[visibleLogs.length - 1]?.timestamp || null
+  };
+  res.json({ summary, logs: filtered, generatedAt: new Date().toISOString() });
+});
+
+app.get('/api/system-logs/trace/:requestId', (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  const requestId = boundedText(req.params.requestId, 100);
+  if (!requestId) return res.status(400).json({ message: 'A request ID is required.' });
+  const logs = structuredLogger.findByRequestId(requestId).filter(entry => structuredLogVisibleTo(entry, actor));
+  const errors = (db.systemErrors || []).filter(entry => entry.requestId === requestId && systemErrorVisibleTo(entry, actor));
+  if (!logs.length && !errors.length) return res.status(404).json({ message: 'No trace was found for this request ID.' });
+  res.json({ requestId, logs, errors });
+});
+
+app.post('/api/system/client-log', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in before sending browser diagnostics.' });
+  const severity = ['info', 'warn', 'error'].includes(String(req.body?.severity || '').toLowerCase()) ? String(req.body.severity).toLowerCase() : 'error';
+  const code = boundedText(req.body?.code || 'CLIENT_ERROR', 100);
+  const page = boundedText(req.body?.page || '/', 200).split('?')[0];
+  const source = boundedText(req.body?.source || '', 220).split('?')[0];
+  const message = boundedText(req.body?.message || 'Browser diagnostic event', 500);
+  const line = Number.isFinite(Number(req.body?.line)) ? Number(req.body.line) : null;
+  const column = Number.isFinite(Number(req.body?.column)) ? Number(req.body.column) : null;
+  const details = [source ? `Source ${source}` : '', line ? `Line ${line}${column ? `:${column}` : ''}` : ''].filter(Boolean).join(' · ');
+  const logged = logStructured(severity, 'client.error', {
+    category: 'browser',
+    requestId: req.requestId,
+    user: actor.username,
+    role: actor.role,
+    schoolId: accountSchoolId(actor),
+    schoolName: actor.schoolName || '',
+    method: 'CLIENT',
+    route: page,
+    result: 'reported',
+    code,
+    source,
+    line,
+    column,
+    message,
+    details
+  });
+
+  const persistentCodes = new Set(['WEB_RUNTIME_ERROR', 'WEB_PROMISE_ERROR', 'WEB_RESOURCE_ERROR']);
+  if (severity === 'error' && persistentCodes.has(code)) {
+    const duplicateCutoff = Date.now() - 5 * 60 * 1000;
+    const duplicate = (db.systemErrors || []).some(entry =>
+      entry.name === code
+      && entry.schoolId === accountSchoolId(actor)
+      && entry.message === redactSensitiveLogText(message)
+      && Date.parse(entry.createdAt || '') >= duplicateCutoff
+    );
+    if (!duplicate) {
+      const clientError = new Error(message);
+      clientError.name = code;
+      recordSystemError(clientError, req, { severity: 'error', route: page, name: code, source, line, column });
+    }
+  }
+  res.status(201).json({ success: true, logId: logged.id, requestId: req.requestId });
+});
+
+const sourceFinding = (severity, category, check, issue, why, source = '', line = null, column = null, recommendation = '') => ({
+  id: crypto.randomUUID(), severity, category, check, issue, why, source, line, column, recommendation
+});
+const sourceLineNumber = (content, offset) => content.slice(0, Math.max(0, offset)).split('\n').length;
+const scanSourceMatches = (sourceName, content, rules) => {
+  const findings = [];
+  for (const rule of rules) {
+    const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : rule.pattern.flags + 'g';
+    const regex = new RegExp(rule.pattern.source, flags);
+    let match;
+    while ((match = regex.exec(content))) {
+      findings.push(sourceFinding(rule.severity, rule.category, rule.check, rule.issue, rule.why, sourceName, sourceLineNumber(content, match.index), null, rule.recommendation));
+      if (!match[0].length) regex.lastIndex += 1;
+      if (findings.length >= 100) return findings;
+    }
+  }
+  return findings;
+};
+
+const runAdminSelfTest = async actor => {
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+  const checks = [];
+  const findings = [];
+  const addCheck = (name, status, detail) => checks.push({ name, status, detail });
+  const addFinding = (...args) => findings.push(sourceFinding(...args));
+
+  const readiness = runtimeReadiness();
+  const readinessReasons = {
+    database: 'The production database connection is not configured.',
+    durableSessions: 'Sessions cannot be stored durably without the production database.',
+    fieldEncryption: 'The field-encryption key is missing.',
+    sessionSecret: 'The secure session secret is missing.',
+    secureCookies: 'Secure-cookie enforcement is not active outside production mode.',
+    bootstrapAccount: 'No administrator account currently exists.',
+    privateObjectStorage: 'Private object storage is not configured.',
+    storageCleanupHealthy: 'At least one object-storage cleanup job requires attention.'
+  };
+  for (const [name, passed] of Object.entries(readiness.checks)) {
+    addCheck(`readiness.${name}`, passed ? 'passed' : 'failed', passed ? 'Configured and available.' : readinessReasons[name]);
+    if (!passed) addFinding('error', 'configuration', `readiness.${name}`, readinessReasons[name], 'This production-readiness requirement is currently false in the running application.', 'runtime configuration', null, null, 'Correct the production configuration or resolve the unhealthy storage job.');
+  }
+
+  try {
+    if (postgresPool) await postgresPool.query('SELECT 1');
+    else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
+    else throw new Error('No active database adapter is available.');
+    addCheck('database.probe', 'passed', 'A live database SELECT 1 probe succeeded.');
+  } catch (error) {
+    addCheck('database.probe', 'failed', 'Database probe failed.');
+    const location = errorSourceLocation(error);
+    addFinding('error', 'persistence', 'database.probe', 'The live database probe failed.', redactSensitiveLogText(error.message), location.source, location.line, location.column, 'Inspect the database connection and Render database availability.');
+  }
+
+  const indexPath = path.join(__dirname, 'index.html');
+  let indexSource = '';
+  try {
+    indexSource = fs.readFileSync(indexPath, 'utf8');
+    const references = [];
+    const collect = regex => {
+      let match;
+      while ((match = regex.exec(indexSource))) references.push({ raw: match[1], offset: match.index });
+    };
+    collect(/(?:src|href)=["']([^"']+)["']/gi);
+    collect(/url\(\s*["']?([^"'\)]+)["']?\s*\)/gi);
+    const checked = new Set();
+    for (const reference of references) {
+      const raw = String(reference.raw || '').trim();
+      if (!raw || raw.startsWith('#') || /^(?:https?:|data:|blob:|mailto:|tel:|javascript:)/i.test(raw)) continue;
+      const local = raw.split(/[?#]/)[0].replace(/^\//, '');
+      if (!local || local.startsWith('api/') || local.startsWith('auth/') || !/\.[a-z0-9]{1,8}$/i.test(local)) continue;
+      if (local.includes('..')) {
+        addFinding('error', 'security', 'frontend.asset_reference', 'A public asset reference contains parent-directory traversal.', 'A deployed page should never reference a static file through .. path traversal.', 'index.html', sourceLineNumber(indexSource, reference.offset), null, 'Replace it with a normal same-origin asset path.');
+        continue;
+      }
+      if (checked.has(local)) continue;
+      checked.add(local);
+      if (!fs.existsSync(path.join(__dirname, local))) {
+        addFinding('error', 'frontend', 'frontend.asset_reference', `Missing deployed asset: ${local}`, 'index.html references a local file that does not exist in the deployed build, which can cause broken UI, scripts, images or styles.', 'index.html', sourceLineNumber(indexSource, reference.offset), null, 'Restore the referenced file or correct the index.html reference.');
+      }
+    }
+    addCheck('frontend.asset_references', findings.some(item => item.check === 'frontend.asset_reference') ? 'failed' : 'passed', `${checked.size} local deployed asset references checked.`);
+  } catch (error) {
+    const location = errorSourceLocation(error);
+    addCheck('frontend.asset_references', 'failed', 'Could not inspect index.html.');
+    addFinding('error', 'frontend', 'frontend.asset_references', 'The deployed page could not be inspected.', redactSensitiveLogText(error.message), location.source, location.line, location.column, 'Verify that index.html exists and is readable in the deployed application.');
+  }
+
+  const publicFiles = ['index.html', 'backup.js'];
+  try {
+    const assetDir = path.join(__dirname, 'assets');
+    for (const entry of fs.readdirSync(assetDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.js')) publicFiles.push(`assets/${entry.name}`);
+    }
+  } catch {}
+  const publicThreatRules = [
+    { pattern: /\bprocess\.env\b/, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'Server environment access appears in public client source.', why: 'Public browser code must never depend on or expose server environment variables.', recommendation: 'Move this logic to a server-only module.' },
+    { pattern: /\b(?:DATABASE_URL|SESSION_SECRET|LF_FIELD_ENCRYPTION_KEY|LF_SMTP_PASSWORD|GOOGLE_CLIENT_SECRET|MICROSOFT_CLIENT_SECRET|R2_SECRET_ACCESS_KEY)\b/, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'A server-only secret/configuration name appears in public client source.', why: 'Server-only configuration identifiers in public code can expose implementation details and increase accidental secret-leak risk.', recommendation: 'Remove the server-only reference from public source.' },
+    { pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'Private-key material appears in public client source.', why: 'Private keys must never be shipped to a browser.', recommendation: 'Remove and rotate the exposed key immediately.' },
+    { pattern: /\b(?:postgres(?:ql)?|mongodb(?:\+srv)?)\:\/\//i, severity: 'error', category: 'security', check: 'public.secret_boundary', issue: 'A database connection URL appears in public client source.', why: 'Database connection strings belong only on the server.', recommendation: 'Remove the connection string from public files and rotate credentials if they were real.' }
+  ];
+  let publicScanned = 0;
+  for (const relative of publicFiles) {
+    try {
+      const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
+      publicScanned += 1;
+      findings.push(...scanSourceMatches(relative, content, publicThreatRules));
+    } catch (error) {
+      addFinding('warn', 'frontend', 'public.source_scan', `Could not inspect public source file ${relative}.`, redactSensitiveLogText(error.message), relative, null, null, 'Verify the deployed file exists and is readable.');
+    }
+  }
+  addCheck('public.secret_boundary', findings.some(item => item.check === 'public.secret_boundary') ? 'failed' : 'passed', `${publicScanned} public source files scanned for server-only secrets and database URLs.`);
+
+  try {
+    const { auditRouteConnections } = require('./scripts/audit-route-connections');
+    const routeAudit = auditRouteConnections(__dirname);
+    const hasBrokenRoute = routeAudit.unmatched.length > 0;
+    addCheck('frontend.route_connections', hasBrokenRoute ? 'failed' : 'passed', String(routeAudit.calls.length) + ' literal frontend API call(s) checked against ' + String(routeAudit.routes.length) + ' registered API route(s).');
+    for (const call of routeAudit.unmatched.slice(0, 100)) {
+      addFinding('error', 'routing', 'frontend.route_connections', 'No matching server route for ' + call.method + ' ' + call.route + '.', 'The deployed frontend contains an API call that does not match any registered server endpoint, so that action can fail at runtime.', call.file, call.line || null, null, 'Restore the matching server route or correct the frontend API path/method.');
+    }
+  } catch (error) {
+    const location = errorSourceLocation(error);
+    addCheck('frontend.route_connections', 'failed', 'The deployed frontend/server route audit could not run.');
+    addFinding('error', 'routing', 'frontend.route_connections', 'The API route connection audit could not complete.', redactSensitiveLogText(error.message), location.source, location.line, location.column, 'Verify scripts/audit-route-connections.js is present and readable in the deployed build.');
+  }
+
+  const runtimeSourceFiles = ['server.js', 'finance-automation-server.js', 'backup.js', ...publicFiles.filter(name => name.startsWith('assets/'))];
+  const executionRules = [
+    { pattern: /\beval\s*\(/, severity: 'error', category: 'security', check: 'source.dynamic_code_execution', issue: 'eval() is present in deployed application source.', why: 'eval() can execute strings as code and expands the impact of injection bugs.', recommendation: 'Replace eval() with explicit parsing or normal function calls.' },
+    { pattern: /\bnew\s+Function\s*\(/, severity: 'error', category: 'security', check: 'source.dynamic_code_execution', issue: 'new Function() is present in deployed application source.', why: 'Dynamic code construction can turn untrusted strings into executable code.', recommendation: 'Replace dynamic function creation with explicit application logic.' }
+  ];
+  for (const relative of [...new Set(runtimeSourceFiles)]) {
+    try {
+      const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
+      findings.push(...scanSourceMatches(relative, content, executionRules));
+    } catch {}
+  }
+  addCheck('source.dynamic_code_execution', findings.some(item => item.check === 'source.dynamic_code_execution') ? 'failed' : 'passed', 'Deployed first-party JavaScript checked for eval() and new Function().');
+
+  for (const relative of [...new Set(runtimeSourceFiles)]) {
+    try {
+      const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
+      const bypassRules = [{
+        pattern: /\bconsole\.(?:log|warn|error)\s*\(/,
+        severity: 'warn', category: 'logging', check: 'logging.centralization',
+        issue: 'A server console call bypasses the centralized structured logger.',
+        why: 'Direct console output cannot be filtered and traced consistently in the Inspect dashboard.',
+        recommendation: 'Route this event through logStructured().'
+      }];
+      findings.push(...scanSourceMatches(relative, content, bypassRules));
+    } catch {}
+  }
+  addCheck('logging.centralization', findings.some(item => item.check === 'logging.centralization') ? 'attention' : 'passed', 'First-party server and browser runtime source checked for direct console logging bypasses.');
+
+  const visibleErrors = (db.systemErrors || []).filter(entry => systemErrorVisibleTo(entry, actor) && entry.status === 'open');
+  addCheck('faults.open', visibleErrors.length ? 'attention' : 'passed', visibleErrors.length ? `${visibleErrors.length} unresolved persistent fault(s) exist.` : 'No unresolved persistent faults.');
+  visibleErrors.slice(0, 25).forEach(error => addFinding(
+    'warn', 'fault-history', 'faults.open',
+    `${error.name || 'Error'} remains ${error.status || 'open'}.`,
+    error.message || 'A runtime fault was recorded and has not yet been resolved.',
+    error.source || error.route || '', error.line || null, error.column || null,
+    error.requestId ? `Trace request ${error.requestId} in Inspect & Logs, fix the cause, then mark the fault resolved.` : 'Review the fault, fix the cause, then mark it resolved.'
+  ));
+
+  const recentCutoff = Date.now() - 15 * 60 * 1000;
+  const visibleLogs = structuredLogger.list().filter(entry => structuredLogVisibleTo(entry, actor) && Date.parse(entry.timestamp) >= recentCutoff);
+  const serverErrors = visibleLogs.filter(entry => Number(entry.status) >= 500);
+  const denied = visibleLogs.filter(entry => [401, 403].includes(Number(entry.status)));
+  const limited = visibleLogs.filter(entry => Number(entry.status) === 429);
+  const slow = visibleLogs.filter(entry => entry.event === 'http.request' && Number(entry.durationMs) >= structuredLogger.slowRequestMs);
+  addCheck('traffic.server_errors', serverErrors.length ? 'attention' : 'passed', `${serverErrors.length} HTTP 5xx response(s) in the last 15 minutes.`);
+  if (serverErrors.length) addFinding('warn', 'runtime', 'traffic.server_errors', `${serverErrors.length} server-error response(s) were recorded recently.`, 'HTTP 5xx responses mean a request reached the server but the server could not complete it successfully.', '', null, null, 'Filter Inspect logs to 5xx and trace the affected Request IDs.');
+  addCheck('traffic.access_denied', denied.length >= 10 ? 'attention' : 'passed', `${denied.length} HTTP 401/403 response(s) in the last 15 minutes.`);
+  if (denied.length >= 10) addFinding('warn', 'security', 'traffic.access_denied', 'A burst of access-denied responses was detected.', 'Repeated 401/403 responses can come from a broken client permission flow or from unauthorised probing.', '', null, null, 'Filter logs to 4xx, review users/routes and confirm the traffic is expected.');
+  addCheck('traffic.rate_limited', limited.length >= 5 ? 'attention' : 'passed', `${limited.length} HTTP 429 response(s) in the last 15 minutes.`);
+  if (limited.length >= 5) addFinding('warn', 'security', 'traffic.rate_limited', 'Repeated rate limiting was triggered.', 'A client is sending requests faster than the configured safety limit; this can be accidental retry behaviour or abusive automation.', '', null, null, 'Filter logs to HTTP 429 and identify the affected route/account pattern.');
+  addCheck('performance.slow_requests', slow.length >= 5 ? 'attention' : 'passed', `${slow.length} request(s) exceeded ${structuredLogger.slowRequestMs} ms in the last 15 minutes.`);
+  if (slow.length >= 5) addFinding('warn', 'performance', 'performance.slow_requests', 'Multiple slow requests were detected.', 'Repeated slow API calls can indicate database pressure, an external integration delay, or an expensive application path.', '', null, null, 'Sort the Inspect stream by route/request and investigate the slowest repeated path.');
+
+  const errors = findings.filter(item => item.severity === 'error').length;
+  const warnings = findings.filter(item => item.severity === 'warn').length;
+  const completedAt = new Date().toISOString();
+  const result = {
+    runId: crypto.randomUUID(), startedAt, completedAt, durationMs: Date.now() - startedMs,
+    status: errors ? 'failed' : warnings ? 'attention' : 'passed',
+    summary: { checks: checks.length, passed: checks.filter(check => check.status === 'passed').length, attention: checks.filter(check => check.status === 'attention').length, failed: checks.filter(check => check.status === 'failed').length, errors, warnings },
+    checks, findings
+  };
+  logStructured(errors ? 'error' : warnings ? 'warn' : 'info', 'system.self_test_completed', {
+    category: 'diagnostics', user: actor.username, role: actor.role, schoolId: accountSchoolId(actor), schoolName: actor.schoolName || '',
+    result: result.status, details: `${result.summary.checks} checks; ${errors} error finding(s); ${warnings} warning finding(s).`
+  });
+  return result;
+};
+
+app.post('/api/system-self-test', async (req, res) => {
+  const actor = requireAdmin(req);
+  if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
+  try {
+    res.json(await runAdminSelfTest(actor));
+  } catch (error) {
+    recordSystemError(error, req, { severity: 'error', name: 'SELF_TEST_FAILURE' });
+    res.status(500).json({ message: 'The site self-test could not complete. The failure was recorded for inspection.', requestId: req.requestId });
+  }
 });
 
 app.patch('/api/system-errors/:id', (req, res) => {
   const actor = requireAdmin(req);
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
-  const entry = (db.systemErrors || []).find(item => item.id === req.params.id && (!item.schoolId || item.schoolId === accountSchoolId(actor)));
+  const entry = (db.systemErrors || []).find(item => item.id === req.params.id && systemErrorVisibleTo(item, actor));
   if (!entry) return res.status(404).json({ message: 'System error report not found.' });
   const status = String(req.body?.status || 'acknowledged').toLowerCase();
   if (!['acknowledged', 'resolved'].includes(status)) return res.status(400).json({ message: 'Choose acknowledged or resolved.' });
   entry.status = status;
   entry.updatedAt = new Date().toISOString();
   entry.updatedBy = actor.username;
+  logStructured('info', 'system.error_status_changed', {
+    category: 'error-management', requestId: req.requestId, user: actor.username, role: actor.role,
+    schoolId: accountSchoolId(actor), schoolName: actor.schoolName || '', method: req.method, route: req.path,
+    result: status, code: entry.name, message: `Error report ${entry.id} marked ${status}.`
+  });
   res.json({ success: true, entry });
 });
 
@@ -2215,7 +2628,7 @@ registerFinanceAutomation(app, {
   findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
   dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
   applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
-  scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess
+  scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
 });
 
 app.get('/api/parent-payments/parents', (req, res) => {
@@ -2713,7 +3126,7 @@ app.get('/api/schools/search', async (req, res) => {
       writeSchoolSearchCache(cacheKey, { results: publicResults });
     } catch (error) {
       liveSearchAvailable = false;
-      console.warn('School-name search fallback unavailable:', error.message);
+      logStructured('warn', 'school_search.fallback_unavailable', { category: 'integration', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     }
   }
 
@@ -2820,7 +3233,7 @@ app.get('/api/nearby-schools', async (req, res) => {
       writeSchoolSearchCache(cacheKey, data);
       res.json(data);
     } catch (fallbackError) {
-      console.error('Nearby school search failed:', error.message, '| fallback failed:', fallbackError.message);
+      logStructured('error', 'school_search.nearby_failed', { category: 'integration', requestId: req.requestId, method: req.method, route: req.path, message: error.message, details: `Fallback: ${fallbackError.message}` });
       res.status(502).json({ message: 'Live school data is temporarily unavailable. Please try again shortly.' });
     }
   }
@@ -2869,7 +3282,7 @@ app.post('/api/schools/enrich', async (req, res) => {
       mapsUrl: place.googleMapsUri || ''
     });
   } catch (error) {
-    console.error('School enrichment failed:', error.message);
+    logStructured('error', 'school_search.enrichment_failed', { category: 'integration', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Verified public-school lookup is temporarily unavailable. Please try again later.' });
   }
 });
@@ -3796,7 +4209,7 @@ const syncConnectedMailbox = async (actor, { initial = false } = {}) => {
     connection.lastError = '';
     return { added, skipped: false, email: connection.email, lastSyncAt: connection.lastSuccessfulSyncAt };
   } catch (error) {
-    console.error('Mailbox sync provider error:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.provider_sync_failed', { category: 'mailbox', message: error.message });
     connection.lastError = 'Mailbox sync is temporarily unavailable. Please try again.';
     throw error;
   }
@@ -3821,7 +4234,7 @@ app.get('/api/email/mailbox/connect/:provider', (req, res) => {
     };
     req.session.save(error => res.redirect(error ? '/?mailboxError=session-failed' : authorization.url));
   } catch (error) {
-    console.error('Mailbox authorization setup failed:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.authorization_setup_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?mailboxError=mailbox-connection-failed');
   }
 });
@@ -3861,7 +4274,7 @@ const completeMailboxOAuth = async (req, res, provider) => {
   } catch (error) {
     if (previousConnection) actor.mailboxConnection = previousConnection;
     else delete actor.mailboxConnection;
-    console.error(`${provider} mailbox connection failed:`, error.message);
+    logStructured('error', 'mailbox.connection_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, details: `Provider ${provider}`, message: error.message });
     return res.redirect('/?mailboxError=mailbox-connection-failed');
   }
 };
@@ -3879,7 +4292,7 @@ app.post('/api/email/mailbox/sync', async (req, res) => {
     await saveDatabaseState();
     res.json({ success: true, ...result, mailbox: mailboxConnectionStatus(actor) });
   } catch (error) {
-    console.error('Mailbox sync request failed:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.sync_request_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Mailbox sync is temporarily unavailable. Please try again.' });
   }
 });
@@ -3897,7 +4310,7 @@ app.post('/api/email/mailbox/send', async (req, res) => {
     await saveDatabaseState();
     res.status(201).json({ success: true, provider: result.provider, id: result.id || '', sentAt: actor.mailboxConnection.lastSentAt });
   } catch (error) {
-    console.error('Mailbox send failed:', redactSensitiveLogText(error.message));
+    logStructured('error', 'mailbox.send_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Email could not be sent right now. Please try again.' });
   }
 });
@@ -3919,7 +4332,7 @@ app.delete('/api/email/mailbox', async (req, res) => {
     });
     revoked = Boolean(result?.revoked);
   } catch (error) {
-    console.warn(`${connection.provider || 'Mailbox'} remote token revocation warning: ${boundedText(error.message, 180)}`);
+    logStructured('warn', 'mailbox.token_revocation_warning', { category: 'mailbox', details: `Provider ${connection.provider || 'Mailbox'}`, message: error.message });
   } finally {
     delete actor.mailboxConnection;
     await saveDatabaseState();
@@ -3987,7 +4400,7 @@ app.post('/api/email/inbound/resend', async (req, res) => {
 
     res.json({ received: true, routed: true });
   } catch (error) {
-    console.error('Inbound email processing failed:', error.message);
+    logStructured('error', 'mailbox.inbound_processing_failed', { category: 'mailbox', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.status(502).json({ message: 'Inbound email could not be processed yet; the provider may retry.' });
   }
 });
@@ -5681,7 +6094,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
     establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'));
   } catch (error) {
-    console.error('Yahoo sign-in failed:', error.message);
+    logStructured('error', 'oauth.yahoo_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=yahoo-sign-in-failed');
   }
 });
@@ -5739,7 +6152,7 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
     establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'));
   } catch (error) {
-    console.error('Microsoft sign-in failed:', error.message);
+    logStructured('error', 'oauth.microsoft_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=microsoft-sign-in-failed');
   }
 });
@@ -5758,7 +6171,6 @@ app.use((req, res, next) => {
 // Wildcard Catch-All (Serves Frontend)
 app.use((error, req, res, _next) => {
   const report = recordSystemError(error, req);
-  console.error(`[${report.requestId || report.id}] ${report.method} ${report.route}: ${report.message}`);
   if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
   scheduleReplicaSnapshot();
   res.status(Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500).json({
@@ -5776,9 +6188,9 @@ app.get(/(.*)/, (req, res) => {
 // Start Server
 persistenceReady.then(() => {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    logStructured('info', 'server.started', { category: 'runtime', result: 'listening', details: `Port ${PORT}` });
   });
 }).catch(error => {
-  console.error('Database startup failed:', error.message);
+  logStructured('error', 'server.startup_failed', { category: 'runtime', result: 'failed', message: error.message });
   process.exit(1);
 });
