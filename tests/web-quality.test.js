@@ -13,6 +13,7 @@ const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8'
 const serviceWorker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 const mobilePwa = fs.readFileSync(path.join(root, 'assets', 'mobile-pwa.js'), 'utf8');
 const ambientBackground = fs.readFileSync(path.join(root, 'assets', 'ambient-background.js'), 'utf8');
+const preferencesEnhancements = fs.readFileSync(path.join(root, 'assets', 'preferences-enhancements.js'), 'utf8');
 const myDay = fs.readFileSync(path.join(root, 'assets', 'my-day.js'), 'utf8');
 const workplaceExtended = fs.readFileSync(path.join(root, 'assets', 'workplace-extended.js'), 'utf8');
 const envExample = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
@@ -366,5 +367,16 @@ assert.doesNotMatch(server, /console\.(?:log|warn|error)\(/);
 assert.doesNotMatch(client, /console\.(?:log|warn|error)\(/);
 assert.doesNotMatch(ambientBackground, /console\.(?:log|info|warn|error|debug)\(/);
 assert.match(ambientBackground, /AMBIENT_VIDEO_AUTOPLAY_BLOCKED/);
+assert.match(page, /preferences-enhancements\.js\?v=20261001-session-aware-polling-v1/);
+assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);
+assert.match(client, /window\.ensureLittleFeetAuthenticatedSession = ensureAuthenticatedSession/);
+assert.match(client, /if \(!await ensureAuthenticatedSession\(\)\) return false/);
+assert.match(client, /expireClientSessionFromServer\(\)/);
+assert.match(client, /alertMonitorId = setInterval\(async/);
+assert.match(client, /ticketMonitorId = setInterval\(async/);
+assert.match(preferencesEnhancements, /const refreshed = await Promise\.resolve\(window\.loadAllData\?\.\(\)\)/);
+assert.match(preferencesEnhancements, /if \(refreshed === false\) return false/);
+assert.match(preferencesEnhancements, /if \(!currentAccount\(\)\) \{/);
+assert.match(server, /'\/api\/auth\/session'/);
 
 console.log('Web quality regression test passed.');
