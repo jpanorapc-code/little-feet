@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v34-notification-dock';
+const CACHE_NAME = 'little-feet-shell-v35-paused-artwork-fix';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
