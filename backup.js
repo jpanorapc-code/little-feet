@@ -206,8 +206,8 @@ function playDingSound() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.3);
-  } catch (e) {
-    console.log('Audio disabled:', e);
+  } catch {
+    // Audio is optional; a blocked browser audio context is not an application fault.
   }
 }
 
@@ -618,7 +618,6 @@ function routeErrorToHelpdesk(error) {
     severity: 'error', code: error.code || 'WEB_RUNTIME_ERROR', message: diagnosticMessage,
     source: error.source || '', line: error.line || null, column: error.column || null, page: window.location.pathname
   });
-  console.error(details);
   if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
   sessionStorage.setItem(`lf_error_${details}`, '1');
   sessionStorage.setItem('lf_pending_support_error', JSON.stringify({ code: error.code, details }));
@@ -799,8 +798,7 @@ if (loginForm) {
       } else {
         alert(data.message || 'Login failed.');
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert('Unable to connect to login server.');
     }
   });
