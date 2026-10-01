@@ -49,7 +49,52 @@ let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
 const WALLPAPER_IDLE_MS = 60 * 60 * 1000;
 const CUSTOM_WALLPAPER_MAX_BYTES = 8 * 1024 * 1024;
+const STANDARD_SPREADSHEET_MAX_BYTES = 5 * 1024 * 1024;
+const SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES = 50 * 1024 * 1024;
+const FORM_DOUBLE_SUBMIT_GUARD_MS = 2000;
 const CUSTOM_WALLPAPER_MAX_GIF_MS = 8000;
+window.LITTLE_FEET_SCHOOL_INTEGRATION_MAX_BYTES = SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES;
+
+function safeUserFacingError(error, fallback = 'Unable to complete this action. Please try again.') {
+  const message = String(error?.message || '').trim().slice(0, 240);
+  if (!message || /[\r\n]/.test(message)) return fallback;
+  const internalPattern = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|EvalError|SQLITE|PostgreSQL|ECONN\w*|ENOTFOUND|EAI_AGAIN|fetch failed|Failed to fetch|NetworkError|AbortError|invalid_client|invalid_grant|access_token|refresh_token|client_secret|node_modules|stack trace|unexpected token|cannot read (?:properties|property)|undefined is not)\b/i;
+  const safePrefix = /^(?:Unable|Please|Choose|Select|Only|Sign in|Connect|No\b|This\b|The\b|Your\b|A\b|An\b|Invalid|Unsupported|Live|Verified|School|Payment|Mailbox|Email|Import|Book|Attendance|Schedule|Account|Recipient|Donation|Subscription|Too many|Authorised|Use\b|Set\b|Add\b|Create\b|Delete\b|Permanently|Sticky note|Provider sign-in|Parent|Management|Request|Large|Split exports)/i;
+  if (internalPattern.test(message) || /(?:^|\s)at\s+\S+\s*\(/.test(message) || !safePrefix.test(message)) return fallback;
+  return message;
+}
+window.safeUserFacingError = safeUserFacingError;
+
+document.addEventListener('submit', event => {
+  const form = event.target;
+  if (!form || form.tagName !== 'FORM') return;
+  const now = Date.now();
+  const lockedUntil = Number(form.dataset.lfSubmitLockedUntil || 0);
+  if (lockedUntil > now) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+
+  form.dataset.lfSubmitLockedUntil = String(now + FORM_DOUBLE_SUBMIT_GUARD_MS);
+  form.setAttribute('aria-busy', 'true');
+  const submitters = [...form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])')];
+  submitters.forEach(button => {
+    button.dataset.lfGuardPointerEvents = button.style.pointerEvents || '';
+    button.style.pointerEvents = 'none';
+    button.setAttribute('aria-disabled', 'true');
+  });
+  window.setTimeout(() => {
+    if (Number(form.dataset.lfSubmitLockedUntil || 0) > Date.now()) return;
+    delete form.dataset.lfSubmitLockedUntil;
+    form.removeAttribute('aria-busy');
+    submitters.forEach(button => {
+      button.style.pointerEvents = button.dataset.lfGuardPointerEvents || '';
+      delete button.dataset.lfGuardPointerEvents;
+      button.removeAttribute('aria-disabled');
+    });
+  }, FORM_DOUBLE_SUBMIT_GUARD_MS + 50);
+}, true);
 const SAVED_LOGIN_USERNAME_KEY = 'lf_saved_login_username';
 const SA_PUBLIC_SCHOOL_CALENDAR = {
   2026: {
@@ -277,7 +322,7 @@ async function completeProviderLogin() {
     window.history.replaceState({}, document.title, '/');
     setupSession();
   } catch (error) {
-    alert(error.message || 'Provider sign-in could not be completed.');
+    alert(safeUserFacingError(error, 'Provider sign-in could not be completed.'));
     window.history.replaceState({}, document.title, '/');
   }
 }
@@ -1418,7 +1463,7 @@ async function importCustomWallpaper() {
     applyCustomWallpaper(file);
     if (status) status.textContent = `${file.name} is saved on this device and ready to preview.`;
   } catch (error) {
-    alert(error.message || 'Unable to save this wallpaper.');
+    alert(safeUserFacingError(error, 'Unable to save this wallpaper.'));
   }
 }
 
@@ -1438,7 +1483,7 @@ async function resetCustomWallpaper() {
     if (input) input.value = '';
     if (status) status.textContent = 'The Little Feet northern lights wallpaper is active.';
   } catch (error) {
-    alert(error.message || 'Unable to restore the default wallpaper.');
+    alert(safeUserFacingError(error, 'Unable to restore the default wallpaper.'));
   }
 }
 
@@ -1610,18 +1655,54 @@ function openAlertsTab() {
 const toBase64 = file => new Promise((resolve, reject) => {
   const maxBytes = 5 * 1024 * 1024;
   if (file.size > maxBytes) {
+    setFileLimitWarning(file, `⚠ File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB. Attachments are limited to 5 MB. Compress it or use a smaller file.`);
     reject(new Error('This file is larger than 5 MB. Compress it or use a smaller file so the school database remains fast.'));
     return;
   }
+  setFileLimitWarning(file, '');
   const reader = new FileReader();
   reader.readAsDataURL(file);
   reader.onload = () => resolve(reader.result);
   reader.onerror = error => reject(error);
 });
-const validateSpreadsheetFile = (file, maxBytes = 8 * 1024 * 1024) => {
+function fileInputForFile(file) {
+  return [...document.querySelectorAll('input[type="file"]')].find(input => input.files?.[0] === file) || null;
+}
+
+function setFileLimitWarning(file, message = '') {
+  const input = fileInputForFile(file);
+  if (!input) return;
+  const warningId = `${input.id || 'file'}LimitWarning`;
+  let warning = document.getElementById(warningId);
+  if (!warning) {
+    warning = document.createElement('div');
+    warning.id = warningId;
+    warning.setAttribute('role', 'alert');
+    warning.setAttribute('aria-live', 'assertive');
+    warning.style.cssText = 'display:none;margin:7px 0 10px;padding:9px 11px;border:1px solid #f59e0b;border-radius:7px;background:rgba(245,158,11,.12);color:var(--text-dark);font-size:.82rem;font-weight:700;line-height:1.45;';
+    input.insertAdjacentElement('afterend', warning);
+  }
+  warning.textContent = message;
+  warning.style.display = message ? 'block' : 'none';
+}
+
+const validateSpreadsheetFile = (file, maxBytes = STANDARD_SPREADSHEET_MAX_BYTES) => {
   const extension = String(file?.name || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '';
-  if (!['.xlsx', '.xls', '.csv'].includes(extension)) return 'Use an XLSX, XLS, or CSV spreadsheet.';
-  if (file.size > maxBytes) return `This spreadsheet exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`;
+  if (!['.xlsx', '.xls', '.csv'].includes(extension)) {
+    setFileLimitWarning(file, '');
+    return 'Use an XLSX, XLS, or CSV spreadsheet.';
+  }
+  if (file.size > maxBytes) {
+    const limitMb = Math.round(maxBytes / 1024 / 1024);
+    const actualMb = Math.max(0.1, file.size / 1024 / 1024).toFixed(1);
+    const schoolIntegration = maxBytes === SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES;
+    const message = schoolIntegration
+      ? `⚠ File too large: ${actualMb} MB. School Integration accepts up to ${limitMb} MB per spreadsheet. Split the school export into smaller approved files.`
+      : `⚠ File too large: ${actualMb} MB. This import accepts up to ${limitMb} MB. Large learner/school-register files must use School Integration; otherwise split or reduce the file.`;
+    setFileLimitWarning(file, message);
+    return message.replace(/^⚠\s*/, '');
+  }
+  setFileLimitWarning(file, '');
   return '';
 };
 
@@ -1918,7 +1999,7 @@ async function submitSchoolApplication(event, index) {
     closeModal();
     alert(`Application sent to ${result.ticket.assignedTo}. Your application reference is ${result.ticket.id}.`);
     loadTickets();
-  } catch (error) { alert(error.message || 'Unable to send the school application.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to send the school application.')); }
 }
 
 async function enrichSchoolPin(button, schoolName, latitude, longitude) {
@@ -1943,7 +2024,7 @@ async function enrichSchoolPin(button, schoolName, latitude, longitude) {
     const notice = document.createElement('p');
     notice.className = 'school-muted';
     notice.style.cssText = 'font-size:.72rem;margin:6px 0 0;';
-    notice.textContent = error.message;
+    notice.textContent = safeUserFacingError(error, 'Verified school details could not be loaded.');
     panel.querySelector('.school-enrichment-error')?.remove();
     notice.classList.add('school-enrichment-error');
     panel.append(notice);
@@ -1989,7 +2070,7 @@ if (postForm) {
     try {
       mediaUrl = file ? await toBase64(file) : null;
     } catch (error) {
-      alert(error.message);
+      alert(safeUserFacingError(error, 'Unable to process this file.'));
       return;
     }
     const body = {
@@ -2183,7 +2264,7 @@ if (worksheetForm) {
     try {
       photoUrl = await toBase64(file);
     } catch (error) {
-      alert(error.message);
+      alert(safeUserFacingError(error, 'Unable to process this file.'));
       return;
     }
     const body = {
@@ -2240,7 +2321,7 @@ function previewLearnerDatabaseImport() {
   const preview = document.getElementById('schoolDatabasePreview');
   const file = input?.files?.[0];
   if (!file || !preview) return alert('Choose an Excel or CSV school register first.');
-  const fileError = validateSpreadsheetFile(file, 50 * 1024 * 1024);
+  const fileError = validateSpreadsheetFile(file, SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES);
   if (fileError) return alert(fileError);
   if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
   const reader = new FileReader();
@@ -2825,7 +2906,7 @@ async function loadSafetyNetwork() {
     if (!response.ok) throw new Error(data.message || 'Unable to load campus safety status.');
     summary.innerHTML = [["Learners marked present", data.presentLearners], ["Visitors on campus", data.visitorsOnCampus], ["Active broadcasts", data.activeBroadcasts], ["Alert acknowledgements", data.acknowledgements]].map(([label, value]) => `<div class="workspace-card"><h3>${value}</h3><p>${label}</p></div>`).join('');
     visitorList.innerHTML = data.visitors.length ? `<h3 class="workspace-heading">Currently on campus</h3>${data.visitors.map(visitor => `<div class="item-row"><div><strong>${escapeWorkspaceText(visitor.visitorName)}</strong><p style="margin-top:4px;">Host: ${escapeWorkspaceText(visitor.host || 'School office')} · ${escapeWorkspaceText(visitor.purpose)}</p><span class="meta">Checked in ${new Date(visitor.checkedInAt).toLocaleString()}</span></div><button type="button" class="action-btn btn-blue" onclick="checkOutCampusVisitor('${visitor.id}')">Check out</button></div>`).join('')}` : '<p class="meta">No approved visitors are currently checked in.</p>';
-  } catch (error) { summary.innerHTML = `<p class="meta">${escapeWorkspaceText(error.message)}</p>`; }
+  } catch (error) { summary.innerHTML = `<p class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load this information.'))}</p>`; }
 }
 
 async function loadVisitorMeetingRecipients() {
@@ -2854,7 +2935,7 @@ async function loadVisitorMeetings() {
       if ((isFullAccessUser() || currentUser.role === 'principal') && meeting.status === 'awaiting-principal-approval') actions = `<button type="button" class="action-btn btn-green" onclick="approveVisitorMeeting('${meeting.id}')">Approve & issue QR pass</button>`;
       return `<div class="item-row"><div><strong>${escapeWorkspaceText(meeting.parentName)} → ${escapeWorkspaceText(meeting.hostName)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(meeting.purpose)}<br>Meeting: ${escapeWorkspaceText(meeting.agreedAt || meeting.proposedAt)}</p><span class="meta">Status: ${escapeWorkspaceText(status)}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}</div></div>`;
     }).join('') : '<p class="meta">No meeting requests are waiting for your action.</p>';
-  } catch (error) { list.textContent = error.message || 'Unable to load meeting requests.'; }
+  } catch (error) { list.textContent = safeUserFacingError(error, 'Unable to load meeting requests.'); }
 }
 
 async function respondVisitorMeeting(id, action) {
@@ -3372,7 +3453,7 @@ async function openDonationModal() {
     const response = await fetch('/api/donations/payment');
     status = await response.json();
     if (!response.ok) throw new Error(status.message || 'Unable to open donations.');
-  } catch (error) { return alert(error.message || 'Unable to open donations.'); }
+  } catch (error) { return alert(safeUserFacingError(error, 'Unable to open donations.')); }
   if (!status.configured) {
     if (isFullAccessUser()) {
       return openModal('Set up donations', `<p style="font-size:.9rem;line-height:1.6;">No donation payment destination has been saved yet. Add a secure payment link or bank-transfer account once, then the Donate button will accept real donation requests.</p><button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionBillingAdmin();">Add payment destination</button>`);
@@ -3393,7 +3474,7 @@ async function createDonationIntent(event) {
     const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
     openModal('Donation ready', `<p style="margin:0 0 10px;">Thank you for supporting Little Feet.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Donation: ${formatSubscriptionMoney(result.donation.amount)}</strong><br>Reference: <strong>${escapeWorkspaceText(result.donation.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the contribution can be matched correctly.</p>`);
     renderCapitecPayMeQr(payment);
-  } catch (error) { alert(error.message || 'Unable to prepare the donation.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to prepare the donation.')); }
 }
 
 function formatSubscriptionMoney(value) {
@@ -3426,7 +3507,7 @@ async function loadSubscriptionBillingOverview() {
     const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : escapeWorkspaceText(String(data.subscription?.status || 'trial').toUpperCase());
     container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
   } catch (error) {
-    container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load subscription information.')}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
+    container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load subscription information.'))}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
   }
 }
 
@@ -3437,7 +3518,7 @@ async function openSubscriptionBillingAdmin() {
     const response = await fetch('/api/subscription-billing');
     data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription billing.');
-  } catch (error) { return alert(error.message || 'Unable to load subscription billing.'); }
+  } catch (error) { return alert(safeUserFacingError(error, 'Unable to load subscription billing.')); }
   const bundle = (capacity, field) => data.pricing.bundles.find(item => item.capacity === capacity)?.[field] || 0;
   const payment = data.payment || {};
   const orders = (data.orders || []).slice(0, 8).map(order => {
@@ -3480,7 +3561,7 @@ async function saveSubscriptionBillingConfig(event) {
     alert('Subscription pricing and payment details saved.');
     loadSubscriptionBillingOverview();
     openSubscriptionBillingAdmin();
-  } catch (error) { alert(error.message || 'Unable to save subscription billing.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to save subscription billing.')); }
 }
 
 async function openSubscriptionCheckout() {
@@ -3490,7 +3571,7 @@ async function openSubscriptionCheckout() {
     const response = await fetch('/api/subscription-billing');
     data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription pricing.');
-  } catch (error) { return alert(error.message || 'Unable to load subscription pricing.'); }
+  } catch (error) { return alert(safeUserFacingError(error, 'Unable to load subscription pricing.')); }
   if (!data.paymentConfigured) return alert('An administrator still needs to configure the payment destination.');
   const plans = Array.isArray(data.plans) ? data.plans : [];
   if (!plans.length) return alert('The published school plans are temporarily unavailable.');
@@ -3509,7 +3590,7 @@ async function createSubscriptionOrder(event) {
     const destination = paymentDestinationMarkup(payment);
     openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
     renderCapitecPayMeQr(payment);
-  } catch (error) { alert(error.message || 'Unable to create payment request.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to create payment request.')); }
 }
 
 function openSubscriptionPaymentReconcile(encodedReference, expectedAmount) {
@@ -3528,7 +3609,7 @@ async function reconcileSubscriptionPayment(event, encodedReference) {
     closeModal();
     await loadSubscriptionBillingOverview();
     alert('Payment recorded. The school subscription is active.');
-  } catch (error) { alert(error.message || 'Unable to record the subscription payment.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to record the subscription payment.')); }
 }
 
 async function refreshCurrentUserAccess() {
@@ -3554,7 +3635,7 @@ async function loadParentSubscription() {
       : '<p class="meta">No subscription payment request has been created yet.</p>';
     panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2>${status}</div><p>Unlock Progress Insights for your linked learners. The plan is R${Number(data.pricePerChild || 29).toFixed(0)} per child for 30 days and activates automatically when payment is confirmed.</p>${latest}<button type="button" class="action-btn btn-green" onclick="openParentSubscriptionCheckout()" ${data.paymentConfigured ? '' : 'disabled'}>${data.active ? 'Renew Plus access' : 'Get Plus access'}</button>${data.paymentConfigured ? '' : '<p class="meta">The payment destination has not been configured yet.</p>'}`;
   } catch (error) {
-    panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2><span class="badge-tag urgent">UNAVAILABLE</span></div><p class="meta">${escapeWorkspaceText(error.message || 'Unable to load subscription access.')}</p><button type="button" class="action-btn btn-blue" onclick="loadParentSubscription()">Try again</button>`;
+    panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2><span class="badge-tag urgent">UNAVAILABLE</span></div><p class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load subscription access.'))}</p><button type="button" class="action-btn btn-blue" onclick="loadParentSubscription()">Try again</button>`;
   }
 }
 
@@ -3568,7 +3649,7 @@ async function openParentSubscriptionCheckout() {
     openModal('Activate LittleSteps Plus', `<p style="margin:0 0 10px;">Your access activates automatically after the payment is confirmed.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Total: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong><br><span class="meta">30 days of Plus access</span></div>${destination}<p class="meta">Use this exact reference so the payment can be matched to your account.</p>`);
     renderCapitecPayMeQr(result.payment);
     await loadParentSubscription();
-  } catch (error) { alert(error.message || 'Unable to create the subscription payment request.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to create the subscription payment request.')); }
 }
 
 function parentPaymentStatusLabel(payment) {
@@ -3601,7 +3682,7 @@ async function loadParentPayments() {
       return `<div class="item-row"><div><strong>${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? ` · ${escapeWorkspaceText(payment.learnerName)}` : ''}</strong> ${parentPaymentStatusLabel(payment)}<p style="margin:4px 0;">${escapeWorkspaceText(payment.description)} · Due ${escapeWorkspaceText(payment.effectiveDueDate)} · Ref <strong>${escapeWorkspaceText(payment.reference)}</strong></p>${arrangement}<p class="meta">Due ${formatSubscriptionMoney(payment.amountDue)}${Number(payment.creditTotal || 0) > 0 ? ` · Credits ${formatSubscriptionMoney(payment.creditTotal)}` : ''} · Paid ${formatSubscriptionMoney(payment.paidAmount)} · Balance ${formatSubscriptionMoney(payment.balance)}${payment.arrears > 0 ? ` · Arrears ${formatSubscriptionMoney(payment.arrears)}` : ''}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${destination}${actions}${currentUser.role === 'parent' && !payment.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signParentPayment('${encodeURIComponent(payment.id)}')">Confirm account</button>` : ''}</div></div>`;
     }).join('') : '<p class="meta">No parent payment requests have been created.</p>';
   } catch (error) {
-    summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load parent payments.')}</p>`;
+    summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load parent payments.'))}</p>`;
     list.innerHTML = '';
   }
 }
@@ -3613,7 +3694,7 @@ async function openParentPaymentAdmin() {
     const response = await fetch('/api/parent-payments/parents');
     parents = await response.json();
     if (!response.ok) throw new Error(parents.message || 'Unable to load parent accounts.');
-  } catch (error) { return alert(error.message || 'Unable to load parent accounts.'); }
+  } catch (error) { return alert(safeUserFacingError(error, 'Unable to load parent accounts.')); }
   if (!parents.length) return alert('Create or approve a parent account first.');
   const options = parents.map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name)} · ${escapeWorkspaceText(parent.username)}</option>`).join('');
   const today = new Date().toISOString().slice(0, 10);
@@ -3631,7 +3712,7 @@ async function createParentPayment(event) {
     closeModal();
     await loadParentPayments();
     alert(`Parent payment created. Reference: ${result.payment.reference}`);
-  } catch (error) { alert(error.message || 'Unable to create parent payment.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to create parent payment.')); }
 }
 
 function openParentPaymentReconcile(encodedId) {
@@ -3649,7 +3730,7 @@ async function reconcileParentPayment(event, encodedReference) {
     if (!response.ok) throw new Error(result.message || 'Unable to record payment.');
     closeModal();
     await loadParentPayments();
-  } catch (error) { alert(error.message || 'Unable to record payment.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to record payment.')); }
 }
 
 function openParentPaymentReport() {
@@ -3690,7 +3771,7 @@ function signParentPayment(encodedId) {
 async function submitParentPaymentSignature(event, encodedId) {
   event.preventDefault();
   const signature = event.currentTarget.elements.signature.value;
-  try { const response = await fetch(`/api/parent-payments/${encodeURIComponent(decodeURIComponent(encodedId))}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save confirmation.'); closeModal(); await loadParentPayments(); } catch (error) { alert(error.message || 'Unable to save confirmation.'); }
+  try { const response = await fetch(`/api/parent-payments/${encodeURIComponent(decodeURIComponent(encodedId))}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save confirmation.'); closeModal(); await loadParentPayments(); } catch (error) { alert(safeUserFacingError(error, 'Unable to save confirmation.')); }
 }
 
 function bookStatusLabel(record) {
@@ -3716,13 +3797,13 @@ async function loadBookRegister() {
       const staffActions = (isFullAccessUser() || currentUser.role === 'principal') && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeURIComponent(record.id)}')">Record return</button>` : '';
       return `<div class="item-row"><div><strong>${escapeWorkspaceText(record.bookTitle)}${record.bookCode ? ` · ${escapeWorkspaceText(record.bookCode)}` : ''}</strong> ${bookStatusLabel(record)}<p style="margin:4px 0;">Learner: ${escapeWorkspaceText(record.learnerName)} · Class: ${escapeWorkspaceText(record.className || 'Not recorded')} · Parent: ${escapeWorkspaceText(record.parentName)}</p><p class="meta">Handover condition: ${escapeWorkspaceText(record.issueCondition)} · Replacement price: ${formatSubscriptionMoney(record.bookPrice)}</p>${returnDetails}${signatures}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${parentActions}${staffActions}</div></div>`;
     }).join('') : '<p class="meta">No books have been added to the school checklist yet.</p>';
-  } catch (error) { summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(error.message || 'Unable to load book checklist.')}</p>`; list.innerHTML = ''; }
+  } catch (error) { summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load book checklist.'))}</p>`; list.innerHTML = ''; }
 }
 
 async function openBookIssueModal() {
   if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can add book checklists.');
   let parents;
-  try { const response = await fetch('/api/book-register/parents'); parents = await response.json(); if (!response.ok) throw new Error(parents.message || 'Unable to load parents.'); } catch (error) { return alert(error.message || 'Unable to load parents.'); }
+  try { const response = await fetch('/api/book-register/parents'); parents = await response.json(); if (!response.ok) throw new Error(parents.message || 'Unable to load parents.'); } catch (error) { return alert(safeUserFacingError(error, 'Unable to load parents.')); }
   if (!parents.length) return alert('Create or approve a parent account first.');
   const options = parents.map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name)} · ${escapeWorkspaceText(parent.username)}</option>`).join('');
   openModal('Add book to checklist', `<form onsubmit="createBookRecord(event)" style="display:grid;gap:12px;"><p class="meta" style="margin:0;">The admin signature and time are saved automatically. The parent can sign after reviewing the handover.</p><div class="workspace-grid"><label>Book title<input name="bookTitle" required maxlength="200" placeholder="e.g. Grade 4 Mathematics"></label><label>Book code (optional)<input name="bookCode" maxlength="80"></label></div><div class="workspace-grid"><label>Learner name<input name="learnerName" required maxlength="160"></label><label>Class<input name="className" maxlength="120" placeholder="e.g. Grade 4A"></label></div><label>Parent account<select name="parentUsername" required>${options}</select></label><div class="workspace-grid"><label>Replacement price (R)<input name="bookPrice" type="number" min="0" step="0.01" required></label><label>Condition before handover<input name="issueCondition" required maxlength="500" placeholder="e.g. New, no markings"></label></div><label>Notes (optional)<input name="notes" maxlength="500"></label><button class="submit-btn">Save book checklist</button></form>`);
@@ -3731,7 +3812,7 @@ async function openBookIssueModal() {
 async function createBookRecord(event) {
   event.preventDefault();
   const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  try { const response = await fetch('/api/book-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save book checklist.'); closeModal(); await loadBookRegister(); } catch (error) { alert(error.message || 'Unable to save book checklist.'); }
+  try { const response = await fetch('/api/book-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save book checklist.'); closeModal(); await loadBookRegister(); } catch (error) { alert(safeUserFacingError(error, 'Unable to save book checklist.')); }
 }
 
 function openBookReturnModal(encodedId) {
@@ -3743,7 +3824,7 @@ function openBookReturnModal(encodedId) {
 async function recordBookReturn(event, encodedId) {
   event.preventDefault();
   const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/return`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to record return.'); closeModal(); await loadBookRegister(); } catch (error) { alert(error.message || 'Unable to record return.'); }
+  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/return`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to record return.'); closeModal(); await loadBookRegister(); } catch (error) { alert(safeUserFacingError(error, 'Unable to record return.')); }
 }
 
 function signBookRecord(encodedId, action) {
@@ -3755,7 +3836,7 @@ function signBookRecord(encodedId, action) {
 async function submitBookSignature(event, encodedId, action) {
   event.preventDefault();
   const signature = event.currentTarget.elements.signature.value;
-  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save signature.'); closeModal(); await loadBookRegister(); } catch (error) { alert(error.message || 'Unable to save signature.'); }
+  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save signature.'); closeModal(); await loadBookRegister(); } catch (error) { alert(safeUserFacingError(error, 'Unable to save signature.')); }
 }
 
 function downloadBookRegisterTemplate() {
@@ -3771,7 +3852,7 @@ function importBookRegisterExcel() {
     const file = event.target.files?.[0]; if (!file) return;
     const fileError = validateSpreadsheetFile(file); if (fileError) return alert(fileError);
     const reader = new FileReader(); reader.onload = async () => {
-      try { const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }); if (rows.length > 2000) throw new Error('Book-register imports are limited to 2,000 records per file.'); const response = await fetch('/api/book-register/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to import checklist.'); await loadBookRegister(); alert(`Imported ${result.imported} row(s).${result.rejected?.length ? ` Rejected ${result.rejected.length} row(s).` : ''}`); } catch (error) { alert(error.message || 'Unable to import checklist.'); }
+      try { const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }); if (rows.length > 2000) throw new Error('Book-register imports are limited to 2,000 records per file.'); const response = await fetch('/api/book-register/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to import checklist.'); await loadBookRegister(); alert(`Imported ${result.imported} row(s).${result.rejected?.length ? ` Rejected ${result.rejected.length} row(s).` : ''}`); } catch (error) { alert(safeUserFacingError(error, 'Unable to import checklist.')); }
     }; reader.readAsArrayBuffer(file);
   }; input.click();
 }
@@ -3863,7 +3944,7 @@ async function loadLearnerAccessCodes() {
     }
     renderLearnerAccessCodes();
   } catch (error) {
-    list.textContent = error.message || 'Unable to load learner code forms.';
+    list.textContent = safeUserFacingError(error, 'Unable to load learner code forms.');
   }
 }
 
@@ -3905,7 +3986,7 @@ async function toggleLearnerCodeTeacherPreview() {
     if (!response.ok) throw new Error(records.message || 'Unable to load the teacher view.');
     panel.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}</strong><p class="meta" style="margin:4px 0 0;">${record.parentName ? `Parent: ${escapeWorkspaceText(record.parentName)} · ` : ''}${record.codeIssued ? 'School code issued' : 'No school code issued'}</p></div><span class="badge-tag info">NO CODE SHOWN</span></div>`).join('') : '<p class="meta">No learner records are available.</p>';
   } catch (error) {
-    panel.innerHTML = `<p class="meta">${escapeWorkspaceText(error.message || 'Unable to load the teacher view.')}</p>`;
+    panel.innerHTML = `<p class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load the teacher view.'))}</p>`;
   }
 }
 
@@ -4023,7 +4104,7 @@ async function searchAccountSchools(query, token) {
     });
   } catch (error) {
     if (token !== accountSchoolSearchToken) return;
-    box.innerHTML = `<div class="meta" style="padding:9px 10px;">${escapeWorkspaceText(error.message || 'School search is temporarily unavailable.')} You can still enter the linked school manually.</div>`;
+    box.innerHTML = `<div class="meta" style="padding:9px 10px;">${escapeWorkspaceText(safeUserFacingError(error, 'School search is temporarily unavailable.'))} You can still enter the linked school manually.</div>`;
   }
 }
 
@@ -4342,7 +4423,7 @@ async function confirmStoreCheckout() {
     openModal('Order ready for payment', `<p style="margin:0 0 10px;">Your order is in the stock-room queue for preparation.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>${escapeWorkspaceText(result.order.productName)} × ${result.order.quantity}: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the order and payment can be matched.</p>`);
     renderCapitecPayMeQr(payment);
     loadStoreItems();
-  } catch (error) { alert(error.message || 'Unable to create the order.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to create the order.')); }
 }
 
 async function addStoreProduct(event) {
@@ -4353,7 +4434,7 @@ async function addStoreProduct(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to add the store item.');
     form.reset(); loadStoreItems();
-  } catch (error) { alert(error.message || 'Unable to add the store item.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to add the store item.')); }
 }
 
 async function removeStoreProduct(productId) {
@@ -4492,7 +4573,7 @@ async function editStickyNote(id) {
     document.getElementById('cancelStickyNoteEdit').classList.remove('hidden');
     form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     form.querySelector('[name="noteTitle"]').focus();
-  } catch (error) { alert(error.message || 'Unable to open this sticky note.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to open this sticky note.')); }
 }
 
 function cancelStickyNoteEdit() {
@@ -4550,7 +4631,7 @@ async function deleteStickyNote(id) {
     localStorage.removeItem(stickyNoteClosedKey(id));
     localStorage.removeItem(stickyNotePositionKey(id));
     await loadStickyNotes();
-  } catch (error) { alert(error.message || 'Unable to delete this sticky note.'); }
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to delete this sticky note.')); }
 }
 
 async function openStickyNote(id) {

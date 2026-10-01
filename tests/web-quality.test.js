@@ -320,4 +320,25 @@ assert.match(page, /class="guide-records-table"/);
 assert.match(page, /data-label="Institution \/ phase"/);
 assert.match(page, /@media \(max-width:760px\)[\s\S]*guide-records-table td::before/);
 assert.ok(page.indexOf('id="littleFeetCinematicJourney"') > page.indexOf('id="schoolMapContainer"'), 'Cinematic should appear after the practical Home content.');
+
+assert.match(client, /const STANDARD_SPREADSHEET_MAX_BYTES = 5 \* 1024 \* 1024/);
+assert.match(client, /const SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES = 50 \* 1024 \* 1024/);
+assert.match(client, /function setFileLimitWarning\(file, message = ''\)/);
+assert.match(client, /Large learner\/school-register files must use School Integration/);
+assert.match(client, /School Integration accepts up to \$\{limitMb\} MB per spreadsheet/);
+assert.match(client, /document\.addEventListener\('submit', event =>/);
+assert.match(client, /FORM_DOUBLE_SUBMIT_GUARD_MS = 2000/);
+assert.match(client, /function safeUserFacingError\(error, fallback/);
+assert.doesNotMatch(client, /alert\(error\.message\)/);
+assert.match(server, /const STANDARD_IMPORT_MAX_BODY_BYTES = 5 \* 1024 \* 1024/);
+assert.match(server, /const STANDARD_IMPORT_API_PATHS = new Set/);
+assert.match(server, /'\/api\/schedules\/import'/);
+assert.match(server, /'\/api\/attendance\/import'/);
+assert.match(server, /'\/api\/book-register\/import'/);
+assert.match(server, /Large school-register imports must use School Integration/);
+assert.match(server, /const DUPLICATE_POST_WINDOW_MS = 5 \* 1000/);
+assert.match(server, /This action is already being processed/);
+assert.doesNotMatch(server, /Mailbox sync failed: \$\{boundedText\(error\.message/);
+assert.doesNotMatch(server, /Email could not be sent: \$\{boundedText\(error\.message/);
+
 console.log('Web quality regression test passed.');

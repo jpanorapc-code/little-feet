@@ -28,6 +28,9 @@ const MAX_DISTRIBUTED_LOGIN_ATTEMPTS = 3;
 const SCHOOL_SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
 const SCHOOL_SEARCH_CACHE_MAX_ENTRIES = 250;
 const MAX_API_BODY_MB = Math.max(1, Math.min(10, Number(process.env.LF_MAX_API_BODY_MB) || 8));
+const STANDARD_IMPORT_MAX_BODY_BYTES = 5 * 1024 * 1024;
+const DUPLICATE_POST_WINDOW_MS = 5 * 1000;
+const recentPostFingerprints = new Map();
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
 const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
@@ -586,6 +589,23 @@ app.use(express.json({
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
 app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
+const STANDARD_IMPORT_API_PATHS = new Set([
+  '/api/schedules/import',
+  '/api/attendance/import',
+  '/api/book-register/import'
+]);
+app.use('/api', (req, res, next) => {
+  if (req.method !== 'POST') return next();
+  const requestPath = String(req.originalUrl || '').split('?')[0];
+  if (!STANDARD_IMPORT_API_PATHS.has(requestPath)) return next();
+  const requestBytes = Buffer.isBuffer(req.rawBody)
+    ? req.rawBody.length
+    : Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8');
+  if (requestBytes <= STANDARD_IMPORT_MAX_BODY_BYTES) return next();
+  return res.status(413).json({
+    message: 'This import is too large. Use a spreadsheet up to 5 MB. Large school-register imports must use School Integration.'
+  });
+});
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
   if (String(req.originalUrl || '').split('?')[0] === '/api/email/inbound/resend') return next();
@@ -955,6 +975,63 @@ app.use((req, res, next) => {
     }
   } catch {
     return res.status(403).json({ message: 'Invalid request origin.' });
+  }
+  next();
+});
+
+const DUPLICATE_POST_EXEMPT_PATHS = new Set([
+  '/api/login',
+  '/api/auth/logout',
+  '/api/email/inbound/resend',
+  '/api/email/mailbox/sync',
+  '/api/payments/webhook',
+  '/api/payments/reconcile',
+  '/api/finance/recurring-runs',
+  '/api/finance/reconciliation/apply',
+  '/api/students/import',
+  '/api/attendance/toggle'
+]);
+const duplicatePostIsHandledByRoute = requestPath =>
+  DUPLICATE_POST_EXEMPT_PATHS.has(requestPath)
+  || /^\/api\/finance\/payroll\/runs\/[^/]+\/approve$/.test(requestPath);
+app.use('/api', (req, res, next) => {
+  if (req.method !== 'POST') return next();
+  const requestPath = String(req.originalUrl || '').split('?')[0];
+  if (duplicatePostIsHandledByRoute(requestPath)) return next();
+
+  const actorKey = normalizeUsername(req.session?.littleFeetUser?.username || '') || String(req.ip || 'anonymous');
+  const bodyHash = crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex');
+  const fingerprint = crypto.createHash('sha256')
+    .update(`${actorKey}\n${requestPath}\n${bodyHash}`)
+    .digest('hex');
+  const now = Date.now();
+  const previous = recentPostFingerprints.get(fingerprint);
+  const duplicateStillActive = previous && !previous.completedAt && now - previous.startedAt < 60 * 1000;
+  const duplicateRecentlyCompleted = previous?.completedAt && now - previous.completedAt < DUPLICATE_POST_WINDOW_MS;
+  if (duplicateStillActive || duplicateRecentlyCompleted) {
+    res.setHeader('Retry-After', '2');
+    return res.status(409).json({
+      message: 'This action is already being processed. Please wait a moment before trying again.',
+      requestId: req.requestId
+    });
+  }
+
+  const entry = { startedAt: now, completedAt: null };
+  recentPostFingerprints.set(fingerprint, entry);
+  res.on('finish', () => {
+    if (recentPostFingerprints.get(fingerprint) !== entry) return;
+    if (res.statusCode >= 400) recentPostFingerprints.delete(fingerprint);
+    else entry.completedAt = Date.now();
+  });
+
+  for (const [key, value] of recentPostFingerprints) {
+    const staleActive = !value.completedAt && now - value.startedAt >= 60 * 1000;
+    const staleCompleted = value.completedAt && now - value.completedAt >= DUPLICATE_POST_WINDOW_MS;
+    if (staleActive || staleCompleted) recentPostFingerprints.delete(key);
+    if (recentPostFingerprints.size <= 5000) break;
+  }
+  while (recentPostFingerprints.size > 5000) {
+    recentPostFingerprints.delete(recentPostFingerprints.keys().next().value);
   }
   next();
 });
@@ -3719,7 +3796,8 @@ const syncConnectedMailbox = async (actor, { initial = false } = {}) => {
     connection.lastError = '';
     return { added, skipped: false, email: connection.email, lastSyncAt: connection.lastSuccessfulSyncAt };
   } catch (error) {
-    connection.lastError = boundedText(error.message, 300);
+    console.error('Mailbox sync provider error:', redactSensitiveLogText(error.message));
+    connection.lastError = 'Mailbox sync is temporarily unavailable. Please try again.';
     throw error;
   }
 };
@@ -3743,7 +3821,8 @@ app.get('/api/email/mailbox/connect/:provider', (req, res) => {
     };
     req.session.save(error => res.redirect(error ? '/?mailboxError=session-failed' : authorization.url));
   } catch (error) {
-    res.redirect(`/?mailboxError=${encodeURIComponent(error.message)}`);
+    console.error('Mailbox authorization setup failed:', redactSensitiveLogText(error.message));
+    res.redirect('/?mailboxError=mailbox-connection-failed');
   }
 });
 
@@ -3800,7 +3879,8 @@ app.post('/api/email/mailbox/sync', async (req, res) => {
     await saveDatabaseState();
     res.json({ success: true, ...result, mailbox: mailboxConnectionStatus(actor) });
   } catch (error) {
-    res.status(502).json({ message: `Mailbox sync failed: ${boundedText(error.message, 240)}` });
+    console.error('Mailbox sync request failed:', redactSensitiveLogText(error.message));
+    res.status(502).json({ message: 'Mailbox sync is temporarily unavailable. Please try again.' });
   }
 });
 
@@ -3817,7 +3897,8 @@ app.post('/api/email/mailbox/send', async (req, res) => {
     await saveDatabaseState();
     res.status(201).json({ success: true, provider: result.provider, id: result.id || '', sentAt: actor.mailboxConnection.lastSentAt });
   } catch (error) {
-    res.status(502).json({ message: `Email could not be sent: ${boundedText(error.message, 240)}` });
+    console.error('Mailbox send failed:', redactSensitiveLogText(error.message));
+    res.status(502).json({ message: 'Email could not be sent right now. Please try again.' });
   }
 });
 
