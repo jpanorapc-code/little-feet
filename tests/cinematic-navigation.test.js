@@ -20,8 +20,8 @@ const pausedArtworkPath = path.join(root, 'assets', 'images', 'little-feet-cinem
 const pausedArtwork = fs.readFileSync(pausedArtworkPath);
 const pausedArtworkStat = fs.statSync(pausedArtworkPath);
 
-assert.match(server, /three\.module\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js'/);
-assert.match(server, /three\.core\.js': 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js'/);
+assert.match(server, /'three\.module\.js': Object\.freeze\(\{[\s\S]*?url: 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js',[\s\S]*?sha256: 'sha256-kFIELWdssP3B3f7\+GTBT80t6wFE6YW\/axFNdSZh4Euo='/);
+assert.match(server, /'three\.core\.js': Object\.freeze\(\{[\s\S]*?url: 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js',[\s\S]*?sha256: 'sha256-nt3gArBmqaBWdqYSf2dzW2K685m96lKfL34xZX2naeY='/);
 assert.match(page, /href="\/assets\/cinematic\.css\?v=20260926-cinematic-v14"/);
 assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260926-cinematic-v47" defer/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
