@@ -179,6 +179,7 @@
         fetchJson('/api/purchase-requests'),
         fetchJson('/api/staff/qualifications')
       ]);
+      if (sessionKey && window.getLittleFeetWorkspaceSessionKey?.() && window.getLittleFeetWorkspaceSessionKey() !== sessionKey) return;
   
       const items = [];
       if (Array.isArray(qualifications)) {
@@ -253,7 +254,6 @@
       list.innerHTML = items.length
         ? items.map(item => `<button type="button" class="my-day-attention-item" data-my-day-open="${esc(item.tab)}"><strong>${esc(item.title)}</strong><span>${esc(item.detail)} →</span></button>`).join('')
         : '<p class="my-day-attention-empty">Nothing from your connected Little Feet queues needs attention right now.</p>';
-      if (sessionKey && window.getLittleFeetWorkspaceSessionKey?.() && window.getLittleFeetWorkspaceSessionKey() !== sessionKey) return;
     })();
     attentionRefreshSessionKey = sessionKey;
     attentionRefreshPromise = job;
