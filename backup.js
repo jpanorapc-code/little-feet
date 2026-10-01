@@ -1322,6 +1322,11 @@ async function clearInspectHistory() {
 
     debugEvents = [];
     sessionStorage.removeItem('lf_debug_events');
+    sessionStorage.removeItem('lf_pending_support_error');
+    [...Array(sessionStorage.length).keys()]
+      .map(index => sessionStorage.key(index))
+      .filter(key => key && key.startsWith('lf_error_'))
+      .forEach(key => sessionStorage.removeItem(key));
     latestServerErrors = [];
     inspectStructuredLogPayload = null;
     inspectServerFaults = [];
