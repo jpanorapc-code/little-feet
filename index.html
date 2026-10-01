@@ -5949,9 +5949,17 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
               <button type="button" class="action-btn btn-green" onclick="loadInspectDashboard()">Refresh now</button>
               <button type="button" id="inspectAutoRefreshToggle" class="action-btn btn-blue" onclick="toggleInspectAutoRefresh()">Auto-refresh: Off</button>
+              <button type="button" id="inspectRunSiteTestButton" class="action-btn btn-green" onclick="runInspectSiteTest()">Run full site test</button>
               <button type="button" class="action-btn btn-blue" onclick="downloadInspectReport()">Download JSON report</button>
               <button type="button" class="action-btn btn-blue" onclick="openDebugReport()">Browser debug report</button>
             </div>
+          </section>
+
+          <section class="workspace-card" style="margin-bottom:16px;">
+            <div class="card-header-bar"><h3>Automated site test</h3><span id="inspectSelfTestStatus" class="meta">Not run</span></div>
+            <p class="meta" style="margin:0 0 10px;">Runs non-destructive checks against the real deployed application: database reachability, production readiness, broken local assets, public-source secret leakage, unsafe dynamic code execution, centralized logging bypasses, unresolved faults, suspicious denied/rate-limited traffic, and repeated slow requests.</p>
+            <div id="inspectSelfTestSummary" class="meta">Press “Run full site test” to inspect the current deployment.</div>
+            <div id="inspectSelfTestFindings" class="record-list" style="margin-top:12px;"></div>
           </section>
 
           <section class="workspace-card" style="margin-bottom:16px;">
