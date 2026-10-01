@@ -4,6 +4,8 @@
   const STAFF_ROLES = new Set(['teacher', 'principal', 'admin', 'staff']);
   const STYLE_ID = 'littleFeetMyDayStyles';
   let currentUser = null;
+  let attentionRefreshPromise = null;
+  let attentionRefreshSessionKey = '';
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -154,101 +156,116 @@
     }
   };
 
-  const loadAttention = async () => {
-    const list = document.getElementById('myDayAttentionList');
-    const badge = document.getElementById('myDayAttentionCount');
-    if (!list || !badge || !currentUser) return;
-    list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
-
-    const username = String(currentUser.username || '').toLowerCase();
-    const [tickets, broadcasts, tasks, leave, cover, reviews, notices, maintenance, bookings, purchases, qualifications] = await Promise.all([
-      fetchJson('/api/tickets'),
-      fetchJson('/api/broadcasts'),
-      fetchJson('/api/staff/tasks'),
-      fetchJson('/api/staff/leave'),
-      fetchJson('/api/staff/cover'),
-      fetchJson('/api/staff/performance-reviews'),
-      fetchJson('/api/staff/notices'),
-      fetchJson('/api/maintenance'),
-      fetchJson('/api/resources/bookings'),
-      fetchJson('/api/purchase-requests'),
-      fetchJson('/api/staff/qualifications')
-    ]);
-
-    const items = [];
-    if (Array.isArray(qualifications)) {
-      const expired = qualifications.filter(x => x.status === 'Expired');
-      const expiring = qualifications.filter(x => x.status === 'Expiring soon');
-      if (expired.length) items.push({ tab:'qualificationsTab', title:`${expired.length} qualification${expired.length===1?'':'s'} expired`, detail:'Review staff compliance' });
-      if (expiring.length) items.push({ tab:'qualificationsTab', title:`${expiring.length} qualification${expiring.length===1?'':'s'} expiring within 30 days`, detail:'Plan renewals' });
-    }
-    if (Array.isArray(tickets)) {
-      const assigned = tickets.filter(ticket =>
-        String(ticket.status || '').toLowerCase() !== 'completed' &&
-        String(ticket.assignedTo || '').toLowerCase() === username
-      );
-      const mine = tickets.filter(ticket =>
-        String(ticket.status || '').toLowerCase() !== 'completed' &&
-        String(ticket.createdBy || '').toLowerCase() === username &&
-        String(ticket.assignedTo || '').toLowerCase() !== username
-      );
-      if (assigned.length) items.push({ tab:'ticketsTab', title:`${assigned.length} support item${assigned.length === 1 ? '' : 's'} assigned to you`, detail:'Open your Support Desk queue' });
-      if (mine.length) items.push({ tab:'ticketsTab', title:`${mine.length} open ticket${mine.length === 1 ? '' : 's'} you are following`, detail:'Review status and responses' });
-    }
-
-    if (Array.isArray(tasks)) {
-      const activeTasks = tasks.filter(item => String(item.status || '').toLowerCase() !== 'completed' && String(item.assignedTo || '').toLowerCase() === username);
-      const today = new Date().toISOString().slice(0, 10);
-      const overdue = activeTasks.filter(item => item.dueDate && item.dueDate < today);
-      const dueToday = activeTasks.filter(item => item.dueDate === today);
-      if (overdue.length) items.push({ tab:'staffWorkTab', title:`${overdue.length} overdue staff task${overdue.length === 1 ? '' : 's'}`, detail:'Open Staff Work' });
-      if (dueToday.length) items.push({ tab:'staffWorkTab', title:`${dueToday.length} task${dueToday.length === 1 ? '' : 's'} due today`, detail:'Open Staff Work' });
-    }
-    if (Array.isArray(leave)) {
-      const pendingLeave = leave.filter(item => String(item.status || '') === 'Pending');
-      if ((window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) && pendingLeave.length) items.push({ tab:'approvalsTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
-    }
-    if (Array.isArray(cover)) {
-      const needsCover = cover.filter(item => String(item.status || '') === 'Needs Cover');
-      const assignedToMe = cover.filter(item => String(item.status || '') === 'Assigned' && String(item.coverTeacher || '').toLowerCase() === username);
-      if ((window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) && needsCover.length) items.push({ tab:'staffWorkTab', title:`${needsCover.length} class cover request${needsCover.length === 1 ? '' : 's'} unassigned`, detail:'Assign teacher cover' });
-      if (assignedToMe.length) items.push({ tab:'staffWorkTab', title:`${assignedToMe.length} cover assignment${assignedToMe.length === 1 ? '' : 's'} for you`, detail:'Review teacher cover' });
-    }
-    if (Array.isArray(reviews)) {
-      const sharedReviews = reviews.filter(item => String(item.status || '') === 'Shared' && String(item.username || '').toLowerCase() === username);
-      if (sharedReviews.length) items.push({ tab:'staffWorkTab', title:`${sharedReviews.length} performance review${sharedReviews.length === 1 ? '' : 's'} awaiting acknowledgement`, detail:'Review your KPI feedback' });
-    }
-    if (Array.isArray(notices)) {
-      const myRole = String(currentUser.role || '').toLowerCase();
-      const pendingNotices = notices.filter(item => item.required && !item.acknowledged && (item.audience === 'All staff' || String(item.audience).toLowerCase() === myRole));
-      if (pendingNotices.length) items.push({ tab:'staffNoticesTab', title:`${pendingNotices.length} staff notice${pendingNotices.length === 1 ? '' : 's'} awaiting acknowledgement`, detail:'Read staff notices' });
-    }
-    if (Array.isArray(maintenance)) {
-      const mine = maintenance.filter(item => item.status !== 'Completed' && String(item.assignedTo || '').toLowerCase() === username);
-      const unassigned = (window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) ? maintenance.filter(item => item.status !== 'Completed' && !item.assignedTo) : [];
-      if (mine.length) items.push({ tab:'maintenanceTab', title:`${mine.length} maintenance work order${mine.length===1?'':'s'} assigned to you`, detail:'Open maintenance' });
-      if (unassigned.length) items.push({ tab:'maintenanceTab', title:`${unassigned.length} unassigned maintenance issue${unassigned.length===1?'':'s'}`, detail:'Assign work orders' });
-    }
-    if (Array.isArray(bookings)) {
-      const today = new Date().toISOString().slice(0,10);
-      const mineToday = bookings.filter(item => item.date === today && String(item.bookedBy || '').toLowerCase() === username);
-      if (mineToday.length) items.push({ tab:'resourceBookingTab', title:`${mineToday.length} resource booking${mineToday.length===1?'':'s'} today`, detail:mineToday.map(x=>`${x.resource} ${x.startTime}`).join(' · ') });
-    }
-    if (Array.isArray(purchases)) {
-      const pendingMine=purchases.filter(x=>x.status==='Pending'&&String(x.requestedBy||'').toLowerCase()===username);
-      const awaitingManagement=['admin','principal'].includes(String(currentUser.role||'').toLowerCase())?purchases.filter(x=>x.status==='Pending'):[];
-      if(pendingMine.length)items.push({tab:'purchaseRequestsTab',title:`${pendingMine.length} purchase request${pendingMine.length===1?'':'s'} awaiting approval`,detail:'View purchase requests'});
-      if(awaitingManagement.length)items.push({tab:'approvalsTab',title:`${awaitingManagement.length} purchase request${awaitingManagement.length===1?'':'s'} need approval`,detail:'Open Approvals Centre'});
-    }
-    if (Array.isArray(broadcasts) && broadcasts.length) {
-      items.push({ tab:'broadcastsTab', title:`${broadcasts.length} current safety alert${broadcasts.length === 1 ? '' : 's'}`, detail:'Review Safety Alerts' });
-    }
-
-    badge.textContent = String(items.reduce((sum, item) => sum + (Number.parseInt(item.title, 10) || 0), 0));
-    list.innerHTML = items.length
-      ? items.map(item => `<button type="button" class="my-day-attention-item" data-my-day-open="${esc(item.tab)}"><strong>${esc(item.title)}</strong><span>${esc(item.detail)} →</span></button>`).join('')
-      : '<p class="my-day-attention-empty">Nothing from your connected Little Feet queues needs attention right now.</p>';
+  const loadAttention = () => {
+    const sessionKey = window.getLittleFeetWorkspaceSessionKey?.() || String(currentUser?.username || '');
+    if (attentionRefreshPromise && attentionRefreshSessionKey === sessionKey) return attentionRefreshPromise;
+    const job = (async () => {
+      const list = document.getElementById('myDayAttentionList');
+      const badge = document.getElementById('myDayAttentionCount');
+      if (!list || !badge || !currentUser) return;
+      list.innerHTML = '<p class="my-day-attention-empty">Checking your current Little Feet workspaces…</p>';
+  
+      const username = String(currentUser.username || '').toLowerCase();
+      const [tickets, broadcasts, tasks, leave, cover, reviews, notices, maintenance, bookings, purchases, qualifications] = await Promise.all([
+        fetchJson('/api/tickets'),
+        fetchJson('/api/broadcasts'),
+        fetchJson('/api/staff/tasks'),
+        fetchJson('/api/staff/leave'),
+        fetchJson('/api/staff/cover'),
+        fetchJson('/api/staff/performance-reviews'),
+        fetchJson('/api/staff/notices'),
+        fetchJson('/api/maintenance'),
+        fetchJson('/api/resources/bookings'),
+        fetchJson('/api/purchase-requests'),
+        fetchJson('/api/staff/qualifications')
+      ]);
+      if (sessionKey && window.getLittleFeetWorkspaceSessionKey?.() && window.getLittleFeetWorkspaceSessionKey() !== sessionKey) return;
+  
+      const items = [];
+      if (Array.isArray(qualifications)) {
+        const expired = qualifications.filter(x => x.status === 'Expired');
+        const expiring = qualifications.filter(x => x.status === 'Expiring soon');
+        if (expired.length) items.push({ tab:'qualificationsTab', title:`${expired.length} qualification${expired.length===1?'':'s'} expired`, detail:'Review staff compliance' });
+        if (expiring.length) items.push({ tab:'qualificationsTab', title:`${expiring.length} qualification${expiring.length===1?'':'s'} expiring within 30 days`, detail:'Plan renewals' });
+      }
+      if (Array.isArray(tickets)) {
+        const assigned = tickets.filter(ticket =>
+          String(ticket.status || '').toLowerCase() !== 'completed' &&
+          String(ticket.assignedTo || '').toLowerCase() === username
+        );
+        const mine = tickets.filter(ticket =>
+          String(ticket.status || '').toLowerCase() !== 'completed' &&
+          String(ticket.createdBy || '').toLowerCase() === username &&
+          String(ticket.assignedTo || '').toLowerCase() !== username
+        );
+        if (assigned.length) items.push({ tab:'ticketsTab', title:`${assigned.length} support item${assigned.length === 1 ? '' : 's'} assigned to you`, detail:'Open your Support Desk queue' });
+        if (mine.length) items.push({ tab:'ticketsTab', title:`${mine.length} open ticket${mine.length === 1 ? '' : 's'} you are following`, detail:'Review status and responses' });
+      }
+  
+      if (Array.isArray(tasks)) {
+        const activeTasks = tasks.filter(item => String(item.status || '').toLowerCase() !== 'completed' && String(item.assignedTo || '').toLowerCase() === username);
+        const today = new Date().toISOString().slice(0, 10);
+        const overdue = activeTasks.filter(item => item.dueDate && item.dueDate < today);
+        const dueToday = activeTasks.filter(item => item.dueDate === today);
+        if (overdue.length) items.push({ tab:'staffWorkTab', title:`${overdue.length} overdue staff task${overdue.length === 1 ? '' : 's'}`, detail:'Open Staff Work' });
+        if (dueToday.length) items.push({ tab:'staffWorkTab', title:`${dueToday.length} task${dueToday.length === 1 ? '' : 's'} due today`, detail:'Open Staff Work' });
+      }
+      if (Array.isArray(leave)) {
+        const pendingLeave = leave.filter(item => String(item.status || '') === 'Pending');
+        if ((window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) && pendingLeave.length) items.push({ tab:'approvalsTab', title:`${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting approval`, detail:'Review leave requests' });
+      }
+      if (Array.isArray(cover)) {
+        const needsCover = cover.filter(item => String(item.status || '') === 'Needs Cover');
+        const assignedToMe = cover.filter(item => String(item.status || '') === 'Assigned' && String(item.coverTeacher || '').toLowerCase() === username);
+        if ((window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) && needsCover.length) items.push({ tab:'staffWorkTab', title:`${needsCover.length} class cover request${needsCover.length === 1 ? '' : 's'} unassigned`, detail:'Assign teacher cover' });
+        if (assignedToMe.length) items.push({ tab:'staffWorkTab', title:`${assignedToMe.length} cover assignment${assignedToMe.length === 1 ? '' : 's'} for you`, detail:'Review teacher cover' });
+      }
+      if (Array.isArray(reviews)) {
+        const sharedReviews = reviews.filter(item => String(item.status || '') === 'Shared' && String(item.username || '').toLowerCase() === username);
+        if (sharedReviews.length) items.push({ tab:'staffWorkTab', title:`${sharedReviews.length} performance review${sharedReviews.length === 1 ? '' : 's'} awaiting acknowledgement`, detail:'Review your KPI feedback' });
+      }
+      if (Array.isArray(notices)) {
+        const myRole = String(currentUser.role || '').toLowerCase();
+        const pendingNotices = notices.filter(item => item.required && !item.acknowledged && (item.audience === 'All staff' || String(item.audience).toLowerCase() === myRole));
+        if (pendingNotices.length) items.push({ tab:'staffNoticesTab', title:`${pendingNotices.length} staff notice${pendingNotices.length === 1 ? '' : 's'} awaiting acknowledgement`, detail:'Read staff notices' });
+      }
+      if (Array.isArray(maintenance)) {
+        const mine = maintenance.filter(item => item.status !== 'Completed' && String(item.assignedTo || '').toLowerCase() === username);
+        const unassigned = (window.isLittleFeetFullAccessUser?.(currentUser) || ['admin','principal'].includes(String(currentUser.role || '').toLowerCase())) ? maintenance.filter(item => item.status !== 'Completed' && !item.assignedTo) : [];
+        if (mine.length) items.push({ tab:'maintenanceTab', title:`${mine.length} maintenance work order${mine.length===1?'':'s'} assigned to you`, detail:'Open maintenance' });
+        if (unassigned.length) items.push({ tab:'maintenanceTab', title:`${unassigned.length} unassigned maintenance issue${unassigned.length===1?'':'s'}`, detail:'Assign work orders' });
+      }
+      if (Array.isArray(bookings)) {
+        const today = new Date().toISOString().slice(0,10);
+        const mineToday = bookings.filter(item => item.date === today && String(item.bookedBy || '').toLowerCase() === username);
+        if (mineToday.length) items.push({ tab:'resourceBookingTab', title:`${mineToday.length} resource booking${mineToday.length===1?'':'s'} today`, detail:mineToday.map(x=>`${x.resource} ${x.startTime}`).join(' · ') });
+      }
+      if (Array.isArray(purchases)) {
+        const pendingMine=purchases.filter(x=>x.status==='Pending'&&String(x.requestedBy||'').toLowerCase()===username);
+        const awaitingManagement=['admin','principal'].includes(String(currentUser.role||'').toLowerCase())?purchases.filter(x=>x.status==='Pending'):[];
+        if(pendingMine.length)items.push({tab:'purchaseRequestsTab',title:`${pendingMine.length} purchase request${pendingMine.length===1?'':'s'} awaiting approval`,detail:'View purchase requests'});
+        if(awaitingManagement.length)items.push({tab:'approvalsTab',title:`${awaitingManagement.length} purchase request${awaitingManagement.length===1?'':'s'} need approval`,detail:'Open Approvals Centre'});
+      }
+      if (Array.isArray(broadcasts) && broadcasts.length) {
+        items.push({ tab:'broadcastsTab', title:`${broadcasts.length} current safety alert${broadcasts.length === 1 ? '' : 's'}`, detail:'Review Safety Alerts' });
+      }
+  
+      badge.textContent = String(items.reduce((sum, item) => sum + (Number.parseInt(item.title, 10) || 0), 0));
+      list.innerHTML = items.length
+        ? items.map(item => `<button type="button" class="my-day-attention-item" data-my-day-open="${esc(item.tab)}"><strong>${esc(item.title)}</strong><span>${esc(item.detail)} →</span></button>`).join('')
+        : '<p class="my-day-attention-empty">Nothing from your connected Little Feet queues needs attention right now.</p>';
+    })();
+    attentionRefreshSessionKey = sessionKey;
+    attentionRefreshPromise = job;
+    return job.finally(() => {
+      if (attentionRefreshPromise === job) {
+        attentionRefreshPromise = null;
+        attentionRefreshSessionKey = '';
+      }
+    });
   };
+
+  window.refreshMyDayAttention = loadAttention;
 
   const getSessionUser = async () => {
     try {
@@ -270,7 +287,6 @@
     addStyles();
     buildNav();
     buildTab(user);
-    loadAttention();
   };
 
   let repairQueued = false;
@@ -299,11 +315,8 @@
     watchMyDayMounts();
   };
 
-  // Initialise on page load, login/session restore, bfcache restore, and tab visibility changes.
-  // The static nav/tab plus the observer make My Day self-healing if another UI refresh replaces DOM.
-  document.addEventListener('littlefeet:session-ready', start);
-  window.addEventListener('pageshow', start);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
-  else start();
+  // Session restoration owns startup. The observer repairs DOM replacement without
+  // refetching the full summary on pageshow or every visibility change.
+  if (typeof window.registerLittleFeetWorkspace === 'function') window.registerLittleFeetWorkspace('my-day', start);
+  else document.addEventListener('littlefeet:session-ready', start);
 })();

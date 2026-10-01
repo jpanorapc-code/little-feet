@@ -62,8 +62,29 @@ async function main() {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await context.route('https://**', route => route.abort());
     const page = await context.newPage();
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.__littleFeetFetchStacks = [];
+      window.fetch = (...args) => {
+        const input = args[0];
+        const url = typeof input === 'string' ? input : (input?.url || '');
+        if (String(url).includes('/api/staff/tasks')) {
+          window.__littleFeetFetchStacks.push({ url:String(url), stack:new Error('Little Feet fetch trace').stack || '' });
+        }
+        return nativeFetch(...args);
+      };
+    });
     const errors = [];
     const failedApi = [];
+    const apiRequestCounts = new Map();
+    page.on('request', request => {
+      try {
+        const url = new URL(request.url());
+        if (url.origin === origin && url.pathname.startsWith('/api/')) {
+          apiRequestCounts.set(url.pathname, (apiRequestCounts.get(url.pathname) || 0) + 1);
+        }
+      } catch {}
+    });
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => {
       if (response.url().startsWith(`${origin}/api/`) && response.status() >= 500) failedApi.push(`${response.status()} ${response.url()}`);
@@ -108,6 +129,52 @@ async function main() {
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
     await page.waitForLoadState('domcontentloaded');
+    if (role === 'admin') {
+      const summaryEndpoints = [
+        '/api/tickets',
+        '/api/broadcasts',
+        '/api/staff/tasks',
+        '/api/staff/leave',
+        '/api/staff/cover',
+        '/api/staff/performance-reviews',
+        '/api/staff/notices',
+        '/api/maintenance',
+        '/api/resources/bookings',
+        '/api/purchase-requests',
+        '/api/staff/qualifications'
+      ];
+      const sessionOwnedEndpoints = [...summaryEndpoints, '/api/accounts', '/api/approvals', '/api/staff/meetings'];
+
+      // Reproduce the production failure mode: restore an already-authenticated session
+      // during page load, when old delayed window.load initializers used to stack.
+      // Let the just-completed interactive login finish its own startup first so
+      // no late request from the old document contaminates the reload count.
+      await page.waitForTimeout(1200);
+      apiRequestCounts.clear();
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.locator('#dashboardSection').waitFor({ state: 'visible' });
+      await page.waitForTimeout(1200);
+
+      for (const endpoint of summaryEndpoints) {
+        const count = apiRequestCounts.get(endpoint) || 0;
+        const trace = endpoint === '/api/staff/tasks' && count > 2
+          ? await page.evaluate(() => window.__littleFeetFetchStacks || [])
+          : [];
+        assert.ok(count <= 2, `Session restore duplicated ${endpoint}: ${count} calls\n${JSON.stringify(trace, null, 2)}`);
+      }
+
+      // Repeated session-ready notifications in the same session must reuse the
+      // initializer promise and add no requests.
+      const beforeRepeatedSession = new Map(sessionOwnedEndpoints.map(endpoint => [endpoint, apiRequestCounts.get(endpoint) || 0]));
+      await page.evaluate(() => {
+        document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
+        document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
+      });
+      await page.waitForTimeout(400);
+      for (const endpoint of sessionOwnedEndpoints) {
+        assert.equal(apiRequestCounts.get(endpoint) || 0, beforeRepeatedSession.get(endpoint), `Repeated session-ready reloaded ${endpoint}`);
+      }
+    }
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();
       for (const element of document.querySelectorAll('[onclick], [onchange], [onsubmit]')) {

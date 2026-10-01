@@ -131,7 +131,7 @@
   let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(async()=>{if(!user()?.username||document.hidden||!document.getElementById('emailIntegrationTab')?.classList.contains('active'))return;try{const sessionOk=await window.ensureLittleFeetAuthenticatedSession?.();if(sessionOk===false)return;const status=await json('/api/email/mailbox/status');if(status.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});await email();}catch{}},300000);};
 
   const load=()=>{qualifications();kpiHistory();development();email();startEmailPoll();};
-  document.addEventListener('littlefeet:session-ready',load);
-  if(user()?.username)load();
+  if(typeof window.registerLittleFeetWorkspace==='function') window.registerLittleFeetWorkspace('workplace-extended',load);
+  else document.addEventListener('littlefeet:session-ready',load);
   window.refreshStaffQualifications=qualifications;window.refreshKpiHistory=kpiHistory;window.refreshStaffDevelopment=development;window.refreshEmailIntegration=email;
 })();
