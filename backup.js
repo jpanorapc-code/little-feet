@@ -844,6 +844,8 @@ function reportClientStructuredLog({ severity = 'warn', code = 'CLIENT_EVENT', m
   }).catch(() => null);
 }
 
+window.reportLittleFeetClientLog = reportClientStructuredLog;
+
 function logAppError(code, reason) {
   captureDebugEvent({ category: 'Application', code, message: reason });
   void reportClientStructuredLog({ severity: 'warn', code, message: reason });
