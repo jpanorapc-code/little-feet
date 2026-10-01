@@ -147,6 +147,9 @@ async function main() {
 
       // Reproduce the production failure mode: restore an already-authenticated session
       // during page load, when old delayed window.load initializers used to stack.
+      // Let the just-completed interactive login finish its own startup first so
+      // no late request from the old document contaminates the reload count.
+      await page.waitForTimeout(1200);
       apiRequestCounts.clear();
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.locator('#dashboardSection').waitFor({ state: 'visible' });
