@@ -1422,6 +1422,11 @@ function logout() {
   schoolStatusTimer = null;
   if (releaseNotesRefreshTimer) window.clearInterval(releaseNotesRefreshTimer);
   releaseNotesRefreshTimer = null;
+  if (inspectAutoRefreshTimer) window.clearInterval(inspectAutoRefreshTimer);
+  inspectAutoRefreshTimer = null;
+  inspectStructuredLogPayload = null;
+  inspectServerFaults = [];
+  inspectDiagnostics = null;
   currentUser = null;
   exitWallpaperMode();
   stopWindtLegacyNote();
