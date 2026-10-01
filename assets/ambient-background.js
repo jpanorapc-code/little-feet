@@ -22,7 +22,12 @@
       catch (error) {
         // Autoplay can be denied by the browser; keep the poster and a retry control.
         video.dataset.playbackState = 'blocked';
-        console.info('Background video could not autoplay:', error.name);
+        void window.reportLittleFeetClientLog?.({
+          severity: 'info',
+          code: 'AMBIENT_VIDEO_AUTOPLAY_BLOCKED',
+          message: error?.name || 'Background video autoplay was blocked.',
+          source: 'assets/ambient-background.js'
+        });
       }
     }
     render();
