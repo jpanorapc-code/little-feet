@@ -152,6 +152,15 @@ const server = http.createServer((req, res) => {
           const themeControl = header.querySelector('[onclick="toggleDarkMode()"]');
           if (!userSwitch || !visible(userSwitch) || userSwitch.getBoundingClientRect().width > 50) errors.push('mobile account control is missing or oversized');
           if (!accountAvatar || !visible(accountAvatar) || accountAvatar.getBoundingClientRect().width < 28) errors.push('mobile account avatar is missing');
+          const avatarSprite = accountAvatar?.querySelector('.profile-avatar-image');
+          if (!avatarSprite || !visible(avatarSprite)) {
+            errors.push('mobile penguin sprite is missing');
+          } else {
+            const spriteRect = avatarSprite.getBoundingClientRect();
+            const spriteStyle = getComputedStyle(avatarSprite);
+            if (spriteRect.width < 34 || spriteRect.height < 34) errors.push('mobile penguin sprite is too small');
+            if (spriteStyle.backgroundSize !== '720% 360%') errors.push(`mobile penguin sprite zoom is wrong: ${spriteStyle.backgroundSize}`);
+          }
           if (accountLabel && getComputedStyle(accountLabel).display !== 'none') errors.push('mobile long account label should be hidden');
           const accountRow = [userSwitch, serverStatus, emailControl, soundControl, themeControl].filter(Boolean).filter(visible);
           if (accountRow.length === 5) {
