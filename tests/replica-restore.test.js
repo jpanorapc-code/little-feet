@@ -88,6 +88,13 @@ const authed = async (route, cookie) => {
     assert.equal(standbyHealth.response.status, 200);
     assert.equal(standbyHealth.data.instance, 'STANDBY');
     assert.equal(standbyHealth.data.readOnly, true);
+    assert.equal(standbyHealth.response.headers.get('x-robots-tag'), 'noindex, nofollow, noarchive');
+
+    const runtimeConfigResponse = await fetch(`http://127.0.0.1:${port}/runtime-config.js`);
+    assert.equal(runtimeConfigResponse.status, 200);
+    const runtimeConfigSource = await runtimeConfigResponse.text();
+    assert.match(runtimeConfigSource, /"instance":"STANDBY"/);
+    assert.match(runtimeConfigSource, /"readOnly":true/);
 
     const failoverStatus = await request('/api/failover-status');
     assert.equal(failoverStatus.response.status, 200);
