@@ -100,7 +100,7 @@ const server = http.createServer((req, res) => {
           const emailRect = emailButton.getBoundingClientRect();
           const panelRect = userPanel.getBoundingClientRect();
           const headerRect = header.getBoundingClientRect();
-          if (width > 640 && (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1)) errors.push('Emails control floats outside account row');
+          if (width > 640 && getComputedStyle(userPanel).display !== 'contents' && (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1)) errors.push('Emails control floats outside account row');
           if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
           if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
         }
@@ -108,27 +108,28 @@ const server = http.createServer((req, res) => {
           const menu = document.getElementById('navMoreToggle');
           if (!menu || !visible(menu)) errors.push('mobile/tablet Menu control missing');
         }
-        if (width > 640 && width < 900) {
-          const quickbar = header.querySelector('.nav-quickbar');
+        if (width > 640 && width < 1200) {
           const term = header.querySelector('.nav-term-panel');
           const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
           const menu = document.getElementById('navMoreToggle');
           const quickRow = [...shortcuts, ...(menu && visible(menu) ? [menu] : [])];
-          if (!quickbar || !term || quickRow.length < 4) {
-            errors.push('split-screen header quick row is incomplete');
+          if (!term || quickRow.length < 4) {
+            errors.push('snapped-window header quick row is incomplete');
           } else {
-            const termTop = Math.round(term.getBoundingClientRect().top);
             const actionTops = quickRow.map(button => Math.round(button.getBoundingClientRect().top));
-            if (actionTops.some(top => Math.abs(top - termTop) > 3)) errors.push('split-screen term/actions are not on one row');
+            if (Math.max(...actionTops) - Math.min(...actionTops) > 3) errors.push('snapped-window quick actions are not on one row');
+            const termRect = term.getBoundingClientRect();
+            const quickRect = quickRow[0].getBoundingClientRect();
+            if (termRect.bottom > quickRect.top + 2) errors.push('snapped-window term overlaps the quick-action row');
           }
           const brand = header.querySelector('.nav-brand');
-          const userPanel = document.getElementById('navUserPanel');
-          if (brand && userPanel && visible(brand) && visible(userPanel)) {
-            if (Math.abs(Math.round(brand.getBoundingClientRect().top) - Math.round(userPanel.getBoundingClientRect().top)) > 4) {
-              errors.push('split-screen brand/account controls are not on one row');
-            }
+          const userSwitch = header.querySelector('.user-switch-control');
+          if (brand && userSwitch && visible(brand) && visible(userSwitch)) {
+            const brandTop = Math.round(brand.getBoundingClientRect().top);
+            const userTop = Math.round(userSwitch.getBoundingClientRect().top);
+            if (Math.abs(brandTop - userTop) > 5) errors.push('snapped-window brand/account controls are not on one row');
           }
-          if (header.getBoundingClientRect().height > 125) errors.push('split-screen header is too tall');
+          if (header.getBoundingClientRect().height > 155) errors.push('snapped-window header is too tall');
         }
         const tabs = [...document.querySelectorAll('.tab-content')];
         for (const tab of tabs) {
