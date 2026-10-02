@@ -356,8 +356,55 @@ function playTicketAlert() {
   } catch { /* Browser sound is optional and can be disabled by device settings. */ }
 }
 
+function failoverRuntimeConfig() {
+  const config = window.LITTLE_FEET_RUNTIME_CONFIG;
+  return config && typeof config === 'object'
+    ? config
+    : { instance: 'PRIMARY', readOnly: false, backupUrl: '', primaryUrl: '' };
+}
+
+function standbyAgeLabel(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return 'Snapshot age unavailable';
+  if (value < 60) return `Snapshot age: ${Math.round(value)}s`;
+  if (value < 3600) return `Snapshot age: ${Math.round(value / 60)} min`;
+  return `Snapshot age: ${Math.round(value / 3600)} hr`;
+}
+
+function updateStandbyModeBanner(health = null) {
+  const config = failoverRuntimeConfig();
+  const instance = String(health?.instance || config.instance || 'PRIMARY').toUpperCase();
+  const isStandby = instance === 'STANDBY' || config.readOnly === true;
+  const dashboardBanner = document.getElementById('standbyEmergencyBanner');
+  const loginBanner = document.getElementById('standbyLoginNotice');
+  document.body.classList.toggle('standby-readonly', isStandby);
+  [dashboardBanner, loginBanner].forEach(node => node?.classList.toggle('hidden', !isStandby));
+  if (!isStandby) return;
+
+  const replica = health?.replica || null;
+  const stale = replica?.stale === true || health?.status === 'DEGRADED';
+  dashboardBanner?.classList.toggle('is-stale', stale);
+  loginBanner?.classList.toggle('is-stale', stale);
+  const detail = document.getElementById('standbyEmergencyDetail');
+  if (!detail) return;
+  if (stale) {
+    detail.textContent = 'Standby data is older than the configured freshness window. Use it for emergency reference only and avoid relying on recently changed information.';
+    return;
+  }
+  const age = replica ? standbyAgeLabel(replica.ageSeconds) : 'Latest verified snapshot loaded';
+  detail.textContent = `Little Feet is serving the latest verified standby snapshot. Viewing remains available; changes are temporarily blocked. ${age}.`;
+}
+
+function returnToPrimaryService() {
+  const target = String(window.LITTLE_FEET_PRIMARY_URL || failoverRuntimeConfig().primaryUrl || '').trim();
+  if (!target) return alert('The primary Little Feet return address is not configured on this standby service.');
+  window.location.assign(target);
+}
+window.returnToPrimaryService = returnToPrimaryService;
+
 // DOM Initialization
 window.addEventListener('DOMContentLoaded', () => {
+  updateStandbyModeBanner();
   upgradeLegacyIcons();
   observeProfessionalIcons();
   document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
@@ -2246,7 +2293,7 @@ function goToMainMenu() {
 
 async function startHealthMonitor() {
   let consecutiveFailures = 0;
-  const configuredBackupUrl = String(window.LITTLE_FEET_BACKUP_URL || '').trim().replace(/\/$/, '');
+  const configuredBackupUrl = String(window.LITTLE_FEET_BACKUP_URL || failoverRuntimeConfig().backupUrl || '').trim().replace(/\/$/, '');
   const checkStatus = async () => {
     const statusEl = document.getElementById('serverStatus');
     const statusText = document.getElementById('serverStatusText');
@@ -2256,14 +2303,39 @@ async function startHealthMonitor() {
       const res = await fetch('/api/health', { cache: 'no-store', signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const health = await res.json();
+      if (health.instance === 'STANDBY' && !health.replica) {
+        try {
+          const failoverResponse = await fetch('/api/failover-status', { cache: 'no-store', signal: controller.signal });
+          if (failoverResponse.ok) {
+            const failover = await failoverResponse.json();
+            if (failover.replica) health.replica = failover.replica;
+          }
+        } catch {}
+      }
       consecutiveFailures = 0;
+      updateStandbyModeBanner(health);
       if (statusEl && statusText) {
         const busy = health.status === 'BUSY';
-        statusEl.className = `server-status ${busy ? 'busy' : 'good'}`;
-        statusText.textContent = busy ? 'Server busy' : health.instance === 'STANDBY' ? 'Backup server online' : 'Server online';
+        const degraded = health.status === 'DEGRADED';
+        statusEl.className = `server-status ${busy || degraded ? 'busy' : 'good'}`;
+        statusText.textContent = degraded
+          ? 'Backup data needs attention'
+          : busy
+            ? 'Server busy'
+            : health.instance === 'STANDBY'
+              ? 'Backup server online'
+              : 'Server online';
       }
       const footerStatus = document.getElementById('footerSystemStatus');
-      if (footerStatus) footerStatus.textContent = health.status === 'BUSY' ? 'Server busy — requests may take longer.' : health.instance === 'STANDBY' ? 'Backup server online.' : 'Server online.';
+      if (footerStatus) {
+        footerStatus.textContent = health.status === 'DEGRADED'
+          ? 'Emergency backup online — replicated data may be stale.'
+          : health.status === 'BUSY'
+            ? 'Server busy — requests may take longer.'
+            : health.instance === 'STANDBY'
+              ? 'Emergency backup online — read-only mode.'
+              : 'Server online.';
+      }
     } catch (e) {
       consecutiveFailures += 1;
       if (statusEl && statusText) {
@@ -2273,8 +2345,8 @@ async function startHealthMonitor() {
       const footerStatus = document.getElementById('footerSystemStatus');
       if (footerStatus) footerStatus.textContent = 'Server connection unavailable.';
       logAppError('ERR_SRV_503', 'Live server connection lost to API.');
-      // A production backup URL is configured by the school host / load balancer.
-      // Local development remains manual so a missing local port never traps users in a redirect loop.
+      // Two consecutive failed probes trigger the configured standby redirect.
+      // The standby itself receives an empty backup URL, preventing redirect loops.
       if (configuredBackupUrl && consecutiveFailures >= 2 && !sessionStorage.getItem('lf_failover_redirected')) {
         sessionStorage.setItem('lf_failover_redirected', '1');
         window.location.replace(configuredBackupUrl);
