@@ -1959,6 +1959,8 @@ app.get('/api/production-readiness', (req, res) => {
   if (!integrations.paymentDestination) missingActions.push('Configure a bank-transfer destination or HTTPS payment link.');
   if (!integrations.monitoring) missingActions.push('Configure error and uptime monitoring.');
   if (!integrations.offsiteBackup) missingActions.push('Configure an offsite backup target and test a restore.');
+  if (!integrations.standbyReplication) missingActions.push('Enable encrypted standby replication to the separate backup bucket.');
+  if (!integrations.standbyPublicUrl) missingActions.push('Configure LF_BACKUP_PUBLIC_URL for the separate standby service.');
   res.json({
     ...readiness,
     integrations,
@@ -2323,6 +2325,9 @@ const runAdminSelfTest = async actor => {
   const readinessReasons = {
     database: 'The production database connection is not configured.',
     durableSessions: 'Sessions cannot be stored durably without the production database.',
+    replicaAvailable: 'The standby has not loaded a verified replica snapshot.',
+    replicaFresh: 'The standby replica snapshot is older than the configured freshness window.',
+    standbyReplication: 'Encrypted remote standby replication is not configured.',
     fieldEncryption: 'The field-encryption key is missing.',
     sessionSecret: 'The secure session secret is missing.',
     secureCookies: 'Secure-cookie enforcement is not active outside production mode.',
