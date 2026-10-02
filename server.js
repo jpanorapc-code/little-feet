@@ -1002,6 +1002,7 @@ let remoteReplicaLastSyncAt = '';
 let remoteReplicaLastPublishedAt = '';
 let remoteReplicaLastError = '';
 let remoteReplicaPublishCount = 0;
+let primaryPersistenceHealth = { checkedAt: 0, ok: true, promise: null, lastLoggedOk: true };
 
 class PostgresSessionStore extends session.Store {
   constructor() {
@@ -1829,14 +1830,51 @@ app.post('/api/login', (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+async function checkPrimaryPersistenceHealth() {
+  if (replicaMode) return true;
+  const now = Date.now();
+  if (primaryPersistenceHealth.promise) return primaryPersistenceHealth.promise;
+  if (now - primaryPersistenceHealth.checkedAt < 10000) return primaryPersistenceHealth.ok;
+  const job = (async () => {
+    let ok = false;
+    try {
+      if (postgresPool) await postgresPool.query('SELECT 1');
+      else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
+      else throw new Error('No persistence adapter is available.');
+      ok = true;
+    } catch (error) {
+      if (primaryPersistenceHealth.lastLoggedOk) {
+        logStructured('error', 'health.persistence_unavailable', { category: 'health', result: 'failed', message: error.message });
+      }
+    }
+    if (ok && !primaryPersistenceHealth.lastLoggedOk) {
+      logStructured('info', 'health.persistence_recovered', { category: 'health', result: 'recovered' });
+    }
+    primaryPersistenceHealth.checkedAt = Date.now();
+    primaryPersistenceHealth.ok = ok;
+    primaryPersistenceHealth.lastLoggedOk = ok;
+    return ok;
+  })();
+  primaryPersistenceHealth.promise = job;
+  try {
+    return await job;
+  } finally {
+    if (primaryPersistenceHealth.promise === job) primaryPersistenceHealth.promise = null;
+  }
+}
+
+app.get('/api/health', async (req, res) => {
   // Do not count the health probe itself, and do not report normal concurrent
   // dashboard startup requests as server overload.
   const reportedActiveRequests = Math.max(0, activeRequestCount - 1);
   const replica = replicaMode ? replicaFreshness() : null;
+  const persistenceHealthy = replicaMode ? true : await checkPrimaryPersistenceHealth();
   const status = replicaMode && (!replica.available || replica.stale)
     ? 'DEGRADED'
-    : reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
+    : !persistenceHealthy
+      ? 'DEGRADED'
+      : reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
+  if (!replicaMode && !persistenceHealthy) res.status(503);
   const actor = getSessionAccount(req);
   res.set('Cache-Control', 'no-store');
   if (!actor) return res.json({
