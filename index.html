@@ -5286,23 +5286,30 @@
     }
 
     /* Snapped-window / tablet / small desktop header.
-       Two explicit wrapper rows. Do NOT flatten wrappers with display:contents:
-       that caused browser/snap-width controls to escape into stray rows. */
+       Absolute slotting is intentional here: it prevents older flex/grid rules,
+       browser zoom and Windows snap widths from pushing Menu/account controls
+       onto extra rows. */
     @media (min-width:641px) and (max-width:1199px) {
       #dashboardSection > nav {
-        display:grid !important;
-        grid-template-columns:minmax(0,1fr) auto !important;
-        grid-template-rows:42px 42px !important;
-        align-items:center !important;
-        gap:6px 8px !important;
+        display:block !important;
+        position:sticky !important;
+        top:0 !important;
+        height:98px !important;
+        min-height:98px !important;
         padding:7px 9px !important;
+        overflow:visible !important;
       }
 
       #dashboardSection .nav-brand {
-        grid-column:1 !important;
-        grid-row:1 !important;
+        position:absolute !important;
+        top:7px !important;
+        left:9px !important;
+        right:250px !important;
+        height:40px !important;
         min-width:0 !important;
-        width:100% !important;
+        width:auto !important;
+        max-width:none !important;
+        margin:0 !important;
         overflow:hidden !important;
       }
       #dashboardSection .nav-brand > div { min-width:0 !important; overflow:hidden !important; }
@@ -5316,16 +5323,20 @@
       #dashboardSection .nav-brand .org-badge { display:none !important; }
 
       #dashboardSection .nav-user-panel {
-        grid-column:2 !important;
-        grid-row:1 !important;
+        position:absolute !important;
+        top:9px !important;
+        right:9px !important;
+        left:auto !important;
+        bottom:auto !important;
         display:flex !important;
         align-items:center !important;
         justify-content:flex-end !important;
         flex-wrap:nowrap !important;
         gap:5px !important;
-        width:auto !important;
-        min-width:0 !important;
-        max-width:330px !important;
+        width:232px !important;
+        min-width:232px !important;
+        max-width:232px !important;
+        height:36px !important;
         margin:0 !important;
       }
       #dashboardSection .nav-user-panel .user-switch-control {
@@ -5333,6 +5344,8 @@
         min-width:40px !important;
         max-width:40px !important;
         height:36px !important;
+        min-height:36px !important;
+        margin:0 !important;
         padding:2px !important;
         justify-content:center !important;
         overflow:hidden !important;
@@ -5357,35 +5370,42 @@
         min-width:32px !important;
         max-width:32px !important;
         height:34px !important;
+        min-height:34px !important;
         margin:0 !important;
         padding:0 !important;
       }
+
       #dashboardSection .nav-user-panel .lf-notification-stack {
         position:static !important;
-        width:auto !important;
-        min-width:0 !important;
-        max-width:86px !important;
+        inset:auto !important;
+        width:72px !important;
+        min-width:72px !important;
+        max-width:72px !important;
+        height:34px !important;
         margin:0 !important;
+        padding:0 !important;
       }
       #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed .lf-notification-controls {
         display:block !important;
+        width:100% !important;
+        height:100% !important;
       }
       #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
-        width:74px !important;
-        min-width:74px !important;
-        max-width:74px !important;
+        width:72px !important;
+        min-width:72px !important;
+        max-width:72px !important;
         height:34px !important;
         min-height:34px !important;
         margin:0 !important;
-        padding:4px 6px !important;
-        font-size:.62rem !important;
+        padding:4px 5px !important;
+        font-size:.60rem !important;
         white-space:nowrap !important;
       }
       #dashboardSection .nav-user-panel > [data-portal-audio-mute],
       #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
-        width:36px !important;
-        min-width:36px !important;
-        max-width:36px !important;
+        width:34px !important;
+        min-width:34px !important;
+        max-width:34px !important;
         height:34px !important;
         min-height:34px !important;
         margin:0 !important;
@@ -5396,21 +5416,25 @@
 
       #dashboardSection .nav-live-pill { display:none !important; }
       #dashboardSection .nav-quickbar {
-        grid-column:1 / -1 !important;
-        grid-row:2 !important;
+        position:absolute !important;
+        left:9px !important;
+        right:9px !important;
+        bottom:7px !important;
+        top:auto !important;
         display:grid !important;
         grid-template-columns:minmax(0,1fr) repeat(4,76px) !important;
         align-items:center !important;
         gap:6px !important;
-        width:100% !important;
+        width:auto !important;
         min-width:0 !important;
+        height:40px !important;
         margin:0 !important;
       }
       #dashboardSection .nav-term-panel {
-        grid-column:1 !important;
         width:100% !important;
         max-width:none !important;
         min-width:0 !important;
+        height:36px !important;
         min-height:36px !important;
         margin:0 !important;
         padding:4px 7px !important;
@@ -5428,9 +5452,9 @@
         padding:4px 8px !important;
         font-size:.62rem !important;
       }
-
       #dashboardSection .nav-quickbar > .nav-shortcut,
       #dashboardSection .nav-quickbar > #navMoreToggle {
+        position:static !important;
         display:flex !important;
         align-items:center !important;
         justify-content:center !important;
@@ -5445,34 +5469,45 @@
         font-size:.66rem !important;
         white-space:nowrap !important;
         overflow:hidden !important;
+        order:initial !important;
+        grid-column:auto !important;
+        grid-row:auto !important;
+        justify-self:stretch !important;
+        align-self:center !important;
       }
 
       #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) {
         position:absolute !important;
-        right:8px !important;
-        top:48px !important;
-        width:min(430px,calc(100vw - 16px)) !important;
-        max-width:min(430px,calc(100vw - 16px)) !important;
+        top:40px !important;
+        right:0 !important;
+        left:auto !important;
+        width:min(430px,calc(100vw - 18px)) !important;
+        min-width:0 !important;
+        max-width:min(430px,calc(100vw - 18px)) !important;
+        height:auto !important;
         z-index:90 !important;
       }
     }
 
     @media (min-width:641px) and (max-width:760px) {
-      #dashboardSection > nav {
-        grid-template-rows:40px 40px !important;
-        gap:5px 6px !important;
-      }
+      #dashboardSection .nav-brand { right:224px !important; }
       #dashboardSection .nav-brand img {
         width:34px !important;
         height:34px !important;
         min-width:34px !important;
       }
       #dashboardSection .nav-brand .site-name { font-size:.88rem !important; }
+      #dashboardSection .nav-user-panel {
+        width:206px !important;
+        min-width:206px !important;
+        max-width:206px !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack,
       #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
-        width:62px !important;
-        min-width:62px !important;
-        max-width:62px !important;
-        font-size:.56rem !important;
+        width:58px !important;
+        min-width:58px !important;
+        max-width:58px !important;
+        font-size:.54rem !important;
       }
       #dashboardSection .nav-quickbar {
         grid-template-columns:minmax(0,1fr) repeat(4,64px) !important;
