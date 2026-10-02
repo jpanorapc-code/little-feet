@@ -15,7 +15,10 @@ for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
+fs.mkdirSync(path.join(temp, 'lib', 'operations'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
+fs.copyFileSync(path.join(root, 'lib', 'operations', 'standby-replication.js'), path.join(temp, 'lib', 'operations', 'standby-replication.js'));
+fs.copyFileSync(path.join(root, 'lib', 'operations', 'recovery-rehearsal.js'), path.join(temp, 'lib', 'operations', 'recovery-rehearsal.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'structured-logger.js'), path.join(temp, 'lib', 'structured-logger.js'));
@@ -81,7 +84,17 @@ const authed = async (route, cookie) => {
       if (i === 99) throw new Error(`Replica test server failed to start. ${stderr}`);
     }
 
-    const login = await request('/api/login', {
+    const standbyHealth = await request('/api/health');
+    assert.equal(standbyHealth.response.status, 200);
+    assert.equal(standbyHealth.data.instance, 'STANDBY');
+    assert.equal(standbyHealth.data.readOnly, true);
+
+    const failoverStatus = await request('/api/failover-status');
+    assert.equal(failoverStatus.response.status, 200);
+    assert.equal(failoverStatus.data.instance, 'STANDBY');
+    assert.equal(failoverStatus.data.readOnly, true);
+
+        const login = await request('/api/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username: 'alpha-admin', pin: 'AlphaPass1' })
