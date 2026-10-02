@@ -24,6 +24,9 @@ fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'storage'), { recursive: true 
 fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'operations'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'operations', 'standby-replication.js'), path.join(temporaryDirectory, 'lib', 'operations', 'standby-replication.js'));
 fs.copyFileSync(path.join(root, 'lib', 'operations', 'recovery-rehearsal.js'), path.join(temporaryDirectory, 'lib', 'operations', 'recovery-rehearsal.js'));
+fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'operations'), { recursive: true });
+fs.copyFileSync(path.join(root, 'lib', 'operations', 'standby-replication.js'), path.join(temporaryDirectory, 'lib', 'operations', 'standby-replication.js'));
+fs.copyFileSync(path.join(root, 'lib', 'operations', 'recovery-rehearsal.js'), path.join(temporaryDirectory, 'lib', 'operations', 'recovery-rehearsal.js'));
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temporaryDirectory, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temporaryDirectory, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temporaryDirectory, 'lib', 'oauth-identity.js'));
