@@ -379,6 +379,11 @@ function updateStandbyModeBanner(health = null) {
   const loginBanner = document.getElementById('standbyLoginNotice');
   document.body.classList.toggle('standby-readonly', isStandby);
   [dashboardBanner, loginBanner].forEach(node => node?.classList.toggle('hidden', !isStandby));
+  document.querySelectorAll('[data-provider-signin]').forEach(button => {
+    button.disabled = isStandby;
+    if (isStandby) button.title = 'Provider sign-in is unavailable on the emergency standby. Use your Little Feet account credentials.';
+    else button.removeAttribute('title');
+  });
   if (!isStandby) return;
 
   const replica = health?.replica || null;
