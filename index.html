@@ -6831,35 +6831,38 @@
             <div class="card-header-bar">
               <div>
                 <h3>SA-SAMS &amp; DBE/LURITS Integration</h3>
-                <p class="meta" style="margin:4px 0 0;">Current Little Feet implementation status and the verified third-party LURITS/LASS pathway.</p>
+                <p class="meta" style="margin:4px 0 0;">Three integration routes are tracked separately so schools can see what works now, what is waiting on DBE, and what can use the established SA-SAMS submission chain.</p>
               </div>
-              <span class="badge-tag info">DBE SPEC PENDING</span>
+              <span class="badge-tag info">3 INTEGRATION ROUTES</span>
             </div>
 
             <div class="workspace-grid" style="margin-top:14px;">
-              <div class="workspace-card">
-                <h4>SA-SAMS learner import</h4>
+              <div class="workspace-card" style="border-left:4px solid var(--primary-color);">
+                <h4>1. Little Feet SA-SAMS spreadsheet bridge</h4>
                 <span class="badge-tag">AVAILABLE NOW</span>
                 <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Import a learner/parent spreadsheet exported from SA-SAMS into this school's real Little Feet learner register. Little Feet maps common learner name, surname, grade, register class and guardian contact columns, previews the result, then sends approved rows through the same bounded, tenant-isolated production import used by the learner register.</p>
-              </div>
-
-              <div class="workspace-card">
-                <h4>Third-party LURITS pathway</h4>
-                <span class="badge-tag info">VERIFIED PATHWAY</span>
-                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">DBE documentation recognises third-party school systems through the LURITS Accredited Software System (LASS) pathway. Little Feet is preparing its integration around the official LURITS-approved interface process rather than reverse-engineering SA-SAMS or inventing an unofficial submission format.</p>
-              </div>
-
-              <div class="workspace-card">
-                <h4>LURITS feedback handling</h4>
-                <span class="badge-tag info">IMPLEMENTATION PLANNED</span>
-                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Documented LURITS feedback is returned as XML files, commonly packaged in ZIP archives. The integration design tracks <code>TransactionCategoryID</code>, returned learner/educator LURITS numbers, validation results and submission errors so feedback can be matched back to the correct school records.</p>
+                <p class="meta" style="margin:8px 0 0;"><strong>Use this when:</strong> a school already has learner data in SA-SAMS/Excel/CSV and wants it brought into Little Feet safely.</p>
               </div>
 
               <div class="workspace-card" style="border-left:4px solid var(--warning-color,#f59e0b);">
-                <h4>Direct DBE/LURITS submission</h4>
-                <span class="badge-tag urgent">NOT ENABLED</span>
-                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Direct Little Feet → DBE/LURITS submission remains disabled until the current official DBE third-party interface package and LASS conformance requirements are obtained, implemented and validated. Little Feet will not claim direct LURITS compatibility before that validation is complete.</p>
+                <h4>2. Direct Little Feet → DBE/LURITS (LASS)</h4>
+                <span class="badge-tag urgent">PENDING DBE / LASS APPROVAL</span>
+                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">DBE documentation recognises third-party school systems through the LURITS Accredited Software System (LASS) pathway. Direct Little Feet → DBE/LURITS submission remains disabled until the current official third-party interface package and LASS conformance requirements are obtained, implemented and validated.</p>
+                <p class="meta" style="margin:8px 0 0;"><strong>Use this when available:</strong> Little Feet submits through the official approved third-party LURITS interface without pretending an unofficial XML format is valid.</p>
               </div>
+
+              <div class="workspace-card" style="border-left:4px solid rgba(45,212,191,.75);">
+                <h4>3. Little Feet → SA-SAMS → LURITS submission chain</h4>
+                <span class="badge-tag info">VERIFIED EXTERNAL PATHWAY · ADAPTER NEXT</span>
+                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Established South African school platforms use a second practical route: generate a SA-SAMS-compatible database/export, validate it in SA-SAMS, complete Module 17 LURITS Approval, then continue through the applicable Valistractor / DDD / district or provincial submission process to LURITS.</p>
+                <p class="meta" style="margin:8px 0 0;"><strong>Little Feet status:</strong> this pathway is documented, but the Little Feet SA-SAMS database export adapter is not enabled until its target database structure/version has been verified. No fake SA-SAMS database file will be generated.</p>
+                <p class="meta" style="margin:8px 0 0;"><strong>Submission chain:</strong> Little Feet export → SA-SAMS validation → Module 17 → Valistractor / DDD / district or provincial channel → LURITS → feedback back to the school system.</p>
+              </div>
+            </div>
+
+            <div class="workspace-card" style="margin-top:14px;">
+              <div class="card-header-bar"><h4>LURITS feedback handling</h4><span class="badge-tag info">SHARED BY ROUTES 2 &amp; 3</span></div>
+              <p style="color:var(--text-muted);line-height:1.55;margin:8px 0 0;">Documented LURITS feedback is returned as XML files, commonly packaged in ZIP archives. The integration design tracks <code>TransactionCategoryID</code>, returned learner/educator LURITS numbers, validation results and submission errors so feedback can be matched back to the correct school records.</p>
             </div>
 
             <div class="workspace-card" style="margin-top:14px;">
