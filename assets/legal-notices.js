@@ -139,6 +139,63 @@
     ].join('');
   }
 
+  function aboutLittleFeetMarkup() {
+    return [
+      '<div style="font-size:.9rem;line-height:1.6;">',
+      '<p class="meta" style="margin:0 0 16px;">Little Feet Technologies (Pty) Ltd · South Africa · Little Feet School Platform v1.0</p>',
+      section('Who we are',
+        '<p><strong>Little Feet Technologies (Pty) Ltd</strong> is a South African education technology company building practical, secure and connected tools for ECD centres, primary schools and high schools.</p><p style="margin-top:8px;">Little Feet brings the moving parts of school life into one connected platform so staff, administrators and families can spend less time switching between disconnected systems and more time focused on the people who matter.</p><p style="margin-top:8px;"><strong>Every Little Step Matters.</strong></p>'),
+      section('What we stand for',
+        bullets([
+          '<strong>Simpler school operations</strong> that reduce unnecessary administrative friction.',
+          '<strong>Better communication</strong> between schools, staff and families.',
+          '<strong>Responsible handling of information</strong> with privacy, security and accountability built into everyday workflows.',
+          '<strong>Technology that supports people</strong> instead of making their work more complicated.',
+          '<strong>Continuous improvement</strong> so the platform can grow with the institutions that use it.'
+        ])),
+      section('Why Little Feet exists',
+        '<p>Schools often have to run their daily operations through a mixture of messaging apps, email, spreadsheets, paper registers, notebooks, finance tools and separate systems. Little Feet was created to bring those pieces together.</p><p style="margin-top:8px;">The platform connects learner and parent services, staff workflows, communication, finance, administration, reporting, safety and everyday school operations in one environment.</p><p style="margin-top:8px;"><strong>Our goal is simple: give schools one place where the work can actually happen.</strong></p>'),
+      section('How we got here',
+        '<p>Little Feet began with something deeply personal: <strong>building a legacy for my son.</strong></p><p style="margin-top:8px;">I wanted to create something meaningful that could grow beyond me, something he could one day be proud of, build upon, and perhaps even take over himself.</p><p style="margin-top:8px;">Getting here has meant late nights, coding after long shifts, sacrificing sleep, missing events, solving problems when it would have been easier to stop, and constantly pushing Little Feet forward.</p><p style="margin-top:8px;">But somewhere along the way, the goal became bigger than my own family.</p><p style="margin-top:8px;">Little Feet is being built to help create a better future not only for my son, but for <strong>children, families, educators and schools across South Africa and beyond.</strong></p><p style="margin-top:8px;"><strong>Every feature, every improvement and every difficult night has been part of the same mission: build something that lasts, improves lives, and gives the next generation something better than what we started with.</strong></p>'),
+      section('What Little Feet is today',
+        bullets([
+          '<strong>Learner and academic operations:</strong> learner records, attendance, schedules, learning files, development, assessments, reporting and SA-SAMS-related workflows.',
+          '<strong>Parent and family access:</strong> communication, payments, school information, notices, learner linking and family-facing services.',
+          '<strong>Staff and workplace management:</strong> tasks, leave, cover, qualifications, development plans, performance reviews, meetings, approvals and internal work.',
+          '<strong>Communication:</strong> direct and group messaging, notices, tickets, broadcasts and connected mailbox tools.',
+          '<strong>Finance and operations:</strong> payments, subscriptions, billing, purchasing, resources, maintenance, book registers and school-store functions.',
+          '<strong>Safety and safeguarding:</strong> safety alerts, visitor management, pickups, consents, care records and controlled access.',
+          '<strong>Administration and oversight:</strong> account management, multi-school administration, reporting, diagnostics, compliance tools and executive visibility.'
+        ])),
+      section('What makes Little Feet different',
+        '<p>Little Feet is not built around one isolated school function. It is designed around the reality that a school is an entire organisation.</p><p style="margin-top:8px;">The aim is not simply to add more features. It is to reduce the number of separate tools a school needs to rely on by connecting school management, staff work, communication and family services in one platform.</p><p style="margin-top:8px;"><strong>One school. One connected platform.</strong></p>'),
+      section('Our commitment to security and privacy',
+        '<p>Schools handle sensitive information, especially information involving children and families. Little Feet therefore treats privacy, controlled access and accountability as core parts of the platform.</p><p style="margin-top:8px;">The platform includes role-based access, school and tenant separation, secure sessions, login protection, security monitoring, controlled file access, incident records and POPIA-aligned processes. Security is part of how Little Feet is designed to operate, not a decorative checkbox.</p>'),
+      section('Built in South Africa',
+        '<p>Little Feet Technologies is a South African company. The platform is being developed with South African schools, legislation, school structures and everyday operational realities in mind, including POPIA, ECD environments and SA-SAMS-related workflows.</p>'),
+      section('Where we are going',
+        '<p>Version 1.0 is the foundation. The future of Little Feet is about making the platform deeper, smarter and more capable without losing the simplicity that makes it practical.</p>' +
+        bullets([
+          'Deeper academic management and learner progress tools.',
+          'Stronger reporting, analytics and operational insight.',
+          'More automation and intelligent assistance.',
+          'Expanded communication, parent and staff experiences.',
+          'More integrations and richer mobile experiences.'
+        ]) +
+        '<p style="margin-top:8px;">The goal is not to build everything overnight. It is to keep improving Little Feet carefully, step by step, without sacrificing reliability or the people already depending on it.</p>'),
+      section('Our long-term vision',
+        '<p>We want Little Feet to become more than a piece of school software. We want it to become a platform that schools can grow with: a place where staff know what needs attention, parents stay connected, administrators have visibility, school leaders can make better decisions, information stays organised and daily work becomes easier.</p><p style="margin-top:8px;">And eventually, something strong enough to outlive its founder and become part of the legacy it was originally created to build.</p>'),
+      section('The future belongs to them',
+        '<p>At the centre of Little Feet is one simple idea: the work schools do today shapes the people who will inherit tomorrow.</p><p style="margin-top:8px;">Technology cannot replace teachers, parents, caregivers or school leaders. But it can give them better tools. If better tools give them more time, more clarity and more connection, then that matters.</p><p style="margin-top:10px;font-size:1rem;"><strong>Every Little Step Matters.</strong></p>'),
+      '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border-color);color:var(--text-muted);font-size:.84rem;line-height:1.65;"><strong style="color:var(--text-dark);">Little Feet Technologies (Pty) Ltd</strong><br>Website: <a href="https://littlefeet.co.za/" target="_blank" rel="noopener">littlefeet.co.za</a><br>Email: <a href="mailto:Christiaan@littleFeet.co.za">Christiaan@littleFeet.co.za</a><br>Telephone: <a href="tel:+27629432244">062 943 2244</a></div>',
+      '</div>'
+    ].join('');
+  }
+
+  function openAboutLittleFeet() {
+    window.openModal?.('About Little Feet Technologies', aboutLittleFeetMarkup());
+  }
+
   function openPopiaPrivacyNotice() {
     window.openModal?.('Privacy & POPIA Notice', privacyNoticeMarkup());
   }
@@ -155,6 +212,7 @@
     LITTLE_FEET_PRIVACY_VERSION: PRIVACY_VERSION,
     LITTLE_FEET_TERMS_VERSION: TERMS_VERSION,
     LITTLE_FEET_IP_VERSION: IP_VERSION,
+    openAboutLittleFeet,
     openPopiaPrivacyNotice,
     openTermsOfService,
     openCopyrightContentPolicy
