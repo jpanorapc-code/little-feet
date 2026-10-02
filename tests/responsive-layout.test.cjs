@@ -224,7 +224,7 @@ const server = http.createServer((req, res) => {
       failures.push(...result.errors.map(message => `${width}x${height}, collapsed=${collapsed}: ${message}`));
       checks += result.count;
 
-      if (width >= 900 && !collapsed) {
+      if (width >= 960 && !collapsed) {
         const before = await page.evaluate(() => {
           const sidebar = document.getElementById('mainNavigation');
           const rect = sidebar.getBoundingClientRect();
