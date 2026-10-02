@@ -1892,6 +1892,21 @@ function syncMobileHeaderOffset() {
   document.documentElement.style.setProperty('--portal-sidebar-top', `${visibleHeaderBottom}px`);
 }
 
+function usesDockedSnappedDesktopSidebar() {
+  return window.matchMedia?.('(min-width: 900px) and (max-width: 1199px) and (hover: hover) and (pointer: fine)').matches === true;
+}
+
+function syncNavigationViewportState() {
+  if (!usesDockedSnappedDesktopSidebar()) return;
+  const dashboard = document.getElementById('dashboardSection');
+  const toggle = document.getElementById('navMoreToggle');
+  dashboard?.classList.remove('sidebar-open');
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = '☰ Menu';
+  }
+}
+
 function observePortalHeaderSize() {
   const header = document.querySelector('#dashboardSection > nav');
   if (!header || typeof ResizeObserver !== 'function') return;
@@ -1906,6 +1921,7 @@ function queuePortalHeaderOffsetSync() {
   portalHeaderScrollFrame = requestAnimationFrame(() => {
     portalHeaderScrollFrame = 0;
     syncMobileHeaderOffset();
+    syncNavigationViewportState();
   });
 }
 
@@ -1914,6 +1930,7 @@ window.addEventListener('scroll', queuePortalHeaderOffsetSync, { passive: true }
 requestAnimationFrame(() => {
   observePortalHeaderSize();
   syncMobileHeaderOffset();
+  syncNavigationViewportState();
 });
 
 function switchTab(tabId, btn) {
@@ -2180,6 +2197,10 @@ function toggleNavigation() {
   const dashboard = document.getElementById('dashboardSection');
   const toggle = document.getElementById('navMoreToggle');
   if (!dashboard || !toggle) return;
+  if (usesDockedSnappedDesktopSidebar()) {
+    syncNavigationViewportState();
+    return;
+  }
   const isOpen = dashboard.classList.toggle('sidebar-open');
   toggle.setAttribute('aria-expanded', String(isOpen));
   toggle.textContent = isOpen ? '✕ Close' : '☰ Menu';
