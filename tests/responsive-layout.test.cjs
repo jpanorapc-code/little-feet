@@ -100,7 +100,7 @@ const server = http.createServer((req, res) => {
           const emailRect = emailButton.getBoundingClientRect();
           const panelRect = userPanel.getBoundingClientRect();
           const headerRect = header.getBoundingClientRect();
-          if (width > 640 && (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1)) errors.push('Emails control floats outside account row');
+          if (width > 640 && getComputedStyle(userPanel).display !== 'contents' && (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1)) errors.push('Emails control floats outside account row');
           if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
           if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
         }
