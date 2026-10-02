@@ -5050,37 +5050,28 @@
     #authSection .login-new-account{margin-top:14px;padding-top:14px;gap:14px}
     #authSection .login-new-account p{font-size:.84rem}
     #authSection .login-new-account .action-btn{min-height:44px;padding:8px 16px;font-size:.86rem}
-    /* Login iceberg artwork: smaller, softer ice keeps the original logo dominant and clear of the brand name. */
+    /* Login iceberg artwork: crisp blue crystal shards sit behind the unchanged logo with no milky foreground layer. */
     .mascot-stage{
-      width:250px;
-      min-height:178px;
+      width:232px;
+      min-height:174px;
       overflow:visible;
     }
     .mascot-stage::before,
     .mascot-stage::after{
       display:none !important;
     }
-    .login-iceberg-art,
-    .login-iceberg-foreground{
+    .login-iceberg-art{
       position:absolute;
+      z-index:1;
       left:50%;
-      top:8px;
-      width:250px;
-      height:168px;
+      top:14px;
+      width:232px;
+      height:148px;
       transform:translateX(-50%);
       overflow:visible;
       pointer-events:none;
-    }
-    .login-iceberg-art{
-      z-index:1;
-      opacity:.92;
-      filter:drop-shadow(0 12px 16px rgba(2,8,23,.20)) drop-shadow(0 0 9px rgba(210,250,255,.18));
-    }
-    .login-iceberg-foreground{
-      z-index:4;
-      top:10px;
-      opacity:.90;
-      filter:drop-shadow(0 7px 9px rgba(2,8,23,.18));
+      opacity:.88;
+      filter:drop-shadow(0 10px 14px rgba(2,8,23,.24));
     }
     .brand-header img{
       position:relative;
@@ -5088,13 +5079,13 @@
       border-color:rgba(248,254,255,.98);
       box-shadow:
         0 9px 20px rgba(2,8,23,.28),
-        0 0 0 2px rgba(247,254,255,.76),
-        0 0 0 5px rgba(163,229,242,.11),
-        0 0 18px rgba(211,249,255,.20);
+        0 0 0 2px rgba(247,254,255,.72),
+        0 0 14px rgba(88,184,219,.16);
     }
     .brand-header h1{
       position:relative;
       z-index:6;
+      margin-top:16px !important;
     }
     @media (max-width:640px){
       #authSection > .auth-card{padding:18px!important;border-radius:18px}
@@ -5102,9 +5093,9 @@
       #authSection .login-background-compact{grid-column:1 / -1;width:100%!important;min-width:0!important}
       #authSection .social-signin{grid-template-columns:1fr}
       #authSection .social-signin button{font-size:.88rem}
-      .mascot-stage{width:218px;min-height:164px}
-      .login-iceberg-art,.login-iceberg-foreground{width:218px;height:150px;top:10px}
-      .login-iceberg-foreground{top:12px}
+      .mascot-stage{width:204px;min-height:160px}
+      .login-iceberg-art{width:204px;height:132px;top:18px}
+      .brand-header h1{margin-top:14px !important}
     }
     @media (max-width:420px){#authSection > .auth-card{padding:16px!important}}
     .email-inbox-toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:14px 0}.email-inbox-list{display:grid;gap:9px}
@@ -5900,46 +5891,43 @@
     <div class="card auth-card">
       <div class="brand-header">
         <div class="mascot-stage">
-          <svg class="login-iceberg-art" viewBox="0 0 250 168" aria-hidden="true" focusable="false">
+          <svg class="login-iceberg-art" viewBox="0 0 232 148" aria-hidden="true" focusable="false">
             <defs>
-              <linearGradient id="lfIceMain" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#ffffff" stop-opacity=".92"/>
-                <stop offset=".38" stop-color="#d9f6fb" stop-opacity=".90"/>
-                <stop offset=".72" stop-color="#8fcddd" stop-opacity=".88"/>
-                <stop offset="1" stop-color="#3d86aa" stop-opacity=".84"/>
+              <linearGradient id="lfIceBlue" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#dff7ff" stop-opacity=".82"/>
+                <stop offset=".42" stop-color="#8fd4e8" stop-opacity=".78"/>
+                <stop offset=".76" stop-color="#3f93bb" stop-opacity=".76"/>
+                <stop offset="1" stop-color="#165f91" stop-opacity=".74"/>
               </linearGradient>
-              <linearGradient id="lfIceShade" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#effcff" stop-opacity=".82"/>
-                <stop offset=".58" stop-color="#9ed6e3" stop-opacity=".76"/>
-                <stop offset="1" stop-color="#397b9d" stop-opacity=".78"/>
+              <linearGradient id="lfIceDeep" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#91d7e9" stop-opacity=".72"/>
+                <stop offset="1" stop-color="#0d4f7e" stop-opacity=".82"/>
               </linearGradient>
-              <radialGradient id="lfIceGlow" cx=".5" cy=".58" r=".65">
-                <stop offset="0" stop-color="#ffffff" stop-opacity=".50"/>
-                <stop offset=".55" stop-color="#d7f8ff" stop-opacity=".18"/>
-                <stop offset="1" stop-color="#b9ecf6" stop-opacity="0"/>
-              </radialGradient>
             </defs>
-            <ellipse cx="125" cy="142" rx="104" ry="19" fill="url(#lfIceGlow)"/>
-            <path d="M18 148 C39 132 47 103 59 72 C67 96 72 119 84 139 C94 126 101 112 108 94 C115 116 119 131 125 142 C132 130 138 116 145 99 C151 119 157 132 168 141 C178 123 183 101 190 76 C202 104 209 129 232 148 C197 154 163 157 125 157 C86 157 51 154 18 148Z" fill="url(#lfIceMain)"/>
-            <path d="M31 146 C47 129 53 105 59 72 C64 104 70 125 84 139 C72 137 59 140 31 146Z" fill="rgba(255,255,255,.28)"/>
-            <path d="M168 141 C180 122 185 99 190 76 C198 111 207 133 226 148 C205 143 185 140 168 141Z" fill="rgba(255,255,255,.24)"/>
-            <path d="M59 72 L84 139 L73 131 Z" fill="rgba(72,145,174,.18)"/>
-            <path d="M190 76 L168 141 L182 128 Z" fill="rgba(71,137,167,.18)"/>
-            <path d="M82 143 C99 138 108 137 125 143 C142 137 153 139 169 144 C157 151 144 154 125 154 C105 154 92 151 82 143Z" fill="url(#lfIceShade)" opacity=".72"/>
-            <path d="M25 149 C58 155 91 158 125 158 C160 158 193 155 226 149" fill="none" stroke="rgba(255,255,255,.64)" stroke-width="1.3" stroke-linecap="round"/>
+            <g stroke="rgba(224,248,255,.48)" stroke-width=".8" stroke-linejoin="round">
+              <polygon points="12,130 38,78 52,130" fill="url(#lfIceDeep)"/>
+              <polygon points="28,130 62,44 82,130" fill="url(#lfIceBlue)"/>
+              <polygon points="54,130 89,76 103,130" fill="url(#lfIceDeep)"/>
+              <polygon points="129,130 145,78 168,130" fill="url(#lfIceDeep)"/>
+              <polygon points="151,130 174,43 202,130" fill="url(#lfIceBlue)"/>
+              <polygon points="184,130 207,75 224,130" fill="url(#lfIceDeep)"/>
+              <polygon points="40,131 62,116 81,129 96,111 113,130 129,118 146,131 163,113 183,129 198,117 220,132 220,139 35,139" fill="#1e6f9b" opacity=".72"/>
+            </g>
+            <g fill="rgba(255,255,255,.15)">
+              <polygon points="62,44 69,83 48,111"/>
+              <polygon points="174,43 181,84 159,111"/>
+              <polygon points="38,78 43,101 27,119"/>
+              <polygon points="207,75 212,101 196,119"/>
+            </g>
+            <g fill="none" stroke="rgba(237,252,255,.40)" stroke-width=".7">
+              <path d="M62 44 48 111 82 130"/>
+              <path d="M174 43 159 111 202 130"/>
+              <path d="M38 78 27 119 52 130"/>
+              <path d="M207 75 196 119 224 130"/>
+            </g>
           </svg>
           <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet mascot — open main menu" onerror="this.style.display='none'">
-          <svg class="login-iceberg-foreground" viewBox="0 0 250 168" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="lfIceFront" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#f8feff" stop-opacity=".88"/>
-                <stop offset=".55" stop-color="#b8e8f0" stop-opacity=".82"/>
-                <stop offset="1" stop-color="#5b9db8" stop-opacity=".78"/>
-              </linearGradient>
-            </defs>
-            <path d="M36 151 C52 140 64 136 78 143 C91 149 101 149 113 143 C124 138 135 138 146 144 C159 151 171 150 184 143 C198 136 211 140 224 151 C193 157 160 160 125 160 C90 160 59 157 36 151Z" fill="url(#lfIceFront)"/>
-            <path d="M42 151 C75 157 96 158 125 158 C154 158 178 157 218 151" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>        </div>
+        </div>
         <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
         <p class="slogan">Every Little Step Matters</p>
       </div>
