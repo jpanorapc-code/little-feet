@@ -22,8 +22,8 @@ const pausedArtworkStat = fs.statSync(pausedArtworkPath);
 
 assert.match(server, /'three\.module\.js': Object\.freeze\(\{[\s\S]*?url: 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.module\.js',[\s\S]*?sha256: 'sha256-kFIELWdssP3B3f7\+GTBT80t6wFE6YW\/axFNdSZh4Euo='/);
 assert.match(server, /'three\.core\.js': Object\.freeze\(\{[\s\S]*?url: 'https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.186\.0\/build\/three\.core\.js',[\s\S]*?sha256: 'sha256-nt3gArBmqaBWdqYSf2dzW2K685m96lKfL34xZX2naeY='/);
-assert.match(page, /href="\/assets\/cinematic\.css\?v=20260926-cinematic-v14"/);
-assert.match(page, /src="\/assets\/cinematic-loader\.js\?v=20260926-cinematic-v47" defer/);
+assert.match(page, /href="\/assets\/cinematic\.css\?v=20261002-cinematic-v15"/);
+assert.doesNotMatch(page, /src="\/assets\/cinematic-loader\.js/);
 assert.doesNotMatch(page, /type="module" src="\/assets\/cinematic\.js/);
 assert.match(page, /id="littleFeetCinematicJourney"/);
 assert.match(page, /id="littleFeetCinematicCanvas"/);
@@ -211,7 +211,13 @@ assert.match(cinematic, /Alosa_alosa\.png\/330px-Alosa_alosa\.png/);
 assert.match(cinematic, /populateFishSchools/);
 assert.match(cinematic, /cinematic-fish-sprite/);
 assert.match(cinematic, /fishSchoolLayouts/);
-assert.match(page, /id="cinematicPause"/);
+assert.match(page, /class="cinematic-journey cinematic-v2-preview"/);
+assert.match(page, /data-feature-status="in-development"/);
+assert.match(page, /Interactive cinematic experience in development/);
+assert.match(page, /Little Feet V2\.0/);
+assert.doesNotMatch(page, /id="cinematicOpenCurrent"/);
+assert.doesNotMatch(page, /id="cinematicPause"/);
+assert.doesNotMatch(page, /id="cinematicSkip"/);
 assert.match(page, /class="cinematic-paused-picture"/);
 assert.match(page, /little-feet-cinematic-paused-school\.avif\?v=20261001-paused-v3/);
 assert.match(styles, /\.cinematic-paused-picture \{[\s\S]*z-index: 3/);
@@ -373,6 +379,9 @@ assert.doesNotMatch(cinematicLoader, /innerHTML\s*=/);
 
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(styles, /\.cinematic-fallback/);
+assert.match(styles, /cinematic-journey\.cinematic-v2-preview/);
+assert.match(styles, /\.cinematic-v2-preview #littleFeetCinematicCanvas[\s\S]*display: none !important/);
+assert.match(styles, /\.cinematic-v2-status/);
 assert.doesNotMatch(styles, /backdrop-filter/);
 
 assert.match(styles, /Cross-device cinematic guard rails/);

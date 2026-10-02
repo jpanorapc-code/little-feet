@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://littlefeet.co.za/#organization","name":"Little Feet Technologies (Pty) Ltd","alternateName":"Little Feet","url":"https://littlefeet.co.za/","logo":"https://littlefeet.co.za/logo.png","description":"South African company operating the Little Feet school operations platform for ECD, primary and secondary school environments."},{"@type":"SoftwareApplication","@id":"https://littlefeet.co.za/#software","name":"Little Feet","alternateName":"Little Feet School Operations Platform","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/","publisher":{"@id":"https://littlefeet.co.za/#organization"},"description":"School operations platform for ECD, primary and secondary schools covering communication, learning, attendance, finance, staff workflows, safeguarding and family engagement."}]}</script>
-  <link rel="stylesheet" href="/assets/cinematic.css?v=20260926-cinematic-v14">
+  <link rel="stylesheet" href="/assets/cinematic.css?v=20261002-cinematic-v15">
   <script src="/vendor/xlsx.js" defer></script>
   <script src="/vendor/qrcode.js" defer></script>
   <!-- Leaflet Maps CSS & JS -->
@@ -6185,7 +6185,7 @@
         </div>
 
         <!-- Cinematic navigation comes after the practical Home content so daily work stays first. -->
-        <section id="littleFeetCinematicJourney" class="cinematic-journey" aria-label="Cinematic Little Feet navigation">
+        <section id="littleFeetCinematicJourney" class="cinematic-journey cinematic-v2-preview" aria-label="Little Feet V2 cinematic preview" data-feature-status="in-development">
           <div id="littleFeetCinematicStage" class="cinematic-stage">
             <picture class="cinematic-depth-picture" aria-hidden="true">
               <source media="(min-width: 2200px) and (min-height: 1200px)" srcset="/assets/images/little-feet-ocean-depth-4k.webp">
@@ -6212,7 +6212,6 @@
                 <span id="cinematicKicker" class="cinematic-kicker">Little Feet · cinematic home</span>
                 <h2 id="cinematicTitle">Surface</h2>
                 <p id="cinematicCopy">Meet the Little Feet penguin on the ice. Move your mouse gently — the camera is alive.</p>
-                <button id="cinematicOpenCurrent" type="button" class="cinematic-skip" style="margin-top:14px;">Open School Feed</button>
               </div>
               <div id="cinematicDepthMeter" class="cinematic-depth-meter" aria-label="Cinematic destinations"></div>
               <div class="cinematic-footer">
@@ -6220,12 +6219,13 @@
                   <div class="cinematic-progress-label"><span>Scroll to dive</span><span id="cinematicDepthLabel">Surface</span></div>
                   <div class="cinematic-progress-track"><div id="cinematicProgressBar" class="cinematic-progress-bar"></div></div>
                 </div>
-                <div class="cinematic-footer-actions">
-                  <button id="cinematicPause" type="button" class="cinematic-skip" aria-pressed="false">Pause cinematic</button>
-                  <button id="cinematicSkip" type="button" class="cinematic-skip">Skip cinematic</button>
-                </div>
               </div>
             </div>
+          </div>
+          <div class="cinematic-v2-status" role="status" aria-live="polite">
+            <span class="cinematic-v2-status-label">Little Feet V2.0</span>
+            <strong>Interactive cinematic experience in development</strong>
+            <p>This feature is being refined and optimized for the Little Feet V2.0 release. Version 1.0 keeps this preview static while development continues.</p>
           </div>
         </section>
       </div>
@@ -7358,7 +7358,6 @@
   <script src="/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
-  <script src="/assets/cinematic-loader.js?v=20260926-cinematic-v47" defer></script>
   <script>
     window.addEventListener('load', () => {
       window.setTimeout(() => document.getElementById('portalLoader')?.classList.add('is-hidden'), 420);
