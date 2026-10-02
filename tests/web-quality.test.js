@@ -119,7 +119,7 @@ assert.match(page, /onclick="switchTab\('parentContactsTab', this\)"/);
 assert.match(page, /id="parentContactsTab" class="tab-content" data-roles="teacher,principal,admin,staff"/);
 assert.match(page, /id="parentContactSearch"/);
 assert.match(page, /id="parentContactList"/);
-assert.match(page, /Copy all details/);
+assert.match(client, /Copy all details/);
 assert.match(client, /parentContactsTab: \[loadParentContacts\]/);
 assert.match(client, /async function loadParentContacts\(\)/);
 assert.match(client, /fetch\('\/api\/parent-contacts'\)/);
