@@ -3986,7 +3986,33 @@ function setupFormListeners() {
     });
   }
 
-  const consentForm = document.getElementById('consentForm');
+  const parentContactEditForm = document.getElementById('parentContactEditForm');
+  if (parentContactEditForm) {
+    parentContactEditForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const recordId = document.getElementById('parentContactEditId').value;
+      if (!recordId) return alert('Choose a parent contact to edit.');
+      const body = {
+        guardianName: document.getElementById('parentContactEditGuardianName').value.trim(),
+        guardianPhone: document.getElementById('parentContactEditGuardianPhone').value.trim(),
+        guardianEmail: document.getElementById('parentContactEditGuardianEmail').value.trim(),
+        emergencyContact: document.getElementById('parentContactEditEmergency').value.trim()
+      };
+      const response = await fetch(`/api/registry/${encodeURIComponent(recordId)}/contact`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const result = await response.json();
+      if (!response.ok) return alert(result.message || 'Unable to update the parent contact.');
+      closeParentContactEditor();
+      await Promise.allSettled([loadParentContacts(), loadRegistry()]);
+      showParentContactNotice('Contact details updated.');
+      playDingSound();
+    });
+  }
+
+    const consentForm = document.getElementById('consentForm');
   if (consentForm) consentForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const response = await fetch('/api/consents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ learnerName: document.getElementById('consentLearner').value.trim(), guardianName: document.getElementById('consentGuardian').value.trim(), internalUpdates: document.getElementById('consentInternal').checked, marketingPhotos: document.getElementById('consentMarketing').checked }) });
@@ -5313,6 +5339,43 @@ async function copyParentContactSummary(encodedId) {
   showParentContactNotice(copied ? 'Full contact details copied.' : 'Copy failed. Select and copy the details manually.');
 }
 
+function openRegistryForNewContact() {
+  closeParentContactEditor();
+  const form = document.getElementById('registryForm');
+  form?.reset();
+  switchTab('registryTab', null);
+  window.setTimeout(() => {
+    document.getElementById('registryLearnerName')?.focus();
+    document.getElementById('registryTab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
+}
+
+function openParentContactEditor(encodedId) {
+  const record = parentContactRecordById(encodedId);
+  const editor = document.getElementById('parentContactEditor');
+  if (!record || !editor) return;
+  document.getElementById('parentContactEditId').value = String(record.id || '');
+  document.getElementById('parentContactEditGuardianName').value = record.guardianName || '';
+  document.getElementById('parentContactEditGuardianPhone').value = record.guardianPhone || '';
+  document.getElementById('parentContactEditGuardianEmail').value = record.guardianEmail || '';
+  document.getElementById('parentContactEditEmergency').value = record.emergencyContact || '';
+  const learner = document.getElementById('parentContactEditLearner');
+  if (learner) learner.textContent = [record.learnerName || 'Unnamed learner', record.className || 'Class pending'].join(' · ');
+  editor.classList.remove('hidden');
+  window.setTimeout(() => editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 20);
+}
+
+function closeParentContactEditor() {
+  const editor = document.getElementById('parentContactEditor');
+  const form = document.getElementById('parentContactEditForm');
+  form?.reset();
+  if (editor) editor.classList.add('hidden');
+  const id = document.getElementById('parentContactEditId');
+  if (id) id.value = '';
+  const learner = document.getElementById('parentContactEditLearner');
+  if (learner) learner.textContent = '';
+}
+
 function renderParentContacts(records) {
   const list = document.getElementById('parentContactList');
   const count = document.getElementById('parentContactCount');
@@ -5345,6 +5408,7 @@ function renderParentContacts(records) {
         <button type="button" class="action-btn btn-blue" onclick="copyParentContactField('${encodedId}','guardianEmail')" ${email ? '' : 'disabled'}>Copy email</button>
         <button type="button" class="action-btn btn-blue" onclick="copyParentContactField('${encodedId}','emergencyContact')" ${emergency ? '' : 'disabled'}>Copy emergency</button>
         <button type="button" class="action-btn btn-blue" onclick="copyParentContactSummary('${encodedId}')">Copy all details</button>
+        <button type="button" class="action-btn" onclick="openParentContactEditor('${encodedId}')">Edit contact</button>
       </div>
     </article>`;
   }).join('');
@@ -5373,6 +5437,14 @@ async function loadParentContacts() {
     list.textContent = safeUserFacingError(error, 'Unable to load parent contacts.');
   }
 }
+
+window.loadParentContacts = loadParentContacts;
+window.filterParentContacts = filterParentContacts;
+window.copyParentContactField = copyParentContactField;
+window.copyParentContactSummary = copyParentContactSummary;
+window.openParentContactEditor = openParentContactEditor;
+window.closeParentContactEditor = closeParentContactEditor;
+window.openRegistryForNewContact = openRegistryForNewContact;
 
 async function loadRegistry() {
   const list = document.getElementById('registryList');
