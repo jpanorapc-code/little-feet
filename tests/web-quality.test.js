@@ -11,7 +11,7 @@ const sitemap = fs.readFileSync(path.join(root, 'sitemap.xml'), 'utf8');
 const checklist = fs.readFileSync(path.join(root, 'VIDEO_REVIEW_CHECKLIST.md'), 'utf8');
 const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
-const penguinAvatarSprite = path.join(root, 'assets', 'profile', 'penguin-profile-avatars.png');
+const penguinAvatarSprite = path.join(root, 'assets', 'profile', 'penguin-profile-avatars.svg');
 const mobilePwa = fs.readFileSync(path.join(root, 'assets', 'mobile-pwa.js'), 'utf8');
 const ambientBackground = fs.readFileSync(path.join(root, 'assets', 'ambient-background.js'), 'utf8');
 const preferencesEnhancements = fs.readFileSync(path.join(root, 'assets', 'preferences-enhancements.js'), 'utf8');
@@ -31,113 +31,6 @@ const curriculum = fs.readFileSync(path.join(root, 'assets', 'curriculum-framewo
 const auroraWallpaper = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-aurora-stars-4k.svg'), 'utf8');
 const starGlowMask = fs.readFileSync(path.join(root, 'assets', '4k', 'little-feet-star-glow-mask-4k.svg'), 'utf8');
 
-function decodeRgbaPng(filePath) {
-  const zlib = require('node:zlib');
-  const png = fs.readFileSync(filePath);
-  const signature = Buffer.from([137,80,78,71,13,10,26,10]);
-  assert.ok(png.subarray(0, 8).equals(signature), 'Avatar sprite must be a PNG.');
-  let offset = 8;
-  let width = 0;
-  let height = 0;
-  let bitDepth = 0;
-  let colorType = 0;
-  const idat = [];
-  while (offset < png.length) {
-    const length = png.readUInt32BE(offset);
-    const type = png.toString('ascii', offset + 4, offset + 8);
-    const data = png.subarray(offset + 8, offset + 8 + length);
-    if (type === 'IHDR') {
-      width = data.readUInt32BE(0);
-      height = data.readUInt32BE(4);
-      bitDepth = data[8];
-      colorType = data[9];
-    } else if (type === 'IDAT') {
-      idat.push(data);
-    } else if (type === 'IEND') {
-      break;
-    }
-    offset += 12 + length;
-  }
-  assert.equal(bitDepth, 8, 'Avatar sprite diagnostic expects 8-bit PNG data.');
-  assert.equal(colorType, 6, 'Avatar sprite diagnostic expects RGBA PNG data.');
-  const inflated = zlib.inflateSync(Buffer.concat(idat));
-  const bpp = 4;
-  const stride = width * bpp;
-  const pixels = Buffer.alloc(height * stride);
-  let inputOffset = 0;
-  for (let y = 0; y < height; y += 1) {
-    const filter = inflated[inputOffset++];
-    const rowOffset = y * stride;
-    for (let x = 0; x < stride; x += 1) {
-      const raw = inflated[inputOffset++];
-      const left = x >= bpp ? pixels[rowOffset + x - bpp] : 0;
-      const up = y > 0 ? pixels[rowOffset - stride + x] : 0;
-      const upLeft = y > 0 && x >= bpp ? pixels[rowOffset - stride + x - bpp] : 0;
-      let value = raw;
-      if (filter === 1) value = (raw + left) & 255;
-      else if (filter === 2) value = (raw + up) & 255;
-      else if (filter === 3) value = (raw + Math.floor((left + up) / 2)) & 255;
-      else if (filter === 4) {
-        const p = left + up - upLeft;
-        const pa = Math.abs(p - left);
-        const pb = Math.abs(p - up);
-        const pc = Math.abs(p - upLeft);
-        const predictor = pa <= pb && pa <= pc ? left : (pb <= pc ? up : upLeft);
-        value = (raw + predictor) & 255;
-      } else if (filter !== 0) {
-        throw new Error('Unsupported PNG filter ' + filter);
-      }
-      pixels[rowOffset + x] = value;
-    }
-  }
-  return { width, height, pixels };
-}
-
-function alphaBounds(image, x0, y0, x1, y1, alphaThreshold = 12) {
-  let minX = x1;
-  let minY = y1;
-  let maxX = -1;
-  let maxY = -1;
-  let count = 0;
-  for (let y = y0; y < y1; y += 1) {
-    for (let x = x0; x < x1; x += 1) {
-      const alpha = image.pixels[(y * image.width + x) * 4 + 3];
-      if (alpha <= alphaThreshold) continue;
-      count += 1;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-  return count ? { minX, minY, maxX, maxY, width:maxX-minX+1, height:maxY-minY+1, count } : null;
-}
-
-const avatarGeometryImage = decodeRgbaPng(penguinAvatarSprite);
-const avatarGeometry = {
-  size:[avatarGeometryImage.width, avatarGeometryImage.height],
-  global:alphaBounds(avatarGeometryImage, 0, 0, avatarGeometryImage.width, avatarGeometryImage.height),
-  eightColumns:Array.from({length:8}, (_, i) => alphaBounds(
-    avatarGeometryImage,
-    Math.floor(i * avatarGeometryImage.width / 8),
-    0,
-    Math.floor((i + 1) * avatarGeometryImage.width / 8),
-    avatarGeometryImage.height
-  )),
-  fourByTwo:Array.from({length:8}, (_, i) => {
-    const col=i%4;
-    const row=Math.floor(i/4);
-    return alphaBounds(
-      avatarGeometryImage,
-      Math.floor(col * avatarGeometryImage.width / 4),
-      Math.floor(row * avatarGeometryImage.height / 2),
-      Math.floor((col + 1) * avatarGeometryImage.width / 4),
-      Math.floor((row + 1) * avatarGeometryImage.height / 2)
-    );
-  })
-};
-console.log('AVATAR_GEOMETRY:' + JSON.stringify(avatarGeometry));
-
 assert.match(page, /<meta name="description" content="Little Feet by Little Feet Technologies \(Pty\) Ltd is a South African school operations platform/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
 assert.ok(page.includes('<link rel="canonical" href="https://littlefeet.co.za/">'));
@@ -148,10 +41,10 @@ assert.match(page, /rel="manifest" href="\/manifest\.webmanifest"/);
 assert.match(page, /name="theme-color" content="#0d9488"/);
 assert.match(page, /id="pwaInstallButton"/);
 assert.ok(fs.existsSync(penguinAvatarSprite), 'Penguin profile avatar sprite should exist.');
-assert.ok(fs.statSync(penguinAvatarSprite).size > 10000, 'Penguin profile avatar sprite should contain real image data.');
-assert.match(page, /penguin-profile-avatars\.png\?v=20261002-penguin-avatars-v1/);
+assert.ok(fs.statSync(penguinAvatarSprite).size > 5000, 'Penguin profile avatar sprite should contain real SVG data.');
+assert.match(page, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2/);
 assert.match(page, /#dashboardSection \.user-avatar \.profile-avatar-image \{/);
-assert.match(page, /background-size:720% 360% !important/);
+assert.doesNotMatch(page, /background-size:720% 360% !important/);
 assert.match(page, /nav-quickbar > #navMoreToggle/);
 assert.match(page, /data-profile-icon="classic"/);
 assert.match(page, /data-profile-icon="lady"/);
@@ -166,11 +59,11 @@ assert.doesNotMatch(page, /data-profile-icon="👤"/);
 assert.match(client, /const profileIcons = \['classic', 'lady', 'tough', 'cute', 'happy', 'cool', 'boss', 'smart-lady'\]/);
 assert.match(client, /const legacyProfileIconMap = Object\.freeze\(/);
 assert.match(client, /function normalizeProfileIcon\(icon\)/);
-assert.match(client, /profile-avatar-image profile-avatar-\$\{selectedIcon\}/);
+assert.match(client, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2#avatar-\$\{selectedIcon\}/);
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
-assert.match(serviceWorker, /little-feet-shell-v41-live-mobile-header/);
-assert.match(serviceWorker, /penguin-profile-avatars\.png\?v=20261002-penguin-avatars-v1/);
-assert.match(serviceWorker, /backup\.js\?v=20261002-penguin-avatars-v1/);
+assert.match(serviceWorker, /little-feet-shell-v42-mobile-toolbar-avatar-svg/);
+assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2/);
+assert.match(serviceWorker, /backup\.js\?v=20261002-avatar-svg-v2/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
 assert.match(page, /id="schoolSetupCard" class="card role-admin school-setup-card"/);
 assert.match(client, /function executiveChartMarkup\(/);
@@ -187,7 +80,7 @@ assert.match(page, /<option value="crm">CRM<\/option>/);
 assert.match(page, /<option value="school_accounts">School Accounts<\/option>/);
 assert.match(page, /<option value="accounts">Little Feet Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
-assert.match(page, /backup\.js\?v=20261002-penguin-avatars-v1/);
+assert.match(page, /backup\.js\?v=20261002-avatar-svg-v2/);
 for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests']) {
   assert.match(page, new RegExp('assets/' + asset + '\\.js\\?v=20261001-startup-dedupe-v1'));
 }
