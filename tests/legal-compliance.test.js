@@ -10,10 +10,12 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(page, /openPopiaPrivacyNotice\(\)/);
 assert.match(page, /openTermsOfService\(\)/);
+assert.match(page, /openAboutLittleFeet\(\)/);
+assert.match(page, /About Little Feet/);
 assert.match(page, /Privacy &amp; POPIA/);
 assert.match(page, /I confirm I am authorised to create this account and have read and accept/);
 assert.match(page, /class="legal-inline-link"/);
-assert.match(page, /assets\/legal-notices\.js\?v=20260929-legal-v5/);
+assert.match(page, /assets\/legal-notices\.js\?v=20261002-about-v1/);
 
 assert.match(server, /LITTLE_FEET_PRIVACY_VERSION = 'POPIA-2026-09-v6'/);
 assert.match(server, /LITTLE_FEET_TERMS_VERSION = 'TOS-ZA-2026-09-v5'/);
@@ -68,6 +70,10 @@ assert.match(legal, /® symbol must not be used/);
 assert.match(legal, /does not claim to be a government department, regulator or official government system/);
 assert.match(legal, /No ownership in Little Feet intellectual property is transferred/);
 assert.match(legal, /does not replace any statutory ECTA procedure/);
-assert.match(sw, /assets\/legal-notices\.js\?v=20260929-legal-v5/);
+assert.match(legal, /building a legacy for my son/i);
+assert.match(legal, /Every Little Step Matters/);
+assert.match(legal, /One school\. One connected platform\./);
+assert.match(legal, /function openAboutLittleFeet\(\)/);
+assert.match(sw, /assets\/legal-notices\.js\?v=20261002-about-v1/);
 
 console.log('South African legal notice regression test passed.');
