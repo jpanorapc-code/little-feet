@@ -6828,13 +6828,64 @@
           </div>
           <div id="schoolDatabasePreview" class="record-list" aria-live="polite" style="margin-top:18px;"></div>
           <section class="workspace-card" style="margin-top:18px;border-left:4px solid var(--primary-color);">
-            <div class="card-header-bar"><h3>SA-SAMS Integration</h3><span class="badge-tag info">WORK IN PROGRESS</span></div>
-            <p style="color:var(--text-muted);line-height:1.55;">SA-SAMS learner import is available and working. Import a learner/parent spreadsheet exported from SA-SAMS into this school's real Little Feet learner register. Little Feet maps common SA-SAMS learner name, surname, grade, register class and guardian contact columns, previews the result, then sends approved rows through the same bounded, tenant-isolated server import used by the production learner register.</p>
-            <p class="meta" style="margin:8px 0 12px;">Direct Little Feet → LURITS/DBE submission is not yet available. Little Feet Technologies has requested the official DBE third-party integration specifications and will only enable this feature once it has been implemented and validated against the official requirements.</p>
-            <label for="saSamsImportFile">SA-SAMS learner/parent export (.xlsx, .xls or .csv)</label>
-            <input id="saSamsImportFile" type="file" accept=".xlsx,.xls,.csv" aria-label="Upload SA-SAMS learner and parent export">
-            <button type="button" class="action-btn btn-green" onclick="previewSaSamsImport()">Check SA-SAMS export</button>
-            <div id="saSamsImportPreview" class="record-list" aria-live="polite" style="margin-top:14px;"></div>
+            <div class="card-header-bar">
+              <div>
+                <h3>SA-SAMS &amp; DBE/LURITS Integration</h3>
+                <p class="meta" style="margin:4px 0 0;">Current Little Feet implementation status and the verified third-party LURITS/LASS pathway.</p>
+              </div>
+              <span class="badge-tag info">DBE SPEC PENDING</span>
+            </div>
+
+            <div class="workspace-grid" style="margin-top:14px;">
+              <div class="workspace-card">
+                <h4>SA-SAMS learner import</h4>
+                <span class="badge-tag">AVAILABLE NOW</span>
+                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Import a learner/parent spreadsheet exported from SA-SAMS into this school's real Little Feet learner register. Little Feet maps common learner name, surname, grade, register class and guardian contact columns, previews the result, then sends approved rows through the same bounded, tenant-isolated production import used by the learner register.</p>
+              </div>
+
+              <div class="workspace-card">
+                <h4>Third-party LURITS pathway</h4>
+                <span class="badge-tag info">VERIFIED PATHWAY</span>
+                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">DBE documentation recognises third-party school systems through the LURITS Accredited Software System (LASS) pathway. Little Feet is preparing its integration around the official LURITS-approved interface process rather than reverse-engineering SA-SAMS or inventing an unofficial submission format.</p>
+              </div>
+
+              <div class="workspace-card">
+                <h4>LURITS feedback handling</h4>
+                <span class="badge-tag info">IMPLEMENTATION PLANNED</span>
+                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Documented LURITS feedback is returned as XML files, commonly packaged in ZIP archives. The integration design tracks <code>TransactionCategoryID</code>, returned learner/educator LURITS numbers, validation results and submission errors so feedback can be matched back to the correct school records.</p>
+              </div>
+
+              <div class="workspace-card" style="border-left:4px solid var(--warning-color,#f59e0b);">
+                <h4>Direct DBE/LURITS submission</h4>
+                <span class="badge-tag urgent">NOT ENABLED</span>
+                <p style="color:var(--text-muted);line-height:1.55;margin-top:10px;">Direct Little Feet → DBE/LURITS submission remains disabled until the current official DBE third-party interface package and LASS conformance requirements are obtained, implemented and validated. Little Feet will not claim direct LURITS compatibility before that validation is complete.</p>
+              </div>
+            </div>
+
+            <div class="workspace-card" style="margin-top:14px;">
+              <h4>Documented LURITS transaction lifecycle being tracked</h4>
+              <p class="meta" style="line-height:1.7;margin:8px 0 0;"><strong>Tx04</strong> learner registration · <strong>Tx05</strong> transfer-in · <strong>Tx07</strong> learner biographical maintenance · <strong>Tx09</strong> transfer-out/leaving · <strong>Tx12</strong> promotion/progression · <strong>Tx13</strong> educator registration · <strong>Tx14</strong> educator maintenance · <strong>Tx16</strong> educator leaving.</p>
+            </div>
+
+            <div class="workspace-card" style="margin-top:14px;">
+              <div class="card-header-bar"><h4>Official DBE package still required</h4><span class="badge-tag info">BLOCKED EXTERNALLY</span></div>
+              <p class="meta" style="margin:6px 0 10px;">The remaining direct-submission work is intentionally blocked until DBE supplies or confirms the current authoritative material:</p>
+              <ul style="margin:0;padding-left:20px;color:var(--text-muted);line-height:1.7;">
+                <li>Current LURITS 3rd Party Software Amendment Specification.</li>
+                <li>Current interface/XSD schema and DBE code tables or enumerations.</li>
+                <li>Accepted XML examples and the current feedback schema.</li>
+                <li>Current transaction sequencing, file naming and submission transport requirements.</li>
+                <li>Current LASS vendor registration, accreditation, testing and conformance process.</li>
+              </ul>
+              <p class="meta" style="margin:10px 0 0;"><strong>Implementation rule:</strong> no guessed, reverse-engineered or unofficial XML schema will be used for production LURITS submissions.</p>
+            </div>
+
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-color);">
+              <label for="saSamsImportFile">SA-SAMS learner/parent export (.xlsx, .xls or .csv)</label>
+              <input id="saSamsImportFile" type="file" accept=".xlsx,.xls,.csv" aria-label="Upload SA-SAMS learner and parent export">
+              <button type="button" class="action-btn btn-green" onclick="previewSaSamsImport()">Check SA-SAMS export</button>
+              <div id="saSamsImportPreview" class="record-list" aria-live="polite" style="margin-top:14px;"></div>
+            </div>
           </section>
         </div>
       </div>
