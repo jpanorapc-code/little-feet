@@ -63,6 +63,7 @@ const server = http.createServer((req, res) => {
         document.documentElement.style.setProperty('--portal-header-height', `${header.getBoundingClientRect().height}px`);
         document.documentElement.style.setProperty('--mobile-header-height', `${header.getBoundingClientRect().height}px`);
         const errors = [];
+        const dockedSnappedDesktop = window.matchMedia('(min-width: 900px) and (max-width: 1199px) and (hover: hover) and (pointer: fine)').matches;
         const visible = element => !!element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden' && getComputedStyle(element).display !== 'none';
         const fits = element => { const r = element.getBoundingClientRect(); return r.left >= -1 && r.right <= document.documentElement.clientWidth + 1; };
         const headerButtons = [...header.querySelectorAll('button')].filter(visible);
@@ -104,9 +105,13 @@ const server = http.createServer((req, res) => {
           if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
           if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
         }
-        if (width < 960) {
+        if (width < 960 && !dockedSnappedDesktop) {
           const menu = document.getElementById('navMoreToggle');
           if (!menu || !visible(menu)) errors.push('mobile/tablet Menu control missing');
+        }
+        if (dockedSnappedDesktop) {
+          const menu = document.getElementById('navMoreToggle');
+          if (menu && visible(menu)) errors.push('snapped desktop should use the docked sidebar, not a Menu drawer control');
         }
         if (width > 640 && width < 1200) {
           const quickbar = header.querySelector('.nav-quickbar');
@@ -115,14 +120,15 @@ const server = http.createServer((req, res) => {
           const menu = document.getElementById('navMoreToggle');
           const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
           const quickRow = [...shortcuts, ...(menu && visible(menu) ? [menu] : [])];
-          if (!quickbar || !userPanel || !term || quickRow.length < 4) errors.push('snapped header controls missing');
+          const expectedQuickActions = dockedSnappedDesktop ? 3 : 4;
+          if (!quickbar || !userPanel || !term || quickRow.length < expectedQuickActions) errors.push('snapped header controls missing');
           if (quickbar && userPanel) {
             if (getComputedStyle(quickbar).display === 'contents') errors.push('snapped quickbar must remain a real grid wrapper');
             if (getComputedStyle(userPanel).display === 'contents') errors.push('snapped account panel must remain a real flex wrapper');
           }
-          if (quickRow.length >= 4) {
+          if (quickRow.length >= expectedQuickActions) {
             const tops = quickRow.map(el => Math.round(el.getBoundingClientRect().top));
-            if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('snapped Home/Search/Help/Menu are not on one row');
+            if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('snapped quick actions are not on one row');
           }
           if (term && quickRow[0]) {
             const termTop = Math.round(term.getBoundingClientRect().top);
@@ -142,7 +148,7 @@ const server = http.createServer((req, res) => {
           tabs.forEach(t => t.classList.toggle('active', t === tab));
           const bounds = tab.getBoundingClientRect();
           if (!fits(tab)) errors.push(`${tab.id}: outside viewport`);
-          if (width >= 960 && bounds.left < sidebar.getBoundingClientRect().right - 1) errors.push(`${tab.id}: under sidebar`);
+          if ((width >= 960 || dockedSnappedDesktop) && bounds.left < sidebar.getBoundingClientRect().right - 1) errors.push(`${tab.id}: under sidebar`);
           for (const control of tab.querySelectorAll('input:not([type="hidden"]), select, textarea, button, .card, .workspace-card')) {
             if (!visible(control) || control.closest('.cinematic-journey') || control.classList.contains('sr-only')) continue;
             if (!fits(control)) errors.push(`${tab.id}: clipped ${control.id || control.className || control.tagName}`);
@@ -206,7 +212,7 @@ const server = http.createServer((req, res) => {
           const welcomeBanner = document.querySelector('#homeTab > .portal-welcome-banner');
           if (welcomeBanner && visible(welcomeBanner) && welcomeBanner.getBoundingClientRect().height > 200) errors.push('mobile welcome hero is too tall');
         }
-        if (width < 960) {
+        if (width < 960 && !dockedSnappedDesktop) {
           dashboard.classList.add('sidebar-open');
           const navButton = sidebar.querySelector('.nav-btn');
           if (sidebar.getBoundingClientRect().width < 200 || getComputedStyle(sidebar.querySelector('.sidebar-links')).opacity === '0' || getComputedStyle(sidebar.querySelector('.sidebar-links')).pointerEvents === 'none') errors.push('mobile menu inherits collapsed desktop state');
@@ -218,7 +224,7 @@ const server = http.createServer((req, res) => {
       failures.push(...result.errors.map(message => `${width}x${height}, collapsed=${collapsed}: ${message}`));
       checks += result.count;
 
-      if (width >= 960 && !collapsed) {
+      if (width >= 900 && !collapsed) {
         const before = await page.evaluate(() => {
           const sidebar = document.getElementById('mainNavigation');
           const rect = sidebar.getBoundingClientRect();
