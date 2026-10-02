@@ -5847,6 +5847,39 @@
         font-size:.45rem !important;
       }
     }
+    /* Windows snapped-desktop repair: keep the navigation docked on a fine-pointer
+       desktop even when the browser is only about half-screen wide. Touch tablets
+       at the same width keep the slide-over drawer. */
+    @media (min-width:900px) and (max-width:1199px) and (hover:hover) and (pointer:fine) {
+      #dashboardSection .nav-quickbar {
+        grid-template-columns:minmax(0,1fr) repeat(3,76px) !important;
+      }
+      #dashboardSection #navMoreToggle {
+        display:none !important;
+      }
+      .app-sidebar {
+        width:236px !important;
+        transform:none !important;
+        transition:none !important;
+        z-index:15 !important;
+      }
+      #dashboardSection.sidebar-open::after {
+        content:none !important;
+        display:none !important;
+      }
+      #dashboardSection > .app-sidebar ~ .container,
+      #dashboardSection.sidebar-collapsed > .app-sidebar ~ .container {
+        width:calc(100% - 236px) !important;
+        max-width:none !important;
+        margin-left:236px !important;
+        padding:clamp(14px,2.1vw,22px) !important;
+      }
+      #dashboardSection > .app-sidebar ~ footer,
+      #dashboardSection.sidebar-collapsed > .app-sidebar ~ footer {
+        margin-left:236px !important;
+      }
+    }
+
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
