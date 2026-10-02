@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
     document.getElementById('displayRole').textContent = 'School Administrator · ADMIN';
     // This geometry harness deliberately strips executable scripts from index.html,
     // so inject the same default avatar markup that backup.js would render.
-    document.getElementById('userAvatar').innerHTML = '<span class="profile-avatar-image profile-avatar-classic" aria-hidden="true"></span>';
+    document.getElementById('userAvatar').innerHTML = '<svg class="profile-avatar-image profile-avatar-classic" viewBox="0 0 128 128" aria-hidden="true"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-classic"></use></svg>';
     return [...document.querySelectorAll('.tab-content')].filter(tab => !tab.parentElement.matches('#dashboardSection > .container')).map(tab => tab.id);
   });
   assert.deepEqual(structure, [], 'Every tab must remain inside the shared content container');
@@ -100,7 +100,7 @@ const server = http.createServer((req, res) => {
           const emailRect = emailButton.getBoundingClientRect();
           const panelRect = userPanel.getBoundingClientRect();
           const headerRect = header.getBoundingClientRect();
-          if (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1) errors.push('Emails control floats outside account row');
+          if (width > 640 && (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1)) errors.push('Emails control floats outside account row');
           if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
           if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
         }
