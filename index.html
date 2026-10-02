@@ -5509,6 +5509,124 @@
       }
     }
 
+
+    /* Live mobile header proof: explicitly neutralize legacy Menu grid placement and
+       make the phone account strip visible, compact and deterministic. */
+    @media (max-width:959px) {
+      #dashboardSection .nav-quickbar > #navMoreToggle {
+        grid-column:auto !important;
+        grid-row:auto !important;
+        order:initial !important;
+        justify-self:stretch !important;
+        align-self:stretch !important;
+        width:100% !important;
+      }
+    }
+
+    @media (max-width:640px) {
+      #dashboardSection .nav-quickbar {
+        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+      }
+      #dashboardSection .nav-quickbar > .nav-shortcut,
+      #dashboardSection .nav-quickbar > #navMoreToggle {
+        grid-column:auto !important;
+        grid-row:auto !important;
+        min-width:0 !important;
+        width:100% !important;
+      }
+
+      #dashboardSection .nav-user-panel {
+        display:grid !important;
+        grid-template-columns:40px 18px minmax(64px,1fr) 36px 36px !important;
+        grid-template-rows:auto auto;
+        align-items:center !important;
+        justify-content:stretch !important;
+        column-gap:5px !important;
+        row-gap:5px !important;
+        width:100% !important;
+      }
+      #dashboardSection .nav-user-panel .user-switch-control {
+        grid-column:1 !important;
+        grid-row:1 !important;
+        display:inline-flex !important;
+        width:40px !important;
+        min-width:40px !important;
+        max-width:40px !important;
+        min-height:36px !important;
+        padding:3px !important;
+        align-items:center !important;
+        justify-content:center !important;
+        overflow:visible !important;
+      }
+      #dashboardSection .nav-user-panel #displayRole {
+        display:none !important;
+      }
+      #dashboardSection .nav-user-panel .user-avatar,
+      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
+        display:block !important;
+        width:30px !important;
+        height:30px !important;
+        min-width:30px !important;
+        flex:0 0 30px !important;
+      }
+      #dashboardSection .nav-user-panel #serverStatus {
+        grid-column:2 !important;
+        grid-row:1 !important;
+        width:18px !important;
+        min-width:18px !important;
+        justify-self:center !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack {
+        grid-column:3 !important;
+        grid-row:1 !important;
+        width:100% !important;
+        min-width:0 !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-controls {
+        width:100%;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed .lf-notification-controls {
+        display:block !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
+        width:100% !important;
+        min-width:0 !important;
+        min-height:36px !important;
+      }
+      #dashboardSection .nav-user-panel > [data-portal-audio-mute] {
+        grid-column:4 !important;
+        grid-row:1 !important;
+      }
+      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
+        grid-column:5 !important;
+        grid-row:1 !important;
+      }
+      #dashboardSection .nav-user-panel > [data-portal-audio-mute],
+      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
+        width:36px !important;
+        min-width:36px !important;
+        max-width:36px !important;
+        min-height:36px !important;
+        padding:6px !important;
+        margin:0 !important;
+      }
+
+      #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) {
+        grid-column:1 / -1 !important;
+        grid-row:2 !important;
+        width:100% !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) .lf-notification-controls {
+        display:grid !important;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:5px;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) .lf-notification-controls .action-btn {
+        width:100% !important;
+        min-width:0 !important;
+        white-space:normal !important;
+      }
+    }
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
@@ -5752,7 +5870,7 @@
         <span id="serverStatus" class="server-status" title="Checking server status"><span class="server-dot"></span><span id="serverStatusText">Server offline</span></span>
         <aside id="lfNotificationStack" class="lf-notification-stack is-collapsed" aria-label="Email notifications">
           <div class="lf-notification-controls">
-            <button class="action-btn" type="button" data-notification-collapse aria-expanded="false" title="Email notifications">▸ Emails</button>
+            <button class="action-btn btn-blue" type="button" data-notification-collapse aria-expanded="false" title="Email notifications">▸ Emails</button>
             <button class="action-btn" type="button" data-notification-dnd title="Email do not disturb">Do not disturb: Off</button>
             <button class="action-btn" type="button" data-notification-close-all title="Close email notifications">Close all</button>
           </div>
