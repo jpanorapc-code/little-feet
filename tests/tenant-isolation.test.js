@@ -259,6 +259,40 @@ const rawRequest = async (route) => {
     assert.equal(teacherParentContacts.data[0].guardianPhone, '0123456789');
     assert.equal(teacherParentContacts.data[0].guardianEmail, 'guardian@invalid.test');
     assert.equal(teacherParentContacts.data[0].emergencyContact, 'Emergency Person 0001112222');
+    const updatedParentContact = await request(`/api/registry/${registryRecord.data.record.id}/contact`, {
+      method: 'PATCH',
+      cookie: alphaTeacherLogin.cookie,
+      body: {
+        guardianName: 'Alpha Parent Updated',
+        guardianPhone: '0112223333',
+        guardianEmail: 'updated.guardian@invalid.test',
+        emergencyContact: 'Emergency Updated 0003334444'
+      }
+    });
+    assert.equal(updatedParentContact.response.status, 200);
+    assert.equal(updatedParentContact.data.record.guardianName, 'Alpha Parent Updated');
+    assert.equal(updatedParentContact.data.record.guardianPhone, '0112223333');
+    assert.equal(updatedParentContact.data.record.guardianEmail, 'updated.guardian@invalid.test');
+    assert.equal(updatedParentContact.data.record.emergencyContact, 'Emergency Updated 0003334444');
+    const refreshedTeacherParentContacts = await request('/api/parent-contacts', { cookie: alphaTeacherLogin.cookie });
+    assert.equal(refreshedTeacherParentContacts.data[0].guardianPhone, '0112223333');
+    assert.equal(refreshedTeacherParentContacts.data[0].guardianEmail, 'updated.guardian@invalid.test');
+    assert.equal(
+      (await request(`/api/registry/${registryRecord.data.record.id}/contact`, {
+        method: 'PATCH',
+        cookie: alphaParentLogin.cookie,
+        body: { guardianName: 'Blocked', guardianPhone: '0000000000', guardianEmail: '', emergencyContact: '' }
+      })).response.status,
+      403
+    );
+    assert.equal(
+      (await request(`/api/registry/${registryRecord.data.record.id}/contact`, {
+        method: 'PATCH',
+        cookie: bravoLogin.cookie,
+        body: { guardianName: 'Cross school', guardianPhone: '0000000000', guardianEmail: '', emergencyContact: '' }
+      })).response.status,
+      404
+    );
     assert.equal(Object.prototype.hasOwnProperty.call(teacherParentContacts.data[0], 'medicalNotes'), false);
     assert.equal(Object.prototype.hasOwnProperty.call(teacherParentContacts.data[0], 'address'), false);
     assert.equal((await request('/api/parent-contacts', { cookie: alphaParentLogin.cookie })).response.status, 403);
