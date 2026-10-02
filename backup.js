@@ -1493,7 +1493,7 @@ function normalizeProfileIcon(icon) {
 
 function profileIconMarkup(icon) {
   const selectedIcon = normalizeProfileIcon(icon);
-  return `<span class="profile-avatar-image profile-avatar-${selectedIcon}" aria-hidden="true"></span>`;
+  return `<svg class="profile-avatar-image profile-avatar-${selectedIcon}" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-${selectedIcon}"></use></svg>`;
 }
 
 function getProfileIconStorageKey() {
