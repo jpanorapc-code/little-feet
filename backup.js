@@ -2313,6 +2313,7 @@ async function startHealthMonitor() {
         } catch {}
       }
       consecutiveFailures = 0;
+      if (health.instance === 'PRIMARY') sessionStorage.removeItem('lf_failover_redirected');
       updateStandbyModeBanner(health);
       if (statusEl && statusText) {
         const busy = health.status === 'BUSY';
