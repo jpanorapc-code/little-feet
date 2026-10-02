@@ -988,6 +988,7 @@ const objectStorage = createObjectStorage({ rootDir: __dirname });
 const standbyReplication = createStandbyReplication({ env: process.env });
 let remoteReplicaPollTimer = null;
 let remoteReplicaPublishTimer = null;
+let remoteReplicaHeartbeatTimer = null;
 let remoteReplicaPublishPromise = null;
 let remoteReplicaObjectKey = '';
 let remoteReplicaCapturedAt = '';
@@ -1722,7 +1723,11 @@ async function initialisePersistence() {
   }
   if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
   writeReplicaSnapshot();
-  if (standbyReplication.enabled) void publishRemoteReplicaSnapshot();
+  if (standbyReplication.enabled) {
+    void publishRemoteReplicaSnapshot();
+    remoteReplicaHeartbeatTimer = setInterval(() => { void publishRemoteReplicaSnapshot(); }, standbyReplication.config.publishIntervalMs);
+    remoteReplicaHeartbeatTimer.unref?.();
+  }
 }
 
 persistenceReady = initialisePersistence();
