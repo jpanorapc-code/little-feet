@@ -5331,56 +5331,133 @@
       }
     }
 
-    /* Tablet portrait / narrow landscape: three rows, never four. */
+    /* Split-screen / tablet width: keep the header compact when the browser
+       is snapped to the side of the display. Row 1 = brand + account controls,
+       row 2 = term + Home/Search/Help/Menu. */
     @media (min-width:641px) and (max-width:899px) {
       #dashboardSection > nav {
         display:grid !important;
-        grid-template-columns:minmax(0,1fr);
-        grid-template-rows:auto auto auto;
-        gap:7px;
+        grid-template-columns:minmax(0,1fr) auto !important;
+        grid-template-rows:auto auto !important;
+        align-items:center !important;
+        gap:7px 8px !important;
+        padding:8px 10px !important;
       }
       #dashboardSection .nav-brand {
-        grid-column:1;
-        grid-row:1;
-        width:100%;
+        grid-column:1 !important;
+        grid-row:1 !important;
+        width:auto !important;
+        min-width:0 !important;
+        overflow:hidden;
       }
-      #dashboardSection .nav-live-pill { display:none !important; }
-      #dashboardSection .nav-quickbar {
-        grid-column:1;
-        grid-row:2;
-        display:grid !important;
-        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
-        gap:6px !important;
-        width:100%;
-        margin:0;
-      }
-      #dashboardSection .nav-term-panel {
-        grid-column:1 / -1;
-        grid-row:1;
-        width:100%;
-        max-width:none !important;
-      }
-      #dashboardSection .nav-quickbar .nav-shortcut,
-      #dashboardSection .nav-quickbar > .nav-more-toggle {
-        width:100% !important;
-        min-width:0;
-        min-height:40px !important;
-        padding:7px 6px !important;
-        font-size:.72rem !important;
-      }
-      #dashboardSection .nav-user-panel {
-        grid-column:1;
-        grid-row:3;
-        width:100% !important;
-        margin:0 !important;
-        justify-content:flex-start !important;
-      }
-      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
-      #dashboardSection .nav-user-panel #displayRole {
-        max-width:220px !important;
+      #dashboardSection .nav-brand .org-badge { display:none !important; }
+      #dashboardSection .nav-brand .site-name {
+        max-width:100%;
         overflow:hidden;
         text-overflow:ellipsis;
         white-space:nowrap;
+      }
+
+      #dashboardSection .nav-user-panel {
+        grid-column:2 !important;
+        grid-row:1 !important;
+        display:flex !important;
+        width:auto !important;
+        max-width:min(52vw,430px) !important;
+        min-width:0 !important;
+        margin:0 !important;
+        justify-content:flex-end !important;
+        flex-wrap:nowrap !important;
+        gap:5px !important;
+      }
+      #dashboardSection .nav-user-panel .user-switch-control {
+        min-width:0 !important;
+        max-width:190px !important;
+      }
+      #dashboardSection .nav-user-panel #displayRole {
+        max-width:135px !important;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      #dashboardSection .nav-user-panel > .action-btn {
+        min-width:34px !important;
+        min-height:34px !important;
+        padding:6px !important;
+      }
+      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
+        min-height:34px !important;
+        padding:6px 8px !important;
+        white-space:nowrap !important;
+      }
+
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-quickbar {
+        grid-column:1 / -1 !important;
+        grid-row:2 !important;
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) repeat(4,max-content) !important;
+        align-items:center !important;
+        gap:6px !important;
+        width:100% !important;
+        min-width:0 !important;
+        margin:0 !important;
+      }
+      #dashboardSection .nav-term-panel {
+        grid-column:1 !important;
+        grid-row:1 !important;
+        width:100% !important;
+        max-width:none !important;
+        min-width:0 !important;
+      }
+      #dashboardSection .nav-term-panel strong {
+        min-width:0 !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+      }
+      #dashboardSection .nav-quickbar .nav-shortcut,
+      #dashboardSection .nav-quickbar > .nav-more-toggle {
+        grid-row:1 !important;
+        width:auto !important;
+        min-width:68px !important;
+        min-height:36px !important;
+        margin:0 !important;
+        padding:7px 8px !important;
+        font-size:.68rem !important;
+        white-space:nowrap !important;
+      }
+
+      #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) {
+        position:absolute !important;
+        right:10px !important;
+        top:calc(100% + 6px) !important;
+        width:min(430px,calc(100vw - 20px)) !important;
+        z-index:40 !important;
+      }
+    }
+
+    @media (min-width:641px) and (max-width:760px) {
+      #dashboardSection .nav-brand img {
+        width:38px !important;
+        height:38px !important;
+      }
+      #dashboardSection .nav-brand .site-name { font-size:.94rem !important; }
+      #dashboardSection .nav-user-panel #displayRole,
+      #dashboardSection .nav-user-panel #serverStatusText { display:none !important; }
+      #dashboardSection .nav-user-panel .user-switch-control {
+        width:40px !important;
+        min-width:40px !important;
+        max-width:40px !important;
+        padding:2px !important;
+        justify-content:center !important;
+      }
+      #dashboardSection .nav-user-panel { max-width:245px !important; }
+      #dashboardSection .nav-quickbar .nav-shortcut,
+      #dashboardSection .nav-quickbar > .nav-more-toggle {
+        min-width:62px !important;
+        padding-inline:6px !important;
       }
     }
 

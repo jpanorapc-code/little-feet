@@ -104,9 +104,31 @@ const server = http.createServer((req, res) => {
           if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
           if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
         }
-        if (width <= 900) {
+        if (width < 960) {
           const menu = document.getElementById('navMoreToggle');
           if (!menu || !visible(menu)) errors.push('mobile/tablet Menu control missing');
+        }
+        if (width > 640 && width < 900) {
+          const quickbar = header.querySelector('.nav-quickbar');
+          const term = header.querySelector('.nav-term-panel');
+          const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
+          const menu = document.getElementById('navMoreToggle');
+          const quickRow = [...shortcuts, ...(menu && visible(menu) ? [menu] : [])];
+          if (!quickbar || !term || quickRow.length < 4) {
+            errors.push('split-screen header quick row is incomplete');
+          } else {
+            const termTop = Math.round(term.getBoundingClientRect().top);
+            const actionTops = quickRow.map(button => Math.round(button.getBoundingClientRect().top));
+            if (actionTops.some(top => Math.abs(top - termTop) > 3)) errors.push('split-screen term/actions are not on one row');
+          }
+          const brand = header.querySelector('.nav-brand');
+          const userPanel = document.getElementById('navUserPanel');
+          if (brand && userPanel && visible(brand) && visible(userPanel)) {
+            if (Math.abs(Math.round(brand.getBoundingClientRect().top) - Math.round(userPanel.getBoundingClientRect().top)) > 4) {
+              errors.push('split-screen brand/account controls are not on one row');
+            }
+          }
+          if (header.getBoundingClientRect().height > 125) errors.push('split-screen header is too tall');
         }
         const tabs = [...document.querySelectorAll('.tab-content')];
         for (const tab of tabs) {
