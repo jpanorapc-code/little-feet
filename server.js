@@ -33,6 +33,12 @@ const cleanFailoverOrigin = value => {
 };
 const primaryPublicUrl = cleanFailoverOrigin(process.env.LF_PRIMARY_PUBLIC_URL || process.env.LF_PUBLIC_ORIGIN || '');
 const backupPublicUrl = cleanFailoverOrigin(process.env.LF_BACKUP_PUBLIC_URL || '');
+if (replicaMode) {
+  app.use((_req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    next();
+  });
+}
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const loginUsernameAttempts = new Map();
