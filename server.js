@@ -10,6 +10,7 @@ const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
+const { createStandbyReplication } = require('./lib/operations/standby-replication');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
 const { createStructuredLogger, redactSensitiveLogText } = require('./lib/structured-logger');
@@ -19,6 +20,25 @@ const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const isProduction = process.env.NODE_ENV === 'production';
 const replicaMode = process.env.LF_REPLICA_MODE === '1';
+const cleanFailoverOrigin = value => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+};
+const primaryPublicUrl = cleanFailoverOrigin(process.env.LF_PRIMARY_PUBLIC_URL || process.env.LF_PUBLIC_ORIGIN || '');
+const backupPublicUrl = cleanFailoverOrigin(process.env.LF_BACKUP_PUBLIC_URL || '');
+if (replicaMode) {
+  app.use((_req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    next();
+  });
+}
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const loginUsernameAttempts = new Map();
@@ -784,6 +804,17 @@ const sendPublicRootFile = (req, res) => {
   else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   res.sendFile(req.path.slice(1), { root: __dirname });
 };
+app.get('/runtime-config.js', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('application/javascript');
+  const config = {
+    instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    readOnly: replicaMode,
+    backupUrl: replicaMode ? '' : backupPublicUrl,
+    primaryUrl: replicaMode ? primaryPublicUrl : ''
+  };
+  res.send(`window.LITTLE_FEET_RUNTIME_CONFIG=${JSON.stringify(config)};window.LITTLE_FEET_BACKUP_URL=window.LITTLE_FEET_RUNTIME_CONFIG.backupUrl||'';window.LITTLE_FEET_PRIMARY_URL=window.LITTLE_FEET_RUNTIME_CONFIG.primaryUrl||'';`);
+});
 app.get('/backup.js', sendPublicRootFile);
 app.get('/paia.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
@@ -960,6 +991,18 @@ let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 let replicaSnapshotVersion = '';
 const objectStorage = createObjectStorage({ rootDir: __dirname });
+const standbyReplication = createStandbyReplication({ env: process.env });
+let remoteReplicaPollTimer = null;
+let remoteReplicaPublishTimer = null;
+let remoteReplicaHeartbeatTimer = null;
+let remoteReplicaPublishPromise = null;
+let remoteReplicaObjectKey = '';
+let remoteReplicaCapturedAt = '';
+let remoteReplicaLastSyncAt = '';
+let remoteReplicaLastPublishedAt = '';
+let remoteReplicaLastError = '';
+let remoteReplicaPublishCount = 0;
+let primaryPersistenceHealth = { checkedAt: 0, ok: true, promise: null, lastLoggedOk: true };
 
 class PostgresSessionStore extends session.Store {
   constructor() {
@@ -1005,7 +1048,7 @@ class PostgresSessionStore extends session.Store {
 }
 
 app.use(session({
-  store: process.env.DATABASE_URL ? new PostgresSessionStore() : undefined,
+  store: process.env.DATABASE_URL && !replicaMode ? new PostgresSessionStore() : undefined,
   secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
   name: 'littlefeet.sid',
   resave: false,
@@ -1397,27 +1440,139 @@ const retryPendingStorageCleanup = async () => {
   if (!objectStorage.configured) return;
   for (const job of db.storageCleanupJobs.filter(item => item.status !== 'completed').slice(0, 25)) await runStorageCleanupJob(job);
 };
+const replicaSnapshotState = () => ({ ...db, replicatedAt: new Date().toISOString() });
+
+function applyReplicaStateToLocalCache(saved) {
+  if (!saved || typeof saved !== 'object') return false;
+  const stagingFile = `${replicaFile}.next`;
+  fs.writeFileSync(stagingFile, JSON.stringify(saved), 'utf8');
+  fs.renameSync(stagingFile, replicaFile);
+  const snapshotStat = fs.statSync(replicaFile);
+  replicaSnapshotVersion = `${snapshotStat.mtimeMs}:${snapshotStat.size}`;
+  return true;
+}
+
 function loadReplicaSnapshot() {
   try {
-    if (!fs.existsSync(replicaFile)) return;
+    if (!fs.existsSync(replicaFile)) return false;
     const snapshotStat = fs.statSync(replicaFile);
     const snapshotVersion = `${snapshotStat.mtimeMs}:${snapshotStat.size}`;
-    if (snapshotVersion === replicaSnapshotVersion) return;
+    if (snapshotVersion === replicaSnapshotVersion) return true;
     const saved = JSON.parse(fs.readFileSync(replicaFile, 'utf8'));
-    if (applySavedState(saved)) replicaSnapshotVersion = snapshotVersion;
+    if (!applySavedState(saved)) return false;
+    replicaSnapshotVersion = snapshotVersion;
+    if (!remoteReplicaCapturedAt && saved.replicatedAt) remoteReplicaCapturedAt = saved.replicatedAt;
+    remoteReplicaLastSyncAt = new Date().toISOString();
+    return true;
   } catch (error) {
     logStructured('error', 'replica.snapshot_load_failed', { category: 'replica', message: error.message });
+    return false;
   }
 }
-function writeReplicaSnapshot() {
-  if (replicaMode) return;
+
+function writeReplicaSnapshot(snapshot = replicaSnapshotState()) {
+  if (replicaMode) return null;
   try {
-    const stagingFile = `${replicaFile}.next`;
-    fs.writeFileSync(stagingFile, JSON.stringify({ ...db, replicatedAt: new Date().toISOString() }), 'utf8');
-    fs.renameSync(stagingFile, replicaFile);
+    applyReplicaStateToLocalCache(snapshot);
+    return snapshot;
   } catch (error) {
     logStructured('error', 'replica.snapshot_write_failed', { category: 'replica', message: error.message });
+    return null;
   }
+}
+
+function replicaFreshness() {
+  const capturedMs = Date.parse(remoteReplicaCapturedAt || '');
+  const ageMs = Number.isFinite(capturedMs) ? Math.max(0, Date.now() - capturedMs) : null;
+  const maxAgeMs = standbyReplication.enabled ? standbyReplication.config.maxAgeMs : 180000;
+  const available = Boolean(replicaSnapshotVersion || remoteReplicaCapturedAt || db.users.length);
+  return {
+    configured: standbyReplication.enabled,
+    available,
+    source: remoteReplicaObjectKey ? 'r2' : replicaSnapshotVersion ? 'local-cache' : 'none',
+    capturedAt: remoteReplicaCapturedAt || null,
+    lastSyncAt: remoteReplicaLastSyncAt || null,
+    lastPublishedAt: remoteReplicaLastPublishedAt || null,
+    ageSeconds: ageMs === null ? null : Math.round(ageMs / 1000),
+    maxAgeSeconds: Math.round(maxAgeMs / 1000),
+    stale: !available || ageMs === null || ageMs > maxAgeMs,
+    lastError: remoteReplicaLastError ? 'replication-sync-error' : ''
+  };
+}
+
+async function refreshRemoteReplicaSnapshot() {
+  if (!replicaMode || !standbyReplication.enabled) return false;
+  try {
+    const latest = await standbyReplication.fetchLatest();
+    remoteReplicaCapturedAt = latest.capturedAt;
+    remoteReplicaLastSyncAt = new Date().toISOString();
+    remoteReplicaLastError = '';
+    if (latest.objectKey === remoteReplicaObjectKey) return true;
+    if (!applySavedState(latest.state)) throw new Error('Downloaded standby state failed application validation.');
+    applyReplicaStateToLocalCache(latest.state);
+    remoteReplicaObjectKey = latest.objectKey;
+    logStructured('info', 'replica.remote_snapshot_loaded', {
+      category: 'replica',
+      result: latest.stale ? 'stale' : 'loaded',
+      details: `Captured ${latest.capturedAt}; ${latest.bytes} encrypted bytes; application ${latest.applicationSha || 'unknown'}`
+    });
+    return true;
+  } catch (error) {
+    remoteReplicaLastError = String(error.message || error).slice(0, 300);
+    logStructured('warn', 'replica.remote_snapshot_load_failed', { category: 'replica', result: 'failed', message: remoteReplicaLastError });
+    return false;
+  }
+}
+
+async function publishRemoteReplicaSnapshot() {
+  if (replicaMode || !standbyReplication.enabled) return null;
+  if (remoteReplicaPublishPromise) return remoteReplicaPublishPromise;
+  const job = (async () => {
+    try {
+      const snapshot = replicaSnapshotState();
+      const manifest = await standbyReplication.publish({
+        state: snapshot,
+        capturedAt: snapshot.replicatedAt,
+        applicationSha: standbyReplication.config.applicationSha
+      });
+      remoteReplicaLastPublishedAt = manifest.capturedAt;
+      remoteReplicaLastError = '';
+      remoteReplicaPublishCount += 1;
+      if (remoteReplicaPublishCount % 20 === 0) {
+        standbyReplication.prune().catch(error => {
+          logStructured('warn', 'replica.remote_snapshot_prune_failed', { category: 'replica', message: error.message });
+        });
+      }
+      logStructured('info', 'replica.remote_snapshot_published', {
+        category: 'replica',
+        result: 'published',
+        details: `Captured ${manifest.capturedAt}; ${manifest.bytes} encrypted bytes`
+      });
+      return manifest;
+    } catch (error) {
+      remoteReplicaLastError = String(error.message || error).slice(0, 300);
+      logStructured('warn', 'replica.remote_snapshot_publish_failed', { category: 'replica', result: 'failed', message: remoteReplicaLastError });
+      return null;
+    }
+  })();
+  remoteReplicaPublishPromise = job;
+  try {
+    return await job;
+  } finally {
+    if (remoteReplicaPublishPromise === job) remoteReplicaPublishPromise = null;
+  }
+}
+
+function scheduleRemoteReplicaSnapshot() {
+  if (replicaMode || !standbyReplication.enabled || remoteReplicaPublishTimer) return;
+  const lastPublishedMs = Date.parse(remoteReplicaLastPublishedAt || '');
+  const elapsed = Number.isFinite(lastPublishedMs) ? Date.now() - lastPublishedMs : standbyReplication.config.publishIntervalMs;
+  const delay = Math.max(0, standbyReplication.config.publishIntervalMs - elapsed);
+  remoteReplicaPublishTimer = setTimeout(() => {
+    remoteReplicaPublishTimer = null;
+    void publishRemoteReplicaSnapshot();
+  }, delay);
+  remoteReplicaPublishTimer.unref?.();
 }
 function ensureBootstrapAdministrator() {
   if (db.users.some(account => account.role === 'admin')) return;
@@ -1534,12 +1689,21 @@ function scheduleReplicaSnapshot() {
   replicaSnapshotTimer = setTimeout(() => {
     replicaSnapshotTimer = null;
     writeReplicaSnapshot();
+    scheduleRemoteReplicaSnapshot();
   }, 250);
+  replicaSnapshotTimer.unref?.();
 }
 async function initialisePersistence() {
   if (replicaMode) {
     loadReplicaSnapshot();
-    replicaTimer = setInterval(loadReplicaSnapshot, 2000);
+    if (standbyReplication.enabled) {
+      await refreshRemoteReplicaSnapshot();
+      remoteReplicaPollTimer = setInterval(() => { void refreshRemoteReplicaSnapshot(); }, standbyReplication.config.pollIntervalMs);
+      remoteReplicaPollTimer.unref?.();
+    } else {
+      replicaTimer = setInterval(loadReplicaSnapshot, 2000);
+      replicaTimer.unref?.();
+    }
     return;
   }
   if (process.env.DATABASE_URL) await openPostgresDatabase();
@@ -1566,6 +1730,11 @@ async function initialisePersistence() {
   }
   if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
   writeReplicaSnapshot();
+  if (standbyReplication.enabled) {
+    void publishRemoteReplicaSnapshot();
+    remoteReplicaHeartbeatTimer = setInterval(() => { void publishRemoteReplicaSnapshot(); }, standbyReplication.config.publishIntervalMs);
+    remoteReplicaHeartbeatTimer.unref?.();
+  }
 }
 
 persistenceReady = initialisePersistence();
@@ -1661,18 +1830,86 @@ app.post('/api/login', (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+async function checkPrimaryPersistenceHealth() {
+  if (replicaMode) return true;
+  const now = Date.now();
+  if (primaryPersistenceHealth.promise) return primaryPersistenceHealth.promise;
+  if (now - primaryPersistenceHealth.checkedAt < 10000) return primaryPersistenceHealth.ok;
+  const job = (async () => {
+    let ok = false;
+    try {
+      if (postgresPool) await postgresPool.query('SELECT 1');
+      else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
+      else throw new Error('No persistence adapter is available.');
+      ok = true;
+    } catch (error) {
+      if (primaryPersistenceHealth.lastLoggedOk) {
+        logStructured('error', 'health.persistence_unavailable', { category: 'health', result: 'failed', message: error.message });
+      }
+    }
+    if (ok && !primaryPersistenceHealth.lastLoggedOk) {
+      logStructured('info', 'health.persistence_recovered', { category: 'health', result: 'recovered' });
+    }
+    primaryPersistenceHealth.checkedAt = Date.now();
+    primaryPersistenceHealth.ok = ok;
+    primaryPersistenceHealth.lastLoggedOk = ok;
+    return ok;
+  })();
+  primaryPersistenceHealth.promise = job;
+  try {
+    return await job;
+  } finally {
+    if (primaryPersistenceHealth.promise === job) primaryPersistenceHealth.promise = null;
+  }
+}
+
+app.get('/api/health', async (req, res) => {
   // Do not count the health probe itself, and do not report normal concurrent
   // dashboard startup requests as server overload.
   const reportedActiveRequests = Math.max(0, activeRequestCount - 1);
-  const status = reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
+  const replica = replicaMode ? replicaFreshness() : null;
+  const persistenceHealthy = replicaMode ? true : await checkPrimaryPersistenceHealth();
+  const status = replicaMode && (!replica.available || replica.stale)
+    ? 'DEGRADED'
+    : !persistenceHealthy
+      ? 'DEGRADED'
+      : reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
+  if (!replicaMode && !persistenceHealthy) res.status(503);
   const actor = getSessionAccount(req);
   res.set('Cache-Control', 'no-store');
-  if (!actor) return res.json({ status, timestamp: new Date().toISOString() });
+  if (!actor) return res.json({
+    status,
+    instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    readOnly: replicaMode,
+    timestamp: new Date().toISOString()
+  });
   return res.json({
     status,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    readOnly: replicaMode,
     activeRequests: reportedActiveRequests,
+    replica: replicaMode ? replica : undefined,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/failover-status', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const replica = replicaMode ? replicaFreshness() : null;
+  res.json({
+    instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    readOnly: replicaMode,
+    backupRedirectConfigured: !replicaMode && Boolean(backupPublicUrl),
+    primaryReturnConfigured: replicaMode && Boolean(primaryPublicUrl),
+    replicationConfigured: standbyReplication.enabled,
+    replica: replicaMode && replica ? {
+      available: replica.available,
+      source: replica.source,
+      capturedAt: replica.capturedAt,
+      ageSeconds: replica.ageSeconds,
+      maxAgeSeconds: replica.maxAgeSeconds,
+      stale: replica.stale
+    } : null,
     timestamp: new Date().toISOString()
   });
 });
@@ -1682,10 +1919,18 @@ app.get('/api/health', (req, res) => {
 // PostgreSQL project remain active without exposing application records.
 app.get('/api/keepalive', async (_req, res) => {
   try {
+    if (replicaMode) {
+      const replica = replicaFreshness();
+      res.set('Cache-Control', 'no-store');
+      if (!replica.available || replica.stale) {
+        return res.status(503).json({ status: 'STANDBY_STALE', instance: 'STANDBY', timestamp: new Date().toISOString() });
+      }
+      return res.json({ status: 'OK', instance: 'STANDBY', timestamp: new Date().toISOString() });
+    }
     if (postgresPool) await postgresPool.query('SELECT 1');
     else if (stateDatabase) stateDatabase.prepare('SELECT 1').get();
     res.set('Cache-Control', 'no-store');
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    res.json({ status: 'OK', instance: 'PRIMARY', timestamp: new Date().toISOString() });
   } catch (error) {
     logStructured('error', 'health.keepalive_probe_failed', { category: 'health', message: error.message, result: 'failed' });
     res.status(503).json({ status: 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
@@ -1693,6 +1938,19 @@ app.get('/api/keepalive', async (_req, res) => {
 });
 
 const runtimeReadiness = () => {
+  if (replicaMode) {
+    const replica = replicaFreshness();
+    const checks = {
+      replicaAvailable: replica.available,
+      replicaFresh: !replica.stale,
+      standbyReplication: standbyReplication.enabled,
+      fieldEncryption: fieldEncryptionConfigured,
+      sessionSecret: sessionSecretConfigured,
+      secureCookies: isProduction,
+      privateObjectStorage: objectStorage.configured
+    };
+    return { checks, ready: Object.values(checks).every(Boolean), standby: true, replica };
+  }
   const checks = {
     database: Boolean(process.env.DATABASE_URL),
     durableSessions: Boolean(process.env.DATABASE_URL),
@@ -1735,6 +1993,8 @@ app.get('/api/production-readiness', (req, res) => {
     privateObjectStorage: objectStorage.configured,
     objectStorageProvider: objectStorage.kind,
     offsiteBackup: Boolean(process.env.LF_BACKUP_R2_BUCKET && process.env.LF_BACKUP_REHEARSAL_ID),
+    standbyReplication: standbyReplication.enabled,
+    standbyPublicUrl: Boolean(backupPublicUrl),
     backupProvider: process.env.LF_BACKUP_R2_BUCKET ? 'cloudflare-r2-isolated-bucket' : '',
     backupRehearsalId: boundedText(process.env.LF_BACKUP_REHEARSAL_ID, 120)
   };
@@ -1747,11 +2007,14 @@ app.get('/api/production-readiness', (req, res) => {
   if (!integrations.paymentDestination) missingActions.push('Configure a bank-transfer destination or HTTPS payment link.');
   if (!integrations.monitoring) missingActions.push('Configure error and uptime monitoring.');
   if (!integrations.offsiteBackup) missingActions.push('Configure an offsite backup target and test a restore.');
+  if (!integrations.standbyReplication) missingActions.push('Enable encrypted standby replication to the separate backup bucket.');
+  if (!integrations.standbyPublicUrl) missingActions.push('Configure LF_BACKUP_PUBLIC_URL for the separate standby service.');
   res.json({
     ...readiness,
     integrations,
     missingActions,
     launchReady: readiness.ready && integrations.paymentDestination && integrations.monitoring && integrations.offsiteBackup,
+    failoverReady: readiness.ready && integrations.offsiteBackup && integrations.standbyReplication && integrations.standbyPublicUrl,
     checkedAt: new Date().toISOString()
   });
 });
@@ -2110,6 +2373,9 @@ const runAdminSelfTest = async actor => {
   const readinessReasons = {
     database: 'The production database connection is not configured.',
     durableSessions: 'Sessions cannot be stored durably without the production database.',
+    replicaAvailable: 'The standby has not loaded a verified replica snapshot.',
+    replicaFresh: 'The standby replica snapshot is older than the configured freshness window.',
+    standbyReplication: 'Encrypted remote standby replication is not configured.',
     fieldEncryption: 'The field-encryption key is missing.',
     sessionSecret: 'The secure session secret is missing.',
     secureCookies: 'Secure-cookie enforcement is not active outside production mode.',

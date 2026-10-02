@@ -8,8 +8,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Feet">
-  <!-- Set this to the public standby URL when deploying behind a load balancer. -->
-  <script>window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || '';</script>
+  <!-- Runtime failover URLs and instance mode are supplied by the server. -->
+  <script src="/runtime-config.js"></script>
+  <script>
+    window.LITTLE_FEET_RUNTIME_CONFIG = window.LITTLE_FEET_RUNTIME_CONFIG || { instance:'PRIMARY', readOnly:false, backupUrl:'', primaryUrl:'' };
+    window.LITTLE_FEET_BACKUP_URL = window.LITTLE_FEET_BACKUP_URL || window.LITTLE_FEET_RUNTIME_CONFIG.backupUrl || '';
+    window.LITTLE_FEET_PRIMARY_URL = window.LITTLE_FEET_PRIMARY_URL || window.LITTLE_FEET_RUNTIME_CONFIG.primaryUrl || '';
+  </script>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <meta name="description" content="Little Feet by Little Feet Technologies (Pty) Ltd is a South African school operations platform for ECD, primary and secondary schools, covering communication, learning, attendance, finance, staff workflows, safeguarding and family engagement.">
   <meta name="robots" content="index,follow,max-image-preview:large">
@@ -5880,6 +5885,34 @@
       }
     }
 
+    .standby-emergency-banner {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin:0 0 16px;
+      padding:12px 14px;
+      border:1px solid rgba(251,191,36,.62);
+      border-radius:14px;
+      background:linear-gradient(135deg,rgba(120,53,15,.88),rgba(69,26,3,.92));
+      box-shadow:0 10px 26px rgba(2,8,23,.22);
+      color:#fff7d6;
+    }
+    .standby-emergency-banner strong { display:block; font-size:.92rem; letter-spacing:.02em; }
+    .standby-emergency-banner .meta { color:#fde7a3; }
+    .standby-emergency-banner .standby-actions { display:flex; gap:8px; flex-wrap:wrap; flex:0 0 auto; }
+    .standby-emergency-banner .standby-actions .action-btn { min-height:36px; }
+    .standby-emergency-banner.is-stale {
+      border-color:rgba(248,113,113,.72);
+      background:linear-gradient(135deg,rgba(127,29,29,.92),rgba(69,10,10,.95));
+    }
+    #standbyLoginNotice { margin:12px 0 0; }
+    @media(max-width:640px){
+      .standby-emergency-banner{align-items:flex-start;flex-direction:column}
+      .standby-emergency-banner .standby-actions{width:100%}
+      .standby-emergency-banner .standby-actions .action-btn{flex:1 1 0}
+    }
+
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
@@ -6046,6 +6079,13 @@
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
+      <div id="standbyLoginNotice" class="standby-emergency-banner hidden" role="status">
+        <div>
+          <strong>Emergency read-only service</strong>
+          <span class="meta">The primary Little Feet service is unavailable. You can sign in to view the latest replicated school information, but changes are temporarily blocked.</span>
+        </div>
+        <div class="standby-actions"><button type="button" class="action-btn" onclick="returnToPrimaryService()">Try primary service</button></div>
+      </div>
 
       <form id="loginForm">
         <div>
@@ -6285,6 +6325,15 @@
     </aside>
 
     <div class="container">
+      <section id="standbyEmergencyBanner" class="standby-emergency-banner hidden" role="status" aria-live="polite">
+        <div>
+          <strong>Emergency read-only mode</strong>
+          <span id="standbyEmergencyDetail" class="meta">Little Feet is serving the latest verified standby snapshot. Viewing remains available; changes are temporarily blocked.</span>
+        </div>
+        <div class="standby-actions">
+          <button type="button" class="action-btn" onclick="returnToPrimaryService()">Try primary service</button>
+        </div>
+      </section>
       
       <!-- 0. Home Page Tab Content -->
       <div id="homeTab" class="tab-content active">
@@ -7543,7 +7592,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261002-parent-contacts-v2" defer></script>
+  <script src="backup.js?v=20261002-standby-failover-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/staff-work.js?v=20261001-startup-dedupe-v1" defer></script>

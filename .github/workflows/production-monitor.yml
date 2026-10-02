@@ -32,3 +32,26 @@ jobs:
             if (keepalive.status !== "OK") throw new Error(`Database keepalive status: ${keepalive.status}`);
             console.log(JSON.stringify({ health: health.status, readiness: ready.status, database: keepalive.status }));
           ' "$health" "$ready" "$keepalive"
+
+      - name: Check optional read-only standby
+        env:
+          STANDBY_ORIGIN: ${{ vars.LF_STANDBY_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${STANDBY_ORIGIN:-}" ]; then
+            echo "LF_STANDBY_URL repository variable is not configured; standby monitor skipped."
+            exit 0
+          fi
+          origin="${STANDBY_ORIGIN%/}"
+          health="$(curl --fail --silent --show-error --location --retry 2 --retry-delay 3 --connect-timeout 10 --max-time 30 "$origin/api/health")"
+          ready="$(curl --fail --silent --show-error --location --retry 2 --retry-delay 3 --connect-timeout 10 --max-time 30 "$origin/api/ready")"
+          keepalive="$(curl --fail --silent --show-error --location --retry 2 --retry-delay 3 --connect-timeout 10 --max-time 30 "$origin/api/keepalive")"
+          node -e '
+            const [health, ready, keepalive] = process.argv.slice(1).map(JSON.parse);
+            if (health.instance !== "STANDBY") throw new Error(`Unexpected standby instance: ${health.instance}`);
+            if (health.status !== "OK") throw new Error(`Standby health status: ${health.status}`);
+            if (ready.ready !== true || ready.status !== "READY") throw new Error(`Standby readiness status: ${ready.status}`);
+            if (keepalive.status !== "OK") throw new Error(`Standby keepalive status: ${keepalive.status}`);
+            console.log(JSON.stringify({ standby: health.instance, health: health.status, readiness: ready.status, replica: keepalive.status }));
+          ' "$health" "$ready" "$keepalive"
