@@ -14,7 +14,7 @@ assert.match(pageSource, /id="lfNotificationStack" class="lf-notification-stack 
 assert.match(pageSource, /workplace-extended\.js\?v=20261002-responsive-header-v1/, 'Responsive email/header JS must be cache-busted');
 assert.doesNotMatch(pageSource, /\.lf-notification-stack\{top:72px;right:8px;bottom:8px/, 'Legacy floating email offset must stay removed');
 assert.match(workplaceExtendedSource, /stack\.dataset\.notificationReady==='true'/, 'Existing header email dock must be safely initialised instead of recreated');
-const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [959, 900], [960, 900], [1024, 768], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
+const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [930, 520], [959, 900], [960, 900], [1024, 768], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
 let browser;
 const server = http.createServer((req, res) => {
   const file = path.resolve(root, '.' + (req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]));
@@ -109,27 +109,33 @@ const server = http.createServer((req, res) => {
           if (!menu || !visible(menu)) errors.push('mobile/tablet Menu control missing');
         }
         if (width > 640 && width < 1200) {
+          const quickbar = header.querySelector('.nav-quickbar');
+          const userPanel = header.querySelector('.nav-user-panel');
           const term = header.querySelector('.nav-term-panel');
-          const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
           const menu = document.getElementById('navMoreToggle');
+          const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
           const quickRow = [...shortcuts, ...(menu && visible(menu) ? [menu] : [])];
-          if (!term || quickRow.length < 4) {
-            errors.push('snapped-window header quick row is incomplete');
-          } else {
-            const actionTops = quickRow.map(button => Math.round(button.getBoundingClientRect().top));
-            if (Math.max(...actionTops) - Math.min(...actionTops) > 3) errors.push('snapped-window quick actions are not on one row');
-            const termRect = term.getBoundingClientRect();
-            const quickRect = quickRow[0].getBoundingClientRect();
-            if (termRect.bottom > quickRect.top + 2) errors.push('snapped-window term overlaps the quick-action row');
+          if (!quickbar || !userPanel || !term || quickRow.length < 4) errors.push('snapped header controls missing');
+          if (quickbar && userPanel) {
+            if (getComputedStyle(quickbar).display === 'contents') errors.push('snapped quickbar must remain a real grid wrapper');
+            if (getComputedStyle(userPanel).display === 'contents') errors.push('snapped account panel must remain a real flex wrapper');
+          }
+          if (quickRow.length >= 4) {
+            const tops = quickRow.map(el => Math.round(el.getBoundingClientRect().top));
+            if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('snapped Home/Search/Help/Menu are not on one row');
+          }
+          if (term && quickRow[0]) {
+            const termTop = Math.round(term.getBoundingClientRect().top);
+            const actionTop = Math.round(quickRow[0].getBoundingClientRect().top);
+            if (Math.abs(termTop - actionTop) > 3) errors.push('snapped term and quick actions are not on one row');
           }
           const brand = header.querySelector('.nav-brand');
-          const userSwitch = header.querySelector('.user-switch-control');
-          if (brand && userSwitch && visible(brand) && visible(userSwitch)) {
+          if (brand && userPanel) {
             const brandTop = Math.round(brand.getBoundingClientRect().top);
-            const userTop = Math.round(userSwitch.getBoundingClientRect().top);
-            if (Math.abs(brandTop - userTop) > 5) errors.push('snapped-window brand/account controls are not on one row');
+            const panelTop = Math.round(userPanel.getBoundingClientRect().top);
+            if (Math.abs(brandTop - panelTop) > 4) errors.push('snapped brand/account row misaligned');
           }
-          if (header.getBoundingClientRect().height > 155) errors.push('snapped-window header is too tall');
+          if (header.getBoundingClientRect().height > 105) errors.push('snapped header is too tall');
         }
         const tabs = [...document.querySelectorAll('.tab-content')];
         for (const tab of tabs) {
