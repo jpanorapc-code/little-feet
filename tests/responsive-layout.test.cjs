@@ -6,8 +6,14 @@ const http = require('node:http');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const backupSource = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const pageSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const workplaceExtendedSource = fs.readFileSync(path.join(root, 'assets', 'workplace-extended.js'), 'utf8');
 assert.match(backupSource, /--portal-sidebar-top/, 'Sidebar runtime offset variable must be maintained');
 assert.match(backupSource, /addEventListener\(['"]scroll['"],\s*queuePortalHeaderOffsetSync/, 'Sidebar/header offset must resync while the page scrolls');
+assert.match(pageSource, /id="lfNotificationStack" class="lf-notification-stack is-collapsed"/, 'Emails control must be present in the header before API loading finishes');
+assert.match(pageSource, /workplace-extended\.js\?v=20261002-responsive-header-v1/, 'Responsive email/header JS must be cache-busted');
+assert.doesNotMatch(pageSource, /\.lf-notification-stack\{top:72px;right:8px;bottom:8px/, 'Legacy floating email offset must stay removed');
+assert.match(workplaceExtendedSource, /stack\.dataset\.notificationReady==='true'/, 'Existing header email dock must be safely initialised instead of recreated');
 const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [959, 900], [960, 900], [1024, 768], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
 let browser;
 const server = http.createServer((req, res) => {
@@ -58,6 +64,47 @@ const server = http.createServer((req, res) => {
         const fits = element => { const r = element.getBoundingClientRect(); return r.left >= -1 && r.right <= document.documentElement.clientWidth + 1; };
         const headerButtons = [...header.querySelectorAll('button')].filter(visible);
         for (const button of headerButtons) if (!fits(button)) errors.push(`header clipped: ${button.textContent.trim()}`);
+
+        const overlaps = (a, b) => {
+          const ar = a.getBoundingClientRect();
+          const br = b.getBoundingClientRect();
+          const x = Math.min(ar.right, br.right) - Math.max(ar.left, br.left);
+          const y = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top);
+          return x > 1 && y > 1;
+        };
+        for (let i = 0; i < headerButtons.length; i += 1) {
+          for (let j = i + 1; j < headerButtons.length; j += 1) {
+            if (overlaps(headerButtons[i], headerButtons[j])) {
+              errors.push(`header buttons overlap: ${headerButtons[i].textContent.trim()} / ${headerButtons[j].textContent.trim()}`);
+            }
+          }
+        }
+
+        const requiredHeaderControls = [
+          ['user switch', '.user-switch-control'],
+          ['Emails', '[data-notification-collapse]'],
+          ['sound', '[data-portal-audio-mute]'],
+          ['theme', '[onclick="toggleDarkMode()"]']
+        ];
+        for (const [label, selector] of requiredHeaderControls) {
+          const control = header.querySelector(selector);
+          if (!control || !visible(control)) errors.push(`header control missing: ${label}`);
+        }
+        const emailButton = header.querySelector('[data-notification-collapse]');
+        const emailDock = document.getElementById('lfNotificationStack');
+        const userPanel = document.getElementById('navUserPanel');
+        if (emailButton && emailDock && userPanel && visible(emailButton)) {
+          const emailRect = emailButton.getBoundingClientRect();
+          const panelRect = userPanel.getBoundingClientRect();
+          const headerRect = header.getBoundingClientRect();
+          if (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1) errors.push('Emails control floats outside account row');
+          if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
+          if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
+        }
+        if (width <= 900) {
+          const menu = document.getElementById('navMoreToggle');
+          if (!menu || !visible(menu)) errors.push('mobile/tablet Menu control missing');
+        }
         const tabs = [...document.querySelectorAll('.tab-content')];
         for (const tab of tabs) {
           tabs.forEach(t => t.classList.toggle('active', t === tab));
