@@ -5751,8 +5751,10 @@ app.delete('/api/modules/:module/:id', (req, res) => {
 });
 
 app.get('/api/parent-contacts', (req, res) => {
-  const actor = requireSchoolStaff(req);
-  if (!actor) return res.status(403).json({ message: 'Authorised school staff can view parent contact details.' });
+  const actor = getSessionAccount(req);
+  if (!actor || !(hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role))) {
+    return res.status(403).json({ message: 'Authorised school staff can view parent contact details.' });
+  }
   const contacts = learnerRecordsVisibleTo(db.registry, actor)
     .map(registryRecordView)
     .map(record => ({
@@ -5770,6 +5772,44 @@ app.get('/api/parent-contacts', (req, res) => {
     });
   res.set('Cache-Control', 'no-store');
   res.json(contacts);
+});
+
+app.patch('/api/registry/:id/contact', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !(hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role))) {
+    return res.status(403).json({ message: 'Authorised school staff can update parent contact details.' });
+  }
+  const record = learnerRecordsVisibleTo(db.registry, actor).find(entry => entry.id === req.params.id);
+  if (!record) return res.status(404).json({ message: 'Learner contact record not found.' });
+
+  const guardianName = limitedText(req.body?.guardianName, 160);
+  const guardianPhone = limitedText(req.body?.guardianPhone, 80);
+  const guardianEmail = limitedText(req.body?.guardianEmail, 160);
+  const emergencyContact = limitedText(req.body?.emergencyContact, 500);
+  if (!guardianName || !guardianPhone || guardianEmail === null || emergencyContact === null) {
+    return res.status(400).json({ message: 'Enter the parent or guardian name and phone number, and keep all contact fields within their allowed length.' });
+  }
+
+  record.guardianName = guardianName;
+  record.guardianPhone = encryptField(guardianPhone);
+  record.guardianEmail = encryptField(guardianEmail || '');
+  record.emergencyContact = encryptField(emergencyContact || '');
+  record.updatedAt = new Date().toISOString();
+  record.updatedBy = actor.username;
+
+  const learner = tenantRecords(db.students, actor).find(student =>
+    normalizeComparableText(student.studentName) === normalizeComparableText(record.learnerName)
+    && normalizeComparableText(student.className) === normalizeComparableText(record.className)
+  );
+  if (learner) {
+    learner.parentName = guardianName;
+    learner.contactEmail = guardianEmail || '';
+    learner.emergencyContact = encryptField(emergencyContact || '');
+    learner.updatedAt = record.updatedAt;
+    learner.updatedBy = actor.username;
+  }
+
+  res.json({ success: true, record: registryRecordView(record) });
 });
 
 app.get('/api/registry', (req, res) => {
