@@ -360,12 +360,16 @@ assert.match(page, /@media \(max-width:900px\) and \(max-height:600px\) and \(or
 assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area-inset-right/);
 assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
 assert.match(page, /cinematic\.css\?v=20261002-cinematic-v15/);
-assert.match(page, /Refined login iceberg: keep the original logo artwork untouched/);
+assert.match(page, /Login iceberg artwork: layered SVG crystal facets surround the existing logo without changing the logo asset/);
+assert.match(page, /<svg class="login-iceberg-art" viewBox="0 0 334 228"/);
+assert.match(page, /<svg class="login-iceberg-foreground" viewBox="0 0 334 228"/);
 assert.match(page, /<img src="little-feet-mascot\.jfif" alt="Little Feet mascot logo"/);
 assert.match(page, />Little Feet Technologies<\/h1>/);
 assert.match(page, /<p class="slogan">Every Little Step Matters<\/p>/);
-assert.match(page, /\.mascot-stage::before\{[\s\S]*width:276px;height:226px[\s\S]*clip-path:polygon\(2% 100%/);
-assert.match(page, /\.mascot-stage::after\{[\s\S]*width:264px;height:96px/);
+assert.match(page, /\.mascot-stage\{[\s\S]*width:334px[\s\S]*min-height:204px/);
+assert.match(page, /\.login-iceberg-art,[\s\S]*width:334px[\s\S]*height:228px/);
+assert.match(page, /id="lfIceMain"/);
+assert.match(page, /id="lfIceFront"/);
 
 assert.match(page, /Little Feet™ School Portal/);
 assert.match(page, /Official site: <a href="https:\/\/littlefeet\.co\.za\//);
