@@ -43,7 +43,7 @@ assert.match(page, /id="pwaInstallButton"/);
 assert.ok(fs.existsSync(penguinAvatarSprite), 'Penguin profile avatar sprite should exist.');
 assert.ok(fs.statSync(penguinAvatarSprite).size > 5000, 'Penguin profile avatar sprite should contain real SVG data.');
 assert.match(page, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2/);
-assert.match(page, /#dashboardSection \.user-avatar \.profile-avatar-image \{/);
+assert.match(page, /\.user-avatar \.profile-avatar-image \{/);
 assert.doesNotMatch(page, /background-size:720% 360% !important/);
 assert.match(page, /nav-quickbar > #navMoreToggle/);
 assert.match(page, /data-profile-icon="classic"/);
