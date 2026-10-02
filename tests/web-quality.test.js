@@ -40,6 +40,14 @@ assert.match(page, /<h1 role="button" tabindex="0"/);
 assert.match(page, /rel="manifest" href="\/manifest\.webmanifest"/);
 assert.match(page, /name="theme-color" content="#0d9488"/);
 assert.match(page, /id="pwaInstallButton"/);
+assert.match(page, /SA-SAMS &amp; DBE\/LURITS Integration/);
+assert.match(page, /LURITS Accredited Software System \(LASS\)/);
+assert.match(page, /TransactionCategoryID/);
+assert.match(page, /Tx04[\s\S]*Tx05[\s\S]*Tx07[\s\S]*Tx09[\s\S]*Tx12[\s\S]*Tx13[\s\S]*Tx14[\s\S]*Tx16/);
+assert.match(page, /Direct Little Feet → DBE\/LURITS submission remains disabled/);
+assert.match(page, /LURITS 3rd Party Software Amendment Specification/);
+assert.doesNotMatch(page, /LURITS_Data_Upload/, 'Do not ship an invented LURITS XML root as an official interface.');
+
 assert.ok(fs.existsSync(penguinAvatarSprite), 'Penguin profile avatar sprite should exist.');
 assert.ok(fs.statSync(penguinAvatarSprite).size > 5000, 'Penguin profile avatar sprite should contain real SVG data.');
 assert.match(page, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2/);
