@@ -1713,8 +1713,6 @@ async function initialisePersistence() {
   syncCurrentReleaseNotes();
   await retryPendingStorageCleanup();
   await saveDatabaseState();
-  writeReplicaSnapshot();
-  if (standbyReplication.enabled) void publishRemoteReplicaSnapshot();
   if (diagnosticHistoryResetApplied) {
     logStructured('info', 'inspection.history_reset_applied', {
       category: 'migration',
@@ -1724,6 +1722,7 @@ async function initialisePersistence() {
   }
   if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
   writeReplicaSnapshot();
+  if (standbyReplication.enabled) void publishRemoteReplicaSnapshot();
 }
 
 persistenceReady = initialisePersistence();
