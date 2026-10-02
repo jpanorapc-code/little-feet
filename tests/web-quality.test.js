@@ -78,9 +78,10 @@ assert.match(page, /<option value="school_accounts">School Accounts<\/option>/);
 assert.match(page, /<option value="accounts">Little Feet Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
 assert.match(page, /backup\.js\?v=20261002-penguin-avatars-v1/);
-for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests','workplace-extended']) {
+for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests']) {
   assert.match(page, new RegExp('assets/' + asset + '\\.js\\?v=20261001-startup-dedupe-v1'));
 }
+assert.match(page, /assets\/workplace-extended\.js\?v=20261002-responsive-header-v1/);
 assert.match(page, /id="accountResetLoginWaitButton"/);
 assert.match(page, /Reset 10-minute login wait/);
 assert.match(client, /async function resetSelectedAccountLoginWait\(\)/);
@@ -104,7 +105,7 @@ assert.match(page, /my-day\.js\?v=20261001-startup-dedupe-v1/);
 assert.match(page, /data-my-day-nav="true"/);
 assert.match(page, /onclick="switchTab\('myDayTab', this\)"/);
 assert.match(page, /id="myDayTab" class="tab-content" data-roles="teacher,principal,admin,staff"/);
-assert.match(page, /workplace-extended\.js\?v=20261001-startup-dedupe-v1/);
+assert.match(page, /workplace-extended\.js\?v=20261002-responsive-header-v1/);
 assert.match(workplaceExtended, /Delivery provider:/);
 assert.match(workplaceExtended, /Connect Google Gmail/);
 assert.match(workplaceExtended, /Connect Microsoft Outlook/);
@@ -121,8 +122,12 @@ assert.match(workplaceExtended, /\/api\/email\/mailbox\/send/);
 assert.match(workplaceExtended, /Do not disturb: Off/);
 assert.match(workplaceExtended, /Close all/);
 assert.match(workplaceExtended, /navUserPanel/);
+assert.match(page, /id="lfNotificationStack" class="lf-notification-stack is-collapsed"/);
+assert.match(page, /data-notification-collapse aria-expanded="false"/);
+assert.doesNotMatch(page, /\.lf-notification-stack\{top:72px;right:8px;bottom:8px/);
+assert.match(workplaceExtended, /stack\.dataset\.notificationReady==='true'/);
 assert.match(workplaceExtended, /lf-notification-stack is-collapsed/);
-assert.match(page, /workplace-extended\.js\?v=20261001-startup-dedupe-v1/);
+assert.match(page, /workplace-extended\.js\?v=20261002-responsive-header-v1/);
 assert.match(page, /\.lf-notification-stack\{position:relative/);
 assert.match(workplaceExtended, /data-inbox-action="reply"/);
 assert.match(workplaceExtended, /\/api\/email\/mailbox\/connect\/google/);

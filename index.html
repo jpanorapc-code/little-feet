@@ -5066,7 +5066,7 @@
     .email-inbox-item{border:1px solid var(--border-color);border-radius:12px;padding:13px;background:rgba(2,15,29,.16)}.email-inbox-item.is-unread{border-left:4px solid #5eead4}.email-inbox-item.is-pinned{box-shadow:inset 0 0 0 1px rgba(94,234,212,.35)}
     .email-inbox-item header{display:flex;justify-content:space-between;gap:10px}.email-inbox-item .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
     .email-compose-card{grid-column:1/-1}.email-compose-card form{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(220px,1.3fr);gap:12px}.email-compose-card form label:nth-of-type(3),.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1/-1}.email-compose-card textarea{resize:vertical}
-    @media(max-width:640px){#authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 42px}#authSection .login-background-compact{grid-column:1/-1;width:100%!important;min-width:0!important}.lf-notification-stack{top:72px;right:8px;bottom:8px;width:calc(100vw - 16px)}.lf-notification-controls{grid-template-columns:1fr 1fr}.lf-notification-controls [data-notification-close-all]{grid-column:1/-1}.email-inbox-item header{flex-direction:column}.email-compose-card form{grid-template-columns:1fr}.email-compose-card form label,.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1}}
+    @media(max-width:640px){#authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 42px}#authSection .login-background-compact{grid-column:1/-1;width:100%!important;min-width:0!important}.lf-notification-controls{display:flex;align-items:center}.email-inbox-item header{flex-direction:column}.email-compose-card form{grid-template-columns:1fr}.email-compose-card form label,.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1}}
 
     /* Little Feet penguin profile avatars: transparent cutouts blend into the portal chrome. */
     .profile-icon-picker {
@@ -5147,6 +5147,368 @@
       .profile-icon-choice .profile-avatar-image { width:56px; height:56px; flex-basis:56px; }
       .profile-icon-label { font-size:.64rem; }
     }
+
+    /* Canonical responsive portal header — one layout owner for phone, tablet, desktop and TV. */
+    #dashboardSection > nav {
+      box-sizing:border-box;
+      align-items:center;
+    }
+    #dashboardSection .nav-brand,
+    #dashboardSection .nav-quickbar,
+    #dashboardSection .nav-user-panel,
+    #dashboardSection .nav-more-toggle { min-width:0; }
+
+    #dashboardSection .nav-user-panel {
+      position:relative;
+      display:flex;
+      align-items:center;
+      flex-wrap:nowrap;
+      gap:6px;
+    }
+    #dashboardSection .lf-notification-stack {
+      position:static !important;
+      inset:auto !important;
+      z-index:70;
+      flex:0 0 auto;
+      width:auto !important;
+      max-width:100%;
+      margin:0 !important;
+      padding:0;
+      border:0;
+      background:transparent;
+      box-shadow:none;
+    }
+    #dashboardSection .lf-notification-controls {
+      display:flex !important;
+      align-items:center;
+      gap:5px;
+    }
+    #dashboardSection .lf-notification-controls .action-btn {
+      width:auto !important;
+      min-width:0;
+      min-height:34px;
+      margin:0;
+      padding:6px 9px !important;
+      white-space:nowrap;
+    }
+    #dashboardSection .lf-notification-items { z-index:90; }
+
+    #dashboardSection .nav-quickbar > .nav-more-toggle {
+      position:static !important;
+      margin:0 !important;
+      min-width:0;
+    }
+    @media (min-width:960px) {
+      #dashboardSection .nav-quickbar > .nav-more-toggle { display:none !important; }
+    }
+    @media (max-width:959px) {
+      #dashboardSection .nav-quickbar > .nav-more-toggle { display:inline-flex !important; }
+    }
+
+    /* Wide desktop / TV: one clean row. */
+    @media (min-width:1440px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:auto minmax(0,1fr) auto;
+        grid-template-rows:auto;
+        gap:8px 12px;
+      }
+      #dashboardSection .nav-brand { grid-column:1; grid-row:1; }
+      #dashboardSection .nav-quickbar {
+        grid-column:2;
+        grid-row:1;
+        display:flex !important;
+        flex-wrap:nowrap;
+        width:100%;
+        margin:0;
+        overflow:visible;
+      }
+      #dashboardSection .nav-user-panel {
+        grid-column:3;
+        grid-row:1;
+        width:auto !important;
+        margin:0 !important;
+        justify-self:end;
+        justify-content:flex-end !important;
+      }
+    }
+
+    /* Compact desktop: Term/Edit and Home/Search/Help always get separate grid cells. */
+    @media (min-width:1200px) and (max-width:1439px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:auto minmax(0,1fr) auto;
+        grid-template-rows:auto;
+        gap:7px 9px;
+      }
+      #dashboardSection .nav-brand { grid-column:1; grid-row:1; }
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-quickbar {
+        grid-column:2;
+        grid-row:1;
+        display:grid !important;
+        grid-template-columns:minmax(190px,1fr) repeat(3,max-content) !important;
+        align-items:center;
+        gap:6px !important;
+        width:100%;
+        margin:0;
+      }
+      #dashboardSection .nav-term-panel {
+        width:100%;
+        max-width:none !important;
+      }
+      #dashboardSection .nav-quickbar .nav-shortcut {
+        min-width:0;
+        padding:6px 8px;
+        font-size:.68rem;
+      }
+      #dashboardSection .nav-user-panel {
+        grid-column:3;
+        grid-row:1;
+        width:auto !important;
+        margin:0 !important;
+        justify-self:end;
+        justify-content:flex-end !important;
+        gap:5px;
+      }
+      #dashboardSection .nav-user-panel #displayRole {
+        max-width:145px !important;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      #dashboardSection .nav-user-panel > .action-btn {
+        width:34px !important;
+        min-width:34px !important;
+        min-height:34px !important;
+        padding:6px !important;
+      }
+      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
+    }
+
+    /* Small desktop / large tablet landscape. */
+    @media (min-width:900px) and (max-width:1199px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) auto;
+        grid-template-rows:auto auto;
+        gap:7px 10px;
+      }
+      #dashboardSection .nav-brand { grid-column:1; grid-row:1; }
+      #dashboardSection .nav-user-panel {
+        grid-column:2;
+        grid-row:1;
+        width:auto !important;
+        max-width:100%;
+        margin:0 !important;
+        justify-content:flex-end !important;
+      }
+      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
+      #dashboardSection .nav-user-panel #displayRole {
+        max-width:160px !important;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-quickbar {
+        grid-column:1 / -1;
+        grid-row:2;
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) repeat(4,max-content) !important;
+        align-items:center;
+        gap:6px !important;
+        width:100%;
+        margin:0;
+      }
+      #dashboardSection .nav-term-panel { width:100%; max-width:none !important; }
+      #dashboardSection .nav-quickbar .nav-shortcut,
+      #dashboardSection .nav-quickbar > .nav-more-toggle {
+        width:auto !important;
+        min-width:74px;
+        min-height:36px !important;
+        padding:7px 9px !important;
+        font-size:.70rem !important;
+      }
+    }
+
+    /* Tablet portrait / narrow landscape: three rows, never four. */
+    @media (min-width:641px) and (max-width:899px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr);
+        grid-template-rows:auto auto auto;
+        gap:7px;
+      }
+      #dashboardSection .nav-brand {
+        grid-column:1;
+        grid-row:1;
+        width:100%;
+      }
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-quickbar {
+        grid-column:1;
+        grid-row:2;
+        display:grid !important;
+        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+        gap:6px !important;
+        width:100%;
+        margin:0;
+      }
+      #dashboardSection .nav-term-panel {
+        grid-column:1 / -1;
+        grid-row:1;
+        width:100%;
+        max-width:none !important;
+      }
+      #dashboardSection .nav-quickbar .nav-shortcut,
+      #dashboardSection .nav-quickbar > .nav-more-toggle {
+        width:100% !important;
+        min-width:0;
+        min-height:40px !important;
+        padding:7px 6px !important;
+        font-size:.72rem !important;
+      }
+      #dashboardSection .nav-user-panel {
+        grid-column:1;
+        grid-row:3;
+        width:100% !important;
+        margin:0 !important;
+        justify-content:flex-start !important;
+      }
+      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
+      #dashboardSection .nav-user-panel #displayRole {
+        max-width:220px !important;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+    }
+
+    /* Phone: brand, quick strip, account strip. No separate Menu row. */
+    @media (max-width:640px) {
+      #dashboardSection > nav {
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) !important;
+        grid-template-rows:auto auto auto !important;
+        gap:5px !important;
+        padding:7px 8px !important;
+      }
+      #dashboardSection .nav-brand {
+        grid-column:1 !important;
+        grid-row:1 !important;
+        width:100% !important;
+        max-width:100% !important;
+      }
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-quickbar {
+        grid-column:1 !important;
+        grid-row:2 !important;
+        display:grid !important;
+        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+        gap:5px !important;
+        width:100%;
+        margin:0;
+      }
+      #dashboardSection .nav-term-panel {
+        grid-column:1 / -1 !important;
+        grid-row:1;
+        width:100%;
+        max-width:none !important;
+        min-height:32px !important;
+        padding:3px 6px !important;
+      }
+      #dashboardSection .nav-term-panel strong {
+        font-size:.63rem !important;
+        line-height:1.05 !important;
+      }
+      #dashboardSection .nav-term-panel .nav-term-edit {
+        min-height:28px !important;
+        padding:3px 6px !important;
+        font-size:.62rem !important;
+      }
+      #dashboardSection .nav-quickbar .nav-shortcut,
+      #dashboardSection .nav-quickbar > .nav-more-toggle {
+        width:100% !important;
+        min-width:0 !important;
+        min-height:36px !important;
+        padding:5px 3px !important;
+        gap:3px !important;
+        font-size:.64rem !important;
+        white-space:nowrap !important;
+      }
+      #dashboardSection .nav-quickbar .ui-icon {
+        width:15px !important;
+        height:15px !important;
+      }
+      #dashboardSection .nav-user-panel {
+        grid-column:1 !important;
+        grid-row:3 !important;
+        display:flex !important;
+        width:100% !important;
+        margin:0 !important;
+        justify-content:flex-start !important;
+        flex-wrap:nowrap !important;
+        gap:4px !important;
+      }
+      #dashboardSection .nav-user-panel .user-switch-control {
+        flex:1 1 auto;
+        min-width:0;
+        max-width:none;
+      }
+      #dashboardSection .nav-user-panel #displayRole {
+        max-width:min(32vw,112px) !important;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      #dashboardSection .nav-user-panel #serverStatus {
+        flex:0 0 auto;
+        min-width:12px;
+      }
+      #dashboardSection .nav-user-panel #serverStatusText { display:none !important; }
+      #dashboardSection .nav-user-panel > .action-btn {
+        flex:0 0 34px;
+        width:34px !important;
+        min-width:34px !important;
+        min-height:34px !important;
+        padding:5px !important;
+      }
+      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
+      #dashboardSection .lf-notification-controls [data-notification-collapse] {
+        min-width:56px !important;
+        min-height:34px;
+        padding:5px 6px !important;
+        font-size:.64rem;
+      }
+      #dashboardSection .lf-notification-items {
+        position:fixed !important;
+        top:calc(var(--portal-header-height, 188px) + 5px) !important;
+        right:8px !important;
+        bottom:auto !important;
+        left:8px !important;
+        width:auto !important;
+        max-height:calc(100dvh - var(--portal-header-height, 188px) - 13px);
+      }
+    }
+
+    @media (max-width:360px) {
+      #dashboardSection .nav-brand .site-name {
+        font-size:.72rem !important;
+        letter-spacing:0 !important;
+      }
+      #dashboardSection .nav-user-panel #displayRole { max-width:25vw !important; }
+      #dashboardSection .lf-notification-controls [data-notification-collapse] {
+        min-width:52px !important;
+        padding-inline:5px !important;
+      }
+      #dashboardSection .nav-quickbar .nav-shortcut,
+      #dashboardSection .nav-quickbar > .nav-more-toggle {
+        font-size:.60rem !important;
+        padding-inline:2px !important;
+      }
+    }
+
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
@@ -5379,6 +5741,7 @@
         <button type="button" class="nav-shortcut" onclick="openWorkspace('homeTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></button>
         <button type="button" class="nav-shortcut" onclick="openGlobalSearch()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search</span></button>
         <button type="button" class="nav-shortcut" onclick="openWorkspace('ticketsTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-help"></use></svg><span>Get help</span></button>
+        <button type="button" id="navMoreToggle" class="nav-more-toggle" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation"><svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg><span>Menu</span></button>
       </div>
 
       <div class="nav-user-panel" id="navUserPanel">
@@ -5387,11 +5750,17 @@
           <span id="displayRole">Staff Member</span>
         </button>
         <span id="serverStatus" class="server-status" title="Checking server status"><span class="server-dot"></span><span id="serverStatusText">Server offline</span></span>
-        <button type="button" data-portal-audio-mute onclick="togglePortalAudioMute()" class="action-btn btn-blue" style="padding:4px 8px;font-size:.72rem;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
-        <button type="button" onclick="toggleDarkMode()" class="action-btn btn-blue" style="padding:4px 8px;font-size:.72rem;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sun"></use></svg><span>Theme</span></button>
+        <aside id="lfNotificationStack" class="lf-notification-stack is-collapsed" aria-label="Email notifications">
+          <div class="lf-notification-controls">
+            <button class="action-btn" type="button" data-notification-collapse aria-expanded="false" title="Email notifications">▸ Emails</button>
+            <button class="action-btn" type="button" data-notification-dnd title="Email do not disturb">Do not disturb: Off</button>
+            <button class="action-btn" type="button" data-notification-close-all title="Close email notifications">Close all</button>
+          </div>
+          <div class="lf-notification-items" aria-live="polite"></div>
+        </aside>
+        <button type="button" data-portal-audio-mute onclick="togglePortalAudioMute()" class="action-btn btn-blue" title="Toggle Little Feet sound" aria-label="Toggle Little Feet sound" style="padding:4px 8px;font-size:.72rem;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button>
+        <button type="button" onclick="toggleDarkMode()" class="action-btn btn-blue" title="Change theme" aria-label="Change theme" style="padding:4px 8px;font-size:.72rem;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sun"></use></svg><span>Theme</span></button>
       </div>
-
-      <button type="button" id="navMoreToggle" class="nav-more-toggle" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation"><svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg><span>Menu</span></button>
     </nav>
 
     <aside id="mainNavigation" class="app-sidebar" aria-label="Main navigation" ondblclick="toggleSidebarCollapse()">
@@ -6665,7 +7034,7 @@
   <script src="/assets/maintenance.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/resource-booking.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/purchase-requests.js?v=20261001-startup-dedupe-v1" defer></script>
-  <script src="/assets/workplace-extended.js?v=20261001-startup-dedupe-v1" defer></script>
+  <script src="/assets/workplace-extended.js?v=20261002-responsive-header-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20261001-api-refresh-flood-v1" defer></script>
   <script src="/assets/legal-notices.js?v=20260929-legal-v5" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1" defer></script>

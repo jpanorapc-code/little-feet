@@ -34,20 +34,31 @@
   const ensureNotificationStack=()=>{
     let stack=document.getElementById('lfNotificationStack');
     const dock=document.getElementById('navUserPanel');
-    if(stack){
-      if(dock&&stack.parentElement!==dock)dock.appendChild(stack);
-      return stack;
+    if(!stack){
+      stack=document.createElement('aside');
+      stack.id='lfNotificationStack';
+      stack.className='lf-notification-stack is-collapsed';
+      stack.setAttribute('aria-label','Email notifications');
+      stack.innerHTML='<div class="lf-notification-controls"><button class="action-btn" type="button" data-notification-collapse aria-expanded="false">▸ Emails</button><button class="action-btn" type="button" data-notification-dnd></button><button class="action-btn" type="button" data-notification-close-all>Close all</button></div><div class="lf-notification-items" aria-live="polite"></div>';
     }
-    stack=document.createElement('aside');stack.id='lfNotificationStack';stack.className='lf-notification-stack is-collapsed';stack.setAttribute('aria-label','Email notifications');
-    stack.innerHTML='<div class="lf-notification-controls"><button class="action-btn" type="button" data-notification-collapse aria-expanded="false">▸ Emails</button><button class="action-btn" type="button" data-notification-dnd></button><button class="action-btn" type="button" data-notification-close-all>Close all</button></div><div class="lf-notification-items" aria-live="polite"></div>';
+    if(dock&&stack.parentElement!==dock)dock.appendChild(stack);
+    if(stack.dataset.notificationReady==='true')return stack;
+
     const preferences=notificationPreferences();
     const collapse=stack.querySelector('[data-notification-collapse]');
-    const dnd=stack.querySelector('[data-notification-dnd]');dnd.textContent=preferences.dnd?'Do not disturb: On':'Do not disturb: Off';dnd.classList.toggle('is-active',Boolean(preferences.dnd));
+    const dnd=stack.querySelector('[data-notification-dnd]');
+    const closeAll=stack.querySelector('[data-notification-close-all]');
+    const items=stack.querySelector('.lf-notification-items');
+    if(!collapse||!dnd||!closeAll||!items)return stack;
+
+    dnd.textContent=preferences.dnd?'Do not disturb: On':'Do not disturb: Off';
+    dnd.classList.toggle('is-active',Boolean(preferences.dnd));
     const setCollapsed=collapsed=>{stack.classList.toggle('is-collapsed',collapsed);collapse.textContent=collapsed?'▸ Emails':'▾ Emails';collapse.setAttribute('aria-expanded',String(!collapsed));};
     collapse.onclick=()=>setCollapsed(!stack.classList.contains('is-collapsed'));
-    dnd.onclick=()=>{const current=notificationPreferences(),next=!current.dnd;saveNotificationPreferences({...current,dnd:next});dnd.textContent=next?'Do not disturb: On':'Do not disturb: Off';dnd.classList.toggle('is-active',next);if(next){stack.querySelector('.lf-notification-items').replaceChildren();setCollapsed(true);}};
-    stack.querySelector('[data-notification-close-all]').onclick=()=>{stack.querySelector('.lf-notification-items').replaceChildren();setCollapsed(true);};
-    (dock||document.body).appendChild(stack);return stack;
+    dnd.onclick=()=>{const current=notificationPreferences(),next=!current.dnd;saveNotificationPreferences({...current,dnd:next});dnd.textContent=next?'Do not disturb: On':'Do not disturb: Off';dnd.classList.toggle('is-active',next);if(next){items.replaceChildren();setCollapsed(true);}};
+    closeAll.onclick=()=>{items.replaceChildren();setCollapsed(true);};
+    stack.dataset.notificationReady='true';
+    return stack;
   };
   const inboxButtons=item=>{
     const destination=item.type==='Email'
