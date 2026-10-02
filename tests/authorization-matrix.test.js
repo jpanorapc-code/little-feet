@@ -118,7 +118,7 @@ function assertDenied(result,label){
     assert.equal((await request('/api/login',{method:'POST',body:{username:'alpha-teacher',pin:'TeacherPass1'}})).response.status,200);
 
     // Anonymous users must not read private operational data.
-    for(const route of ['/api/accounts','/api/schools/search?q=L','/api/email/status','/api/registry','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
+    for(const route of ['/api/accounts','/api/schools/search?q=L','/api/email/status','/api/registry','/api/parent-contacts','/api/modules/operations','/api/chat/groups','/api/store','/api/parent-payments','/api/report-reviews','/api/household','/api/learner-access-codes','/api/safety-network']){
       assertDenied(await request(route),'anonymous '+route);
     }
 
@@ -134,6 +134,7 @@ function assertDenied(result,label){
     assertDenied(await request('/api/store/products',{method:'POST',cookie:parent,body:{name:'probe',price:1,stockQuantity:1}}),'parent store admin');
     assertDenied(await request('/api/broadcasts',{method:'POST',cookie:parent,body:{bcMessage:'probe',bcPriority:'Urgent',location:{lat:-25,lng:28},radiusKm:1}}),'parent broadcast create');
     assertDenied(await request('/api/learner-access-codes',{cookie:parent}),'parent learner codes');
+    assertDenied(await request('/api/parent-contacts',{cookie:parent}),'parent contact directory');
 
     // Teacher: classroom workflows stay available, admin/principal surfaces stay denied.
     assert.equal((await request('/api/modules/operations',{method:'POST',cookie:teacher,body:{type:'Routine',details:'Classroom record'}})).response.status,200);
@@ -141,6 +142,7 @@ function assertDenied(result,label){
     assertDenied(await request('/api/payments/reconcile',{method:'POST',cookie:teacher,body:{eventId:'x',reference:'x',status:'paid',amount:1}}),'teacher reconciliation');
     assertDenied(await request('/api/safety-network',{cookie:teacher}),'teacher safety-network admin view');
     assertDenied(await request('/api/learner-access-codes',{cookie:teacher}),'teacher learner codes');
+    assert.equal((await request('/api/parent-contacts',{cookie:teacher})).response.status,200);
 
     // Principal: operational leadership is preserved, platform-admin controls remain admin-only.
     assert.equal((await request('/api/subscription-billing',{cookie:principal})).response.status,200);
@@ -149,10 +151,12 @@ function assertDenied(result,label){
     assert.equal((await request('/api/payments/ledger',{cookie:principal})).response.status,200);
     assertDenied(await request('/api/store/products',{method:'POST',cookie:principal,body:{name:'probe',price:1,stockQuantity:1}}),'principal store product admin');
     assertDenied(await request('/api/learner-access-codes/printable-list',{cookie:principal}),'principal bulk code export');
+    assert.equal((await request('/api/parent-contacts',{cookie:principal})).response.status,200);
 
     // District: approved overview/search surfaces only; private chat/learner registers are blocked.
     assert.equal((await request('/api/subscription-billing',{cookie:district})).response.status,200);
     assertDenied(await request('/api/registry',{cookie:district}),'district registry');
+    assertDenied(await request('/api/parent-contacts',{cookie:district}),'district parent contacts');
     assertDenied(await request('/api/modules/operations',{cookie:district}),'district modules');
     assertDenied(await request('/api/chat/groups',{cookie:district}),'district group chat');
     assertDenied(await request('/api/chat/direct/users',{cookie:district}),'district direct chat');
