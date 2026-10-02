@@ -5750,6 +5750,28 @@ app.delete('/api/modules/:module/:id', (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/api/parent-contacts', (req, res) => {
+  const actor = requireSchoolStaff(req);
+  if (!actor) return res.status(403).json({ message: 'Authorised school staff can view parent contact details.' });
+  const contacts = learnerRecordsVisibleTo(db.registry, actor)
+    .map(registryRecordView)
+    .map(record => ({
+      id: record.id || [record.schoolId, record.learnerName, record.guardianName].map(value => String(value || '')).join('|'),
+      learnerName: record.learnerName || '',
+      className: record.className || '',
+      guardianName: record.guardianName || '',
+      guardianPhone: record.guardianPhone || '',
+      guardianEmail: record.guardianEmail || '',
+      emergencyContact: record.emergencyContact || ''
+    }))
+    .sort((first, second) => {
+      const classOrder = String(first.className || '').localeCompare(String(second.className || ''), undefined, { numeric: true, sensitivity: 'base' });
+      return classOrder || String(first.learnerName || '').localeCompare(String(second.learnerName || ''), undefined, { sensitivity: 'base' });
+    });
+  res.set('Cache-Control', 'no-store');
+  res.json(contacts);
+});
+
 app.get('/api/registry', (req, res) => {
   const actor = requireSchoolStaff(req);
   if (!actor) return res.status(403).json({ message: 'Authorised school staff can view the learner register.' });
