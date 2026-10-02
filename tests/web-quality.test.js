@@ -360,6 +360,12 @@ assert.match(page, /@media \(max-width:900px\) and \(max-height:600px\) and \(or
 assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area-inset-right/);
 assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
 assert.match(page, /cinematic\.css\?v=20261002-cinematic-v15/);
+assert.match(page, /Refined login iceberg: keep the original logo artwork untouched/);
+assert.match(page, /<img src="little-feet-mascot\.jfif" alt="Little Feet mascot logo"/);
+assert.match(page, />Little Feet Technologies<\/h1>/);
+assert.match(page, /<p class="slogan">Every Little Step Matters<\/p>/);
+assert.match(page, /\.mascot-stage::before\{[\s\S]*width:276px;height:226px[\s\S]*clip-path:polygon\(2% 100%/);
+assert.match(page, /\.mascot-stage::after\{[\s\S]*width:264px;height:96px/);
 
 assert.match(page, /Little Feet™ School Portal/);
 assert.match(page, /Official site: <a href="https:\/\/littlefeet\.co\.za\//);
