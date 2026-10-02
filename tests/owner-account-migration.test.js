@@ -13,6 +13,9 @@ for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
+fs.mkdirSync(path.join(temp, 'lib', 'operations'), { recursive: true });
+fs.copyFileSync(path.join(root, 'lib', 'operations', 'standby-replication.js'), path.join(temp, 'lib', 'operations', 'standby-replication.js'));
+fs.copyFileSync(path.join(root, 'lib', 'operations', 'recovery-rehearsal.js'), path.join(temp, 'lib', 'operations', 'recovery-rehearsal.js'));
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
