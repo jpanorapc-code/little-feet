@@ -460,7 +460,7 @@ assert.doesNotMatch(server, /Mailbox sync failed: \$\{boundedText\(error\.messag
 assert.doesNotMatch(server, /Email could not be sent: \$\{boundedText\(error\.message/);
 
 assert.match(page, /id="inspectTab" class="tab-content" data-roles="admin,staff"/);
-assert.match(page, />Inspect &amp; Logs<\/span>/);
+assert.match(page, /switchTab\('inspectTab', this\)">Inspect &amp; Logs<\/button>/);
 assert.match(page, /id="inspectRunSiteTestButton"/);
 assert.match(page, /Run full site test/);
 assert.match(client, /async function loadInspectDashboard/);
