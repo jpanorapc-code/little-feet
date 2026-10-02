@@ -429,7 +429,7 @@ assert.match(page, /Professional future surface system/);
 assert.match(page, /--portal-header-height/);
 assert.match(page, /#dashboardSection > \.app-sidebar\.is-collapsed ~ \.container/);
 assert.match(page, /@media \(min-width:900px\) and \(max-width:1199px\) and \(hover:hover\) and \(pointer:fine\)/);
-assert.match(page, /#dashboardSection #navMoreToggle[\s\S]*display:none !important/);
+assert.match(page, /#dashboardSection \.nav-quickbar > #navMoreToggle[\s\S]*display:none !important/);
 assert.match(page, /\.app-sidebar[\s\S]*width:236px !important[\s\S]*transform:none !important/);
 assert.match(client, /function usesDockedSnappedDesktopSidebar\(\)/);
 assert.match(client, /syncNavigationViewportState\(\)/);
