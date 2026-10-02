@@ -134,13 +134,33 @@ const server = http.createServer((req, res) => {
           if (activeTourHeading && parseFloat(getComputedStyle(activeTourHeading).fontSize) > 22) errors.push('mobile portal tour heading is oversized');
 
           const shortcuts = [...header.querySelectorAll('.nav-shortcut')].filter(visible);
-          if (shortcuts.length >= 3) {
-            const tops = shortcuts.map(button => Math.round(button.getBoundingClientRect().top));
-            if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('mobile quick shortcuts wrap onto multiple rows');
+          const mobileMenu = document.getElementById('navMoreToggle');
+          const quickActions = [...shortcuts, ...(mobileMenu && visible(mobileMenu) ? [mobileMenu] : [])];
+          if (quickActions.length >= 4) {
+            const tops = quickActions.map(button => Math.round(button.getBoundingClientRect().top));
+            if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('mobile Home/Search/Help/Menu are not on one row');
           }
           if (header.getBoundingClientRect().height > 230) errors.push('mobile header is too tall');
           const menuButton = document.getElementById('navMoreToggle');
           if (menuButton && menuButton.getBoundingClientRect().height > 48) errors.push('mobile menu button is too tall');
+          const userSwitch = header.querySelector('.user-switch-control');
+          const accountAvatar = document.getElementById('userAvatar');
+          const accountLabel = document.getElementById('displayRole');
+          const serverStatus = document.getElementById('serverStatus');
+          const emailControl = header.querySelector('[data-notification-collapse]');
+          const soundControl = header.querySelector('[data-portal-audio-mute]');
+          const themeControl = header.querySelector('[onclick="toggleDarkMode()"]');
+          if (!userSwitch || !visible(userSwitch) || userSwitch.getBoundingClientRect().width > 50) errors.push('mobile account control is missing or oversized');
+          if (!accountAvatar || !visible(accountAvatar) || accountAvatar.getBoundingClientRect().width < 28) errors.push('mobile account avatar is missing');
+          if (accountLabel && getComputedStyle(accountLabel).display !== 'none') errors.push('mobile long account label should be hidden');
+          const accountRow = [userSwitch, serverStatus, emailControl, soundControl, themeControl].filter(Boolean).filter(visible);
+          if (accountRow.length === 5) {
+            const centers = accountRow.map(element => {
+              const r = element.getBoundingClientRect();
+              return Math.round(r.top + r.height / 2);
+            });
+            if (Math.max(...centers) - Math.min(...centers) > 4) errors.push('mobile account/email controls are not aligned on one row');
+          }
 
           const termsNotice = document.getElementById('termsNotice');
           if (termsNotice && visible(termsNotice) && width <= 420 && termsNotice.getBoundingClientRect().height > 230) errors.push('mobile privacy notice is too tall');
