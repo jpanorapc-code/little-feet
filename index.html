@@ -5068,7 +5068,7 @@
     .email-compose-card{grid-column:1/-1}.email-compose-card form{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(220px,1.3fr);gap:12px}.email-compose-card form label:nth-of-type(3),.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1/-1}.email-compose-card textarea{resize:vertical}
     @media(max-width:640px){#authSection .login-card-actions{grid-template-columns:minmax(0,1fr) 42px}#authSection .login-background-compact{grid-column:1/-1;width:100%!important;min-width:0!important}.lf-notification-controls{display:flex;align-items:center}.email-inbox-item header{flex-direction:column}.email-compose-card form{grid-template-columns:1fr}.email-compose-card form label,.email-compose-card form .actions,.email-compose-card form .meta{grid-column:1}}
 
-    /* Little Feet penguin profile avatars: transparent cutouts blend into the portal chrome. */
+    /* Little Feet penguin profile avatars: external SVG symbols avoid fragile PNG sprite cropping. */
     .profile-icon-picker {
       grid-template-columns:repeat(4,minmax(0,1fr)) !important;
       gap:10px !important;
@@ -5088,20 +5088,10 @@
       width:64px;
       height:64px;
       flex:0 0 64px;
-      background-image:url('/assets/profile/penguin-profile-avatars.png?v=20261002-penguin-avatars-v1');
-      background-repeat:no-repeat;
-      background-size:400% 200%;
+      overflow:visible;
       filter:drop-shadow(0 2px 4px rgba(0,0,0,.30));
       pointer-events:none;
     }
-    .profile-avatar-classic { background-position:0% 0%; }
-    .profile-avatar-lady { background-position:33.333% 0%; }
-    .profile-avatar-tough { background-position:66.667% 0%; }
-    .profile-avatar-cute { background-position:100% 0%; }
-    .profile-avatar-happy { background-position:0% 100%; }
-    .profile-avatar-cool { background-position:33.333% 100%; }
-    .profile-avatar-boss { background-position:66.667% 100%; }
-    .profile-avatar-smart-lady { background-position:100% 100%; }
     .profile-icon-label {
       display:block;
       max-width:100%;
@@ -5121,30 +5111,35 @@
       filter:drop-shadow(0 0 7px rgba(94,234,212,.62)) drop-shadow(0 2px 4px rgba(0,0,0,.28));
     }
     .user-avatar {
-      width:30px !important;
-      height:30px !important;
-      flex:0 0 30px;
-      overflow:visible;
+      width:34px !important;
+      height:34px !important;
+      min-width:34px !important;
+      flex:0 0 34px !important;
+      display:flex !important;
+      align-items:center;
+      justify-content:center;
+      overflow:visible !important;
       border-radius:0 !important;
       background:transparent !important;
       color:inherit;
     }
     .user-avatar .profile-avatar-image {
-      width:30px;
-      height:30px;
-      flex-basis:30px;
+      width:32px;
+      height:32px;
+      min-width:32px;
+      flex:0 0 32px;
       filter:drop-shadow(0 1px 2px rgba(0,0,0,.36));
     }
     @media (max-width:480px) {
       .profile-icon-picker { grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:7px !important; }
-      .profile-icon-choice { min-height:78px !important; padding:6px 3px !important; }
-      .profile-icon-choice .profile-avatar-image { width:50px; height:50px; flex-basis:50px; }
+      .profile-icon-choice { min-height:82px !important; padding:6px 3px !important; }
+      .profile-icon-choice .profile-avatar-image { width:56px; height:56px; flex-basis:56px; }
       .profile-icon-label { font-size:.58rem; }
     }
     @media (max-width:360px) {
       .profile-icon-picker { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
-      .profile-icon-choice { min-height:86px !important; }
-      .profile-icon-choice .profile-avatar-image { width:56px; height:56px; flex-basis:56px; }
+      .profile-icon-choice { min-height:90px !important; }
+      .profile-icon-choice .profile-avatar-image { width:60px; height:60px; flex-basis:60px; }
       .profile-icon-label { font-size:.64rem; }
     }
 
@@ -5389,296 +5384,254 @@
       }
     }
 
-    /* Phone: brand, quick strip, account strip. No separate Menu row. */
+    /* Phone: compact three-row header.
+       Row 1 = brand + avatar/status, row 2 = term, row 3 = the full task bar. */
     @media (max-width:640px) {
       #dashboardSection > nav {
         display:grid !important;
-        grid-template-columns:minmax(0,1fr) !important;
-        grid-template-rows:auto auto auto !important;
-        gap:5px !important;
-        padding:7px 8px !important;
+        grid-template-columns:repeat(7,minmax(0,1fr)) !important;
+        grid-template-rows:minmax(40px,auto) auto 42px !important;
+        gap:5px 4px !important;
+        padding:6px 7px !important;
+        align-items:center !important;
       }
       #dashboardSection .nav-brand {
-        grid-column:1 !important;
+        grid-column:1 / 6 !important;
         grid-row:1 !important;
         width:100% !important;
-        max-width:100% !important;
-      }
-      #dashboardSection .nav-live-pill { display:none !important; }
-      #dashboardSection .nav-quickbar {
-        grid-column:1 !important;
-        grid-row:2 !important;
-        display:grid !important;
-        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
-        gap:5px !important;
-        width:100%;
-        margin:0;
-      }
-      #dashboardSection .nav-term-panel {
-        grid-column:1 / -1 !important;
-        grid-row:1;
-        width:100%;
-        max-width:none !important;
-        min-height:32px !important;
-        padding:3px 6px !important;
-      }
-      #dashboardSection .nav-term-panel strong {
-        font-size:.63rem !important;
-        line-height:1.05 !important;
-      }
-      #dashboardSection .nav-term-panel .nav-term-edit {
-        min-height:28px !important;
-        padding:3px 6px !important;
-        font-size:.62rem !important;
-      }
-      #dashboardSection .nav-quickbar .nav-shortcut,
-      #dashboardSection .nav-quickbar > .nav-more-toggle {
-        width:100% !important;
         min-width:0 !important;
-        min-height:36px !important;
-        padding:5px 3px !important;
-        gap:3px !important;
-        font-size:.64rem !important;
-        white-space:nowrap !important;
+        max-width:100% !important;
+        min-height:40px !important;
+        padding:0 !important;
+        gap:7px !important;
+        overflow:hidden;
       }
-      #dashboardSection .nav-quickbar .ui-icon {
-        width:15px !important;
-        height:15px !important;
+      #dashboardSection .nav-brand img {
+        width:34px !important;
+        height:34px !important;
+        min-width:34px !important;
       }
-      #dashboardSection .nav-user-panel {
-        grid-column:1 !important;
-        grid-row:3 !important;
-        display:flex !important;
-        width:100% !important;
-        margin:0 !important;
-        justify-content:flex-start !important;
-        flex-wrap:nowrap !important;
-        gap:4px !important;
-      }
-      #dashboardSection .nav-user-panel .user-switch-control {
-        flex:1 1 auto;
+      #dashboardSection .nav-brand > div { min-width:0 !important; }
+      #dashboardSection .nav-brand .site-name {
+        display:block;
         min-width:0;
-        max-width:none;
-      }
-      #dashboardSection .nav-user-panel #displayRole {
-        max-width:min(32vw,112px) !important;
         overflow:hidden;
         text-overflow:ellipsis;
         white-space:nowrap;
+        font-size:.78rem !important;
+        letter-spacing:.01em !important;
       }
-      #dashboardSection .nav-user-panel #serverStatus {
-        flex:0 0 auto;
-        min-width:12px;
-      }
-      #dashboardSection .nav-user-panel #serverStatusText { display:none !important; }
-      #dashboardSection .nav-user-panel > .action-btn {
-        flex:0 0 34px;
-        width:34px !important;
-        min-width:34px !important;
-        min-height:34px !important;
-        padding:5px !important;
-      }
-      #dashboardSection .nav-user-panel > .action-btn > span { display:none !important; }
-      #dashboardSection .lf-notification-controls [data-notification-collapse] {
-        min-width:56px !important;
-        min-height:34px;
-        padding:5px 6px !important;
-        font-size:.64rem;
-      }
-      #dashboardSection .lf-notification-items {
-        position:fixed !important;
-        top:calc(var(--portal-header-height, 188px) + 5px) !important;
-        right:8px !important;
-        bottom:auto !important;
-        left:8px !important;
-        width:auto !important;
-        max-height:calc(100dvh - var(--portal-header-height, 188px) - 13px);
-      }
-    }
+      #dashboardSection .nav-brand .org-badge { display:none !important; }
 
-    @media (max-width:360px) {
-      #dashboardSection .nav-brand .site-name {
-        font-size:.72rem !important;
-        letter-spacing:0 !important;
+      #dashboardSection .nav-quickbar,
+      #dashboardSection .nav-user-panel {
+        display:contents !important;
       }
-      #dashboardSection .nav-user-panel #displayRole { max-width:25vw !important; }
-      #dashboardSection .lf-notification-controls [data-notification-collapse] {
-        min-width:52px !important;
-        padding-inline:5px !important;
-      }
-      #dashboardSection .nav-quickbar .nav-shortcut,
-      #dashboardSection .nav-quickbar > .nav-more-toggle {
-        font-size:.60rem !important;
-        padding-inline:2px !important;
-      }
-    }
-
-
-    /* Live mobile header proof: explicitly neutralize legacy Menu grid placement and
-       make the phone account strip visible, compact and deterministic. */
-    @media (max-width:959px) {
-      #dashboardSection .nav-quickbar > #navMoreToggle {
-        grid-column:auto !important;
-        grid-row:auto !important;
-        order:initial !important;
-        justify-self:stretch !important;
-        align-self:stretch !important;
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-term-panel {
+        grid-column:1 / -1 !important;
+        grid-row:2 !important;
         width:100% !important;
+        max-width:none !important;
+        min-width:0 !important;
+        min-height:32px !important;
+        padding:3px 6px !important;
+        margin:0 !important;
       }
-    }
+      #dashboardSection .nav-term-panel strong {
+        min-width:0 !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+        font-size:.62rem !important;
+        line-height:1.05 !important;
+      }
+      #dashboardSection .nav-term-status { display:none !important; }
+      #dashboardSection .nav-term-panel .nav-term-edit {
+        min-height:28px !important;
+        padding:3px 7px !important;
+        font-size:.60rem !important;
+      }
 
-    @media (max-width:640px) {
-      #dashboardSection .nav-quickbar {
-        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
-      }
+      #dashboardSection .nav-quickbar > .nav-shortcut:nth-of-type(1) { grid-column:1 !important; grid-row:3 !important; }
+      #dashboardSection .nav-quickbar > .nav-shortcut:nth-of-type(2) { grid-column:2 !important; grid-row:3 !important; }
+      #dashboardSection .nav-quickbar > .nav-shortcut:nth-of-type(3) { grid-column:3 !important; grid-row:3 !important; }
+      #dashboardSection .nav-quickbar > #navMoreToggle { grid-column:4 !important; grid-row:3 !important; }
+
       #dashboardSection .nav-quickbar > .nav-shortcut,
       #dashboardSection .nav-quickbar > #navMoreToggle {
-        grid-column:auto !important;
-        grid-row:auto !important;
-        min-width:0 !important;
-        width:100% !important;
-      }
-
-      #dashboardSection .nav-user-panel {
-        display:grid !important;
-        grid-template-columns:40px 18px minmax(64px,1fr) 36px 36px !important;
-        grid-template-rows:auto auto;
-        align-items:center !important;
-        justify-content:stretch !important;
-        column-gap:5px !important;
-        row-gap:5px !important;
-        width:100% !important;
-      }
-      #dashboardSection .nav-user-panel .user-switch-control {
-        grid-column:1 !important;
-        grid-row:1 !important;
-        display:inline-flex !important;
-        width:40px !important;
-        min-width:40px !important;
-        max-width:40px !important;
-        min-height:36px !important;
-        padding:3px !important;
+        display:flex !important;
+        flex-direction:column !important;
         align-items:center !important;
         justify-content:center !important;
-        overflow:visible !important;
-      }
-      #dashboardSection .nav-user-panel #displayRole {
-        display:none !important;
-      }
-      #dashboardSection .nav-user-panel .user-avatar,
-      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
-        display:block !important;
-        width:30px !important;
-        height:30px !important;
-        min-width:30px !important;
-        flex:0 0 30px !important;
-      }
-      #dashboardSection .nav-user-panel #serverStatus {
-        grid-column:2 !important;
-        grid-row:1 !important;
-        width:18px !important;
-        min-width:18px !important;
-        justify-self:center !important;
-      }
-      #dashboardSection .nav-user-panel .lf-notification-stack {
-        grid-column:3 !important;
-        grid-row:1 !important;
+        align-self:stretch !important;
+        justify-self:stretch !important;
         width:100% !important;
         min-width:0 !important;
+        max-width:none !important;
+        min-height:40px !important;
+        height:40px !important;
+        margin:0 !important;
+        padding:3px 1px !important;
+        gap:1px !important;
+        white-space:nowrap !important;
+        overflow:hidden;
       }
-      #dashboardSection .nav-user-panel .lf-notification-controls {
-        width:100%;
+      #dashboardSection .nav-quickbar > .nav-shortcut > span,
+      #dashboardSection .nav-quickbar > #navMoreToggle > span { display:none !important; }
+      #dashboardSection .nav-quickbar > [data-mobile-label]::after {
+        content:attr(data-mobile-label);
+        display:block;
+        font-size:.50rem;
+        font-weight:800;
+        line-height:1;
+      }
+      #dashboardSection .nav-quickbar .ui-icon {
+        width:17px !important;
+        height:17px !important;
+        flex:0 0 17px !important;
+      }
+
+      #dashboardSection .nav-user-panel .user-switch-control {
+        grid-column:6 !important;
+        grid-row:1 !important;
+        display:inline-flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        align-self:center !important;
+        justify-self:center !important;
+        width:38px !important;
+        min-width:38px !important;
+        max-width:38px !important;
+        height:38px !important;
+        min-height:38px !important;
+        margin:0 !important;
+        padding:2px !important;
+        overflow:visible !important;
+      }
+      #dashboardSection .nav-user-panel #displayRole { display:none !important; }
+      #dashboardSection .nav-user-panel .user-avatar {
+        width:34px !important;
+        height:34px !important;
+        min-width:34px !important;
+      }
+      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
+        width:32px !important;
+        height:32px !important;
+        min-width:32px !important;
+        flex-basis:32px !important;
+      }
+      #dashboardSection .nav-user-panel #serverStatus {
+        grid-column:7 !important;
+        grid-row:1 !important;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        align-self:center !important;
+        justify-self:center !important;
+        width:34px !important;
+        min-width:34px !important;
+        max-width:34px !important;
+        height:34px !important;
+        margin:0 !important;
+        padding:0 !important;
+      }
+      #dashboardSection .nav-user-panel #serverStatusText { display:none !important; }
+
+      #dashboardSection .nav-user-panel .lf-notification-stack {
+        grid-column:5 !important;
+        grid-row:3 !important;
+        align-self:stretch !important;
+        justify-self:stretch !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:none !important;
+        margin:0 !important;
       }
       #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed .lf-notification-controls {
         display:block !important;
+        width:100% !important;
+        height:100% !important;
       }
       #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
         width:100% !important;
         min-width:0 !important;
-        min-height:36px !important;
+        max-width:none !important;
+        height:40px !important;
+        min-height:40px !important;
+        margin:0 !important;
+        padding:3px 1px !important;
+        font-size:.50rem !important;
+        line-height:1 !important;
+        white-space:normal !important;
+        text-align:center;
       }
+
       #dashboardSection .nav-user-panel > [data-portal-audio-mute] {
-        grid-column:4 !important;
-        grid-row:1 !important;
+        grid-column:6 !important;
+        grid-row:3 !important;
       }
       #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
-        grid-column:5 !important;
-        grid-row:1 !important;
+        grid-column:7 !important;
+        grid-row:3 !important;
       }
       #dashboardSection .nav-user-panel > [data-portal-audio-mute],
       #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
-        width:36px !important;
-        min-width:36px !important;
-        max-width:36px !important;
-        min-height:36px !important;
-        padding:6px !important;
+        align-self:stretch !important;
+        justify-self:stretch !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:none !important;
+        height:40px !important;
+        min-height:40px !important;
         margin:0 !important;
+        padding:5px !important;
+      }
+      #dashboardSection .nav-user-panel > [data-portal-audio-mute] > span,
+      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] > span { display:none !important; }
+      #dashboardSection .nav-user-panel > [data-portal-audio-mute] .ui-icon,
+      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] .ui-icon {
+        width:18px !important;
+        height:18px !important;
       }
 
       #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) {
         grid-column:1 / -1 !important;
-        grid-row:2 !important;
+        grid-row:4 !important;
         width:100% !important;
       }
       #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) .lf-notification-controls {
         display:grid !important;
-        grid-template-columns:repeat(3,minmax(0,1fr));
-        gap:5px;
+        grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+        gap:5px !important;
+        width:100% !important;
       }
       #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) .lf-notification-controls .action-btn {
         width:100% !important;
         min-width:0 !important;
+        min-height:36px !important;
         white-space:normal !important;
       }
+      #dashboardSection .lf-notification-items {
+        position:fixed !important;
+        top:calc(var(--portal-header-height, 128px) + 5px) !important;
+        right:8px !important;
+        bottom:auto !important;
+        left:8px !important;
+        width:auto !important;
+        max-height:calc(100dvh - var(--portal-header-height, 128px) - 13px);
+      }
     }
 
-    /* Top-bar profile avatar: zoom into each transparent sprite cell so the
-       penguin remains recognisable at 30–36px instead of becoming a tiny smudge. */
-    #dashboardSection .user-avatar {
-      width:36px !important;
-      height:36px !important;
-      min-width:36px !important;
-      flex:0 0 36px !important;
-      display:flex !important;
-      align-items:center;
-      justify-content:center;
-      overflow:visible !important;
-    }
-    #dashboardSection .user-avatar .profile-avatar-image {
-      width:34px !important;
-      height:34px !important;
-      min-width:34px !important;
-      flex:0 0 34px !important;
-      background-size:720% 360% !important;
-      background-repeat:no-repeat !important;
-      filter:drop-shadow(0 1px 2px rgba(0,0,0,.38)) !important;
-    }
-    #dashboardSection .user-avatar .profile-avatar-classic { background-position:6.45% 15.38% !important; }
-    #dashboardSection .user-avatar .profile-avatar-lady { background-position:35.48% 15.38% !important; }
-    #dashboardSection .user-avatar .profile-avatar-tough { background-position:64.52% 15.38% !important; }
-    #dashboardSection .user-avatar .profile-avatar-cute { background-position:93.55% 15.38% !important; }
-    #dashboardSection .user-avatar .profile-avatar-happy { background-position:6.45% 84.62% !important; }
-    #dashboardSection .user-avatar .profile-avatar-cool { background-position:35.48% 84.62% !important; }
-    #dashboardSection .user-avatar .profile-avatar-boss { background-position:64.52% 84.62% !important; }
-    #dashboardSection .user-avatar .profile-avatar-smart-lady { background-position:93.55% 84.62% !important; }
-
-    @media (max-width:640px) {
-      #dashboardSection .nav-user-panel .user-switch-control {
-        width:42px !important;
-        min-width:42px !important;
-        max-width:42px !important;
-        padding:2px !important;
-      }
-      #dashboardSection .nav-user-panel .user-avatar {
-        width:38px !important;
-        height:38px !important;
-        min-width:38px !important;
-      }
-      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
-        width:36px !important;
-        height:36px !important;
-        min-width:36px !important;
-        flex-basis:36px !important;
+    @media (max-width:360px) {
+      #dashboardSection > nav { gap:4px 3px !important; padding-inline:5px !important; }
+      #dashboardSection .nav-brand .site-name { font-size:.70rem !important; }
+      #dashboardSection .nav-quickbar > [data-mobile-label]::after { font-size:.46rem !important; }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
+        font-size:.45rem !important;
       }
     }
 </style>
@@ -5910,10 +5863,10 @@
           <button type="button" class="nav-term-edit role-admin hidden" onclick="editTermModal()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Edit</span></button>
           <span id="liveSyncTag" class="nav-term-status">Last synced: Just now</span>
         </div>
-        <button type="button" class="nav-shortcut" onclick="openWorkspace('homeTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></button>
-        <button type="button" class="nav-shortcut" onclick="openGlobalSearch()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search</span></button>
-        <button type="button" class="nav-shortcut" onclick="openWorkspace('ticketsTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-help"></use></svg><span>Get help</span></button>
-        <button type="button" id="navMoreToggle" class="nav-more-toggle" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation"><svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg><span>Menu</span></button>
+        <button type="button" class="nav-shortcut" data-mobile-label="Home" onclick="openWorkspace('homeTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></button>
+        <button type="button" class="nav-shortcut" data-mobile-label="Search" onclick="openGlobalSearch()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search</span></button>
+        <button type="button" class="nav-shortcut" data-mobile-label="Help" onclick="openWorkspace('ticketsTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-help"></use></svg><span>Get help</span></button>
+        <button type="button" id="navMoreToggle" class="nav-more-toggle" data-mobile-label="Menu" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation"><svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg><span>Menu</span></button>
       </div>
 
       <div class="nav-user-panel" id="navUserPanel">
@@ -7062,7 +7015,7 @@
         <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-operations"></use></svg></span><span>Personal settings</span></h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
           <p style="color:var(--text-muted);margin-bottom:16px;">These settings are saved on this device for the signed-in account.</p>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Profile icon</h3><p>Choose your Little Feet penguin shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your penguin profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="classic" aria-label="Classic penguin" title="Classic penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-classic" aria-hidden="true"></span><span class="profile-icon-label">Classic</span></button><button type="button" class="profile-icon-choice" data-profile-icon="lady" aria-label="Lady penguin" title="Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-lady" aria-hidden="true"></span><span class="profile-icon-label">Lady</span></button><button type="button" class="profile-icon-choice" data-profile-icon="tough" aria-label="Tough penguin" title="Tough penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-tough" aria-hidden="true"></span><span class="profile-icon-label">Tough</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cute" aria-label="Cute penguin" title="Cute penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-cute" aria-hidden="true"></span><span class="profile-icon-label">Cute</span></button><button type="button" class="profile-icon-choice" data-profile-icon="happy" aria-label="Happy penguin" title="Happy penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-happy" aria-hidden="true"></span><span class="profile-icon-label">Happy</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cool" aria-label="Cool penguin" title="Cool penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-cool" aria-hidden="true"></span><span class="profile-icon-label">Cool</span></button><button type="button" class="profile-icon-choice" data-profile-icon="boss" aria-label="Boss penguin" title="Boss penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-boss" aria-hidden="true"></span><span class="profile-icon-label">Boss</span></button><button type="button" class="profile-icon-choice" data-profile-icon="smart-lady" aria-label="Smart Lady penguin" title="Smart Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><span class="profile-avatar-image profile-avatar-smart-lady" aria-hidden="true"></span><span class="profile-icon-label">Smart Lady</span></button></div></div>
+            <div class="workspace-card"><h3>Profile icon</h3><p>Choose your Little Feet penguin shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your penguin profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="classic" aria-label="Classic penguin" title="Classic penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-classic" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-classic"></use></svg><span class="profile-icon-label">Classic</span></button><button type="button" class="profile-icon-choice" data-profile-icon="lady" aria-label="Lady penguin" title="Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-lady" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-lady"></use></svg><span class="profile-icon-label">Lady</span></button><button type="button" class="profile-icon-choice" data-profile-icon="tough" aria-label="Tough penguin" title="Tough penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-tough" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-tough"></use></svg><span class="profile-icon-label">Tough</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cute" aria-label="Cute penguin" title="Cute penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-cute" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-cute"></use></svg><span class="profile-icon-label">Cute</span></button><button type="button" class="profile-icon-choice" data-profile-icon="happy" aria-label="Happy penguin" title="Happy penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-happy" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-happy"></use></svg><span class="profile-icon-label">Happy</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cool" aria-label="Cool penguin" title="Cool penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-cool" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-cool"></use></svg><span class="profile-icon-label">Cool</span></button><button type="button" class="profile-icon-choice" data-profile-icon="boss" aria-label="Boss penguin" title="Boss penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-boss" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-boss"></use></svg><span class="profile-icon-label">Boss</span></button><button type="button" class="profile-icon-choice" data-profile-icon="smart-lady" aria-label="Smart Lady penguin" title="Smart Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-smart-lady" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-smart-lady"></use></svg><span class="profile-icon-label">Smart Lady</span></button></div></div>
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. Core navigation and settings are translated; untranslated workspace text safely falls back to English.</p><select id="languagePreference" data-no-draft onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans</option><option value="zu">isiZulu</option><option value="xh">isiXhosa</option><option value="nso">Sepedi</option><option value="st">Sesotho</option><option value="tn">Setswana</option><option value="ss">siSwati</option><option value="ve">Tshivenda</option><option value="ts">itsonga</option><option value="nr">isiNdebele</option></select><p class="meta" style="margin-top:8px;">South African Sign Language (SASL) is an official language. Text translation is not a substitute for signed content, so SASL accessibility content is tracked separately rather than shown as a fake text translation.</p></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without hammering the API. Smart refresh updates only the active workspace and pauses while this tab is hidden.</p><select id="refreshPreference" data-no-draft onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="auto">Auto (smart · 2–5 minutes)</option><option value="300000">Every 5 minutes</option><option value="900000">Every 15 minutes</option><option value="1800000">Every 30 minutes</option><option value="3600000">Every hour</option><option value="7200000">Every 2 hours</option><option value="86400000">Every day</option></select><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="action-btn btn-blue" onclick="refreshDashboardSafely()">Refresh now safely</button></div><p class="meta" style="margin-top:8px;">Draft protection uses this browser tab only. Passwords, PINs, one-time codes, signatures and files are never stored in the draft checkpoint.</p></div>
             <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute penguin calls, alerts, wallpaper audio and other optional Little Feet sounds. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
@@ -7196,7 +7149,7 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261002-penguin-avatars-v1" defer></script>
+  <script src="backup.js?v=20261002-avatar-svg-v2" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/staff-work.js?v=20261001-startup-dedupe-v1" defer></script>
