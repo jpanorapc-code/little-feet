@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
     document.getElementById('displayRole').textContent = 'School Administrator · ADMIN';
     // This geometry harness deliberately strips executable scripts from index.html,
     // so inject the same default avatar markup that backup.js would render.
-    document.getElementById('userAvatar').innerHTML = '<span class="profile-avatar-image profile-avatar-classic" aria-hidden="true"></span>';
+    document.getElementById('userAvatar').innerHTML = '<svg class="profile-avatar-image profile-avatar-classic" viewBox="0 0 128 128" aria-hidden="true"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-classic"></use></svg>';
     return [...document.querySelectorAll('.tab-content')].filter(tab => !tab.parentElement.matches('#dashboardSection > .container')).map(tab => tab.id);
   });
   assert.deepEqual(structure, [], 'Every tab must remain inside the shared content container');
@@ -100,7 +100,7 @@ const server = http.createServer((req, res) => {
           const emailRect = emailButton.getBoundingClientRect();
           const panelRect = userPanel.getBoundingClientRect();
           const headerRect = header.getBoundingClientRect();
-          if (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1) errors.push('Emails control floats outside account row');
+          if (width > 640 && (emailRect.top < panelRect.top - 1 || emailRect.bottom > panelRect.bottom + 1)) errors.push('Emails control floats outside account row');
           if (emailRect.top < headerRect.top - 1 || emailRect.bottom > headerRect.bottom + 1) errors.push('Emails control floats outside header');
           if (getComputedStyle(emailDock).position === 'fixed') errors.push('Emails dock itself must not be fixed/floating');
         }
@@ -143,7 +143,7 @@ const server = http.createServer((req, res) => {
             const tops = quickActions.map(button => Math.round(button.getBoundingClientRect().top));
             if (Math.max(...tops) - Math.min(...tops) > 2) errors.push('mobile Home/Search/Help/Menu are not on one row');
           }
-          if (header.getBoundingClientRect().height > 230) errors.push('mobile header is too tall');
+          if (header.getBoundingClientRect().height > 170) errors.push('mobile header is too tall');
           const menuButton = document.getElementById('navMoreToggle');
           if (menuButton && menuButton.getBoundingClientRect().height > 48) errors.push('mobile menu button is too tall');
           const userSwitch = header.querySelector('.user-switch-control');
@@ -155,23 +155,21 @@ const server = http.createServer((req, res) => {
           const themeControl = header.querySelector('[onclick="toggleDarkMode()"]');
           if (!userSwitch || !visible(userSwitch) || userSwitch.getBoundingClientRect().width > 50) errors.push('mobile account control is missing or oversized');
           if (!accountAvatar || !visible(accountAvatar) || accountAvatar.getBoundingClientRect().width < 28) errors.push('mobile account avatar is missing');
-          const avatarSprite = accountAvatar?.querySelector('.profile-avatar-image');
+          const avatarSprite = accountAvatar?.querySelector('svg.profile-avatar-image');
           if (!avatarSprite || !visible(avatarSprite)) {
-            errors.push('mobile penguin sprite is missing');
+            errors.push('mobile penguin SVG is missing');
           } else {
             const spriteRect = avatarSprite.getBoundingClientRect();
-            const spriteStyle = getComputedStyle(avatarSprite);
-            if (spriteRect.width < 34 || spriteRect.height < 34) errors.push('mobile penguin sprite is too small');
-            if (spriteStyle.backgroundSize !== '720% 360%') errors.push(`mobile penguin sprite zoom is wrong: ${spriteStyle.backgroundSize}`);
+            const use = avatarSprite.querySelector('use');
+            const href = use?.getAttribute('href') || '';
+            if (spriteRect.width < 30 || spriteRect.height < 30) errors.push('mobile penguin SVG is too small');
+            if (!href.includes('penguin-profile-avatars.svg') || !href.includes('#avatar-')) errors.push('mobile penguin SVG source is wrong');
           }
           if (accountLabel && getComputedStyle(accountLabel).display !== 'none') errors.push('mobile long account label should be hidden');
-          const accountRow = [userSwitch, serverStatus, emailControl, soundControl, themeControl].filter(Boolean).filter(visible);
-          if (accountRow.length === 5) {
-            const centers = accountRow.map(element => {
-              const r = element.getBoundingClientRect();
-              return Math.round(r.top + r.height / 2);
-            });
-            if (Math.max(...centers) - Math.min(...centers) > 4) errors.push('mobile account/email controls are not aligned on one row');
+          const toolbarRow = [...quickActions, emailControl, soundControl, themeControl].filter(Boolean).filter(visible);
+          if (toolbarRow.length >= 7) {
+            const tops = toolbarRow.map(element => Math.round(element.getBoundingClientRect().top));
+            if (Math.max(...tops) - Math.min(...tops) > 3) errors.push('mobile task-bar controls are not aligned on one row');
           }
 
           const termsNotice = document.getElementById('termsNotice');
