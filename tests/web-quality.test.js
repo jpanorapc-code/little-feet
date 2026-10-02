@@ -78,9 +78,10 @@ assert.match(page, /<option value="school_accounts">School Accounts<\/option>/);
 assert.match(page, /<option value="accounts">Little Feet Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
 assert.match(page, /backup\.js\?v=20261002-penguin-avatars-v1/);
-for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests','workplace-extended']) {
+for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests']) {
   assert.match(page, new RegExp('assets/' + asset + '\\.js\\?v=20261001-startup-dedupe-v1'));
 }
+assert.match(page, /assets\/workplace-extended\.js\?v=20261002-responsive-header-v1/);
 assert.match(page, /id="accountResetLoginWaitButton"/);
 assert.match(page, /Reset 10-minute login wait/);
 assert.match(client, /async function resetSelectedAccountLoginWait\(\)/);
