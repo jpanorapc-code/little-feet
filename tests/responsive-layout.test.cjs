@@ -42,6 +42,9 @@ const server = http.createServer((req, res) => {
     document.body.classList.add('portal-active');
     document.querySelectorAll('.role-admin, [data-roles]').forEach(el => el.classList.remove('hidden'));
     document.getElementById('displayRole').textContent = 'School Administrator · ADMIN';
+    // This geometry harness deliberately strips executable scripts from index.html,
+    // so inject the same default avatar markup that backup.js would render.
+    document.getElementById('userAvatar').innerHTML = '<span class="profile-avatar-image profile-avatar-classic" aria-hidden="true"></span>';
     return [...document.querySelectorAll('.tab-content')].filter(tab => !tab.parentElement.matches('#dashboardSection > .container')).map(tab => tab.id);
   });
   assert.deepEqual(structure, [], 'Every tab must remain inside the shared content container');
