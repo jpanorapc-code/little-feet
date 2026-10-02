@@ -2156,8 +2156,10 @@ const runAdminSelfTest = async actor => {
       }
       if (checked.has(local)) continue;
       checked.add(local);
-      if (!fs.existsSync(path.join(__dirname, local))) {
-        addFinding('error', 'frontend', 'frontend.asset_reference', `Missing deployed asset: ${local}`, 'index.html references a local file that does not exist in the deployed build, which can cause broken UI, scripts, images or styles.', 'index.html', sourceLineNumber(indexSource, reference.offset), null, 'Restore the referenced file or correct the index.html reference.');
+      const vendorAsset = local.startsWith('vendor/') ? local.slice('vendor/'.length) : '';
+      const routeBackedAsset = Boolean(vendorAsset && Object.prototype.hasOwnProperty.call(browserVendorSources, vendorAsset));
+      if (!fs.existsSync(path.join(__dirname, local)) && !routeBackedAsset) {
+        addFinding('error', 'frontend', 'frontend.asset_reference', `Missing deployed asset: ${local}`, 'index.html references a same-origin asset that is neither present on disk nor provided by an approved application route, which can cause broken UI, scripts, images or styles.', 'index.html', sourceLineNumber(indexSource, reference.offset), null, 'Restore the referenced file, add the approved serving route, or correct the index.html reference.');
       }
     }
     addCheck('frontend.asset_references', findings.some(item => item.check === 'frontend.asset_reference') ? 'failed' : 'passed', `${checked.size} local deployed asset references checked.`);
@@ -2214,7 +2216,14 @@ const runAdminSelfTest = async actor => {
   for (const relative of [...new Set(runtimeSourceFiles)]) {
     try {
       const content = fs.readFileSync(path.join(__dirname, relative), 'utf8');
-      findings.push(...scanSourceMatches(relative, content, executionRules));
+      const executionFindings = scanSourceMatches(relative, content, executionRules).filter(item => {
+        if (relative !== 'server.js' || !item.line) return true;
+        const sourceLine = content.split('\n')[item.line - 1] || '';
+        // The self-test stores the detector regexes and human-readable rule names
+        // in server.js. Those literals are not executable dynamic code.
+        return !sourceLine.includes("source.dynamic_code_execution");
+      });
+      findings.push(...executionFindings);
     } catch {}
   }
   addCheck('source.dynamic_code_execution', findings.some(item => item.check === 'source.dynamic_code_execution') ? 'failed' : 'passed', 'Deployed first-party JavaScript checked for eval() and new Function().');
