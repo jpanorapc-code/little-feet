@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v42-mobile-toolbar-avatar-svg';
+const CACHE_NAME = 'little-feet-shell-v43-about-company';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -16,7 +16,7 @@ const SHELL_ASSETS = [
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
   '/assets/preferences-enhancements.js?v=20261001-api-refresh-flood-v1',
-  '/assets/legal-notices.js?v=20260929-legal-v5',
+  '/assets/legal-notices.js?v=20261002-about-v1',
   '/assets/finance-automation.js?v=20260925-finance-v1'
 ];
 
