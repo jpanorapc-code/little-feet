@@ -5286,31 +5286,28 @@
     }
 
     /* Snapped-window / tablet / small desktop header.
-       Use explicit grid slots so Windows split-screen and browser zoom cannot
-       make Menu or account controls fall onto stray rows.
-       Row 1 = brand + account controls, row 2 = term, row 3 = quick actions. */
+       Two explicit wrapper rows. Do NOT flatten wrappers with display:contents:
+       that caused browser/snap-width controls to escape into stray rows. */
     @media (min-width:641px) and (max-width:1199px) {
       #dashboardSection > nav {
         display:grid !important;
-        grid-template-columns:repeat(12,minmax(0,1fr)) !important;
-        grid-template-rows:minmax(40px,auto) auto 40px !important;
+        grid-template-columns:minmax(0,1fr) auto !important;
+        grid-template-rows:42px 42px !important;
         align-items:center !important;
-        gap:5px 6px !important;
+        gap:6px 8px !important;
         padding:7px 9px !important;
       }
 
       #dashboardSection .nav-brand {
-        grid-column:1 / 7 !important;
+        grid-column:1 !important;
         grid-row:1 !important;
-        width:100% !important;
         min-width:0 !important;
-        max-width:100% !important;
+        width:100% !important;
         overflow:hidden !important;
       }
       #dashboardSection .nav-brand > div { min-width:0 !important; overflow:hidden !important; }
       #dashboardSection .nav-brand .site-name {
         display:block !important;
-        min-width:0 !important;
         max-width:100% !important;
         overflow:hidden !important;
         text-overflow:ellipsis !important;
@@ -5318,19 +5315,103 @@
       }
       #dashboardSection .nav-brand .org-badge { display:none !important; }
 
-      #dashboardSection .nav-quickbar,
       #dashboardSection .nav-user-panel {
-        display:contents !important;
+        grid-column:2 !important;
+        grid-row:1 !important;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:flex-end !important;
+        flex-wrap:nowrap !important;
+        gap:5px !important;
+        width:auto !important;
+        min-width:0 !important;
+        max-width:330px !important;
+        margin:0 !important;
       }
-      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-user-panel .user-switch-control {
+        width:40px !important;
+        min-width:40px !important;
+        max-width:40px !important;
+        height:36px !important;
+        padding:2px !important;
+        justify-content:center !important;
+        overflow:hidden !important;
+      }
+      #dashboardSection .nav-user-panel #displayRole,
+      #dashboardSection .nav-user-panel #serverStatusText { display:none !important; }
+      #dashboardSection .nav-user-panel .user-avatar {
+        width:30px !important;
+        height:30px !important;
+        min-width:30px !important;
+      }
+      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
+        width:28px !important;
+        height:28px !important;
+        min-width:28px !important;
+      }
+      #dashboardSection .nav-user-panel #serverStatus {
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        width:32px !important;
+        min-width:32px !important;
+        max-width:32px !important;
+        height:34px !important;
+        margin:0 !important;
+        padding:0 !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack {
+        position:static !important;
+        width:auto !important;
+        min-width:0 !important;
+        max-width:86px !important;
+        margin:0 !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed .lf-notification-controls {
+        display:block !important;
+      }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
+        width:74px !important;
+        min-width:74px !important;
+        max-width:74px !important;
+        height:34px !important;
+        min-height:34px !important;
+        margin:0 !important;
+        padding:4px 6px !important;
+        font-size:.62rem !important;
+        white-space:nowrap !important;
+      }
+      #dashboardSection .nav-user-panel > [data-portal-audio-mute],
+      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
+        width:36px !important;
+        min-width:36px !important;
+        max-width:36px !important;
+        height:34px !important;
+        min-height:34px !important;
+        margin:0 !important;
+        padding:5px !important;
+      }
+      #dashboardSection .nav-user-panel > [data-portal-audio-mute] > span,
+      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] > span { display:none !important; }
 
-      #dashboardSection .nav-term-panel {
+      #dashboardSection .nav-live-pill { display:none !important; }
+      #dashboardSection .nav-quickbar {
         grid-column:1 / -1 !important;
         grid-row:2 !important;
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) repeat(4,76px) !important;
+        align-items:center !important;
+        gap:6px !important;
+        width:100% !important;
+        min-width:0 !important;
+        margin:0 !important;
+      }
+      #dashboardSection .nav-term-panel {
+        grid-column:1 !important;
         width:100% !important;
         max-width:none !important;
         min-width:0 !important;
-        min-height:32px !important;
+        min-height:36px !important;
         margin:0 !important;
         padding:4px 7px !important;
       }
@@ -5348,170 +5429,62 @@
         font-size:.62rem !important;
       }
 
-      #dashboardSection .nav-quickbar > .nav-shortcut:nth-of-type(1) { grid-column:1 / 4 !important; grid-row:3 !important; }
-      #dashboardSection .nav-quickbar > .nav-shortcut:nth-of-type(2) { grid-column:4 / 7 !important; grid-row:3 !important; }
-      #dashboardSection .nav-quickbar > .nav-shortcut:nth-of-type(3) { grid-column:7 / 10 !important; grid-row:3 !important; }
-      #dashboardSection .nav-quickbar > #navMoreToggle { grid-column:10 / 13 !important; grid-row:3 !important; }
-
       #dashboardSection .nav-quickbar > .nav-shortcut,
       #dashboardSection .nav-quickbar > #navMoreToggle {
         display:flex !important;
         align-items:center !important;
         justify-content:center !important;
-        width:100% !important;
-        min-width:0 !important;
-        max-width:none !important;
-        height:40px !important;
-        min-height:40px !important;
-        margin:0 !important;
-        padding:6px 8px !important;
-        gap:5px !important;
-        font-size:.70rem !important;
-        white-space:nowrap !important;
-        overflow:hidden !important;
-      }
-
-      #dashboardSection .nav-user-panel .user-switch-control {
-        grid-column:7 / 9 !important;
-        grid-row:1 !important;
-        align-self:center !important;
-        justify-self:stretch !important;
-        width:100% !important;
-        min-width:0 !important;
-        max-width:none !important;
+        width:76px !important;
+        min-width:76px !important;
+        max-width:76px !important;
         height:36px !important;
         min-height:36px !important;
         margin:0 !important;
-        padding:3px 5px !important;
-        overflow:hidden !important;
-      }
-      #dashboardSection .nav-user-panel #displayRole {
-        display:block !important;
-        min-width:0 !important;
-        max-width:100% !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-        white-space:nowrap !important;
-        font-size:.68rem !important;
-      }
-      #dashboardSection .nav-user-panel .user-avatar {
-        flex:0 0 30px !important;
-        width:30px !important;
-        height:30px !important;
-        min-width:30px !important;
-      }
-      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
-        width:28px !important;
-        height:28px !important;
-        min-width:28px !important;
-      }
-
-      #dashboardSection .nav-user-panel #serverStatus {
-        grid-column:9 / 10 !important;
-        grid-row:1 !important;
-        align-self:center !important;
-        justify-self:stretch !important;
-        display:flex !important;
-        align-items:center !important;
-        justify-content:center !important;
-        min-width:0 !important;
-        height:34px !important;
-        margin:0 !important;
-        overflow:hidden !important;
-      }
-      #dashboardSection .nav-user-panel #serverStatusText { display:none !important; }
-
-      #dashboardSection .nav-user-panel .lf-notification-stack {
-        grid-column:10 / 11 !important;
-        grid-row:1 !important;
-        align-self:center !important;
-        justify-self:stretch !important;
-        width:100% !important;
-        min-width:0 !important;
-        max-width:none !important;
-        margin:0 !important;
-      }
-      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed .lf-notification-controls {
-        display:block !important;
-        width:100% !important;
-      }
-      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
-        display:flex !important;
-        align-items:center !important;
-        justify-content:center !important;
-        width:100% !important;
-        min-width:0 !important;
-        max-width:none !important;
-        height:34px !important;
-        min-height:34px !important;
-        margin:0 !important;
-        padding:4px 3px !important;
-        font-size:.58rem !important;
+        padding:6px 5px !important;
+        gap:4px !important;
+        font-size:.66rem !important;
         white-space:nowrap !important;
         overflow:hidden !important;
       }
-
-      #dashboardSection .nav-user-panel > [data-portal-audio-mute] {
-        grid-column:11 / 12 !important;
-        grid-row:1 !important;
-      }
-      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
-        grid-column:12 / 13 !important;
-        grid-row:1 !important;
-      }
-      #dashboardSection .nav-user-panel > [data-portal-audio-mute],
-      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] {
-        align-self:center !important;
-        justify-self:stretch !important;
-        width:100% !important;
-        min-width:0 !important;
-        max-width:none !important;
-        height:34px !important;
-        min-height:34px !important;
-        margin:0 !important;
-        padding:5px !important;
-      }
-      #dashboardSection .nav-user-panel > [data-portal-audio-mute] > span,
-      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] > span { display:none !important; }
 
       #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) {
-        grid-column:1 / -1 !important;
-        grid-row:4 !important;
-        width:100% !important;
-        z-index:40 !important;
-      }
-      #dashboardSection .nav-user-panel .lf-notification-stack:not(.is-collapsed) .lf-notification-controls {
-        display:grid !important;
-        grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-        gap:5px !important;
-        width:100% !important;
+        position:absolute !important;
+        right:8px !important;
+        top:48px !important;
+        width:min(430px,calc(100vw - 16px)) !important;
+        max-width:min(430px,calc(100vw - 16px)) !important;
+        z-index:90 !important;
       }
     }
 
     @media (min-width:641px) and (max-width:760px) {
-      #dashboardSection .nav-brand { grid-column:1 / 8 !important; }
+      #dashboardSection > nav {
+        grid-template-rows:40px 40px !important;
+        gap:5px 6px !important;
+      }
       #dashboardSection .nav-brand img {
-        width:36px !important;
-        height:36px !important;
-        min-width:36px !important;
+        width:34px !important;
+        height:34px !important;
+        min-width:34px !important;
       }
-      #dashboardSection .nav-brand .site-name { font-size:.90rem !important; }
-
-      #dashboardSection .nav-user-panel .user-switch-control {
-        grid-column:8 / 9 !important;
-        padding:2px !important;
-        justify-content:center !important;
+      #dashboardSection .nav-brand .site-name { font-size:.88rem !important; }
+      #dashboardSection .nav-user-panel .lf-notification-stack.is-collapsed [data-notification-collapse] {
+        width:62px !important;
+        min-width:62px !important;
+        max-width:62px !important;
+        font-size:.56rem !important;
       }
-      #dashboardSection .nav-user-panel #displayRole { display:none !important; }
-      #dashboardSection .nav-user-panel #serverStatus { grid-column:9 / 10 !important; }
-      #dashboardSection .nav-user-panel .lf-notification-stack { grid-column:10 / 11 !important; }
-      #dashboardSection .nav-user-panel > [data-portal-audio-mute] { grid-column:11 / 12 !important; }
-      #dashboardSection .nav-user-panel > [onclick="toggleDarkMode()"] { grid-column:12 / 13 !important; }
-
+      #dashboardSection .nav-quickbar {
+        grid-template-columns:minmax(0,1fr) repeat(4,64px) !important;
+        gap:4px !important;
+      }
       #dashboardSection .nav-quickbar > .nav-shortcut,
       #dashboardSection .nav-quickbar > #navMoreToggle {
-        padding-inline:5px !important;
-        font-size:.66rem !important;
+        width:64px !important;
+        min-width:64px !important;
+        max-width:64px !important;
+        font-size:.60rem !important;
+        padding-inline:3px !important;
       }
     }
 
