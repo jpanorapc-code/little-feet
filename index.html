@@ -5627,6 +5627,56 @@
         white-space:normal !important;
       }
     }
+
+    /* Top-bar profile avatar: zoom into each transparent sprite cell so the
+       penguin remains recognisable at 30–36px instead of becoming a tiny smudge. */
+    #dashboardSection .user-avatar {
+      width:36px !important;
+      height:36px !important;
+      min-width:36px !important;
+      flex:0 0 36px !important;
+      display:flex !important;
+      align-items:center;
+      justify-content:center;
+      overflow:visible !important;
+    }
+    #dashboardSection .user-avatar .profile-avatar-image {
+      width:34px !important;
+      height:34px !important;
+      min-width:34px !important;
+      flex:0 0 34px !important;
+      background-size:720% 360% !important;
+      background-repeat:no-repeat !important;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,.38)) !important;
+    }
+    #dashboardSection .user-avatar .profile-avatar-classic { background-position:6.45% 15.38% !important; }
+    #dashboardSection .user-avatar .profile-avatar-lady { background-position:35.48% 15.38% !important; }
+    #dashboardSection .user-avatar .profile-avatar-tough { background-position:64.52% 15.38% !important; }
+    #dashboardSection .user-avatar .profile-avatar-cute { background-position:93.55% 15.38% !important; }
+    #dashboardSection .user-avatar .profile-avatar-happy { background-position:6.45% 84.62% !important; }
+    #dashboardSection .user-avatar .profile-avatar-cool { background-position:35.48% 84.62% !important; }
+    #dashboardSection .user-avatar .profile-avatar-boss { background-position:64.52% 84.62% !important; }
+    #dashboardSection .user-avatar .profile-avatar-smart-lady { background-position:93.55% 84.62% !important; }
+
+    @media (max-width:640px) {
+      #dashboardSection .nav-user-panel .user-switch-control {
+        width:42px !important;
+        min-width:42px !important;
+        max-width:42px !important;
+        padding:2px !important;
+      }
+      #dashboardSection .nav-user-panel .user-avatar {
+        width:38px !important;
+        height:38px !important;
+        min-width:38px !important;
+      }
+      #dashboardSection .nav-user-panel .user-avatar .profile-avatar-image {
+        width:36px !important;
+        height:36px !important;
+        min-width:36px !important;
+        flex-basis:36px !important;
+      }
+    }
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
   <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
