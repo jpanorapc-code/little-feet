@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v40-penguin-avatars';
+const CACHE_NAME = 'little-feet-shell-v41-live-mobile-header';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
