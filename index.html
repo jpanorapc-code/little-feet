@@ -5122,6 +5122,8 @@
     .parent-contact-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:8px 10px;align-items:end;margin:12px 0 16px}
     .parent-contact-toolbar label{grid-column:1/-1;font-size:.82rem;font-weight:800;color:var(--text-muted)}
     .parent-contact-toolbar input{min-height:44px}
+    .parent-contact-toolbar-actions{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+    #parentContactEditor{margin:0 0 16px}
     .parent-contact-list{display:grid;gap:12px}
     .parent-contact-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px;border:1px solid var(--border-color);border-radius:14px;background:rgba(2,15,29,.16)}
     .parent-contact-card h3{margin:0 0 4px;font-size:1rem}
@@ -5132,7 +5134,7 @@
     .parent-contact-field strong{display:block;margin-top:2px;overflow-wrap:anywhere;font-size:.88rem}
     .parent-contact-actions{display:flex;flex-direction:column;gap:7px;min-width:132px}
     .parent-contact-actions .action-btn{min-height:38px;padding:7px 10px;font-size:.78rem}
-    @media(max-width:640px){.parent-contact-toolbar{grid-template-columns:1fr}.parent-contact-toolbar label{grid-column:auto}.parent-contact-card{grid-template-columns:1fr}.parent-contact-details{grid-template-columns:1fr}.parent-contact-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}}
+    @media(max-width:640px){.parent-contact-toolbar{grid-template-columns:1fr}.parent-contact-toolbar label{grid-column:auto}.parent-contact-toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.parent-contact-card{grid-template-columns:1fr}.parent-contact-details{grid-template-columns:1fr}.parent-contact-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}}
     @media(max-width:390px){.parent-contact-actions{grid-template-columns:1fr}}
         .email-inbox-toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:14px 0}.email-inbox-list{display:grid;gap:9px}
     .email-inbox-item{border:1px solid var(--border-color);border-radius:12px;padding:13px;background:rgba(2,15,29,.16)}.email-inbox-item.is-unread{border-left:4px solid #5eead4}.email-inbox-item.is-pinned{box-shadow:inset 0 0 0 1px rgba(94,234,212,.35)}
@@ -6931,7 +6933,27 @@
           <div class="parent-contact-toolbar">
             <label for="parentContactSearch">Find a contact</label>
             <input id="parentContactSearch" type="search" placeholder="Search learner, parent, class, phone or email" oninput="filterParentContacts()" autocomplete="off">
-            <button type="button" class="action-btn btn-blue" onclick="loadParentContacts()">Refresh contacts</button>
+            <div class="parent-contact-toolbar-actions">
+              <button type="button" class="action-btn btn-blue" onclick="loadParentContacts()">Refresh contacts</button>
+              <button type="button" class="action-btn" onclick="openRegistryForNewContact()">Add learner contact</button>
+            </div>
+          </div>
+          <div id="parentContactEditor" class="workspace-card hidden" aria-live="polite">
+            <div class="card-header-bar">
+              <div>
+                <h3 style="margin:0;">Edit parent / guardian contact</h3>
+                <p id="parentContactEditLearner" class="meta" style="margin-top:4px;"></p>
+              </div>
+              <button type="button" class="action-btn" onclick="closeParentContactEditor()">Cancel</button>
+            </div>
+            <form id="parentContactEditForm" class="workspace-grid">
+              <input id="parentContactEditId" type="hidden">
+              <div><label for="parentContactEditGuardianName">Parent / guardian name *</label><input id="parentContactEditGuardianName" required autocomplete="section-parent-contact name"></div>
+              <div><label for="parentContactEditGuardianPhone">Guardian phone *</label><input id="parentContactEditGuardianPhone" type="tel" required autocomplete="section-parent-contact tel"></div>
+              <div><label for="parentContactEditGuardianEmail">Guardian email</label><input id="parentContactEditGuardianEmail" type="email" autocomplete="section-parent-contact email"></div>
+              <div><label for="parentContactEditEmergency">Emergency contact &amp; phone</label><input id="parentContactEditEmergency" placeholder="Name · phone"></div>
+              <div style="grid-column:1/-1;"><button type="submit" class="submit-btn">Save contact changes</button></div>
+            </form>
           </div>
           <div id="parentContactList" class="parent-contact-list" aria-live="polite"></div>
         </div>
