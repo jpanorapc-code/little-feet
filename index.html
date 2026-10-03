@@ -6368,6 +6368,71 @@
         0 0 10px rgba(143,231,238,.12) !important;
     }
 
+  
+    /* Icy brand artwork wordmark, shared by mobile and desktop. */
+    #authSection .brand-title-accessible {
+      position:absolute !important;
+      width:1px !important;
+      height:1px !important;
+      padding:0 !important;
+      margin:-1px !important;
+      overflow:hidden !important;
+      clip:rect(0,0,0,0) !important;
+      clip-path:inset(50%) !important;
+      white-space:nowrap !important;
+      border:0 !important;
+    }
+
+    #authSection .brand-wordmark-button {
+      order:2 !important;
+      display:block !important;
+      width:min(100%,620px) !important;
+      max-width:620px !important;
+      height:auto !important;
+      margin:4px auto 8px !important;
+      padding:0 !important;
+      border:0 !important;
+      background:transparent !important;
+      box-shadow:none !important;
+      line-height:0 !important;
+      cursor:pointer !important;
+    }
+
+    #authSection .brand-wordmark-button:focus-visible {
+      outline:2px solid rgba(165,243,252,.95) !important;
+      outline-offset:4px !important;
+      border-radius:10px !important;
+    }
+
+    #authSection .brand-wordmark {
+      display:block !important;
+      width:100% !important;
+      max-width:100% !important;
+      height:auto !important;
+      margin:0 auto !important;
+      object-fit:contain !important;
+      filter:drop-shadow(0 4px 10px rgba(2,12,28,.34)) !important;
+    }
+
+    #authSection .brand-header p.slogan {
+      order:3 !important;
+    }
+
+    @media (max-width:640px) {
+      #authSection .brand-wordmark-button {
+        width:min(92vw,430px) !important;
+        max-width:calc(100vw - 24px) !important;
+        margin:4px auto 7px !important;
+      }
+    }
+
+    @media (max-width:420px) {
+      #authSection .brand-wordmark-button {
+        width:min(94vw,390px) !important;
+        margin-top:2px !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
@@ -6461,7 +6526,10 @@
 <image href="assets/brand/iceberg-wave-backing.webp" width="1672" height="941" clip-path="url(#penguinArmBacking)"/>
 <g class="penguin-wave"><image href="assets/brand/iceberg-blue-eyes.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
 </svg></button></div>
-<h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
+<h1 class="brand-title-accessible">Little Feet Technologies</h1>
+        <button class="brand-wordmark-button" type="button" onclick="goToMainMenu()" aria-label="Little Feet Technologies — open main menu" title="Open main menu">
+          <img class="brand-wordmark" src="/assets/brand/little-feet-ice-wordmark.svg" alt="" aria-hidden="true">
+        </button>
         <p class="slogan"><span>Every Little Step Matters</span></p>
       </div>
       <div class="login-card-tools">
