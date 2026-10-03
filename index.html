@@ -6208,6 +6208,70 @@
       letter-spacing:.085em !important;
     }
 
+  
+    /* Mobile brand geometry fix.
+       The legacy mascot stage is absolutely positioned; return it to normal
+       flow so it physically reserves space above the company name. */
+    @media (max-width:640px) {
+      #authSection .brand-header {
+        display:flex !important;
+        flex-direction:column !important;
+        align-items:center !important;
+      }
+
+      #authSection .mascot-stage {
+        position:relative !important;
+        left:auto !important;
+        right:auto !important;
+        top:auto !important;
+        bottom:auto !important;
+        transform:none !important;
+        order:1 !important;
+        display:block !important;
+        width:min(250px,70vw) !important;
+        min-height:0 !important;
+        height:auto !important;
+        margin:0 auto 8px !important;
+        pointer-events:auto !important;
+      }
+
+      #authSection .login-emblem-button {
+        position:relative !important;
+        display:block !important;
+        width:100% !important;
+        max-width:none !important;
+        height:auto !important;
+        margin:0 auto !important;
+      }
+
+      #authSection .login-iceberg-emblem {
+        position:relative !important;
+        display:block !important;
+        width:100% !important;
+        height:auto !important;
+        max-width:none !important;
+        margin:0 auto !important;
+      }
+
+      #authSection .brand-header h1 {
+        order:2 !important;
+        position:relative !important;
+        margin:0 auto 7px !important;
+      }
+
+      #authSection .brand-header p.slogan {
+        order:3 !important;
+        position:relative !important;
+        margin:0 auto !important;
+      }
+    }
+
+    @media (max-width:420px) {
+      #authSection .mascot-stage {
+        width:min(225px,68vw) !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
