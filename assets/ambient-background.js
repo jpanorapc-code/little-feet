@@ -1,27 +1,49 @@
 (() => {
-  const video = document.getElementById('ambientBackgroundVideo');
+  const loginVideo = document.getElementById('loginBackgroundVideo');
+  const portalVideo = document.getElementById('ambientBackgroundVideo');
   const button = document.getElementById('backgroundMotionToggle');
-  if (!video || !button) return;
+  if ((!loginVideo && !portalVideo) || !button) return;
+
+  const videos = [loginVideo, portalVideo].filter(Boolean);
   const preference = 'lf_background_paused';
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let userPaused = false;
   try { userPaused = localStorage.getItem(preference) === 'true'; } catch {}
-  video.muted = true;
-  video.defaultMuted = true;
+
+  videos.forEach(video => {
+    video.muted = true;
+    video.defaultMuted = true;
+  });
+
+  function activeVideo() {
+    return document.body.classList.contains('portal-active') ? (portalVideo || loginVideo) : (loginVideo || portalVideo);
+  }
+
   function render() {
-    const paused = video.paused;
-    button.textContent = paused ? 'Play background' : 'Pause background';
-    button.setAttribute('aria-pressed', String(!paused));
-    button.disabled = reducedMotion.matches;
+    const active = activeVideo();
+    const unavailable = active?.dataset.playbackState === 'error';
+    const paused = !active || active.paused;
+    button.textContent = unavailable ? 'Background unavailable' : (paused ? 'Play background' : 'Pause background');
+    button.setAttribute('aria-pressed', String(!paused && !unavailable));
+    button.disabled = reducedMotion.matches || unavailable;
     button.title = reducedMotion.matches ? 'Background motion follows your reduced-motion setting' : button.textContent;
   }
+
   async function sync() {
-    if (userPaused || reducedMotion.matches || document.hidden) video.pause();
-    else {
-      try { await video.play(); }
-      catch (error) {
-        // Autoplay can be denied by the browser; keep the poster and a retry control.
-        video.dataset.playbackState = 'blocked';
+    const active = activeVideo();
+    for (const video of videos) {
+      if (video !== active && !video.paused) video.pause();
+    }
+    if (!active) return render();
+
+    if (userPaused || reducedMotion.matches || document.hidden) {
+      active.pause();
+    } else {
+      try {
+        await active.play();
+        active.dataset.playbackState = 'playing';
+      } catch (error) {
+        active.dataset.playbackState = 'blocked';
         void window.reportLittleFeetClientLog?.({
           severity: 'info',
           code: 'AMBIENT_VIDEO_AUTOPLAY_BLOCKED',
@@ -32,20 +54,26 @@
     }
     render();
   }
+
   button.addEventListener('click', () => {
-    userPaused = !video.paused;
+    userPaused = !activeVideo()?.paused;
+    userPaused = !userPaused;
     try { localStorage.setItem(preference, String(userPaused)); } catch {}
     void sync();
   });
-  video.addEventListener('play', render);
-  video.addEventListener('pause', render);
-  video.addEventListener('error', () => {
-    video.dataset.playbackState = 'error';
-    button.textContent = 'Background unavailable';
-    button.disabled = true;
-    /* Poster fallback is expected when background video is unavailable. */
+
+  videos.forEach(video => {
+    video.addEventListener('play', render);
+    video.addEventListener('pause', render);
+    video.addEventListener('error', () => {
+      video.dataset.playbackState = 'error';
+      render();
+    });
   });
+
   document.addEventListener('visibilitychange', sync);
+  document.addEventListener('littlefeet:session-ready', sync);
+  document.addEventListener('littlefeet:session-ended', sync);
   reducedMotion.addEventListener('change', sync);
   void sync();
 })();

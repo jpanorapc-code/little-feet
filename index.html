@@ -5856,12 +5856,15 @@
     }
 
 </style>
-  <link rel="stylesheet" href="/assets/ambient-background.css?v=20260926-blue-v1">
-  <script defer src="/assets/ambient-background.js?v=20260926-blue-v1"></script>
+  <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v1">
+  <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
 </head>
 <body>
   <div class="ambient-background" aria-hidden="true">
-    <video id="ambientBackgroundVideo" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
+    <video id="loginBackgroundVideo" class="login-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
+      <source src="/assets/video/little-feet-login-wallpaper.mp4" type="video/mp4">
+    </video>
+    <video id="ambientBackgroundVideo" class="portal-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
       <source src="/assets/video/little-feet-ambient-silent.mp4" type="video/mp4">
     </video>
   </div>
@@ -5968,7 +5971,7 @@
             </select>
           </label>
           <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Sound On</span></button>
-          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="ambientBackgroundVideo" aria-pressed="false">Play background</button>
+          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="loginBackgroundVideo ambientBackgroundVideo" aria-pressed="false">Play background</button>
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>

@@ -6,4 +6,4 @@ Generation direction: preserve logo lettering, footprints, rose, glasses and sui
 
 WebP assets are 1672 × 941 (the generator output), not native 4K. They are intentionally not labelled 4K.
 
-Wallpaper request remains pending: the supplied Wallpaper Engine project is a scene with shaders/particles, not a browser-playable video. A clean MP4/WebM recording is required to preserve its exact effects. No substitute animation or production background change was made.
+The login page now uses the supplied silent Wallpaper Engine screen recording as its login-only motion background. The existing Little Feet ambient video remains the authenticated portal background. Session start/end events switch which video is active, while the existing pause preference and reduced-motion behavior remain in control.
