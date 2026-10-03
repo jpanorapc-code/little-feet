@@ -87,6 +87,7 @@ const authed = async (route, cookie) => {
 
     const readinessResponse = await fetch(`http://127.0.0.1:${port}/api/failover-readiness`);
     const readiness = await readinessResponse.json();
+    assert.equal(readinessResponse.status, 503, 'an unready replica must fail HTTP health checks');
     assert.equal(readiness.instance, 'STANDBY');
     assert.equal(readiness.ready, false, 'a local-only test replica must not claim remote failover readiness');
     assert.equal(readiness.configured, false);

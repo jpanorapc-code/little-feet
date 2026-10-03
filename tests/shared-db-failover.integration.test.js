@@ -86,6 +86,7 @@ async function request(port, route, { cookie = '', method = 'GET', body, origin 
     standby = startServer(standbyPort, { LF_REPLICA_MODE: '1', LF_SHARED_DATABASE_FAILOVER: '1' });
     await waitForServer(standbyPort, standby);
     const readiness = await request(standbyPort, '/api/failover-readiness');
+    assert.equal(readiness.response.status, 200, JSON.stringify(readiness.data));
     assert.equal(readiness.data.ready, true, JSON.stringify(readiness.data));
     assert.equal(readiness.data.mode, 'shared-postgresql-writable');
     assert.equal(readiness.data.writeCapable, true);

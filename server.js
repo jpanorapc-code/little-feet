@@ -1813,7 +1813,7 @@ app.get('/api/failover-readiness', async (req, res) => {
     && ageSeconds <= maximumAgeSeconds && versionMatch === true;
   res.set('Cache-Control', 'no-store');
   res.set('Access-Control-Allow-Origin', '*');
-  return res.json({
+  return res.status(ready ? 200 : 503).json({
     ready,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
     mode: sharedDatabaseFailover ? 'shared-postgresql-writable' : replicaMode ? 'r2-snapshot-read-only' : 'primary',
@@ -1827,16 +1827,25 @@ app.get('/api/failover-readiness', async (req, res) => {
     versionMatch: sharedDatabaseFailover ? null : versionMatch
   });
 });
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   // Do not count the health probe itself, and do not report normal concurrent
   // dashboard startup requests as server overload.
   const reportedActiveRequests = Math.max(0, activeRequestCount - 1);
   const status = reportedActiveRequests >= SERVER_BUSY_THRESHOLD ? 'BUSY' : 'OK';
   const actor = getSessionAccount(req);
   res.set('Cache-Control', 'no-store');
-  if (!actor) return res.json({ status, timestamp: new Date().toISOString() });
+  let persistenceAvailable = true;
+  if (postgresPool) {
+    try { await postgresPool.query('SELECT 1'); }
+    catch (error) {
+      persistenceAvailable = false;
+      logStructured('warn', 'persistence.health_probe_failed', { category: 'persistence', message: error.message });
+    }
+  }
+  if (!persistenceAvailable) res.status(503);
+  if (!actor) return res.json({ status: persistenceAvailable ? status : 'DATABASE_UNAVAILABLE', timestamp: new Date().toISOString() });
   return res.json({
-    status,
+    status: persistenceAvailable ? status : 'DATABASE_UNAVAILABLE',
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
     replica: replicaMode ? {
       mode: sharedDatabaseFailover ? 'shared-postgresql-writable' : 'r2-snapshot-read-only',
