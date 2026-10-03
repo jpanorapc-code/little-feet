@@ -5986,41 +5986,31 @@
       text-underline-offset:4px !important;
     }
 
-    /* Slogan: borderless navy/teal glass, matching typography. */
+    /* Slogan: solid Little Feet navy text, no pill, border, or glass shell. */
     #authSection .brand-header p.slogan {
       order:3 !important;
       position:relative !important;
       z-index:6 !important;
-      display:inline-flex !important;
-      align-items:center !important;
-      justify-content:center !important;
+      display:block !important;
       max-width:100% !important;
       margin:0 auto !important;
-      padding:6px 14px !important;
+      padding:0 !important;
 
       border:0 !important;
       outline:0 !important;
-      border-radius:999px !important;
+      border-radius:0 !important;
 
-      background:
-        linear-gradient(
-          180deg,
-          rgba(18,63,159,.68),
-          rgba(8,40,127,.76) 58%,
-          rgba(15,143,154,.44)
-        ) !important;
+      background:none !important;
+      background-image:none !important;
+      box-shadow:none !important;
 
-      box-shadow:
-        0 7px 18px rgba(2,12,28,.20),
-        inset 0 1px 0 rgba(255,255,255,.12) !important;
-
-      backdrop-filter:blur(8px) saturate(115%) !important;
-      -webkit-backdrop-filter:blur(8px) saturate(115%) !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
     }
 
     #authSection .brand-header p.slogan span {
-      color:#eaffff !important;
-      -webkit-text-fill-color:#eaffff !important;
+      color:var(--dark-navy) !important;
+      -webkit-text-fill-color:var(--dark-navy) !important;
       background:none !important;
       background-image:none !important;
       background-clip:border-box !important;
@@ -6035,8 +6025,32 @@
       letter-spacing:.075em !important;
       text-transform:uppercase !important;
 
-      text-shadow:0 1px 2px rgba(2,12,28,.68) !important;
+      text-shadow:
+        0 1px 0 rgba(255,255,255,.42),
+        0 2px 7px rgba(2,12,28,.20) !important;
       animation:none !important;
+    }
+
+    /* Keep wallpaper lettering from showing through the login card.
+       This opacity is local to the card, not a full-screen/mobile blur. */
+    #authSection > .auth-card {
+      background:
+        linear-gradient(
+          155deg,
+          rgba(8,40,127,.97),
+          rgba(6,29,91,.965)
+        ) !important;
+      backdrop-filter:blur(10px) saturate(108%) !important;
+      -webkit-backdrop-filter:blur(10px) saturate(108%) !important;
+    }
+
+    body.light-mode #authSection > .auth-card {
+      background:
+        linear-gradient(
+          155deg,
+          rgba(222,244,253,.97),
+          rgba(190,225,241,.965)
+        ) !important;
     }
 
     /* Desktop / tablet / TV: reserve enough air above the card. */
