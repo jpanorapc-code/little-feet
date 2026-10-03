@@ -1,11 +1,11 @@
-const CACHE_NAME = 'little-feet-shell-v46-login-wallpaper';
+const CACHE_NAME = 'little-feet-shell-v47-login-wallpaper-clarity';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
-  '/assets/ambient-background.css?v=20261003-login-wallpaper-v1',
+  '/assets/ambient-background.css?v=20261003-login-wallpaper-v2',
   '/assets/ambient-background.js?v=20261003-login-wallpaper-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
-  '/assets/video/little-feet-login-wallpaper.mp4',
+  '/assets/video/little-feet-login-wallpaper.mp4?v=20261003-clarity-v2',
   '/assets/brand/iceberg-blue-eyes.webp',
   '/assets/brand/iceberg-wave-backing.webp',
   '/logo.png',
