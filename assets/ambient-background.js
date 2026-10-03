@@ -56,8 +56,7 @@
   }
 
   button.addEventListener('click', () => {
-    userPaused = !activeVideo()?.paused;
-    userPaused = !userPaused;
+    userPaused = !(activeVideo()?.paused ?? true);
     try { localStorage.setItem(preference, String(userPaused)); } catch {}
     void sync();
   });
