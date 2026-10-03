@@ -14,8 +14,7 @@ assert.deepEqual(resolveFailoverMode({ LF_REPLICA_MODE: '1', LF_SHARED_DATABASE_
 });
 assert.throws(() => resolveFailoverMode({ LF_REPLICA_MODE: '1', LF_SHARED_DATABASE_FAILOVER: '1' }),
   /requires DATABASE_URL/i);
-assert.deepEqual(resolveFailoverMode({ LF_SHARED_DATABASE_FAILOVER: '1', DATABASE_URL: 'postgres://db' }), {
-  replica: false, sharedDatabase: false, readOnlySnapshot: false, databaseUrl: 'postgres://db'
-});
+assert.throws(() => resolveFailoverMode({ LF_SHARED_DATABASE_FAILOVER: '1', DATABASE_URL: 'postgres://db' }),
+  /requires LF_REPLICA_MODE=1/i);
 
 console.log('Failover mode configuration tests passed.');
