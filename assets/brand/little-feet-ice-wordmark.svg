@@ -1,62 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 260" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 225" role="img" aria-labelledby="title desc">
   <title id="title">Little Feet Technologies</title>
-  <desc id="desc">An original icy glass wordmark with frozen blue-white lettering and icicle details.</desc>
+  <desc id="desc">Transparent icy Little Feet Technologies wordmark with frozen blue-white lettering and icicle details.</desc>
   <defs>
     <linearGradient id="iceFill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset=".22" stop-color="#e9fbff"/>
-      <stop offset=".5" stop-color="#9ed9e8"/>
-      <stop offset=".72" stop-color="#d9f6ff"/>
-      <stop offset="1" stop-color="#6fa8bc"/>
+      <stop offset=".20" stop-color="#eefcff"/>
+      <stop offset=".48" stop-color="#a9deeb"/>
+      <stop offset=".72" stop-color="#d9f7ff"/>
+      <stop offset="1" stop-color="#78aec0"/>
     </linearGradient>
     <linearGradient id="iceDrop" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#dffaff" stop-opacity=".95"/>
-      <stop offset=".55" stop-color="#8ed5e7" stop-opacity=".88"/>
-      <stop offset="1" stop-color="#4b8298" stop-opacity=".84"/>
+      <stop offset="0" stop-color="#e8fbff" stop-opacity=".96"/>
+      <stop offset=".55" stop-color="#9bd9e8" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#58889a" stop-opacity=".84"/>
     </linearGradient>
-    <filter id="iceRough" x="-10%" y="-30%" width="120%" height="180%">
+    <filter id="iceRough" x="-10%" y="-35%" width="120%" height="190%">
       <feTurbulence type="fractalNoise" baseFrequency=".012 .07" numOctaves="2" seed="17" result="noise"/>
-      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="rough"/>
-      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#00162f" flood-opacity=".72"/>
-      <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#c8f7ff" flood-opacity=".72"/>
-    </filter>
-    <filter id="softGlow" x="-30%" y="-50%" width="160%" height="220%">
-      <feGaussianBlur stdDeviation="5"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.9" xChannelSelector="R" yChannelSelector="G" result="rough"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#00162f" flood-opacity=".68"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#bcefff" flood-opacity=".44"/>
     </filter>
   </defs>
 
-  <g opacity=".34" filter="url(#softGlow)" fill="#aeeeff">
-    <ellipse cx="750" cy="152" rx="650" ry="34"/>
-  </g>
-
   <g filter="url(#iceRough)" font-family="Segoe UI Variable, Segoe UI, Arial, sans-serif" font-weight="800" text-anchor="middle">
-    <text x="750" y="143" font-size="108" letter-spacing="-2.5"
-          fill="none" stroke="#031b38" stroke-width="10" stroke-linejoin="round">Little Feet Technologies</text>
-    <text x="750" y="143" font-size="108" letter-spacing="-2.5"
-          fill="url(#iceFill)" stroke="#dffbff" stroke-width="2.8" stroke-linejoin="round">Little Feet Technologies</text>
+    <text x="750" y="128" font-size="108" letter-spacing="-2.5" fill="url(#iceFill)">Little Feet Technologies</text>
   </g>
 
-  <g fill="url(#iceDrop)" stroke="#d9fbff" stroke-width="1.2" opacity=".96">
-    <path d="M175 148 l14 0 -7 44z"/>
-    <path d="M245 149 l11 0 -5.5 28z"/>
-    <path d="M340 149 l15 0 -7.5 52z"/>
-    <path d="M470 149 l12 0 -6 34z"/>
-    <path d="M565 149 l14 0 -7 46z"/>
-    <path d="M675 149 l10 0 -5 25z"/>
-    <path d="M770 149 l15 0 -7.5 48z"/>
-    <path d="M905 149 l12 0 -6 33z"/>
-    <path d="M1010 149 l15 0 -7.5 56z"/>
-    <path d="M1125 149 l11 0 -5.5 30z"/>
-    <path d="M1240 149 l14 0 -7 44z"/>
-    <path d="M1335 149 l10 0 -5 26z"/>
+  <g fill="url(#iceDrop)" opacity=".95">
+    <path d="M175 134 l12 0 -6 37z"/>
+    <path d="M245 134 l10 0 -5 24z"/>
+    <path d="M340 134 l13 0 -6.5 44z"/>
+    <path d="M470 134 l11 0 -5.5 29z"/>
+    <path d="M565 134 l12 0 -6 39z"/>
+    <path d="M675 134 l9 0 -4.5 22z"/>
+    <path d="M770 134 l13 0 -6.5 41z"/>
+    <path d="M905 134 l11 0 -5.5 28z"/>
+    <path d="M1010 134 l13 0 -6.5 47z"/>
+    <path d="M1125 134 l10 0 -5 26z"/>
+    <path d="M1240 134 l12 0 -6 37z"/>
+    <path d="M1335 134 l9 0 -4.5 23z"/>
   </g>
 
-  <g fill="none" stroke="#ffffff" stroke-linecap="round" opacity=".58">
-    <path d="M190 78 l34 0" stroke-width="3"/>
-    <path d="M420 92 l50 -8" stroke-width="2.5"/>
-    <path d="M640 70 l38 6" stroke-width="2.4"/>
-    <path d="M840 88 l46 -10" stroke-width="2.6"/>
-    <path d="M1078 71 l44 5" stroke-width="2.4"/>
-    <path d="M1250 91 l39 -8" stroke-width="2.5"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" opacity=".48">
+    <path d="M190 70 l34 0" stroke-width="2.4"/>
+    <path d="M420 84 l50 -8" stroke-width="2"/>
+    <path d="M640 62 l38 6" stroke-width="2"/>
+    <path d="M840 80 l46 -10" stroke-width="2"/>
+    <path d="M1078 63 l44 5" stroke-width="2"/>
+    <path d="M1250 83 l39 -8" stroke-width="2"/>
   </g>
 </svg>
