@@ -6034,6 +6034,55 @@
       }
     }
 
+  
+    /* Mobile video-brand de-duplication.
+       The wallpaper recording contains its own title. Blur only the narrow
+       branding band behind our live title/slogan so the duplicate disappears
+       without disabling or zooming the animated background. */
+    @media (max-width:640px) {
+      #authSection .brand-header::after {
+        content:"" !important;
+        position:absolute !important;
+        z-index:1 !important;
+        left:50% !important;
+        bottom:-10px !important;
+        width:100vw !important;
+        height:82px !important;
+        transform:translateX(-50%) !important;
+        pointer-events:none !important;
+        background:linear-gradient(
+          180deg,
+          rgba(4,18,38,0) 0%,
+          rgba(4,18,38,.10) 24%,
+          rgba(4,18,38,.14) 50%,
+          rgba(4,18,38,.10) 76%,
+          rgba(4,18,38,0) 100%
+        ) !important;
+        -webkit-backdrop-filter:blur(20px) saturate(.82) !important;
+        backdrop-filter:blur(20px) saturate(.82) !important;
+        -webkit-mask-image:linear-gradient(
+          180deg,
+          transparent 0%,
+          #000 20%,
+          #000 82%,
+          transparent 100%
+        );
+        mask-image:linear-gradient(
+          180deg,
+          transparent 0%,
+          #000 20%,
+          #000 82%,
+          transparent 100%
+        );
+      }
+
+      #authSection .brand-header h1,
+      #authSection .brand-header p.slogan {
+        position:relative !important;
+        z-index:6 !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
