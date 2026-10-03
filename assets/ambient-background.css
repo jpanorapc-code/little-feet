@@ -20,8 +20,10 @@ body.portal-active::before, body.portal-active::after,
 .ambient-background .portal-background-video { opacity:0; visibility:hidden; }
 body.portal-active .ambient-background .login-background-video { opacity:0; visibility:hidden; }
 body.portal-active .ambient-background .portal-background-video { opacity:1; visibility:visible; }
-.ambient-background::after { content:""; position:absolute; inset:0; background:rgba(var(--lf-blue-rgb),.35); }
-body:not(.light-mode) .ambient-background::after { background:rgba(var(--lf-blue-rgb),.56); }
+.ambient-background::after { content:""; position:absolute; inset:0; background:rgba(4,18,38,.08); }
+.ambient-background .login-background-video { filter:contrast(1.08) brightness(1.04); }
+body.portal-active .ambient-background::after { background:rgba(var(--lf-blue-rgb),.35); }
+body.portal-active:not(.light-mode) .ambient-background::after { background:rgba(var(--lf-blue-rgb),.56); }
 #dashboardSection { z-index:1; }
 /* :is keeps specificity above the existing theme guards without changing geometry. */
 body:is(.light-mode,:not(.light-mode)) #dashboardSection > nav,
