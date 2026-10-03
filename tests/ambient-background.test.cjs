@@ -73,19 +73,20 @@ async function main() {
     assert.equal(navigationResponse.status(), 200, (await page.content()).slice(0, 1200));
     if (role === 'admin') {
       await page.waitForFunction(() => {
-        const v = document.getElementById('ambientBackgroundVideo');
-        return v.readyState >= 2 && !v.paused && v.currentTime > 0;
+        const login = document.getElementById('loginBackgroundVideo');
+        const portal = document.getElementById('ambientBackgroundVideo');
+        return login?.readyState >= 2 && !login.paused && login.currentTime > 0 && portal?.paused;
       });
-      const media = await page.locator('#ambientBackgroundVideo').evaluate(v => ({muted:v.muted,loop:v.loop,duration:v.duration}));
-      assert.ok(media.muted && media.loop && media.duration > 49 && media.duration < 52, JSON.stringify(media));
+      const loginMedia = await page.locator('#loginBackgroundVideo').evaluate(v => ({muted:v.muted,loop:v.loop,duration:v.duration}));
+      assert.ok(loginMedia.muted && loginMedia.loop && loginMedia.duration > 1, JSON.stringify(loginMedia));
       await page.locator('#backgroundMotionToggle').click();
-      assert.ok(await page.locator('#ambientBackgroundVideo').evaluate(v => v.paused));
+      assert.ok(await page.locator('#loginBackgroundVideo').evaluate(v => v.paused));
       await page.locator('#backgroundMotionToggle').click();
-      await page.waitForFunction(() => !document.getElementById('ambientBackgroundVideo').paused);
+      await page.waitForFunction(() => !document.getElementById('loginBackgroundVideo').paused);
       await page.emulateMedia({reducedMotion:'reduce'});
-      await page.waitForFunction(() => document.getElementById('ambientBackgroundVideo').paused);
+      await page.waitForFunction(() => document.getElementById('loginBackgroundVideo').paused);
       await page.emulateMedia({reducedMotion:'no-preference'});
-      await page.waitForFunction(() => !document.getElementById('ambientBackgroundVideo').paused);
+      await page.waitForFunction(() => !document.getElementById('loginBackgroundVideo').paused);
 
       const desktopToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -123,6 +124,13 @@ async function main() {
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
     await page.waitForLoadState('domcontentloaded');
+    if (role === 'admin') {
+      await page.waitForFunction(() => {
+        const login = document.getElementById('loginBackgroundVideo');
+        const portal = document.getElementById('ambientBackgroundVideo');
+        return login?.paused && portal?.readyState >= 2 && !portal.paused && portal.currentTime > 0;
+      });
+    }
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();
       for (const element of document.querySelectorAll('[onclick], [onchange], [onsubmit]')) {
@@ -174,6 +182,13 @@ async function main() {
     await page.locator('.sidebar-signout').click();
     await page.locator('#authSection').waitFor({ state: 'visible' });
     await page.waitForLoadState('domcontentloaded');
+    if (role === 'admin') {
+      await page.waitForFunction(() => {
+        const login = document.getElementById('loginBackgroundVideo');
+        const portal = document.getElementById('ambientBackgroundVideo');
+        return login?.readyState >= 2 && !login.paused && portal?.paused;
+      });
+    }
     const session = await page.evaluate(() => fetch('/api/auth/session').then(response => response.json()));
     assert.equal(session.authenticated, false, `${role}: logout did not clear server session`);
     assert.deepEqual(errors, [], `${role}: browser runtime errors`);
