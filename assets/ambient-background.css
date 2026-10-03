@@ -15,13 +15,13 @@ body.light-mode, body:not(.light-mode) { background-color:var(--lf-blue) !import
 body.portal-active::before, body.portal-active::after,
 #authSection::before, #authSection::after { content:none !important; }
 .ambient-background { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; background:url('/assets/video/little-feet-ambient-poster.jpg') center/cover; }
-.ambient-background video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; transition:opacity .22s ease, visibility .22s ease; }
+.ambient-background video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; transition:opacity .22s ease, visibility .22s ease; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
 .ambient-background .login-background-video { opacity:1; visibility:visible; }
 .ambient-background .portal-background-video { opacity:0; visibility:hidden; }
 body.portal-active .ambient-background .login-background-video { opacity:0; visibility:hidden; }
 body.portal-active .ambient-background .portal-background-video { opacity:1; visibility:visible; }
 .ambient-background::after { content:""; position:absolute; inset:0; background:rgba(4,18,38,.08); }
-.ambient-background .login-background-video { filter:contrast(1.08) brightness(1.04); }
+.ambient-background .login-background-video { filter:none; }
 body.portal-active .ambient-background::after { background:rgba(var(--lf-blue-rgb),.35); }
 body.portal-active:not(.light-mode) .ambient-background::after { background:rgba(var(--lf-blue-rgb),.56); }
 #dashboardSection { z-index:1; }
@@ -70,7 +70,11 @@ body:is(.light-mode,:not(.light-mode)) .portal-welcome-banner {
 @media (prefers-reduced-motion:reduce) { .ambient-background video { visibility:hidden; } }
 /* Keep login and footer text legible over the moving blue backdrop. */
 body:is(.light-mode,:not(.light-mode)) #authSection > .auth-card {
-  background:linear-gradient(145deg,rgba(var(--lf-blue-rgb),.94),var(--lf-blue-deep)) !important;
+  background:linear-gradient(145deg,rgba(var(--lf-blue-rgb),.98),var(--lf-blue-deep)) !important;
+  /* Live backdrop blur forces the browser to re-blur a large moving video
+     every frame. Keep the card visually solid and let the video decode once. */
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
 }
 body:is(.light-mode,:not(.light-mode)) footer a,
 body:is(.light-mode,:not(.light-mode)) footer p,
