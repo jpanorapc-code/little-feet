@@ -5857,8 +5857,8 @@
 
 
     /* Login brand contrast + cross-device fit.
-       Keep the frosted gradient, but give the lettering a dark edge so it
-       remains readable over bright wallpaper frames without changing layout. */
+       Preserve the original icy gradient fill; only the letter edge is darkened
+       so bright wallpaper frames cannot wash the branding out. */
     #authSection .brand-header h1 {
       box-sizing:border-box !important;
       width:100% !important;
@@ -5869,14 +5869,8 @@
       letter-spacing:clamp(0,.12vw,.035em) !important;
       white-space:nowrap !important;
       text-align:center !important;
-      -webkit-text-stroke:clamp(.7px,.11vw,1.35px) rgba(2,12,28,.96);
+      -webkit-text-stroke:clamp(.7px,.11vw,1.2px) rgba(2,12,28,.96);
       paint-order:stroke fill;
-      text-shadow:
-        -1px -1px 0 rgba(2,12,28,.88),
-         1px -1px 0 rgba(2,12,28,.88),
-        -1px  1px 0 rgba(2,12,28,.88),
-         1px  1px 0 rgba(2,12,28,.88),
-         0 2px 10px rgba(2,12,28,.48) !important;
     }
     #authSection .brand-header p.slogan {
       box-sizing:border-box;
@@ -5888,16 +5882,9 @@
       letter-spacing:clamp(.55px,.22vw,1.45px) !important;
       white-space:nowrap !important;
     }
-    #authSection .brand-header p.slogan,
     #authSection .brand-header p.slogan span {
-      -webkit-text-stroke:.45px rgba(2,12,28,.94);
+      -webkit-text-stroke:.4px rgba(2,12,28,.94);
       paint-order:stroke fill;
-      text-shadow:
-        -1px 0 0 rgba(2,12,28,.72),
-         1px 0 0 rgba(2,12,28,.72),
-         0 1px 0 rgba(2,12,28,.72),
-         0 -1px 0 rgba(2,12,28,.72),
-         0 2px 7px rgba(2,12,28,.42) !important;
     }
     @media (max-width:420px) {
       #authSection .brand-header h1 {
