@@ -1,10 +1,12 @@
-const CACHE_NAME = 'little-feet-shell-v44-parent-contacts';
+const CACHE_NAME = 'little-feet-shell-v45-iceberg-brand';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20260926-blue-v1',
   '/assets/ambient-background.js?v=20260926-blue-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
+  '/assets/brand/iceberg-blue-eyes.webp',
+  '/assets/brand/iceberg-wave-backing.webp',
   '/logo.png',
   '/logo-transparent.png',
   '/assets/4k/little-feet-aurora-stars-4k.svg',

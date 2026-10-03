@@ -5050,9 +5050,9 @@
     #authSection .login-new-account{margin-top:14px;padding-top:14px;gap:14px}
     #authSection .login-new-account p{font-size:.84rem}
     #authSection .login-new-account .action-btn{min-height:44px;padding:8px 16px;font-size:.86rem}
-    /* Login iceberg artwork: balanced glacier frame with a visible angular base and no liquid-looking white layer. */
+    /* Login iceberg artwork with blue eyes and a gently waving flipper. */
     .mascot-stage{
-      width:258px;
+      width:340px;
       min-height:194px;
       top:-4px;
       overflow:visible;
@@ -5060,42 +5060,6 @@
     .mascot-stage::before,
     .mascot-stage::after{
       display:none !important;
-    }
-    .login-iceberg-art{
-      position:absolute;
-      z-index:1;
-      left:50%;
-      top:6px;
-      width:258px;
-      height:176px;
-      transform:translateX(-50%);
-      overflow:visible;
-      pointer-events:none;
-      opacity:.94;
-      filter:drop-shadow(0 12px 16px rgba(2,8,23,.24));
-    }
-    .login-iceberg-base{
-      position:absolute;
-      z-index:4;
-      left:50%;
-      top:143px;
-      width:232px;
-      height:38px;
-      transform:translateX(-50%);
-      pointer-events:none;
-      opacity:.92;
-      filter:drop-shadow(0 5px 7px rgba(2,8,23,.22));
-    }
-    .brand-header img{
-      position:relative;
-      z-index:3;
-      width:146px !important;
-      height:146px !important;
-      border-color:rgba(248,254,255,.98);
-      box-shadow:
-        0 9px 20px rgba(2,8,23,.28),
-        0 0 0 2px rgba(247,254,255,.68),
-        0 0 15px rgba(71,169,207,.15);
     }
     .brand-header{
       padding-top:172px;
@@ -5111,14 +5075,25 @@
       #authSection .login-background-compact{grid-column:1 / -1;width:100%!important;min-width:0!important}
       #authSection .social-signin{grid-template-columns:1fr}
       #authSection .social-signin button{font-size:.88rem}
-      .mascot-stage{width:226px;min-height:178px;top:8px}
-      .login-iceberg-art{width:226px;height:156px;top:9px}
-      .login-iceberg-base{width:204px;height:34px;top:132px}
+      .mascot-stage{width:min(300px,calc(100vw - 32px));min-height:178px;top:8px}
       .brand-header{padding-top:176px}
       .brand-header img{width:132px !important;height:132px !important}
       .brand-header h1{margin-top:4px !important}
     }
     @media (max-width:420px){#authSection > .auth-card{padding:16px!important}}
+
+    @media(min-width:641px){#authSection{padding-top:280px!important}}
+    .login-emblem-button{display:block;width:100%;padding:0;border:0;background:none;box-shadow:none;cursor:pointer;pointer-events:auto;line-height:0}
+    .login-emblem-button:focus-visible{outline:2px solid #a5f3fc;outline-offset:4px;border-radius:12px}
+    .login-iceberg-emblem{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 8px 12px #02132155)}
+    .penguin-wave{transform-origin:947px 617px;animation:penguinWave 7s ease-in-out infinite}
+    @keyframes penguinWave{0%,58%,86%,100%{transform:rotate(0deg)}64%,76%{transform:rotate(-12deg)}70%,82%{transform:rotate(5deg)}}
+    .brand-header h1{font-family:'Palatino Linotype','Book Antiqua',Georgia,serif;font-weight:600}
+    .brand-header h1,.brand-header .slogan span{color:transparent;background-image:radial-gradient(ellipse at center,#fff 0 7%,transparent 12%),linear-gradient(110deg,#c8f5f4 10%,#effeff 35%,#87dce7 48%,#fff 51%,#cef8ff 54%,#9ae9dd 70%);background-size:19px 3px,250% 100%;background-clip:text;-webkit-background-clip:text;animation:windblownFrost 8s linear infinite;text-shadow:0 1px 16px #b7f3ff30}
+    .brand-header .slogan{animation:none}
+    .brand-header .slogan span{display:inline-block;animation-delay:-2s}
+    @keyframes windblownFrost{from{background-position:100% 0,140% 50%}to{background-position:-100% 7px,-110% 50%}}
+    @media(prefers-reduced-motion:reduce){.penguin-wave,.brand-header h1,.brand-header .slogan span{animation:none!important}}
     .parent-contact-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:8px 10px;align-items:end;margin:12px 0 16px}
     .parent-contact-toolbar label{grid-column:1/-1;font-size:.82rem;font-weight:800;color:var(--text-muted)}
     .parent-contact-toolbar input{min-height:44px}
@@ -5962,65 +5937,16 @@
     <div class="card auth-card">
       <div class="brand-header">
         <div class="mascot-stage">
-          <svg class="login-iceberg-art" viewBox="0 0 258 176" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="lfGlacierLight" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#d8f3fb" stop-opacity=".84"/>
-                <stop offset=".42" stop-color="#79c5dc" stop-opacity=".82"/>
-                <stop offset="1" stop-color="#246f9f" stop-opacity=".84"/>
-              </linearGradient>
-              <linearGradient id="lfGlacierDeep" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#83cfe2" stop-opacity=".78"/>
-                <stop offset="1" stop-color="#0e4e7d" stop-opacity=".90"/>
-              </linearGradient>
-              <linearGradient id="lfGlacierMid" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stop-color="#3d91b8" stop-opacity=".80"/>
-                <stop offset=".5" stop-color="#71bfd3" stop-opacity=".76"/>
-                <stop offset="1" stop-color="#245f8a" stop-opacity=".82"/>
-              </linearGradient>
-            </defs>
-            <g stroke="rgba(218,246,253,.30)" stroke-width=".7" stroke-linejoin="round">
-              <polygon points="7,145 35,84 52,145" fill="url(#lfGlacierDeep)"/>
-              <polygon points="22,145 58,50 79,145" fill="url(#lfGlacierLight)"/>
-              <polygon points="55,145 88,91 104,145" fill="url(#lfGlacierDeep)"/>
-              <polygon points="154,145 171,91 196,145" fill="url(#lfGlacierDeep)"/>
-              <polygon points="180,145 201,48 232,145" fill="url(#lfGlacierLight)"/>
-              <polygon points="211,145 236,82 252,145" fill="url(#lfGlacierDeep)"/>
-              <polygon points="47,146 68,124 87,140 101,119 118,143 132,128 148,143 165,120 185,140 203,123 229,146 229,158 39,158" fill="url(#lfGlacierMid)"/>
-            </g>
-            <g fill="rgba(224,248,253,.17)">
-              <polygon points="58,50 66,91 43,126"/>
-              <polygon points="201,48 210,90 185,126"/>
-              <polygon points="35,84 42,111 23,133"/>
-              <polygon points="236,82 243,110 224,133"/>
-            </g>
-            <g fill="rgba(7,57,92,.18)">
-              <polygon points="66,91 79,145 61,132"/>
-              <polygon points="210,90 232,145 208,132"/>
-              <polygon points="88,91 104,145 88,132"/>
-              <polygon points="171,91 196,145 174,132"/>
-            </g>
-          </svg>
-          <img src="little-feet-mascot.jfif" alt="Little Feet mascot logo" role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet mascot — open main menu" onerror="this.style.display='none'">
-          <svg class="login-iceberg-base" viewBox="0 0 232 38" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="lfGlacierBase" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#3d93b5" stop-opacity=".92"/>
-                <stop offset=".48" stop-color="#67b7cc" stop-opacity=".88"/>
-                <stop offset="1" stop-color="#1e5c86" stop-opacity=".94"/>
-              </linearGradient>
-            </defs>
-            <polygon points="4,30 25,18 43,27 61,13 79,29 99,18 116,30 135,16 154,28 175,12 193,27 211,17 228,30 220,36 12,36" fill="url(#lfGlacierBase)"/>
-            <g fill="rgba(205,241,249,.16)">
-              <polygon points="25,18 43,27 33,31"/>
-              <polygon points="61,13 79,29 65,25"/>
-              <polygon points="135,16 154,28 141,25"/>
-              <polygon points="175,12 193,27 178,24"/>
-            </g>
-          </svg>
-        </div>
-        <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
-        <p class="slogan">Every Little Step Matters</p>
+<button class="login-emblem-button" type="button" onclick="goToMainMenu()" title="Open main menu" aria-label="Little Feet mascot — open main menu">
+<svg class="login-iceberg-emblem" viewBox="0 0 1672 941" aria-hidden="true">
+<defs><clipPath id="penguinArm"><path d="M934 610 L946 570 L981 531 Q1003 508 1025 522 Q1040 541 1021 583 L961 638 Z"/></clipPath>
+<clipPath id="penguinArmBacking"><path d="M932 608 L942 565 L978 523 Q1005 500 1032 516 Q1047 543 1027 588 L962 641 Z"/></clipPath></defs>
+<image href="assets/brand/iceberg-blue-eyes.webp" width="1672" height="941"/>
+<image href="assets/brand/iceberg-wave-backing.webp" width="1672" height="941" clip-path="url(#penguinArmBacking)"/>
+<g class="penguin-wave"><image href="assets/brand/iceberg-blue-eyes.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
+</svg></button></div>
+<h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
+        <p class="slogan"><span>Every Little Step Matters</span></p>
       </div>
       <div class="login-card-tools">
         <span class="login-secure-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="securePortal">Secure school portal</span></span>
