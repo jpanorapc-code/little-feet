@@ -911,22 +911,38 @@ if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     unlockPortalAudio();
-    const username = document.getElementById('loginUsername').value;
-    const pin = document.getElementById('loginPin').value;
+
+    const usernameInput = document.getElementById('loginUsername');
+    const pinInput = document.getElementById('loginPin');
+    const username = usernameInput?.value.trim() || '';
+    const pin = pinInput?.value || '';
     const rememberLogin = document.getElementById('rememberLogin')?.checked === true;
+
+    if (!username || !pin) {
+      loginForm.reportValidity();
+      return;
+    }
+    if (usernameInput && usernameInput.value !== username) usernameInput.value = username;
     if (!rememberLogin) clearRememberedLogin();
 
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, pin })
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.user) {
         currentUser = data.user;
-        if (rememberLogin) await saveRememberedLogin(username, pin);
+
+        // Enter the portal immediately after the server accepts the login.
+        // Mobile credential managers can keep navigator.credentials.store()
+        // pending while their native save-password UI is open, so saving the
+        // optional remembered credential must never block session startup.
         setupSession();
+        if (rememberLogin) void saveRememberedLogin(username, pin);
       } else {
         alert(data.message || 'Login failed.');
       }
