@@ -73,6 +73,7 @@
   document.addEventListener('visibilitychange', sync);
   document.addEventListener('littlefeet:session-ready', sync);
   document.addEventListener('littlefeet:session-ended', sync);
+  new MutationObserver(() => { void sync(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   reducedMotion.addEventListener('change', sync);
   void sync();
 })();
