@@ -222,3 +222,6 @@ button.submit-btn,
 .nav-shortcut,
 .nav-more-toggle,
 .sidebar-links .nav-btn { font-weight:650; letter-spacing:.005em; }
+
+body:not(.portal-active) .ambient-background{background-image:url("/assets/video/little-feet-login-clean.jpg")}
+#authSection .login-iceberg-emblem{filter:drop-shadow(0 2px 1px #d8f9ff66) drop-shadow(0 12px 10px #09243b70)}

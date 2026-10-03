@@ -5930,7 +5930,7 @@
       box-shadow:none !important;
     }
 
-    /* Company name: same clean typography language as the slogan, no border. */
+    /* Ice-carved wordmark: pale face, blue bevel and a short dimensional shadow. */
     #authSection .brand-header h1 {
       order:2 !important;
       position:relative !important;
@@ -5941,7 +5941,7 @@
       margin:0 auto 8px !important;
       padding:0 6px !important;
 
-      font-family:Georgia,"Times New Roman",serif !important;
+      font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
       font-size:clamp(1.65rem,3.25vw,2.35rem) !important;
       font-weight:800 !important;
       font-style:normal !important;
@@ -5951,8 +5951,8 @@
       text-align:center !important;
       text-transform:none !important;
 
-      color:var(--dark-navy) !important;
-      -webkit-text-fill-color:var(--dark-navy) !important;
+      color:#e6f7ff !important;
+      -webkit-text-fill-color:#e6f7ff !important;
       background:none !important;
       background-image:none !important;
       background-clip:border-box !important;
@@ -5964,8 +5964,7 @@
       box-shadow:none !important;
 
       text-shadow:
-        0 1px 0 rgba(255,255,255,.48),
-        0 3px 10px rgba(2,12,28,.22) !important;
+        0 -1px 0 #fff, 0 1px 0 #7fbacf, 0 2px 0 #47758f, 0 3px 0 #244762, 0 5px 8px #020c1cc0 !important;
       animation:none !important;
       cursor:pointer !important;
     }
@@ -5986,7 +5985,7 @@
       text-underline-offset:4px !important;
     }
 
-    /* Slogan: solid Little Feet navy text, no pill, border, or glass shell. */
+    /* Raised ice lettering without a surrounding panel. */
     #authSection .brand-header p.slogan {
       order:3 !important;
       position:relative !important;
@@ -6009,8 +6008,8 @@
     }
 
     #authSection .brand-header p.slogan span {
-      color:var(--dark-navy) !important;
-      -webkit-text-fill-color:var(--dark-navy) !important;
+      color:#e6f7ff !important;
+      -webkit-text-fill-color:#e6f7ff !important;
       background:none !important;
       background-image:none !important;
       background-clip:border-box !important;
@@ -6026,8 +6025,7 @@
       text-transform:uppercase !important;
 
       text-shadow:
-        0 1px 0 rgba(255,255,255,.42),
-        0 2px 7px rgba(2,12,28,.20) !important;
+        0 -1px 0 #fff, 0 1px 0 #568aa5, 0 2px 0 #193c60, 0 3px 6px #020c1ce6 !important;
       animation:none !important;
     }
 
@@ -6040,8 +6038,8 @@
           rgba(8,40,127,.97),
           rgba(6,29,91,.965)
         ) !important;
-      backdrop-filter:blur(10px) saturate(108%) !important;
-      -webkit-backdrop-filter:blur(10px) saturate(108%) !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
     }
 
     body.light-mode #authSection > .auth-card {
@@ -6205,13 +6203,13 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
-  <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
+  <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-depth-v1">
+  <script defer src="/assets/ambient-background.js?v=20261003-depth-v1"></script>
 </head>
 <body>
   <div class="ambient-background" aria-hidden="true">
-    <video id="loginBackgroundVideo" class="login-background-video" muted loop playsinline preload="auto" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
-      <source src="/assets/video/little-feet-login-wallpaper.mp4?v=20261003-hq-v3" type="video/mp4">
+    <video id="loginBackgroundVideo" class="login-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-login-clean.jpg" tabindex="-1">
+      <source src="/assets/video/little-feet-login-clean.mp4" type="video/mp4">
     </video>
     <video id="ambientBackgroundVideo" class="portal-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
       <source src="/assets/video/little-feet-ambient-silent.mp4" type="video/mp4">
