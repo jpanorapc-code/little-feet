@@ -11,7 +11,7 @@
     "recovery:rehearse": "node scripts/production-recovery-rehearsal.js",
     "start": "node server.js",
     "start:backup": "node backup-server.js",
-    "postinstall": "node scripts/write-deploy-release.js",
+    "postinstall": "node scripts/restore-login-wallpaper.js && node scripts/write-deploy-release.js",
     "audit:project": "node scripts/audit-project-integrity.js"
   },
   "keywords": [],
