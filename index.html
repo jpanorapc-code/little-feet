@@ -5907,6 +5907,133 @@
       }
     }
 
+  
+    /* Mobile login composition repair.
+       Keep desktop/tablet/TV behavior unchanged while giving phones a compact
+       identity block and preventing the information runner from covering forms. */
+    @media (max-width:640px) {
+      html, body { overflow-x:hidden; }
+
+      #authSection {
+        min-height:100dvh !important;
+        align-items:flex-start !important;
+        justify-content:center !important;
+        padding:
+          max(14px, env(safe-area-inset-top))
+          max(12px, env(safe-area-inset-right))
+          24px
+          max(12px, env(safe-area-inset-left)) !important;
+      }
+
+      #authSection > .auth-card {
+        width:min(100%,520px) !important;
+        max-width:520px !important;
+        margin:clamp(190px,31vw,220px) auto 0 !important;
+        padding:14px !important;
+        border-radius:16px !important;
+        overflow:visible !important;
+      }
+
+      #authSection .brand-header {
+        position:absolute !important;
+        top:clamp(-215px,-30vw,-185px) !important;
+        left:50% !important;
+        transform:translateX(-50%) !important;
+        width:min(92vw,330px) !important;
+        max-width:calc(100vw - 28px) !important;
+        margin:0 !important;
+        padding:0 !important;
+        overflow:visible !important;
+      }
+
+      #authSection .mascot-stage {
+        width:min(250px,70vw) !important;
+        min-height:0 !important;
+        height:auto !important;
+        top:0 !important;
+        margin:0 auto 2px !important;
+        overflow:visible !important;
+      }
+
+      #authSection .login-emblem-button {
+        width:100% !important;
+        max-width:250px !important;
+        margin:0 auto !important;
+      }
+
+      #authSection .login-iceberg-emblem {
+        display:block !important;
+        width:100% !important;
+        max-width:250px !important;
+        height:auto !important;
+        margin:0 auto !important;
+      }
+
+      #authSection .brand-header h1 {
+        width:100% !important;
+        margin:-2px auto 4px !important;
+        padding:0 2px !important;
+        font-size:clamp(1.22rem,6vw,1.7rem) !important;
+        line-height:1.04 !important;
+        letter-spacing:0 !important;
+        white-space:nowrap !important;
+        text-align:center !important;
+      }
+
+      #authSection .brand-header p.slogan {
+        display:inline-block !important;
+        max-width:100% !important;
+        margin:0 auto !important;
+        padding:4px 8px !important;
+        font-size:clamp(.52rem,2.35vw,.62rem) !important;
+        line-height:1.15 !important;
+        letter-spacing:clamp(.35px,.12vw,.7px) !important;
+        white-space:nowrap !important;
+      }
+
+      #authSection .login-card-tools {
+        gap:10px !important;
+      }
+
+      #authSection .login-context {
+        margin-top:10px !important;
+      }
+
+      .login-info-runner {
+        position:relative !important;
+        left:auto !important;
+        right:auto !important;
+        bottom:auto !important;
+        z-index:3 !important;
+        min-height:42px !important;
+        margin:0 !important;
+        padding:9px 0 max(9px, env(safe-area-inset-bottom)) !important;
+      }
+    }
+
+    @media (max-width:420px) {
+      #authSection > .auth-card {
+        margin-top:188px !important;
+        padding:13px !important;
+      }
+      #authSection .brand-header {
+        top:-181px !important;
+        width:calc(100vw - 24px) !important;
+      }
+      #authSection .mascot-stage,
+      #authSection .login-emblem-button,
+      #authSection .login-iceberg-emblem {
+        width:min(225px,68vw) !important;
+        max-width:225px !important;
+      }
+      #authSection .brand-header h1 {
+        font-size:clamp(1.14rem,5.9vw,1.45rem) !important;
+      }
+      #authSection .brand-header p.slogan {
+        font-size:clamp(.49rem,2.2vw,.58rem) !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
