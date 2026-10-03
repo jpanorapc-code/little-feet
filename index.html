@@ -5855,7 +5855,72 @@
       }
     }
 
-</style>
+
+    /* Login brand contrast + cross-device fit.
+       Keep the frosted gradient, but give the lettering a dark edge so it
+       remains readable over bright wallpaper frames without changing layout. */
+    #authSection .brand-header h1 {
+      box-sizing:border-box !important;
+      width:100% !important;
+      max-width:100% !important;
+      padding-inline:clamp(2px,1vw,10px) !important;
+      font-size:clamp(1rem,6.2vw,2.35rem) !important;
+      line-height:1.08 !important;
+      letter-spacing:clamp(0,.12vw,.035em) !important;
+      white-space:nowrap !important;
+      text-align:center !important;
+      -webkit-text-stroke:clamp(.7px,.11vw,1.35px) rgba(2,12,28,.96);
+      paint-order:stroke fill;
+      text-shadow:
+        -1px -1px 0 rgba(2,12,28,.88),
+         1px -1px 0 rgba(2,12,28,.88),
+        -1px  1px 0 rgba(2,12,28,.88),
+         1px  1px 0 rgba(2,12,28,.88),
+         0 2px 10px rgba(2,12,28,.48) !important;
+    }
+    #authSection .brand-header p.slogan {
+      box-sizing:border-box;
+      max-width:100% !important;
+      margin-inline:auto !important;
+      padding-inline:clamp(8px,1.8vw,12px) !important;
+      font-size:clamp(.54rem,2.15vw,.72rem) !important;
+      line-height:1.22 !important;
+      letter-spacing:clamp(.55px,.22vw,1.45px) !important;
+      white-space:nowrap !important;
+    }
+    #authSection .brand-header p.slogan,
+    #authSection .brand-header p.slogan span {
+      -webkit-text-stroke:.45px rgba(2,12,28,.94);
+      paint-order:stroke fill;
+      text-shadow:
+        -1px 0 0 rgba(2,12,28,.72),
+         1px 0 0 rgba(2,12,28,.72),
+         0 1px 0 rgba(2,12,28,.72),
+         0 -1px 0 rgba(2,12,28,.72),
+         0 2px 7px rgba(2,12,28,.42) !important;
+    }
+    @media (max-width:420px) {
+      #authSection .brand-header h1 {
+        font-size:clamp(.98rem,6vw,1.48rem) !important;
+        letter-spacing:0 !important;
+        padding-inline:0 !important;
+      }
+      #authSection .brand-header p.slogan {
+        font-size:clamp(.50rem,2.45vw,.61rem) !important;
+        letter-spacing:clamp(.35px,.15vw,.75px) !important;
+        padding-inline:7px !important;
+      }
+    }
+    @media (min-width:1280px) {
+      #authSection .brand-header h1 {
+        font-size:2.35rem !important;
+      }
+      #authSection .brand-header p.slogan {
+        font-size:.72rem !important;
+      }
+    }
+
+  </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
 </head>
