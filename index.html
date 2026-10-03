@@ -6433,6 +6433,43 @@
       }
     }
 
+  
+    /* Borderless final brand treatment. */
+    #authSection .brand-wordmark-button {
+      width:min(82vw,520px) !important;
+      max-width:520px !important;
+      border:0 !important;
+      background:transparent !important;
+      box-shadow:none !important;
+    }
+
+    #authSection .brand-wordmark {
+      border:0 !important;
+      background:transparent !important;
+      box-shadow:none !important;
+      filter:drop-shadow(0 4px 9px rgba(2,12,28,.30)) !important;
+    }
+
+    #authSection .brand-header p.slogan {
+      border:0 !important;
+      outline:0 !important;
+      background:linear-gradient(
+        180deg,
+        rgba(20,66,140,.40),
+        rgba(6,29,91,.56)
+      ) !important;
+      box-shadow:
+        0 7px 18px rgba(2,12,28,.20),
+        inset 0 1px 0 rgba(255,255,255,.16) !important;
+    }
+
+    @media (max-width:640px) {
+      #authSection .brand-wordmark-button {
+        width:min(86vw,390px) !important;
+        max-width:calc(100vw - 30px) !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
