@@ -37,6 +37,14 @@ const structuredLogger = createStructuredLogger({
   slowRequestMs: Number(process.env.LF_SLOW_REQUEST_MS) || 1500
 });
 const logStructured = (severity, event, fields = {}) => structuredLogger.emit(severity, event, fields);
+const applicationSha = (() => {
+  const fromEnvironment = String(process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || '').trim();
+  if (fromEnvironment) return fromEnvironment;
+  try {
+    const release = JSON.parse(fs.readFileSync(path.join(__dirname, '.render-deploy-release.json'), 'utf8'));
+    return String(release.fullCommitSha || '').trim();
+  } catch { return ''; }
+})();
 const SERVER_BUSY_THRESHOLD = Math.max(8, Math.min(100, Number(process.env.LF_SERVER_BUSY_THRESHOLD) || 12));
 const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cunt', 'dick', 'fok', 'fokken', 'fuck', 'kak', 'poes', 'shit']);
 const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
@@ -766,6 +774,16 @@ const staticFileOptions = {
   }
 };
 app.use('/assets', express.static(path.join(__dirname, 'assets'), staticFileOptions));
+app.get('/runtime-config.js', (_req, res) => {
+  const configured = replicaMode ? '' : String(process.env.LITTLE_FEET_BACKUP_URL || '').trim();
+  let backupUrl = '';
+  try {
+    const parsed = new URL(configured);
+    if (parsed.protocol === 'https:' && !parsed.username && !parsed.password && parsed.origin !== publicOrigin()) backupUrl = parsed.origin;
+  } catch {}
+  res.set('Cache-Control', 'no-store');
+  res.type('application/javascript').send(`window.LITTLE_FEET_BACKUP_URL = ${JSON.stringify(backupUrl)};`);
+});
 const publicOutputDocuments = Object.freeze(new Map([
   ['LittleFeet_Presentation_2026_Updated.pdf', 'LittleFeet_Presentation_2026_Updated.pdf'],
   ['LittleFeet_User_Manual_2026_Updated.pdf', 'LittleFeet_User_Manual_2026_Updated.pdf'],
@@ -953,6 +971,7 @@ const db = {
 const databaseFile = path.join(__dirname, 'littlefeet.db');
 const replicaFile = path.join(__dirname, 'littlefeet-replica.json');
 let replicaTimer = null;
+let replicaRemoteTimer = null;
 let replicaSnapshotTimer = null;
 let stateDatabase = null;
 let postgresPool = null;
@@ -960,6 +979,20 @@ let postgresSaveChain = Promise.resolve();
 let postgresPersistenceSnapshot = new Map();
 let replicaSnapshotVersion = '';
 const objectStorage = createObjectStorage({ rootDir: __dirname });
+let replicaTransportLoadError = null;
+let replicaTransport;
+try {
+  const { createReplicaTransport } = require('./lib/operations/replica-transport');
+  replicaTransport = createReplicaTransport();
+} catch (error) {
+  replicaTransportLoadError = error;
+  replicaTransport = { configured: false, missing: ['replica transport module unavailable'], async load() { return null; }, async publish() { throw error; } };
+}
+if (replicaTransportLoadError) logStructured('error', 'replica.transport_module_unavailable', { category: 'replica', message: replicaTransportLoadError.message });
+let replicaCapturedAt = '';
+let replicaSourceSha = '';
+let replicaPublishChain = Promise.resolve();
+let replicaRemotePollInProgress = false;
 
 class PostgresSessionStore extends session.Store {
   constructor() {
@@ -1353,7 +1386,7 @@ async function saveDatabaseState() {
         client.release();
       }
     });
-    return postgresSaveChain;
+    return postgresSaveChain.then(() => { scheduleReplicaSnapshot(); });
   }
   if (!stateDatabase) return;
   try {
@@ -1364,6 +1397,7 @@ async function saveDatabaseState() {
         payload = excluded.payload,
         updated_at = excluded.updated_at
     `).run('primary', JSON.stringify(db), new Date().toISOString());
+    scheduleReplicaSnapshot();
   } catch (error) {
     logStructured('error', 'persistence.sqlite_save_failed', { category: 'persistence', message: error.message });
     throw error;
@@ -1404,9 +1438,33 @@ function loadReplicaSnapshot() {
     const snapshotVersion = `${snapshotStat.mtimeMs}:${snapshotStat.size}`;
     if (snapshotVersion === replicaSnapshotVersion) return;
     const saved = JSON.parse(fs.readFileSync(replicaFile, 'utf8'));
-    if (applySavedState(saved)) replicaSnapshotVersion = snapshotVersion;
+    if (replicaCapturedAt && Number.isFinite(Date.parse(saved.replicatedAt))
+      && Date.parse(saved.replicatedAt) < Date.parse(replicaCapturedAt)) return;
+    if (applySavedState(saved)) {
+      replicaSnapshotVersion = snapshotVersion;
+      if (Number.isFinite(Date.parse(saved.replicatedAt))) replicaCapturedAt = new Date(saved.replicatedAt).toISOString();
+    }
   } catch (error) {
     logStructured('error', 'replica.snapshot_load_failed', { category: 'replica', message: error.message });
+  }
+}
+async function loadRemoteReplicaSnapshot() {
+  if (!replicaMode || !replicaTransport.configured || replicaRemotePollInProgress) return;
+  replicaRemotePollInProgress = true;
+  try {
+    const snapshot = await replicaTransport.load();
+    if (!snapshot || snapshot.capturedAt === replicaCapturedAt) return;
+    if (replicaCapturedAt && Date.parse(snapshot.capturedAt) < Date.parse(replicaCapturedAt)) return;
+    if (!applySavedState({ ...snapshot.state, replicatedAt: snapshot.capturedAt })) throw new Error('Remote replica snapshot could not be applied.');
+    replicaCapturedAt = snapshot.capturedAt;
+    replicaSourceSha = snapshot.applicationSha;
+    logStructured('info', 'replica.remote_snapshot_loaded', {
+      category: 'replica', result: 'success', details: `Loaded encrypted snapshot from ${snapshot.applicationSha}; captured ${snapshot.capturedAt}.`
+    });
+  } catch (error) {
+    logStructured('error', 'replica.remote_snapshot_load_failed', { category: 'replica', message: error.message });
+  } finally {
+    replicaRemotePollInProgress = false;
   }
 }
 function writeReplicaSnapshot() {
@@ -1415,6 +1473,20 @@ function writeReplicaSnapshot() {
     const stagingFile = `${replicaFile}.next`;
     fs.writeFileSync(stagingFile, JSON.stringify({ ...db, replicatedAt: new Date().toISOString() }), 'utf8');
     fs.renameSync(stagingFile, replicaFile);
+    const snapshot = { ...db, replicatedAt: new Date().toISOString() };
+    if (replicaTransport.configured) {
+      replicaPublishChain = replicaPublishChain.catch(() => {}).then(() => replicaTransport.publish(snapshot, {
+        applicationSha: applicationSha || 'unrecorded'
+      })).then(result => {
+        replicaCapturedAt = result.capturedAt;
+        replicaSourceSha = applicationSha || 'unrecorded';
+        logStructured('info', 'replica.remote_snapshot_published', {
+          category: 'replica', result: 'success', details: `Encrypted standby snapshot published (${result.bytes} bytes).`
+        });
+      }).catch(error => {
+        logStructured('error', 'replica.remote_snapshot_publish_failed', { category: 'replica', message: error.message });
+      });
+    }
   } catch (error) {
     logStructured('error', 'replica.snapshot_write_failed', { category: 'replica', message: error.message });
   }
@@ -1539,6 +1611,14 @@ function scheduleReplicaSnapshot() {
 async function initialisePersistence() {
   if (replicaMode) {
     loadReplicaSnapshot();
+    if (!replicaTransport.configured) {
+      logStructured('warn', 'replica.remote_transport_unconfigured', {
+        category: 'configuration', details: `Standby is limited to a local snapshot. Missing: ${replicaTransport.missing.join(', ')}.`
+      });
+    } else {
+      void loadRemoteReplicaSnapshot();
+      replicaRemoteTimer = setInterval(() => { void loadRemoteReplicaSnapshot(); }, 10000);
+    }
     replicaTimer = setInterval(loadReplicaSnapshot, 2000);
     return;
   }
@@ -1661,6 +1741,29 @@ app.post('/api/login', (req, res) => {
 });
 
 // Health check
+app.get('/api/failover-readiness', (req, res) => {
+  const capturedMs = Date.parse(replicaCapturedAt);
+  const ageSeconds = Number.isFinite(capturedMs) ? Math.max(0, Math.floor((Date.now() - capturedMs) / 1000)) : null;
+  const maximumAgeSeconds = Math.max(30, Math.min(600, Number(process.env.LF_REPLICA_MAX_AGE_SECONDS) || 120));
+  const versionMatch = applicationSha && replicaSourceSha
+    ? applicationSha === replicaSourceSha
+    : false;
+  const ready = replicaMode && replicaTransport.configured && ageSeconds !== null
+    && ageSeconds <= maximumAgeSeconds && versionMatch === true;
+  res.set('Cache-Control', 'no-store');
+  res.set('Access-Control-Allow-Origin', '*');
+  return res.json({
+    ready,
+    instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    configured: replicaTransport.configured,
+    capturedAt: replicaCapturedAt || null,
+    ageSeconds,
+    maximumAgeSeconds,
+    applicationSha: applicationSha || null,
+    replicaSourceSha: replicaSourceSha || null,
+    versionMatch
+  });
+});
 app.get('/api/health', (req, res) => {
   // Do not count the health probe itself, and do not report normal concurrent
   // dashboard startup requests as server overload.
@@ -1672,6 +1775,14 @@ app.get('/api/health', (req, res) => {
   return res.json({
     status,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
+    replica: replicaMode ? {
+      transport: replicaTransport.configured ? 'cloudflare-r2' : 'local-file-only',
+      configured: replicaTransport.configured,
+      available: Boolean(replicaCapturedAt),
+      capturedAt: replicaCapturedAt || null,
+      ageSeconds: replicaCapturedAt ? Math.max(0, Math.floor((Date.now() - Date.parse(replicaCapturedAt)) / 1000)) : null,
+      applicationSha: replicaSourceSha || null
+    } : undefined,
     activeRequests: reportedActiveRequests,
     timestamp: new Date().toISOString()
   });

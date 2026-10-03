@@ -2257,6 +2257,7 @@ async function startHealthMonitor() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const health = await res.json();
       consecutiveFailures = 0;
+      sessionStorage.removeItem('lf_backup_unready_notified');
       if (statusEl && statusText) {
         const busy = health.status === 'BUSY';
         statusEl.className = `server-status ${busy ? 'busy' : 'good'}`;
@@ -2273,11 +2274,35 @@ async function startHealthMonitor() {
       const footerStatus = document.getElementById('footerSystemStatus');
       if (footerStatus) footerStatus.textContent = 'Server connection unavailable.';
       logAppError('ERR_SRV_503', 'Live server connection lost to API.');
-      // A production backup URL is configured by the school host / load balancer.
-      // Local development remains manual so a missing local port never traps users in a redirect loop.
+      // Redirect only to a separately deployed standby with a recent replica
+      // snapshot and compatible code. An unready standby remains read-only and
+      // must not receive users with an empty or stale database.
       if (configuredBackupUrl && consecutiveFailures >= 2 && !sessionStorage.getItem('lf_failover_redirected')) {
-        sessionStorage.setItem('lf_failover_redirected', '1');
-        window.location.replace(configuredBackupUrl);
+        try {
+          const backupController = new AbortController();
+          const backupTimeout = window.setTimeout(() => backupController.abort(), 5000);
+          let backupReadiness;
+          try {
+            const backupResponse = await fetch(`${configuredBackupUrl}/api/failover-readiness`, {
+              cache: 'no-store', mode: 'cors', signal: backupController.signal
+            });
+            if (backupResponse.ok) backupReadiness = await backupResponse.json();
+          } finally {
+            window.clearTimeout(backupTimeout);
+          }
+          if (backupReadiness?.ready === true && backupReadiness.instance === 'STANDBY') {
+            sessionStorage.setItem('lf_failover_redirected', '1');
+            window.location.replace(configuredBackupUrl);
+          } else if (!sessionStorage.getItem('lf_backup_unready_notified')) {
+            sessionStorage.setItem('lf_backup_unready_notified', '1');
+            footerStatus && (footerStatus.textContent = 'Primary unavailable; backup is not current yet. Please retry shortly.');
+          }
+        } catch (backupError) {
+          if (!sessionStorage.getItem('lf_backup_unready_notified')) {
+            sessionStorage.setItem('lf_backup_unready_notified', '1');
+            footerStatus && (footerStatus.textContent = 'Primary unavailable; backup could not be reached. Please retry shortly.');
+          }
+        }
       }
     } finally {
       window.clearTimeout(requestTimeout);

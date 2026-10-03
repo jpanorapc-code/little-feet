@@ -11,11 +11,15 @@ const temp = fs.mkdtempSync(path.join(tempRoot, 'replica-restore-'));
 const port = 6100 + Math.floor(Math.random() * 300);
 const pinHash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
-for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
+for (const file of ['server.js', 'backup-server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
+fs.mkdirSync(path.join(temp, 'lib', 'operations'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
+for (const file of ['replica-transport.js', 'recovery-rehearsal.js']) {
+  fs.copyFileSync(path.join(root, 'lib', 'operations', file), path.join(temp, 'lib', 'operations', file));
+}
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'structured-logger.js'), path.join(temp, 'lib', 'structured-logger.js'));
@@ -46,9 +50,9 @@ const teacher = { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), n
 const replicaFile = path.join(temp, 'littlefeet-replica.json');
 fs.writeFileSync(replicaFile, JSON.stringify(snapshot([admin])));
 
-const child = spawn(process.execPath, ['server.js'], {
+const child = spawn(process.execPath, ['backup-server.js'], {
   cwd: temp,
-  env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test' },
+  env: { ...process.env, PORT: String(port), BACKUP_PORT: '', LF_REPLICA_MODE: '1', NODE_ENV: 'test' },
   stdio: ['ignore', 'ignore', 'pipe']
 });
 let stderr = '';
@@ -80,6 +84,15 @@ const authed = async (route, cookie) => {
       await wait(100);
       if (i === 99) throw new Error(`Replica test server failed to start. ${stderr}`);
     }
+
+    const readinessResponse = await fetch(`http://127.0.0.1:${port}/api/failover-readiness`);
+    const readiness = await readinessResponse.json();
+    assert.equal(readiness.instance, 'STANDBY');
+    assert.equal(readiness.ready, false, 'a local-only test replica must not claim remote failover readiness');
+    assert.equal(readiness.configured, false);
+    const runtimeConfig = await fetch(`http://127.0.0.1:${port}/runtime-config.js`);
+    assert.match(await runtimeConfig.text(), /LITTLE_FEET_BACKUP_URL = ""/,
+      'standby deployment must not redirect users back to itself');
 
     const login = await request('/api/login', {
       method: 'POST',
