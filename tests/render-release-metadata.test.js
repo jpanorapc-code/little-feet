@@ -26,7 +26,7 @@ try {
   assert.doesNotMatch(metadata.summary, infrastructureReleaseText);
   assert.doesNotMatch('Render live executive Home charts', infrastructureReleaseText);
 
-  for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json', '.littlefeet-release-baseline']) {
+  for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'manifest.webmanifest', 'service-worker.js', '.render-deploy-release.json', '.littlefeet-release-baseline']) {
     fs.copyFileSync(path.join(root, file), path.join(temp, file));
   }
   fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });

@@ -14,11 +14,15 @@ const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
 const { createStructuredLogger, redactSensitiveLogText } = require('./lib/structured-logger');
 const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, sendMailboxMessage, revokeMailboxAccess } = require('./lib/mailbox-oauth');
+const { resolveFailoverMode } = require('./failover-mode');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const isProduction = process.env.NODE_ENV === 'production';
-const replicaMode = process.env.LF_REPLICA_MODE === '1';
+const failoverMode = resolveFailoverMode(process.env);
+const replicaMode = failoverMode.replica;
+const sharedDatabaseFailover = failoverMode.sharedDatabase;
+const readOnlySnapshotMode = failoverMode.readOnlySnapshot;
 const schoolSearchCache = new Map();
 const loginAttempts = new Map();
 const loginUsernameAttempts = new Map();
@@ -50,11 +54,12 @@ const DEFAULT_BLOCKED_TERMS = Object.freeze(['asshole', 'bastard', 'bitch', 'cun
 const blockedTerms = Object.freeze((process.env.LF_BLOCKED_TERMS || DEFAULT_BLOCKED_TERMS.join(','))
   .split(',').map(term => term.trim().toLocaleLowerCase('en-US')).filter(Boolean));
 let activeRequestCount = 0;
+let activeSharedDatabaseMutations = 0;
 let persistenceReady = Promise.resolve();
 const fieldEncryptionConfigured = Boolean(process.env.LF_FIELD_ENCRYPTION_KEY);
 const sessionSecretConfigured = Boolean(process.env.SESSION_SECRET);
 const productionConfigurationErrors = [];
-if (isProduction && !replicaMode && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
+if (isProduction && !readOnlySnapshotMode && !process.env.DATABASE_URL) productionConfigurationErrors.push('DATABASE_URL');
 if (isProduction && !fieldEncryptionConfigured) productionConfigurationErrors.push('LF_FIELD_ENCRYPTION_KEY');
 if (isProduction && !sessionSecretConfigured) productionConfigurationErrors.push('SESSION_SECRET');
 if (productionConfigurationErrors.length) {
@@ -694,7 +699,7 @@ app.use('/api', (req, res, next) => {
 });
 app.use((req, res, next) => {
   const allowReplicaWritesForTests = process.env.NODE_ENV === 'test' && process.env.LF_TEST_ALLOW_REPLICA_WRITES === '1';
-  if (!replicaMode || allowReplicaWritesForTests || !req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (!readOnlySnapshotMode || allowReplicaWritesForTests || !req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   // Standby replicas are deliberately read-only. Authentication is allowed so
   // users can inspect the latest snapshot during failover, but business-data
   // writes must never return success when there is no durable write path.
@@ -711,24 +716,35 @@ app.use((req, res, next) => {
     let requestReleased = false;
     let mutationLockClient = null;
     let mutationLockReleased = false;
+    let sharedMutationCounted = false;
     const releaseRequest = () => {
       if (requestReleased) return;
       requestReleased = true;
       activeRequestCount = Math.max(0, activeRequestCount - 1);
     };
     const releaseMutationLock = async () => {
-      if (mutationLockReleased || !mutationLockClient) return;
+      if (mutationLockReleased) return;
       mutationLockReleased = true;
-      await mutationLockClient.query('SELECT pg_advisory_unlock(12801337)').catch(() => {});
-      mutationLockClient.release();
-      mutationLockClient = null;
+      if (mutationLockClient) {
+        await mutationLockClient.query('SELECT pg_advisory_unlock(12801337)').catch(() => {});
+        mutationLockClient.release();
+        mutationLockClient = null;
+      }
+      if (sharedMutationCounted) {
+        sharedMutationCounted = false;
+        activeSharedDatabaseMutations = Math.max(0, activeSharedDatabaseMutations - 1);
+      }
     };
     res.on('finish', () => { releaseRequest(); void releaseMutationLock(); });
     res.on('close', () => { releaseRequest(); void releaseMutationLock(); });
 
-    if (!req.method || req.method === 'GET' || replicaMode) return next();
+    if (!req.method || req.method === 'GET' || readOnlySnapshotMode) return next();
 
     if (postgresPool) {
+      if (sharedDatabaseFailover) {
+        activeSharedDatabaseMutations += 1;
+        sharedMutationCounted = true;
+      }
       mutationLockClient = await postgresPool.connect();
       await mutationLockClient.query('SELECT pg_advisory_lock(12801337)');
       await loadDatabaseState();
@@ -1058,7 +1074,12 @@ app.use((req, res, next) => {
   if (!source) return res.status(403).json({ message: 'A same-origin browser request is required.' });
   try {
     const sourceUrl = new URL(source);
-    if (sourceUrl.host !== req.get('host') || sourceUrl.protocol !== `${req.protocol}:`) {
+    const configuredOrigins = String(process.env.LF_ALLOWED_BROWSER_ORIGINS || '').split(',').map(value => {
+      try { return new URL(value.trim()).origin; } catch { return ''; }
+    }).filter(Boolean);
+    const requestOrigin = `${req.protocol}://${req.get('host')}`;
+    const canonicalOriginAllowed = sourceUrl.protocol === 'https:' && configuredOrigins.includes(sourceUrl.origin);
+    if ((sourceUrl.origin !== requestOrigin && !canonicalOriginAllowed) || sourceUrl.protocol !== `${req.protocol}:`) {
       return res.status(403).json({ message: 'Cross-origin state changes are not allowed.' });
     }
   } catch {
@@ -1149,7 +1170,7 @@ const flattenPersistentState = () => {
 };
 
 function openStateDatabase() {
-  if (replicaMode) return;
+  if (readOnlySnapshotMode) return;
   stateDatabase = new Database(databaseFile);
   stateDatabase.pragma('journal_mode = WAL');
   stateDatabase.exec(`
@@ -1340,7 +1361,7 @@ async function loadDatabaseState() {
 }
 
 async function saveDatabaseState() {
-  if (replicaMode) return;
+  if (readOnlySnapshotMode) return;
   if (postgresPool) {
     postgresSaveChain = postgresSaveChain.catch(() => {}).then(async () => {
       const { records, metadata } = flattenPersistentState();
@@ -1609,7 +1630,7 @@ function scheduleReplicaSnapshot() {
   }, 250);
 }
 async function initialisePersistence() {
-  if (replicaMode) {
+  if (readOnlySnapshotMode) {
     loadReplicaSnapshot();
     if (!replicaTransport.configured) {
       logStructured('warn', 'replica.remote_transport_unconfigured', {
@@ -1625,6 +1646,37 @@ async function initialisePersistence() {
   if (process.env.DATABASE_URL) await openPostgresDatabase();
   else openStateDatabase();
   const restoredFromDatabase = await loadDatabaseState();
+  if (sharedDatabaseFailover) {
+    if (!restoredFromDatabase) throw new Error('Shared-database standby refused startup because the primary Little Feet database contains no persisted state.');
+    logStructured('info', 'failover.shared_database_standby_ready', {
+      category: 'failover', result: 'ready', details: 'Standby uses the authoritative PostgreSQL database; writes are serialized by the shared advisory lock.'
+    });
+    let sharedStateRefreshInProgress = false;
+    const sharedStateRefreshTimer = setInterval(() => {
+      if (activeSharedDatabaseMutations > 0 || sharedStateRefreshInProgress || !postgresPool) return;
+      sharedStateRefreshInProgress = true;
+      activeSharedDatabaseMutations += 1;
+      void (async () => {
+        let client;
+        try {
+          client = await postgresPool.connect();
+          await client.query('SELECT pg_advisory_lock(12801337)');
+          await loadDatabaseState();
+        } catch (error) {
+          logStructured('error', 'failover.shared_database_refresh_failed', { category: 'failover', message: error.message });
+        } finally {
+          if (client) {
+            await client.query('SELECT pg_advisory_unlock(12801337)').catch(() => {});
+            client.release();
+          }
+          activeSharedDatabaseMutations = Math.max(0, activeSharedDatabaseMutations - 1);
+          sharedStateRefreshInProgress = false;
+        }
+      })();
+    }, 3000);
+    sharedStateRefreshTimer.unref?.();
+    return;
+  }
   if (!restoredFromDatabase) loadReplicaSnapshot();
   const diagnosticHistoryResetApplied = applyDiagnosticHistoryResetMigration();
   const ownerAccountResetApplied = applyOwnerAccountMigration();
@@ -1741,27 +1793,38 @@ app.post('/api/login', (req, res) => {
 });
 
 // Health check
-app.get('/api/failover-readiness', (req, res) => {
+app.get('/api/failover-readiness', async (req, res) => {
   const capturedMs = Date.parse(replicaCapturedAt);
   const ageSeconds = Number.isFinite(capturedMs) ? Math.max(0, Math.floor((Date.now() - capturedMs) / 1000)) : null;
   const maximumAgeSeconds = Math.max(30, Math.min(600, Number(process.env.LF_REPLICA_MAX_AGE_SECONDS) || 120));
   const versionMatch = applicationSha && replicaSourceSha
     ? applicationSha === replicaSourceSha
     : false;
-  const ready = replicaMode && replicaTransport.configured && ageSeconds !== null
+  let sharedDatabaseReady = false;
+  if (sharedDatabaseFailover && postgresPool) {
+    try {
+      await postgresPool.query('SELECT 1 FROM little_feet_metadata LIMIT 1');
+      sharedDatabaseReady = true;
+    } catch (error) {
+      logStructured('warn', 'failover.shared_database_readiness_failed', { category: 'failover', message: error.message });
+    }
+  }
+  const ready = sharedDatabaseFailover ? sharedDatabaseReady : replicaMode && replicaTransport.configured && ageSeconds !== null
     && ageSeconds <= maximumAgeSeconds && versionMatch === true;
   res.set('Cache-Control', 'no-store');
   res.set('Access-Control-Allow-Origin', '*');
   return res.json({
     ready,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
-    configured: replicaTransport.configured,
+    mode: sharedDatabaseFailover ? 'shared-postgresql-writable' : replicaMode ? 'r2-snapshot-read-only' : 'primary',
+    writeCapable: !readOnlySnapshotMode,
+    configured: sharedDatabaseFailover ? Boolean(process.env.DATABASE_URL) : replicaTransport.configured,
     capturedAt: replicaCapturedAt || null,
     ageSeconds,
     maximumAgeSeconds,
     applicationSha: applicationSha || null,
     replicaSourceSha: replicaSourceSha || null,
-    versionMatch
+    versionMatch: sharedDatabaseFailover ? null : versionMatch
   });
 });
 app.get('/api/health', (req, res) => {
@@ -1776,9 +1839,10 @@ app.get('/api/health', (req, res) => {
     status,
     instance: replicaMode ? 'STANDBY' : 'PRIMARY',
     replica: replicaMode ? {
-      transport: replicaTransport.configured ? 'cloudflare-r2' : 'local-file-only',
-      configured: replicaTransport.configured,
-      available: Boolean(replicaCapturedAt),
+      mode: sharedDatabaseFailover ? 'shared-postgresql-writable' : 'r2-snapshot-read-only',
+      transport: sharedDatabaseFailover ? 'shared-postgresql' : replicaTransport.configured ? 'cloudflare-r2' : 'local-file-only',
+      configured: sharedDatabaseFailover ? Boolean(process.env.DATABASE_URL) : replicaTransport.configured,
+      available: sharedDatabaseFailover ? Boolean(postgresPool) : Boolean(replicaCapturedAt),
       capturedAt: replicaCapturedAt || null,
       ageSeconds: replicaCapturedAt ? Math.max(0, Math.floor((Date.now() - Date.parse(replicaCapturedAt)) / 1000)) : null,
       applicationSha: replicaSourceSha || null

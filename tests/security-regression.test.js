@@ -56,7 +56,7 @@ assert.match(server, /school-deletion\/execute/);
 assert.match(server, /LF_API_MUTATION_RATE_LIMIT/);
 assert.match(server, /LF_API_READ_RATE_LIMIT/);
 assert.match(server, /Backup server is read-only/);
-assert.match(server, /!replicaMode && !process\.env\.DATABASE_URL/);
+assert.match(server, /!readOnlySnapshotMode && !process\.env\.DATABASE_URL/);
 assert.match(server, /status: readiness\.ready \? 'READY' : 'NOT_READY'/);
 assert.doesNotMatch(server, /res\.json\(\{ status: 'OK', database:/);
 assert.match(server, /MODERATION_EXEMPT_FIELDS/);

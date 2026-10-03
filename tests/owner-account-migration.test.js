@@ -9,7 +9,7 @@ fs.mkdirSync(tempRoot, { recursive: true });
 const temp = fs.mkdtempSync(path.join(tempRoot, 'owner-account-migration-'));
 const port = 6500 + Math.floor(Math.random() * 300);
 
-for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
+for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });

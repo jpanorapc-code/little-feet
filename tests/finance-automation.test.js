@@ -12,7 +12,7 @@ const port = 7550 + Math.floor(Math.random() * 120);
 const base = 'http://127.0.0.1:' + port;
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
-for (const file of ['server.js','finance-automation-server.js','auth-crypto.js','backup.js']) {
+for (const file of ['server.js','failover-mode.js','finance-automation-server.js','auth-crypto.js','backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(tmp, file));
 }
 fs.mkdirSync(path.join(tmp, 'lib', 'storage'), { recursive: true });

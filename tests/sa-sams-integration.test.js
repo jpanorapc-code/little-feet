@@ -9,7 +9,7 @@ const temp = fs.mkdtempSync(path.join(root, 'tmp', 'sa-sams-'));
 const port = 7950 + Math.floor(Math.random() * 100);
 const origin = `http://127.0.0.1:${port}`;
 const hash = pin => crypto.scryptSync(pin, 'little-feet-pin-salt', 64).toString('hex');
-for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) fs.copyFileSync(path.join(root, file), path.join(temp, file));
+for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) fs.copyFileSync(path.join(root, file), path.join(temp, file));
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.mkdirSync(path.join(temp, 'lib', 'operations'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
