@@ -5941,32 +5941,45 @@
       margin:0 auto 8px !important;
       padding:0 6px !important;
 
-      font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
+      font-family:Georgia,"Times New Roman",serif !important;
       font-size:clamp(1.65rem,3.25vw,2.35rem) !important;
-      font-weight:750 !important;
+      font-weight:800 !important;
       font-style:normal !important;
-      line-height:1.06 !important;
-      letter-spacing:-.018em !important;
+      line-height:1.05 !important;
+      letter-spacing:.018em !important;
       white-space:nowrap !important;
       text-align:center !important;
       text-transform:none !important;
 
-      color:#eaffff !important;
-      -webkit-text-fill-color:#eaffff !important;
-      background:none !important;
-      background-image:none !important;
-      background-clip:border-box !important;
-      -webkit-background-clip:border-box !important;
+      color:transparent !important;
+      -webkit-text-fill-color:transparent !important;
+      background:
+        linear-gradient(
+          105deg,
+          #ffffff 8%,
+          #c8fff7 44%,
+          #5eead4 70%,
+          #ffffff 96%
+        ) !important;
+      background-image:
+        linear-gradient(
+          105deg,
+          #ffffff 8%,
+          #c8fff7 44%,
+          #5eead4 70%,
+          #ffffff 96%
+        ) !important;
+      background-size:180% auto !important;
+      background-clip:text !important;
+      -webkit-background-clip:text !important;
       -webkit-text-stroke:0 !important;
 
       border:0 !important;
       outline:0 !important;
       box-shadow:none !important;
 
-      text-shadow:
-        0 1px 2px rgba(2,12,28,.72),
-        0 4px 14px rgba(8,40,127,.24) !important;
-      animation:none !important;
+      text-shadow:0 1px 12px rgba(94,234,212,.28) !important;
+      animation:siteNameShimmer 8s ease-in-out infinite !important;
       cursor:pointer !important;
     }
 
@@ -6108,7 +6121,7 @@
 
       #authSection .brand-header h1 {
         font-size:clamp(1.22rem,5.7vw,1.62rem) !important;
-        letter-spacing:-.018em !important;
+        letter-spacing:.012em !important;
         margin-bottom:6px !important;
         padding-inline:0 !important;
       }
