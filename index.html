@@ -6202,6 +6202,94 @@
         padding:4px 9px !important;
       }
     }
+  
+    /* Mobile login interaction guard.
+       Keep decorative branding from covering real form hit targets. */
+    #authSection > .auth-card {
+      position:relative !important;
+      z-index:10 !important;
+      isolation:isolate !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection .brand-header {
+      z-index:4 !important;
+      pointer-events:none !important;
+    }
+
+    #authSection .brand-header .login-emblem-button,
+    #authSection .brand-header h1 {
+      pointer-events:auto !important;
+    }
+
+    #authSection .login-card-tools,
+    #authSection .login-access-note,
+    #authSection #loginForm,
+    #authSection .login-new-account,
+    #authSection .login-legal,
+    #authSection #signupForm {
+      position:relative !important;
+      z-index:8 !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection #loginForm {
+      width:100% !important;
+      min-width:0 !important;
+    }
+
+    #authSection #loginForm input,
+    #authSection #loginForm select,
+    #authSection #loginForm button,
+    #authSection #loginForm label,
+    #authSection #loginForm .password-field,
+    #authSection #loginForm .login-utility-row {
+      pointer-events:auto !important;
+    }
+
+    #authSection #loginForm button,
+    #authSection #loginForm input,
+    #authSection #loginForm select {
+      touch-action:manipulation;
+    }
+
+    #authSection #loginForm > .submit-btn {
+      position:relative !important;
+      z-index:9 !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection .login-info-runner {
+      pointer-events:none !important;
+    }
+
+    @media (max-width:640px) {
+      #authSection > .auth-card {
+        width:min(calc(100vw - 24px),520px) !important;
+        max-width:520px !important;
+        min-width:0 !important;
+        overflow:visible !important;
+      }
+
+      #authSection #loginForm > .submit-btn {
+        width:100% !important;
+        max-width:none !important;
+        min-height:48px !important;
+      }
+
+      #authSection #loginForm input,
+      #authSection #loginForm select {
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+      }
+
+      #authSection .password-field {
+        width:100% !important;
+        min-width:0 !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-depth-v1">
   <script defer src="/assets/ambient-background.js?v=20261003-depth-v1"></script>
