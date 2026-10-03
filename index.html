@@ -5856,263 +5856,194 @@
     }
 
 
-    /* Login brand contrast + cross-device fit.
-       Preserve the original icy gradient fill; only the letter edge is darkened
-       so bright wallpaper frames cannot wash the branding out. */
+    /* Final login branding and responsive composition.
+       Professional Little Feet typography, portal colours, no decorative borders,
+       no mobile blur mask, and no overlap across phone/tablet/desktop/TV. */
+    #authSection {
+      overflow-x:hidden;
+    }
+
+    #authSection > .auth-card {
+      overflow:visible !important;
+    }
+
+    #authSection .brand-header {
+      box-sizing:border-box !important;
+      position:absolute !important;
+      z-index:4 !important;
+      left:50% !important;
+      right:auto !important;
+      display:flex !important;
+      flex-direction:column !important;
+      align-items:center !important;
+      justify-content:flex-start !important;
+      width:min(640px,calc(100vw - 32px)) !important;
+      max-width:640px !important;
+      margin:0 !important;
+      padding:0 !important;
+      transform:translateX(-50%) !important;
+      overflow:visible !important;
+      text-align:center !important;
+    }
+
+    /* Remove the oversized mobile blur/mask entirely. */
+    #authSection .brand-header::after {
+      content:none !important;
+      display:none !important;
+      background:none !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
+      mask-image:none !important;
+      -webkit-mask-image:none !important;
+    }
+
+    #authSection .mascot-stage {
+      position:relative !important;
+      z-index:5 !important;
+      left:auto !important;
+      right:auto !important;
+      top:auto !important;
+      bottom:auto !important;
+      order:1 !important;
+      display:block !important;
+      width:min(340px,72vw) !important;
+      min-height:0 !important;
+      height:auto !important;
+      margin:0 auto 8px !important;
+      transform:none !important;
+      overflow:visible !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection .login-emblem-button,
+    #authSection .login-iceberg-emblem {
+      position:relative !important;
+      display:block !important;
+      width:100% !important;
+      max-width:none !important;
+      height:auto !important;
+      margin:0 auto !important;
+      border:0 !important;
+      background:transparent !important;
+      box-shadow:none !important;
+    }
+
+    /* Professional portal-colour wordmark, no outline/border. */
     #authSection .brand-header h1 {
+      order:2 !important;
+      position:relative !important;
+      z-index:6 !important;
       box-sizing:border-box !important;
       width:100% !important;
       max-width:100% !important;
-      padding-inline:clamp(2px,1vw,10px) !important;
-      font-size:clamp(1rem,6.2vw,2.35rem) !important;
-      line-height:1.08 !important;
-      letter-spacing:clamp(0,.12vw,.035em) !important;
+      margin:0 auto 8px !important;
+      padding:0 6px !important;
+      font-family:"Segoe UI Variable Display","Aptos Display","Segoe UI",Arial,sans-serif !important;
+      font-size:clamp(1.65rem,3.25vw,2.35rem) !important;
+      font-weight:720 !important;
+      font-style:normal !important;
+      line-height:1.06 !important;
+      letter-spacing:-.022em !important;
       white-space:nowrap !important;
       text-align:center !important;
-      -webkit-text-stroke:clamp(.7px,.11vw,1.2px) rgba(2,12,28,.96);
-      paint-order:stroke fill;
+      color:transparent !important;
+      -webkit-text-fill-color:transparent !important;
+      background:
+        linear-gradient(180deg,#f4fbff 0%,#d8f6ff 30%,#9ee7df 62%,#7fc8ee 100%) !important;
+      background-image:
+        linear-gradient(180deg,#f4fbff 0%,#d8f6ff 30%,#9ee7df 62%,#7fc8ee 100%) !important;
+      background-clip:text !important;
+      -webkit-background-clip:text !important;
+      -webkit-text-stroke:0 !important;
+      text-shadow:
+        0 2px 4px rgba(2,12,28,.62),
+        0 8px 20px rgba(8,40,127,.24) !important;
+      animation:none !important;
+      cursor:pointer;
     }
+
+    /* Borderless glass slogan in the same Little Feet palette. */
     #authSection .brand-header p.slogan {
-      box-sizing:border-box;
+      order:3 !important;
+      position:relative !important;
+      z-index:6 !important;
+      display:inline-flex !important;
+      align-items:center !important;
+      justify-content:center !important;
       max-width:100% !important;
-      margin-inline:auto !important;
-      padding-inline:clamp(8px,1.8vw,12px) !important;
-      font-size:clamp(.54rem,2.15vw,.72rem) !important;
-      line-height:1.22 !important;
-      letter-spacing:clamp(.55px,.22vw,1.45px) !important;
-      white-space:nowrap !important;
+      margin:0 auto !important;
+      padding:6px 14px !important;
+      border:0 !important;
+      outline:0 !important;
+      border-radius:999px !important;
+      background:
+        linear-gradient(180deg,rgba(8,40,127,.56),rgba(6,29,91,.68)) !important;
+      box-shadow:
+        0 7px 18px rgba(2,12,28,.22),
+        inset 0 1px 0 rgba(255,255,255,.14) !important;
+      backdrop-filter:blur(8px) saturate(115%) !important;
+      -webkit-backdrop-filter:blur(8px) saturate(115%) !important;
     }
+
     #authSection .brand-header p.slogan span {
-      -webkit-text-stroke:.4px rgba(2,12,28,.94);
-      paint-order:stroke fill;
-    }
-    @media (max-width:420px) {
-      #authSection .brand-header h1 {
-        font-size:clamp(.98rem,6vw,1.48rem) !important;
-        letter-spacing:0 !important;
-        padding-inline:0 !important;
-      }
-      #authSection .brand-header p.slogan {
-        font-size:clamp(.50rem,2.45vw,.61rem) !important;
-        letter-spacing:clamp(.35px,.15vw,.75px) !important;
-        padding-inline:7px !important;
-      }
-    }
-    @media (min-width:1280px) {
-      #authSection .brand-header h1 {
-        font-size:2.35rem !important;
-      }
-      #authSection .brand-header p.slogan {
-        font-size:.72rem !important;
-      }
+      color:#eaffff !important;
+      -webkit-text-fill-color:#eaffff !important;
+      background:none !important;
+      background-image:none !important;
+      -webkit-background-clip:border-box !important;
+      background-clip:border-box !important;
+      -webkit-text-stroke:0 !important;
+      font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
+      font-size:clamp(.62rem,.9vw,.74rem) !important;
+      font-weight:750 !important;
+      font-style:normal !important;
+      line-height:1.15 !important;
+      letter-spacing:.075em !important;
+      text-transform:uppercase;
+      text-shadow:0 1px 2px rgba(2,12,28,.68) !important;
+      animation:none !important;
     }
 
-  
-    /* Mobile login composition repair.
-       Keep desktop/tablet/TV behavior unchanged while giving phones a compact
-       identity block and preventing the information runner from covering forms. */
-    @media (max-width:640px) {
-      html, body { overflow-x:hidden; }
-
+    /* Desktop/tablet/TV: reserve a clean brand zone above the card. */
+    @media (min-width:641px) {
       #authSection {
         min-height:100dvh !important;
         align-items:flex-start !important;
         justify-content:center !important;
         padding:
-          max(14px, env(safe-area-inset-top))
-          max(12px, env(safe-area-inset-right))
-          24px
-          max(12px, env(safe-area-inset-left)) !important;
+          max(16px,env(safe-area-inset-top))
+          max(18px,env(safe-area-inset-right))
+          44px
+          max(18px,env(safe-area-inset-left)) !important;
       }
 
       #authSection > .auth-card {
         width:min(100%,520px) !important;
         max-width:520px !important;
-        margin:clamp(190px,31vw,220px) auto 0 !important;
-        padding:14px !important;
-        border-radius:16px !important;
-        overflow:visible !important;
+        margin:270px auto 0 !important;
       }
 
       #authSection .brand-header {
-        position:absolute !important;
-        top:clamp(-215px,-30vw,-185px) !important;
-        left:50% !important;
-        transform:translateX(-50%) !important;
-        width:min(92vw,330px) !important;
-        max-width:calc(100vw - 28px) !important;
-        margin:0 !important;
-        padding:0 !important;
-        overflow:visible !important;
-      }
-
-      #authSection .mascot-stage {
-        width:min(250px,70vw) !important;
-        min-height:0 !important;
-        height:auto !important;
-        top:0 !important;
-        margin:0 auto 2px !important;
-        overflow:visible !important;
-      }
-
-      #authSection .login-emblem-button {
-        width:100% !important;
-        max-width:250px !important;
-        margin:0 auto !important;
-      }
-
-      #authSection .login-iceberg-emblem {
-        display:block !important;
-        width:100% !important;
-        max-width:250px !important;
-        height:auto !important;
-        margin:0 auto !important;
-      }
-
-      #authSection .brand-header h1 {
-        width:100% !important;
-        margin:-2px auto 4px !important;
-        padding:0 2px !important;
-        font-size:clamp(1.22rem,6vw,1.7rem) !important;
-        line-height:1.04 !important;
-        letter-spacing:0 !important;
-        white-space:nowrap !important;
-        text-align:center !important;
-      }
-
-      #authSection .brand-header p.slogan {
-        display:inline-block !important;
-        max-width:100% !important;
-        margin:0 auto !important;
-        padding:4px 8px !important;
-        font-size:clamp(.52rem,2.35vw,.62rem) !important;
-        line-height:1.15 !important;
-        letter-spacing:clamp(.35px,.12vw,.7px) !important;
-        white-space:nowrap !important;
-      }
-
-      #authSection .login-card-tools {
-        gap:10px !important;
-      }
-
-      #authSection .login-context {
-        margin-top:10px !important;
-      }
-
-      .login-info-runner {
-        position:relative !important;
-        left:auto !important;
-        right:auto !important;
-        bottom:auto !important;
-        z-index:3 !important;
-        min-height:42px !important;
-        margin:0 !important;
-        padding:9px 0 max(9px, env(safe-area-inset-bottom)) !important;
+        top:-258px !important;
       }
     }
 
-    @media (max-width:420px) {
-      #authSection > .auth-card {
-        margin-top:188px !important;
-        padding:13px !important;
-      }
-      #authSection .brand-header {
-        top:-181px !important;
-        width:calc(100vw - 24px) !important;
-      }
-      #authSection .mascot-stage,
-      #authSection .login-emblem-button,
-      #authSection .login-iceberg-emblem {
-        width:min(225px,68vw) !important;
-        max-width:225px !important;
-      }
-      #authSection .brand-header h1 {
-        font-size:clamp(1.14rem,5.9vw,1.45rem) !important;
-      }
-      #authSection .brand-header p.slogan {
-        font-size:clamp(.49rem,2.2vw,.58rem) !important;
-      }
-    }
-
-  
-    /* Mobile video-brand de-duplication.
-       The wallpaper recording contains its own title. Blur only the narrow
-       branding band behind our live title/slogan so the duplicate disappears
-       without disabling or zooming the animated background. */
+    /* Phone: smaller identity block, same typography, explicit separation. */
     @media (max-width:640px) {
-      #authSection .brand-header::after {
-        content:"" !important;
-        position:absolute !important;
-        z-index:1 !important;
-        left:50% !important;
-        bottom:-10px !important;
-        width:100vw !important;
-        height:82px !important;
-        transform:translateX(-50%) !important;
-        pointer-events:none !important;
-        background:linear-gradient(
-          180deg,
-          rgba(4,18,38,0) 0%,
-          rgba(4,18,38,.10) 24%,
-          rgba(4,18,38,.14) 50%,
-          rgba(4,18,38,.10) 76%,
-          rgba(4,18,38,0) 100%
-        ) !important;
-        -webkit-backdrop-filter:blur(20px) saturate(.82) !important;
-        backdrop-filter:blur(20px) saturate(.82) !important;
-        -webkit-mask-image:linear-gradient(
-          180deg,
-          transparent 0%,
-          #000 20%,
-          #000 82%,
-          transparent 100%
-        );
-        mask-image:linear-gradient(
-          180deg,
-          transparent 0%,
-          #000 20%,
-          #000 82%,
-          transparent 100%
-        );
-      }
+      html,body { overflow-x:hidden; }
 
-      #authSection .brand-header h1,
-      #authSection .brand-header p.slogan {
-        position:relative !important;
-        z-index:6 !important;
-      }
-    }
-
-  
-    /* Formal login brand typography.
-       Keep the frosted treatment, but use the same professional system display
-       family as the rest of the product instead of the decorative serif. */
-    #authSection .brand-header h1 {
-      font-family:"Aptos Display","Segoe UI Variable Display","Segoe UI",Arial,sans-serif !important;
-      font-weight:760 !important;
-      letter-spacing:-.012em !important;
-    }
-    #authSection .brand-header p.slogan,
-    #authSection .brand-header p.slogan span {
-      font-family:Aptos,"Segoe UI Variable Text","Segoe UI",Arial,sans-serif !important;
-      font-weight:760 !important;
-    }
-    @media (max-width:640px) {
-      #authSection .brand-header h1 {
-        letter-spacing:-.016em !important;
-      }
-    }
-
-  
-    /* Emergency mobile auth flow correction.
-       The runner must stack below the auth card, never beside it. */
-    @media (max-width:640px) {
       #authSection {
         display:flex !important;
         flex-direction:column !important;
         align-items:center !important;
         justify-content:flex-start !important;
+        min-height:100dvh !important;
         width:100% !important;
+        padding:
+          max(12px,env(safe-area-inset-top))
+          max(12px,env(safe-area-inset-right))
+          22px
+          max(12px,env(safe-area-inset-left)) !important;
       }
 
       #authSection > .auth-card {
@@ -6121,355 +6052,103 @@
         width:min(calc(100vw - 24px),520px) !important;
         max-width:520px !important;
         min-width:0 !important;
+        margin:214px auto 0 !important;
+        padding:14px !important;
+        border-radius:16px !important;
       }
 
-      #authSection > .login-info-runner {
+      #authSection .brand-header {
+        top:-202px !important;
+        width:calc(100vw - 28px) !important;
+        max-width:430px !important;
+      }
+
+      #authSection .mascot-stage {
+        width:min(225px,66vw) !important;
+        margin-bottom:6px !important;
+      }
+
+      #authSection .brand-header h1 {
+        font-size:clamp(1.22rem,5.7vw,1.62rem) !important;
+        letter-spacing:-.024em !important;
+        margin-bottom:6px !important;
+        padding-inline:0 !important;
+      }
+
+      #authSection .brand-header p.slogan {
+        padding:5px 10px !important;
+      }
+
+      #authSection .brand-header p.slogan span {
+        font-size:clamp(.52rem,2.2vw,.61rem) !important;
+        letter-spacing:.065em !important;
+      }
+
+      #authSection .login-card-tools {
+        gap:10px !important;
+      }
+
+      #authSection .login-info-runner {
+        position:relative !important;
+        left:auto !important;
+        right:auto !important;
+        bottom:auto !important;
+        z-index:3 !important;
         flex:0 0 auto !important;
         align-self:stretch !important;
         width:100vw !important;
         max-width:100vw !important;
+        min-height:42px !important;
         margin:16px calc(50% - 50vw) 0 !important;
-      }
-
-      #authSection .brand-header {
-        left:50% !important;
-        right:auto !important;
-        transform:translateX(-50%) !important;
-      }
-
-      #authSection .mascot-stage,
-      #authSection .login-emblem-button,
-      #authSection .login-iceberg-emblem {
-        margin-left:auto !important;
-        margin-right:auto !important;
+        padding:9px 0 max(9px,env(safe-area-inset-bottom)) !important;
       }
     }
 
-  
-    /* Final login brand stack: iceberg -> company name -> slogan. */
-    @media (max-width:640px) {
+    @media (max-width:380px) {
+      #authSection > .auth-card {
+        margin-top:202px !important;
+        padding:13px !important;
+      }
+
       #authSection .brand-header {
-        display:flex !important;
-        flex-direction:column !important;
-        align-items:center !important;
-        justify-content:flex-start !important;
-        gap:0 !important;
-        top:-208px !important;
+        top:-191px !important;
       }
 
       #authSection .mascot-stage {
-        order:1 !important;
-        flex:0 0 auto !important;
-        margin:0 auto 6px !important;
+        width:min(205px,64vw) !important;
       }
 
       #authSection .brand-header h1 {
-        order:2 !important;
-        flex:0 0 auto !important;
-        margin:0 auto 7px !important;
+        font-size:clamp(1.08rem,5.5vw,1.34rem) !important;
+      }
+    }
+
+    @media (max-width:900px) and (max-height:600px) and (orientation:landscape) {
+      #authSection {
+        padding-top:10px !important;
+      }
+
+      #authSection > .auth-card {
+        margin-top:154px !important;
+      }
+
+      #authSection .brand-header {
+        top:-146px !important;
+      }
+
+      #authSection .mascot-stage {
+        width:150px !important;
+      }
+
+      #authSection .brand-header h1 {
+        font-size:1.18rem !important;
+        margin-bottom:4px !important;
       }
 
       #authSection .brand-header p.slogan {
-        order:3 !important;
-        flex:0 0 auto !important;
-        margin:0 auto !important;
+        padding:4px 9px !important;
       }
     }
-
-    @media (max-width:420px) {
-      #authSection .brand-header {
-        top:-198px !important;
-      }
-    }
-
-    /* Professional slogan badge: solid, high-contrast, no frosted text wash. */
-    #authSection .brand-header p.slogan {
-      padding:6px 13px !important;
-      border:1px solid rgba(94,234,212,.62) !important;
-      border-radius:999px !important;
-      background:
-        linear-gradient(180deg,rgba(8,40,127,.88),rgba(6,29,91,.92)) !important;
-      box-shadow:
-        0 7px 18px rgba(2,12,28,.28),
-        inset 0 1px 0 rgba(255,255,255,.16) !important;
-    }
-
-    #authSection .brand-header p.slogan span {
-      color:#e9feff !important;
-      background:none !important;
-      background-image:none !important;
-      -webkit-background-clip:border-box !important;
-      background-clip:border-box !important;
-      -webkit-text-fill-color:#e9feff !important;
-      -webkit-text-stroke:0 !important;
-      text-shadow:0 1px 2px rgba(2,12,28,.72) !important;
-      animation:none !important;
-      font-weight:800 !important;
-      letter-spacing:.085em !important;
-    }
-
-  
-    /* Mobile brand geometry fix.
-       The legacy mascot stage is absolutely positioned; return it to normal
-       flow so it physically reserves space above the company name. */
-    @media (max-width:640px) {
-      #authSection .brand-header {
-        display:flex !important;
-        flex-direction:column !important;
-        align-items:center !important;
-      }
-
-      #authSection .mascot-stage {
-        position:relative !important;
-        left:auto !important;
-        right:auto !important;
-        top:auto !important;
-        bottom:auto !important;
-        transform:none !important;
-        order:1 !important;
-        display:block !important;
-        width:min(250px,70vw) !important;
-        min-height:0 !important;
-        height:auto !important;
-        margin:0 auto 8px !important;
-        pointer-events:auto !important;
-      }
-
-      #authSection .login-emblem-button {
-        position:relative !important;
-        display:block !important;
-        width:100% !important;
-        max-width:none !important;
-        height:auto !important;
-        margin:0 auto !important;
-      }
-
-      #authSection .login-iceberg-emblem {
-        position:relative !important;
-        display:block !important;
-        width:100% !important;
-        height:auto !important;
-        max-width:none !important;
-        margin:0 auto !important;
-      }
-
-      #authSection .brand-header h1 {
-        order:2 !important;
-        position:relative !important;
-        margin:0 auto 7px !important;
-      }
-
-      #authSection .brand-header p.slogan {
-        order:3 !important;
-        position:relative !important;
-        margin:0 auto !important;
-      }
-    }
-
-    @media (max-width:420px) {
-      #authSection .mascot-stage {
-        width:min(225px,68vw) !important;
-      }
-    }
-
-  
-    /* Unified professional login wordmark across phone, tablet, desktop and TV. */
-    #authSection .brand-header h1 {
-      font-family:"Segoe UI Variable Display","Aptos Display","Segoe UI",Arial,sans-serif !important;
-      font-weight:700 !important;
-      font-style:normal !important;
-      letter-spacing:-.018em !important;
-      color:#f4fbff !important;
-      -webkit-text-fill-color:#f4fbff !important;
-      background:none !important;
-      background-image:none !important;
-      background-clip:border-box !important;
-      -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:0 !important;
-      text-shadow:
-        0 1px 2px rgba(2,12,28,.92),
-        0 4px 14px rgba(2,12,28,.46) !important;
-      animation:none !important;
-    }
-
-    #authSection .brand-header p.slogan,
-    #authSection .brand-header p.slogan span {
-      font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
-      font-style:normal !important;
-      font-weight:700 !important;
-    }
-
-    #authSection .brand-header p.slogan span {
-      color:#f4fbff !important;
-      -webkit-text-fill-color:#f4fbff !important;
-      letter-spacing:.075em !important;
-      text-shadow:0 1px 2px rgba(2,12,28,.74) !important;
-    }
-
-    @media (max-width:640px) {
-      #authSection .brand-header h1 {
-        letter-spacing:-.022em !important;
-      }
-    }
-
-  
-    /* Refined glass wordmark: professional typography with translucent icy depth. */
-    #authSection .brand-header h1 {
-      color:transparent !important;
-      -webkit-text-fill-color:transparent !important;
-      background:
-        linear-gradient(
-          180deg,
-          rgba(255,255,255,.96) 0%,
-          rgba(226,249,255,.84) 34%,
-          rgba(153,223,236,.70) 62%,
-          rgba(244,253,255,.92) 100%
-        ) !important;
-      background-image:
-        linear-gradient(
-          180deg,
-          rgba(255,255,255,.96) 0%,
-          rgba(226,249,255,.84) 34%,
-          rgba(153,223,236,.70) 62%,
-          rgba(244,253,255,.92) 100%
-        ) !important;
-      background-clip:text !important;
-      -webkit-background-clip:text !important;
-      -webkit-text-stroke:.55px rgba(4,22,48,.82) !important;
-      text-shadow:
-        0 1px 0 rgba(255,255,255,.18),
-        0 2px 6px rgba(2,12,28,.42),
-        0 8px 18px rgba(2,12,28,.20) !important;
-      animation:none !important;
-    }
-
-    /* Glass slogan badge shared by mobile and desktop. */
-    #authSection .brand-header p.slogan {
-      border:1px solid rgba(117,231,224,.62) !important;
-      background:
-        linear-gradient(
-          180deg,
-          rgba(20,66,140,.46),
-          rgba(6,29,91,.64)
-        ) !important;
-      box-shadow:
-        0 8px 22px rgba(2,12,28,.24),
-        inset 0 1px 0 rgba(255,255,255,.20),
-        inset 0 -1px 0 rgba(0,0,0,.18) !important;
-      backdrop-filter:blur(12px) saturate(125%) !important;
-      -webkit-backdrop-filter:blur(12px) saturate(125%) !important;
-    }
-
-    #authSection .brand-header p.slogan span {
-      color:#eefeff !important;
-      -webkit-text-fill-color:#eefeff !important;
-      text-shadow:
-        0 1px 2px rgba(2,12,28,.72),
-        0 0 10px rgba(143,231,238,.12) !important;
-    }
-
-  
-    /* Icy brand artwork wordmark, shared by mobile and desktop. */
-    #authSection .brand-title-accessible {
-      position:absolute !important;
-      width:1px !important;
-      height:1px !important;
-      padding:0 !important;
-      margin:-1px !important;
-      overflow:hidden !important;
-      clip:rect(0,0,0,0) !important;
-      clip-path:inset(50%) !important;
-      white-space:nowrap !important;
-      border:0 !important;
-    }
-
-    #authSection .brand-wordmark-button {
-      order:2 !important;
-      display:block !important;
-      width:min(100%,620px) !important;
-      max-width:620px !important;
-      height:auto !important;
-      margin:4px auto 8px !important;
-      padding:0 !important;
-      border:0 !important;
-      background:transparent !important;
-      box-shadow:none !important;
-      line-height:0 !important;
-      cursor:pointer !important;
-    }
-
-    #authSection .brand-wordmark-button:focus-visible {
-      outline:2px solid rgba(165,243,252,.95) !important;
-      outline-offset:4px !important;
-      border-radius:10px !important;
-    }
-
-    #authSection .brand-wordmark {
-      display:block !important;
-      width:100% !important;
-      max-width:100% !important;
-      height:auto !important;
-      margin:0 auto !important;
-      object-fit:contain !important;
-      filter:drop-shadow(0 4px 10px rgba(2,12,28,.34)) !important;
-    }
-
-    #authSection .brand-header p.slogan {
-      order:3 !important;
-    }
-
-    @media (max-width:640px) {
-      #authSection .brand-wordmark-button {
-        width:min(92vw,430px) !important;
-        max-width:calc(100vw - 24px) !important;
-        margin:4px auto 7px !important;
-      }
-    }
-
-    @media (max-width:420px) {
-      #authSection .brand-wordmark-button {
-        width:min(94vw,390px) !important;
-        margin-top:2px !important;
-      }
-    }
-
-  
-    /* Borderless final brand treatment. */
-    #authSection .brand-wordmark-button {
-      width:min(82vw,520px) !important;
-      max-width:520px !important;
-      border:0 !important;
-      background:transparent !important;
-      box-shadow:none !important;
-    }
-
-    #authSection .brand-wordmark {
-      border:0 !important;
-      background:transparent !important;
-      box-shadow:none !important;
-      filter:drop-shadow(0 4px 9px rgba(2,12,28,.30)) !important;
-    }
-
-    #authSection .brand-header p.slogan {
-      border:0 !important;
-      outline:0 !important;
-      background:linear-gradient(
-        180deg,
-        rgba(20,66,140,.40),
-        rgba(6,29,91,.56)
-      ) !important;
-      box-shadow:
-        0 7px 18px rgba(2,12,28,.20),
-        inset 0 1px 0 rgba(255,255,255,.16) !important;
-    }
-
-    @media (max-width:640px) {
-      #authSection .brand-wordmark-button {
-        width:min(86vw,390px) !important;
-        max-width:calc(100vw - 30px) !important;
-      }
-    }
-
   </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
   <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
@@ -6563,10 +6242,7 @@
 <image href="assets/brand/iceberg-wave-backing.webp" width="1672" height="941" clip-path="url(#penguinArmBacking)"/>
 <g class="penguin-wave"><image href="assets/brand/iceberg-blue-eyes.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
 </svg></button></div>
-<h1 class="brand-title-accessible">Little Feet Technologies</h1>
-        <button class="brand-wordmark-button" type="button" onclick="goToMainMenu()" aria-label="Little Feet Technologies — open main menu" title="Open main menu">
-          <img class="brand-wordmark" src="/assets/brand/little-feet-ice-wordmark.svg" alt="" aria-hidden="true">
-        </button>
+<h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
         <p class="slogan"><span>Every Little Step Matters</span></p>
       </div>
       <div class="login-card-tools">
