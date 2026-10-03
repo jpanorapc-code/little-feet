@@ -5856,11 +5856,12 @@
     }
 
 
-    /* Final login branding and responsive composition.
-       Professional Little Feet typography, portal colours, no decorative borders,
-       no mobile blur mask, and no overlap across phone/tablet/desktop/TV. */
+    /* Final login branding: one authoritative block for every viewport.
+       Professional Little Feet styling, no decorative borders, no mobile blur,
+       and explicit spacing so the identity never overlaps the login card. */
+
     #authSection {
-      overflow-x:hidden;
+      overflow-x:hidden !important;
     }
 
     #authSection > .auth-card {
@@ -5886,7 +5887,7 @@
       text-align:center !important;
     }
 
-    /* Remove the oversized mobile blur/mask entirely. */
+    /* Kill the old mobile blur/mask completely. */
     #authSection .brand-header::after {
       content:none !important;
       display:none !important;
@@ -5909,7 +5910,7 @@
       width:min(340px,72vw) !important;
       min-height:0 !important;
       height:auto !important;
-      margin:0 auto 8px !important;
+      margin:0 auto 10px !important;
       transform:none !important;
       overflow:visible !important;
       pointer-events:auto !important;
@@ -5924,11 +5925,12 @@
       height:auto !important;
       margin:0 auto !important;
       border:0 !important;
+      outline:0 !important;
       background:transparent !important;
       box-shadow:none !important;
     }
 
-    /* Professional portal-colour wordmark, no outline/border. */
+    /* Company name: same clean typography language as the slogan, no border. */
     #authSection .brand-header h1 {
       order:2 !important;
       position:relative !important;
@@ -5938,43 +5940,53 @@
       max-width:100% !important;
       margin:0 auto 8px !important;
       padding:0 6px !important;
-      font-family:"Segoe UI Variable Display","Aptos Display","Segoe UI",Arial,sans-serif !important;
+
+      font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
       font-size:clamp(1.65rem,3.25vw,2.35rem) !important;
-      font-weight:720 !important;
+      font-weight:750 !important;
       font-style:normal !important;
       line-height:1.06 !important;
-      letter-spacing:-.022em !important;
+      letter-spacing:-.018em !important;
       white-space:nowrap !important;
       text-align:center !important;
-      color:transparent !important;
-      -webkit-text-fill-color:transparent !important;
-      background:
-        linear-gradient(
-          180deg,
-          #0b2f86 0%,
-          #123f9f 34%,
-          #0f8f9a 68%,
-          #5eead4 100%
-        ) !important;
-      background-image:
-        linear-gradient(
-          180deg,
-          #0b2f86 0%,
-          #123f9f 34%,
-          #0f8f9a 68%,
-          #5eead4 100%
-        ) !important;
-      background-clip:text !important;
-      -webkit-background-clip:text !important;
+      text-transform:none !important;
+
+      color:#eaffff !important;
+      -webkit-text-fill-color:#eaffff !important;
+      background:none !important;
+      background-image:none !important;
+      background-clip:border-box !important;
+      -webkit-background-clip:border-box !important;
       -webkit-text-stroke:0 !important;
+
+      border:0 !important;
+      outline:0 !important;
+      box-shadow:none !important;
+
       text-shadow:
-        0 1px 1px rgba(255,255,255,.22),
-        0 3px 10px rgba(2,12,28,.30) !important;
+        0 1px 2px rgba(2,12,28,.72),
+        0 4px 14px rgba(8,40,127,.24) !important;
       animation:none !important;
-      cursor:pointer;
+      cursor:pointer !important;
     }
 
-    /* Borderless glass slogan in the same Little Feet palette. */
+    #authSection .brand-header h1:focus,
+    #authSection .brand-header h1:active {
+      border:0 !important;
+      outline:0 !important;
+      box-shadow:none !important;
+    }
+
+    #authSection .brand-header h1:focus-visible {
+      border:0 !important;
+      outline:0 !important;
+      box-shadow:none !important;
+      text-decoration:underline !important;
+      text-decoration-color:#5eead4 !important;
+      text-underline-offset:4px !important;
+    }
+
+    /* Slogan: borderless navy/teal glass, matching typography. */
     #authSection .brand-header p.slogan {
       order:3 !important;
       position:relative !important;
@@ -5985,43 +5997,49 @@
       max-width:100% !important;
       margin:0 auto !important;
       padding:6px 14px !important;
+
       border:0 !important;
       outline:0 !important;
       border-radius:999px !important;
+
       background:
         linear-gradient(
           180deg,
           rgba(18,63,159,.68),
-          rgba(8,40,127,.76) 56%,
-          rgba(15,143,154,.48)
+          rgba(8,40,127,.76) 58%,
+          rgba(15,143,154,.44)
         ) !important;
+
       box-shadow:
         0 7px 18px rgba(2,12,28,.20),
         inset 0 1px 0 rgba(255,255,255,.12) !important;
+
       backdrop-filter:blur(8px) saturate(115%) !important;
       -webkit-backdrop-filter:blur(8px) saturate(115%) !important;
     }
 
     #authSection .brand-header p.slogan span {
-      color:#dffcf8 !important;
-      -webkit-text-fill-color:#dffcf8 !important;
+      color:#eaffff !important;
+      -webkit-text-fill-color:#eaffff !important;
       background:none !important;
       background-image:none !important;
-      -webkit-background-clip:border-box !important;
       background-clip:border-box !important;
+      -webkit-background-clip:border-box !important;
       -webkit-text-stroke:0 !important;
+
       font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
       font-size:clamp(.62rem,.9vw,.74rem) !important;
       font-weight:750 !important;
       font-style:normal !important;
       line-height:1.15 !important;
       letter-spacing:.075em !important;
-      text-transform:uppercase;
+      text-transform:uppercase !important;
+
       text-shadow:0 1px 2px rgba(2,12,28,.68) !important;
       animation:none !important;
     }
 
-    /* Desktop/tablet/TV: reserve a clean brand zone above the card. */
+    /* Desktop / tablet / TV: reserve enough air above the card. */
     @media (min-width:641px) {
       #authSection {
         min-height:100dvh !important;
@@ -6037,17 +6055,20 @@
       #authSection > .auth-card {
         width:min(100%,520px) !important;
         max-width:520px !important;
-        margin:270px auto 0 !important;
+        margin:286px auto 0 !important;
       }
 
       #authSection .brand-header {
-        top:-258px !important;
+        top:-274px !important;
       }
     }
 
-    /* Phone: smaller identity block, same typography, explicit separation. */
+    /* Phones: same visual system, tighter geometry, zero overlap. */
     @media (max-width:640px) {
-      html,body { overflow-x:hidden; }
+      html,
+      body {
+        overflow-x:hidden !important;
+      }
 
       #authSection {
         display:flex !important;
@@ -6069,25 +6090,25 @@
         width:min(calc(100vw - 24px),520px) !important;
         max-width:520px !important;
         min-width:0 !important;
-        margin:214px auto 0 !important;
+        margin:228px auto 0 !important;
         padding:14px !important;
         border-radius:16px !important;
       }
 
       #authSection .brand-header {
-        top:-202px !important;
+        top:-216px !important;
         width:calc(100vw - 28px) !important;
         max-width:430px !important;
       }
 
       #authSection .mascot-stage {
         width:min(225px,66vw) !important;
-        margin-bottom:6px !important;
+        margin-bottom:8px !important;
       }
 
       #authSection .brand-header h1 {
         font-size:clamp(1.22rem,5.7vw,1.62rem) !important;
-        letter-spacing:-.024em !important;
+        letter-spacing:-.018em !important;
         margin-bottom:6px !important;
         padding-inline:0 !important;
       }
@@ -6105,6 +6126,7 @@
         gap:10px !important;
       }
 
+      /* The ticker stacks after the card on phones. */
       #authSection .login-info-runner {
         position:relative !important;
         left:auto !important;
@@ -6123,12 +6145,12 @@
 
     @media (max-width:380px) {
       #authSection > .auth-card {
-        margin-top:202px !important;
+        margin-top:214px !important;
         padding:13px !important;
       }
 
       #authSection .brand-header {
-        top:-191px !important;
+        top:-202px !important;
       }
 
       #authSection .mascot-stage {
@@ -6140,21 +6162,23 @@
       }
     }
 
+    /* Short landscape phones/tablets: compact but still separated. */
     @media (max-width:900px) and (max-height:600px) and (orientation:landscape) {
       #authSection {
         padding-top:10px !important;
       }
 
       #authSection > .auth-card {
-        margin-top:154px !important;
+        margin-top:164px !important;
       }
 
       #authSection .brand-header {
-        top:-146px !important;
+        top:-154px !important;
       }
 
       #authSection .mascot-stage {
         width:150px !important;
+        margin-bottom:4px !important;
       }
 
       #authSection .brand-header h1 {
