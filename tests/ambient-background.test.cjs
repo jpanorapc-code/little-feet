@@ -105,15 +105,36 @@ async function main() {
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
       await page.locator('.login-audio-compact').click();
       await page.setViewportSize({width:390,height:844});
-      const mobileToolsFit = await page.evaluate(() => {
+      const mobileLoginState = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
         const language = document.querySelector('.login-language-pill').getBoundingClientRect();
         const audio = document.querySelector('.login-audio-compact').getBoundingClientRect();
-        return audio.right <= card.right + 1 && audio.left >= language.right - 1;
+        const username = document.getElementById('loginUsername');
+        const pinInput = document.getElementById('loginPin');
+        const submit = document.querySelector('#loginForm button[type="submit"]');
+        const hit = element => {
+          const rect = element.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          const top = document.elementFromPoint(x, y);
+          return top === element || element.contains(top);
+        };
+        return {
+          toolsFit: audio.right <= card.right + 1 && audio.left >= language.right - 1,
+          usernameHit: hit(username),
+          pinHit: hit(pinInput),
+          submitHit: hit(submit),
+          brandPointerEvents: getComputedStyle(document.querySelector('.brand-header')).pointerEvents,
+          cardPointerEvents: getComputedStyle(document.querySelector('.auth-card')).pointerEvents
+        };
       });
-      assert.ok(mobileToolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      assert.ok(mobileLoginState.toolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      assert.ok(mobileLoginState.usernameHit, 'Mobile username field must receive taps');
+      assert.ok(mobileLoginState.pinHit, 'Mobile PIN field must receive taps');
+      assert.ok(mobileLoginState.submitHit, 'Mobile login submit button must receive taps');
+      assert.equal(mobileLoginState.brandPointerEvents, 'none', 'Decorative mobile brand layer must not steal form taps');
+      assert.equal(mobileLoginState.cardPointerEvents, 'auto', 'Mobile login card must remain interactive');
       await page.screenshot({ path:path.join(root,'tmp','mobile-login-video.png') });
-      await page.setViewportSize({width:1440,height:1000});
     }
     await page.locator('#loginPinToggle').click();
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'text');
@@ -121,10 +142,14 @@ async function main() {
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'password');
     await page.locator('#loginUsername').fill(`browser-${role}`);
     await page.locator('#loginPin').fill(pin);
+    if (role === 'admin') await page.locator('#rememberLogin').check();
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
+      // Admin signs in while the viewport is still phone-sized. Restore desktop
+      // only after the mobile login has successfully transitioned into the portal.
+      await page.setViewportSize({width:1440,height:1000});
       await page.waitForFunction(() => {
         const login = document.getElementById('loginBackgroundVideo');
         const portal = document.getElementById('ambientBackgroundVideo');
