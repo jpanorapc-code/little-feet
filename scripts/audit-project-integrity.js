@@ -81,6 +81,7 @@ const shouldCheckStatic = ref => {
   if (!ref.startsWith('/')) return false;
   const clean = ref.split(/[?#]/)[0];
   if (/^\/(?:api|auth|vendor)(?:\/|$)/.test(clean)) return false;
+  if (clean === '/runtime-config.js') return false; // Server-generated deployment configuration, not a static asset.
   if (clean === '/') return false;
   return clean.startsWith('/assets/') || staticExtensions.has(path.extname(clean).toLowerCase()) ||
     ['/logo.png','/logo-transparent.png','/little-feet-mascot.jfif','/manifest.webmanifest','/backup.js','/paia.html'].includes(clean);

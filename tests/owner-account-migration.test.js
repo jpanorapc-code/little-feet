@@ -9,11 +9,15 @@ fs.mkdirSync(tempRoot, { recursive: true });
 const temp = fs.mkdtempSync(path.join(tempRoot, 'owner-account-migration-'));
 const port = 6500 + Math.floor(Math.random() * 300);
 
-for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
+for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
 }
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
+fs.mkdirSync(path.join(temp, 'lib', 'operations'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
+for (const file of ['replica-transport.js', 'recovery-rehearsal.js']) {
+  fs.copyFileSync(path.join(root, 'lib', 'operations', file), path.join(temp, 'lib', 'operations', file));
+}
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));
 fs.copyFileSync(path.join(root, 'lib', 'oauth-identity.js'), path.join(temp, 'lib', 'oauth-identity.js'));
 fs.copyFileSync(path.join(root, 'lib', 'structured-logger.js'), path.join(temp, 'lib', 'structured-logger.js'));

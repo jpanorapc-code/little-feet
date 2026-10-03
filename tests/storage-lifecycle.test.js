@@ -13,7 +13,7 @@ const pinHash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64
 const pngA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const pngB = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4x8AAAAASUVORK5CYII=';
 
-for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) fs.copyFileSync(path.join(root, file), path.join(temp, file));
+for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js']) fs.copyFileSync(path.join(root, file), path.join(temp, file));
 fs.mkdirSync(path.join(temp, 'lib', 'storage'), { recursive: true });
 fs.copyFileSync(path.join(root, 'lib', 'storage', 'object-storage.js'), path.join(temp, 'lib', 'storage', 'object-storage.js'));
 fs.copyFileSync(path.join(root, 'lib', 'mailbox-integration.js'), path.join(temp, 'lib', 'mailbox-integration.js'));

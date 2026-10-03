@@ -183,3 +183,15 @@ At minimum: `NODE_ENV`, `DATABASE_URL`, `SESSION_SECRET`, `LF_FIELD_ENCRYPTION_K
 
 The requested account cutover completed successfully. Remove the temporary `LF_OWNER_*` values and obsolete `LF_BOOTSTRAP_ADMIN_*` values from Render after verification; the database migration record prevents replay. Keep only ordinary runtime configuration and the four R2 variables.
 
+## Standby replication work after the audited base
+
+The original standby process selected port 5001 by default and ignored Render's injected `PORT`, and its replica loader could only read a JSON file on that process's own disk. Therefore the previous code could not serve as a separate Render standby using the available deployment configuration.
+
+The current branch adds encrypted R2 snapshot transport, publishes after durable application-state saves, has the separate standby poll and validate the latest snapshot, exposes replica freshness and code-SHA readiness, refuses browser redirection when the standby is missing/stale/incompatible, and makes `backup-server.js` honor Render's `PORT`. Business mutations on standby remain HTTP 503/read-only. Its snapshot includes the application state, not live PostgreSQL session rows; users must sign in again after failover.
+
+Automated local verification covers transport encryption/publish/load between independent instances, updated snapshots, wrong-key and corruption rejection, refusal to claim failover readiness without remote R2, local HTTP standby restore, and Render port forwarding. Final `npm test` passed all listed regression stages from this branch, including both standby-specific tests; syntax checks and `git diff --check` also passed. This does not change the older successful coordinated PostgreSQL/R2 recovery rehearsal above.
+
+The first PR CI attempt passed syntax and browser tests but the repository integrity audit classified `/runtime-config.js` as a missing static file. That audit now recognizes it as a server-generated route; the updated project-integrity audit and full local regression suite pass. The follow-up GitHub CI run is pending.
+
+**Live failover remains BLOCKED:** the code cannot create/configure the separate Render service or install its protected R2 credentials. Create the standby service from this same repository and `main` branch with automatic deploy enabled; set `LF_REPLICA_MODE=1`, matching recovery bucket and encryption key, scoped R2 permissions, and its health check. On primary, set `LITTLE_FEET_BACKUP_URL` to the standby HTTPS origin. After both deploy the same commit, verify `/api/failover-readiness` reports `ready: true`, a current snapshot and matching SHA, then test browser redirect. The standby intentionally does not accept business writes: a genuinely writable automatic failover still requires traffic-controller support and a primary fencing/lease mechanism to prevent split-brain. No automatic DNS/server-side failover or safe writer promotion is claimed.
+

@@ -22,6 +22,7 @@ const students = Array.from({ length: 2000 }, (_, index) => {
 });
 
 fs.copyFileSync(path.join(root, 'server.js'), path.join(temporaryDirectory, 'server.js'));
+fs.copyFileSync(path.join(root, 'failover-mode.js'), path.join(temporaryDirectory, 'failover-mode.js'));
 fs.copyFileSync(path.join(root, 'finance-automation-server.js'), path.join(temporaryDirectory, 'finance-automation-server.js'));
 fs.copyFileSync(path.join(root, 'auth-crypto.js'), path.join(temporaryDirectory, 'auth-crypto.js'));
 fs.mkdirSync(path.join(temporaryDirectory, 'lib', 'storage'), { recursive: true });

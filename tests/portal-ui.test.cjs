@@ -23,7 +23,7 @@ let browser;
 let stderr = '';
 
 async function main() {
-  for (const file of ['server.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
+  for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));
   }
   // Keep the browser fixture aligned with every local server dependency.
