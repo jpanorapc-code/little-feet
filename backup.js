@@ -673,9 +673,12 @@ function syncLittleFeetAntarcticMix() {
 
 function pauseLittleFeetAntarcticMix() {
   removeLittleFeetAntarcticUnlockListeners();
-  if (!littleFeetAntarcticMixAudio) return;
-  littleFeetAntarcticMixAudio.muted = true;
-  littleFeetAntarcticMixAudio.pause();
+  const audio = document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
+  if (!audio) return;
+  window.__littleFeetAntarcticMixAudio = audio;
+  littleFeetAntarcticMixAudio = audio;
+  audio.muted = true;
+  audio.pause();
 }
 
 window.getLittleFeetAntarcticMixAudio = () => document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
