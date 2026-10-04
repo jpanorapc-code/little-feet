@@ -56,7 +56,7 @@ async function main() {
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
   assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
-  const antarcticResponse = await fetch(`${origin}/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1`);
+  const antarcticResponse = await fetch(`${origin}/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-quiet-duet-v2`);
   assert.equal(antarcticResponse.status, 200, 'Antarctic soundtrack must be served');
   assert.match(antarcticResponse.headers.get('content-type') || '', /audio\/mpeg/i, 'Antarctic soundtrack must be served as MPEG audio');
   assert.ok(Number(antarcticResponse.headers.get('content-length') || 0) > 100000, 'Antarctic soundtrack response must contain the real audio file');
@@ -135,6 +135,9 @@ async function main() {
         } : null;
       });
       assert.ok(antarcticState && !antarcticState.paused && !antarcticState.muted, `Antarctic audio did not enter playback: ${JSON.stringify(antarcticState)}`);
+      assert.equal(await page.locator('#littleFeetAntarcticAudio').evaluate(a => a.volume), 0.35);
+      assert.ok(antarcticState.duration > 250, 'Both supplied tracks must be present in the full ambient mix');
+      await page.waitForFunction(t => document.getElementById('littleFeetAntarcticAudio').currentTime > t + .2, antarcticState.currentTime);
       await page.setViewportSize({width:390,height:844});
       const mobileToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -154,6 +157,10 @@ async function main() {
     await page.locator('#loginPin').fill(pin);
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
+    if (role === 'admin') {
+      const t = await page.locator('#littleFeetAntarcticAudio').evaluate(a => a.currentTime);
+      await page.waitForFunction(t => {const a = document.getElementById('littleFeetAntarcticAudio');return !a.paused && !a.muted && a.currentTime > t + .2;}, t);
+    }
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
       // Profile avatars are a device-local preference: selecting one must not

@@ -270,7 +270,7 @@ function getLittleFeetAntarcticAudio() {
   const audio = document.getElementById('littleFeetAntarcticAudio');
   if (!audio) return null;
   audio.loop = true;
-  audio.volume = 0.56;
+  audio.volume = 0.35;
   audio.muted = portalAudioMuted;
   return audio;
 }
