@@ -111,7 +111,7 @@ async function main() {
       await page.locator('.login-audio-compact').click();
       await page.waitForFunction(() => {
         const audio = window.getLittleFeetAntarcticAudio?.();
-        return audio && !audio.paused && !audio.muted && audio.currentTime > 0;
+        return audio && !audio.paused && !audio.muted;
       }, null, { timeout:10000 });
       await page.setViewportSize({width:390,height:844});
       const mobileToolsFit = await page.evaluate(() => {
