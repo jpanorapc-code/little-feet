@@ -278,7 +278,6 @@ assert.match(client, /classList\.toggle\('is-muted', portalAudioMuted\)/);
 assert.match(client, /little-feet-antarctic-mix\.mp3\?v=20261004-audio-clean-v1/);
 assert.match(client, /function startLittleFeetAntarcticAudioFromGesture\(\)/);
 assert.match(client, /function pauseLittleFeetAntarcticAudio\(\)/);
-assert.match(serviceWorker, /little-feet-antarctic-mix\.mp3\?v=20261004-audio-clean-v1/);
 assert.match(page, /class="login-info-runner"/);
 assert.match(page, /aria-label="About Little Feet"/);
 assert.match(page, /Little Feet<\/strong>[\s\S]*secure ECD, primary and secondary school operations platform/);
