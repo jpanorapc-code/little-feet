@@ -56,6 +56,10 @@ async function main() {
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
   assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
+  const antarcticResponse = await fetch(`${origin}/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1`);
+  assert.equal(antarcticResponse.status, 200, 'Antarctic soundtrack must be served');
+  assert.match(antarcticResponse.headers.get('content-type') || '', /audio\/mpeg/i, 'Antarctic soundtrack must be served as MPEG audio');
+  assert.ok(Number(antarcticResponse.headers.get('content-length') || 0) > 100000, 'Antarctic soundtrack response must contain the real audio file');
   browser = await chromium.launch({
     headless: true,
     args: ['--autoplay-policy=no-user-gesture-required'],
@@ -113,10 +117,24 @@ async function main() {
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'true');
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
       await page.locator('.login-audio-compact').click();
-      await page.waitForFunction(() => {
+      await page.waitForTimeout(1200);
+      const antarcticState = await page.evaluate(() => {
         const audio = window.getLittleFeetAntarcticAudio?.();
-        return audio && !audio.paused && !audio.muted;
-      }, null, { timeout:10000 });
+        return audio ? {
+          paused:audio.paused,
+          muted:audio.muted,
+          readyState:audio.readyState,
+          networkState:audio.networkState,
+          currentTime:audio.currentTime,
+          duration:audio.duration,
+          errorCode:audio.error?.code || null,
+          errorMessage:audio.error?.message || '',
+          currentSrc:audio.currentSrc || audio.src,
+          userActivationActive:navigator.userActivation?.isActive ?? null,
+          userActivationSeen:navigator.userActivation?.hasBeenActive ?? null
+        } : null;
+      });
+      assert.ok(antarcticState && !antarcticState.paused && !antarcticState.muted, `Antarctic audio did not enter playback: ${JSON.stringify(antarcticState)}`);
       await page.setViewportSize({width:390,height:844});
       const mobileToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
