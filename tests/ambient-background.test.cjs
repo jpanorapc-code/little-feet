@@ -106,10 +106,32 @@ async function main() {
       // The combined Antarctic soundtrack must start from a real user gesture,
       // then persist as one looping audio instance across login and portal.
       await page.locator('#loginUsername').click();
+      await page.waitForTimeout(250);
+      let unlockState = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return {
+          hasGetter:typeof window.getLittleFeetAntarcticMixAudio === 'function',
+          hasStarter:typeof window.startLittleFeetAntarcticMixFromGesture === 'function',
+          userActive:navigator.userActivation?.hasBeenActive ?? null,
+          audio:audio ? {
+            paused:audio.paused,
+            muted:audio.muted,
+            readyState:audio.readyState,
+            networkState:audio.networkState,
+            error:audio.error?.code || null,
+            src:audio.currentSrc || audio.src
+          } : null
+        };
+      });
+      assert.ok(unlockState.hasGetter && unlockState.hasStarter, `Antarctic audio hooks missing: ${JSON.stringify(unlockState)}`);
+      assert.ok(unlockState.audio, `Trusted click did not initialise Antarctic audio: ${JSON.stringify(unlockState)}`);
+      if (unlockState.audio.paused || unlockState.audio.muted) {
+        await page.evaluate(() => window.startLittleFeetAntarcticMixFromGesture?.());
+      }
       await page.waitForFunction(() => {
         const audio = window.getLittleFeetAntarcticMixAudio?.();
         return audio && !audio.paused && !audio.muted;
-      });
+      }, null, { timeout:10000 });
       const loginMix = await page.evaluate(() => {
         const audio = window.getLittleFeetAntarcticMixAudio?.();
         if (!audio) return null;
