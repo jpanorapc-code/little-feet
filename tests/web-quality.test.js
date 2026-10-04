@@ -77,9 +77,9 @@ assert.match(client, /const legacyProfileIconMap = Object\.freeze\(/);
 assert.match(client, /function normalizeProfileIcon\(icon\)/);
 assert.match(client, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3#avatar-\$\{selectedIcon\}/);
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
-assert.match(serviceWorker, /little-feet-shell-v59-antarctic-audio-autoplay/);
+assert.match(serviceWorker, /little-feet-shell-v60-antarctic-audio-mute/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
-assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-v10/);
+assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-v11/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
 assert.match(page, /id="schoolSetupCard" class="card role-admin school-setup-card"/);
 assert.match(client, /function executiveChartMarkup\(/);
@@ -96,7 +96,7 @@ assert.match(page, /<option value="crm">CRM<\/option>/);
 assert.match(page, /<option value="school_accounts">School Accounts<\/option>/);
 assert.match(page, /<option value="accounts">Little Feet Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
-assert.match(page, /backup\.js\?v=20261004-antarctic-audio-v10/);
+assert.match(page, /backup\.js\?v=20261004-antarctic-audio-v11/);
 for (const asset of ['staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests']) {
   assert.match(page, new RegExp('assets/' + asset + '\\.js\\?v=20261001-startup-dedupe-v1'));
 }
@@ -352,7 +352,7 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20261004-antarctic-audio-v10/);
+assert.match(page, /backup\.js\?v=20261004-antarctic-audio-v11/);
 assert.match(page, /id="stickyNoteForm"/);
 assert.doesNotMatch(page, /onsubmit="saveStickyNote\(event\)"/);
 assert.match(client, /function bindStickyNoteForm\(\)/);
@@ -548,7 +548,7 @@ assert.match(page, /id="ambientBackgroundVideo"[\s\S]*little-feet-login-clean\.m
 assert.match(ambientBackground, /littlefeet:session-ready/);
 assert.match(ambientBackground, /littlefeet:session-ended/);
 assert.match(ambientBackground, /document\.body\.classList\.contains\('portal-active'\)/);
-assert.match(serviceWorker, /little-feet-shell-v59-antarctic-audio-autoplay/);
+assert.match(serviceWorker, /little-feet-shell-v60-antarctic-audio-mute/);
 assert.match(serviceWorker, /little-feet-login-clean\.jpg/);
 assert.match(page, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
 assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);
