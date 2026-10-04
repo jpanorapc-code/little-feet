@@ -6082,7 +6082,7 @@
         overflow-x:hidden !important;
       }
 
-      #authSection {
+      #authSection:not(.hidden) {
         display:flex !important;
         flex-direction:column !important;
         align-items:center !important;
@@ -6277,7 +6277,7 @@
         min-height:48px !important;
       }
 
-      #authSection #loginForm input,
+      #authSection #loginForm input:not([type="checkbox"]):not([type="radio"]),
       #authSection #loginForm select {
         width:100% !important;
         max-width:100% !important;

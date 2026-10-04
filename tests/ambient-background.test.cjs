@@ -128,6 +128,8 @@ async function main() {
           cardPointerEvents: getComputedStyle(document.querySelector('.auth-card')).pointerEvents
         };
       });
+      const rememberWidth = await page.locator('#rememberLogin').evaluate(el => el.getBoundingClientRect().width);
+      assert.ok(rememberWidth <= 24, 'Remember-email checkbox must not stretch across the mobile form');
       assert.ok(mobileLoginState.toolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
       assert.ok(mobileLoginState.usernameHit, 'Mobile username field must receive taps');
       assert.ok(mobileLoginState.pinHit, 'Mobile PIN field must receive taps');
@@ -145,6 +147,7 @@ async function main() {
     if (role === 'admin') await page.locator('#rememberLogin').check();
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
+    await page.locator('#authSection').waitFor({ state: 'hidden' });
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
       // Admin signs in while the viewport is still phone-sized. Restore desktop
