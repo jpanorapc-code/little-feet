@@ -99,8 +99,13 @@ async function main() {
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
 
-      // The combined Antarctic soundtrack must be one persistent looping
-      // audio instance shared by login and the signed-in portal.
+      // The combined Antarctic soundtrack must start from a real user gesture,
+      // then persist as one looping audio instance across login and portal.
+      await page.locator('#loginUsername').click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      });
       const loginMix = await page.evaluate(() => {
         const audio = window.getLittleFeetAntarcticMixAudio?.();
         if (!audio) return null;
@@ -109,26 +114,20 @@ async function main() {
           src: audio.currentSrc || audio.src,
           loop: audio.loop,
           muted: audio.muted,
-          volume: audio.volume
+          paused: audio.paused,
+          volume: audio.volume,
+          currentTime: audio.currentTime
         };
       });
-      assert.ok(loginMix, 'Combined Antarctic soundtrack must be initialised on the login page');
+      assert.ok(loginMix, 'Combined Antarctic soundtrack must initialise after the first login-page user gesture');
       assert.ok(loginMix.src.includes('little-feet-antarctic-mix.mp3'), JSON.stringify(loginMix));
       assert.equal(loginMix.loop, true, 'Combined Antarctic soundtrack must loop');
-      assert.equal(loginMix.muted, false, 'Combined Antarctic soundtrack should start unmuted when Little Feet sound is on');
+      assert.equal(loginMix.muted, false, 'Combined Antarctic soundtrack should be unmuted when Little Feet sound is on');
+      assert.equal(loginMix.paused, false, 'Combined Antarctic soundtrack must be actively playing after the first gesture');
       assert.ok(loginMix.volume > 0 && loginMix.volume <= 1, JSON.stringify(loginMix));
-
-      // A real user gesture must unlock audible playback, not just create
-      // an Audio element with the right metadata.
-      await page.locator('#loginUsername').click();
-      await page.waitForFunction(() => {
-        const audio = window.getLittleFeetAntarcticMixAudio?.();
-        return audio && !audio.paused && !audio.muted;
-      });
-      const loginPlaybackStart = await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.currentTime || 0);
       await page.waitForTimeout(180);
       const loginPlaybackAfter = await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.currentTime || 0);
-      assert.ok(loginPlaybackAfter > loginPlaybackStart, 'Antarctic mix currentTime must advance after login-page user interaction');
+      assert.ok(loginPlaybackAfter > loginMix.currentTime, 'Antarctic mix currentTime must advance after login-page user interaction');
 
       await page.locator('.login-audio-compact').click();
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Muted');
