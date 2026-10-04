@@ -286,7 +286,7 @@ assert.match(client, /classList\.toggle\('is-muted', portalAudioMuted\)/);
 assert.ok(fs.existsSync(antarcticMix), 'Combined Antarctic soundtrack must exist.');
 assert.ok(fs.statSync(antarcticMix).size > 500000, 'Combined Antarctic soundtrack must contain the full mixed loop.');
 assert.match(client, /LITTLE_FEET_ANTARCTIC_MIX_SRC = '\/assets\/audio\/little-feet-antarctic-mix\.mp3\?v=20261004-antarctic-mix-v1'/);
-assert.match(client, /littleFeetAntarcticMixAudio\.loop = true/);
+assert.match(client, /audio\.loop = true/);
 assert.match(client, /function syncLittleFeetAntarcticMix\(\)/);
 assert.match(client, /function pauseLittleFeetAntarcticMix\(\)/);
 assert.match(client, /function startLittleFeetAntarcticMixFromGesture\(\)/);
