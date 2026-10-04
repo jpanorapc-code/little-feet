@@ -414,6 +414,7 @@ window.addEventListener('DOMContentLoaded', () => {
   upgradeLegacyIcons();
   observeProfessionalIcons();
   document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
+  getLittleFeetAntarcticAudio();
   installLittleFeetAntarcticUnlockListeners();
   try {
     if (localStorage.getItem('lf_wallpaper_muted') === 'true' && localStorage.getItem('lf_portal_audio_muted_last') === null) localStorage.setItem('lf_portal_audio_muted_last', 'true');
