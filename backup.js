@@ -598,15 +598,15 @@ function getLittleFeetAntarcticMixAudio() {
 }
 
 function removeLittleFeetAntarcticUnlockListeners() {
-  document.removeEventListener('pointerdown', handleLittleFeetAntarcticUnlockGesture, true);
-  document.removeEventListener('touchstart', handleLittleFeetAntarcticUnlockGesture, true);
+  document.removeEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
   document.removeEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
 }
 
 function installLittleFeetAntarcticUnlockListeners() {
   if (littleFeetAntarcticMixPlaybackConfirmed || portalAudioMuted) return;
-  document.addEventListener('pointerdown', handleLittleFeetAntarcticUnlockGesture, { capture:true, passive:true });
-  document.addEventListener('touchstart', handleLittleFeetAntarcticUnlockGesture, { capture:true, passive:true });
+  // Use click rather than pointerdown: Chrome grants transient media
+  // activation by the time the trusted click fires, including touch taps.
+  document.addEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
   document.addEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
 }
 
