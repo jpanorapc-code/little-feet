@@ -678,12 +678,12 @@ function pauseLittleFeetAntarcticMix() {
   littleFeetAntarcticMixAudio.pause();
 }
 
-window.getLittleFeetAntarcticMixAudio = () => window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
+window.getLittleFeetAntarcticMixAudio = () => document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
 window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
 window.getLittleFeetAntarcticAudioDiagnostics = () => ({
   lastError:littleFeetAntarcticMixLastError,
   playbackConfirmed:littleFeetAntarcticMixPlaybackConfirmed,
-  hasAudio:Boolean(window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio),
+  hasAudio:Boolean(document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio),
   readyState:document.readyState
 });
 
