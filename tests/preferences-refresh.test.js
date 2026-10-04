@@ -52,8 +52,8 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v54-antarctic-audio-prime/);
-assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-v5/);
+assert.match(serviceWorker, /little-feet-shell-v55-antarctic-audio-dom/);
+assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-v6/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 
