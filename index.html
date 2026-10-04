@@ -6084,7 +6084,7 @@
         overflow-x:hidden !important;
       }
 
-      #authSection {
+      #authSection:not(.hidden) {
         display:flex !important;
         flex-direction:column !important;
         align-items:center !important;
@@ -6138,6 +6138,14 @@
 
       #authSection .login-card-tools {
         gap:10px !important;
+      }
+
+      #authSection #loginForm input[type="checkbox"],
+      #authSection #loginForm input[type="radio"] {
+        width:auto !important;
+        min-width:0 !important;
+        min-height:0 !important;
+        flex:0 0 auto !important;
       }
 
       /* The ticker stacks after the card on phones. */
