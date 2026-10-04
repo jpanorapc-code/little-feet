@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v47-login-wallpaper-clarity';
+const CACHE_NAME = 'little-feet-shell-v48-antarctic-audio-clean';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -6,6 +6,7 @@ const SHELL_ASSETS = [
   '/assets/ambient-background.js?v=20261003-login-wallpaper-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-wallpaper.mp4?v=20261003-clarity-v2',
+  '/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1',
   '/assets/brand/iceberg-blue-eyes.webp',
   '/assets/brand/iceberg-wave-backing.webp',
   '/logo.png',
@@ -14,7 +15,7 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
   '/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2',
-  '/backup.js?v=20261002-parent-contacts-v2',
+  '/backup.js?v=20261004-antarctic-audio-clean-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
@@ -65,7 +66,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (/\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?)$/i.test(url.pathname)) {
+  if (/\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?|mp3)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
         if (!response.ok) return response;
