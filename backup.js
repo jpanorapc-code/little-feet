@@ -566,14 +566,16 @@ let littleFeetAntarcticMixPlaybackConfirmed = false;
 let littleFeetAntarcticMixLastError = '';
 
 function reportLittleFeetAntarcticAudioIssue(code, error) {
-  const name = String(error?.name || error?.message || 'Playback unavailable').slice(0,120);
-  const fingerprint = code + ':' + name;
+  const name = String(error?.name || 'Error').slice(0,60);
+  const detail = String(error?.message || '').slice(0,180);
+  const description = detail ? `${name}: ${detail}` : name;
+  const fingerprint = code + ':' + description;
   if (fingerprint === littleFeetAntarcticMixLastError) return;
   littleFeetAntarcticMixLastError = fingerprint;
   void window.reportLittleFeetClientLog?.({
     severity: code === 'ANTARCTIC_AUDIO_LOAD_FAILED' ? 'warn' : 'info',
     code,
-    message:name,
+    message:description,
     source:'backup.js'
   });
 }
