@@ -581,21 +581,16 @@ function reportLittleFeetAntarcticAudioIssue(code, error) {
 }
 
 function getLittleFeetAntarcticMixAudio() {
-  let audio = window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
-  if (!audio) {
-    audio = document.createElement('audio');
-    // Keep the authoritative instance on window as well as the local client
-    // reference. This avoids any browser named-property/DOM lifecycle quirk
-    // from collapsing the shared soundtrack reference back to null.
-    window.__littleFeetAntarcticMixAudio = audio;
-    littleFeetAntarcticMixAudio = audio;
-    audio.id = 'littleFeetAntarcticMixAudio';
-    audio.src = LITTLE_FEET_ANTARCTIC_MIX_SRC;
-    audio.preload = 'auto';
-    audio.loop = true;
-    audio.volume = 0.56;
-    audio.muted = portalAudioMuted;
-    audio.setAttribute('aria-hidden', 'true');
+  const audio = document.getElementById('littleFeetAntarcticMixAudio');
+  if (!audio) throw new Error('Persistent Antarctic audio element is missing');
+  window.__littleFeetAntarcticMixAudio = audio;
+  littleFeetAntarcticMixAudio = audio;
+  audio.preload = 'auto';
+  audio.loop = true;
+  audio.volume = 0.56;
+  audio.muted = portalAudioMuted;
+  if (!audio.dataset.lfAntarcticBound) {
+    audio.dataset.lfAntarcticBound = 'true';
     audio.addEventListener('playing', () => {
       littleFeetAntarcticMixPlaybackConfirmed = true;
       littleFeetAntarcticMixLastError = '';
@@ -605,7 +600,6 @@ function getLittleFeetAntarcticMixAudio() {
       reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', audio.error || new Error('Audio element failed to load'));
     });
   }
-  littleFeetAntarcticMixAudio = audio;
   return audio;
 }
 
