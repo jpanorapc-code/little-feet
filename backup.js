@@ -685,11 +685,10 @@ function primeLittleFeetAntarcticMix() {
 window.getLittleFeetAntarcticMixAudio = () => littleFeetAntarcticMixAudio;
 window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', primeLittleFeetAntarcticMix, { once:true });
-} else {
-  primeLittleFeetAntarcticMix();
-}
+// Prime immediately while the deferred client script is evaluated. Constructing
+// HTMLAudioElement does not start sound, but guarantees the object and trusted
+// gesture listeners exist before the login form can receive its first click.
+primeLittleFeetAntarcticMix();
 
 function portalAudioPreferenceKey() {
   const username = String(currentUser?.username || '').trim().toLowerCase();
