@@ -1,135 +1,147 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <style>
-      .body{fill:#07182e;stroke:#5eead4;stroke-width:2}
-      .belly{fill:#f8fafc}
-      .wing{fill:#0d3154}
-      .eye{fill:#07111f}
-      .beak,.feet{fill:#f59e0b}
-      .shine{fill:#fff}
-      .teal{fill:#2dd4bf}
-      .pink{fill:#f472b6}
-      .red{fill:#ef4444}
-      .gold{fill:#fbbf24}
-      .purple{fill:#a78bfa}
-      .navy{fill:#0f2744}
-      .line{fill:none;stroke:#07111f;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-    </style>
-  </defs>
-
-  <symbol id="avatar-classic" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="28" ry="35"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <ellipse class="shine" cx="52" cy="52" rx="8" ry="10"/><ellipse class="shine" cx="76" cy="52" rx="8" ry="10"/>
-    <circle class="eye" cx="54" cy="54" r="4"/><circle class="eye" cx="74" cy="54" r="4"/>
-    <circle class="shine" cx="55.5" cy="52.5" r="1.2"/><circle class="shine" cx="75.5" cy="52.5" r="1.2"/>
-    <path class="beak" d="M56 63 64 69 72 63 64 59Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path class="teal" d="M51 91 63 98 51 105 47 98Z"/><path class="teal" d="M77 91 65 98 77 105 81 98Z"/><circle class="gold" cx="64" cy="98" r="4"/>
-  </symbol>
-
-  <symbol id="avatar-lady" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="28" ry="35"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <ellipse class="shine" cx="52" cy="52" rx="8" ry="10"/><ellipse class="shine" cx="76" cy="52" rx="8" ry="10"/>
-    <circle class="eye" cx="54" cy="54" r="4"/><circle class="eye" cx="74" cy="54" r="4"/>
-    <path class="line" d="M49 45 46 42M79 45 82 42"/>
-    <path class="beak" d="M56 63 64 69 72 63 64 59Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path class="pink" d="M38 25c-8-8-14 1-8 8 3 3 8 4 13 2-1 6 3 11 8 11 8 0 8-12 0-15 4-5 2-12-4-12-4 0-7 3-9 6Z"/>
-    <circle class="gold" cx="44" cy="31" r="3"/>
-    <circle cx="49" cy="74" r="4" fill="#fda4af" opacity=".65"/><circle cx="79" cy="74" r="4" fill="#fda4af" opacity=".65"/>
-  </symbol>
-
-  <symbol id="avatar-tough" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="28" ry="35"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <path class="red" d="M31 37c17-9 49-10 66 0l-3 10c-17-6-43-6-60 0Z"/>
-    <path class="red" d="M94 40 108 32 103 49Z"/>
-    <ellipse class="shine" cx="52" cy="53" rx="8" ry="9"/><ellipse class="shine" cx="76" cy="53" rx="8" ry="9"/>
-    <circle class="eye" cx="54" cy="55" r="4"/><circle class="eye" cx="74" cy="55" r="4"/>
-    <path class="line" d="M46 47 57 44M82 47 71 44"/>
-    <path class="beak" d="M56 64 64 70 72 64 64 60Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path d="M58 82h12l6 22H52Z" fill="#1e293b"/><path class="gold" d="m64 85 4 6-4 6-4-6Z"/>
-  </symbol>
-
-  <symbol id="avatar-cute" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="29" ry="36"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <ellipse class="shine" cx="52" cy="52" rx="9" ry="11"/><ellipse class="shine" cx="76" cy="52" rx="9" ry="11"/>
-    <circle class="eye" cx="54" cy="55" r="4"/><circle class="eye" cx="74" cy="55" r="4"/>
-    <circle class="shine" cx="55.5" cy="53.5" r="1.4"/><circle class="shine" cx="75.5" cy="53.5" r="1.4"/>
-    <path class="beak" d="M57 64 64 69 71 64 64 61Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <circle cx="47" cy="74" r="5" fill="#fda4af" opacity=".7"/><circle cx="81" cy="74" r="5" fill="#fda4af" opacity=".7"/>
-    <path class="pink" d="M64 87c-5-8-17-4-14 5 2 6 8 10 14 15 6-5 12-9 14-15 3-9-9-13-14-5Z"/>
-  </symbol>
-
-  <symbol id="avatar-happy" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="28" ry="35"/>
-    <ellipse class="wing" cx="28" cy="73" rx="10" ry="25" transform="rotate(35 28 73)"/>
-    <ellipse class="wing" cx="100" cy="73" rx="10" ry="25" transform="rotate(-35 100 73)"/>
-    <path class="line" d="M46 53c4-6 10-6 14 0M68 53c4-6 10-6 14 0"/>
-    <path class="beak" d="M55 64c5 11 13 11 18 0l-9-4Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path class="gold" d="M39 30c14-13 36-15 51-3l-5 11c-13-7-29-6-41 1Z"/>
-    <circle class="teal" cx="91" cy="27" r="6"/>
-    <path class="teal" d="M51 92h26v11H51Z"/><circle class="gold" cx="64" cy="97.5" r="3"/>
-  </symbol>
-
-  <symbol id="avatar-cool" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="28" ry="35"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <rect x="42" y="47" width="18" height="13" rx="5" fill="#020617" stroke="#2dd4bf" stroke-width="2"/>
-    <rect x="68" y="47" width="18" height="13" rx="5" fill="#020617" stroke="#2dd4bf" stroke-width="2"/>
-    <path d="M60 52h8" stroke="#2dd4bf" stroke-width="3"/>
-    <path class="beak" d="M56 65 64 70 72 65 64 61Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path class="teal" d="M45 88c11 7 27 7 38 0l4 9c-15 10-31 10-46 0Z"/>
-    <path class="gold" d="m91 34 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z"/>
-  </symbol>
-
-  <symbol id="avatar-boss" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="69" rx="28" ry="35"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <ellipse class="shine" cx="52" cy="51" rx="8" ry="10"/><ellipse class="shine" cx="76" cy="51" rx="8" ry="10"/>
-    <circle class="eye" cx="54" cy="54" r="4"/><circle class="eye" cx="74" cy="54" r="4"/>
-    <path class="beak" d="M56 63 64 69 72 63 64 59Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path class="navy" d="M39 82 55 77 64 89 73 77 89 82 84 109H44Z"/>
-    <path fill="#f8fafc" d="m55 77 9 12 9-12-9-4Z"/>
-    <path class="gold" d="m64 86 5 8-5 12-5-12Z"/>
-    <rect x="74" y="94" width="9" height="4" rx="1" fill="#2dd4bf"/>
-  </symbol>
-
-  <symbol id="avatar-smart-lady" viewBox="0 0 128 128">
-    <ellipse class="body" cx="64" cy="66" rx="39" ry="50"/>
-    <ellipse class="belly" cx="64" cy="70" rx="28" ry="35"/>
-    <ellipse class="wing" cx="29" cy="75" rx="10" ry="24" transform="rotate(18 29 75)"/>
-    <ellipse class="wing" cx="99" cy="75" rx="10" ry="24" transform="rotate(-18 99 75)"/>
-    <ellipse class="shine" cx="52" cy="52" rx="8" ry="10"/><ellipse class="shine" cx="76" cy="52" rx="8" ry="10"/>
-    <circle class="eye" cx="54" cy="54" r="4"/><circle class="eye" cx="74" cy="54" r="4"/>
-    <circle cx="52" cy="53" r="12" fill="none" stroke="#a78bfa" stroke-width="3"/>
-    <circle cx="76" cy="53" r="12" fill="none" stroke="#a78bfa" stroke-width="3"/>
-    <path d="M64 53h-2" stroke="#a78bfa" stroke-width="3"/>
-    <path class="beak" d="M56 64 64 70 72 64 64 60Z"/>
-    <ellipse class="feet" cx="48" cy="113" rx="14" ry="5"/><ellipse class="feet" cx="80" cy="113" rx="14" ry="5"/>
-    <path class="purple" d="M38 26c-7-7-14 0-8 8 4 4 9 4 14 1-1 6 4 10 9 9 7-2 6-13-2-15 3-5 0-11-5-10-4 0-6 3-8 7Z"/>
-    <circle class="gold" cx="44" cy="31" r="3"/>
-    <path class="purple" d="M51 92 63 99 51 106 47 99Z"/><path class="purple" d="M77 92 65 99 77 106 81 99Z"/><circle class="gold" cx="64" cy="99" r="4"/>
-  </symbol>
+<defs>
+<radialGradient id="back" cx="30%" cy="20%" r="90%">
+<stop stop-color="#47869e"/>
+<stop offset=".55" stop-color="#163e69"/>
+<stop offset="1" stop-color="#071936"/>
+</radialGradient>
+<linearGradient id="feathers" x2=".85" y2="1">
+<stop stop-color="#298d9c"/>
+<stop offset=".42" stop-color="#123c53"/>
+<stop offset="1" stop-color="#07172d"/>
+</linearGradient>
+<linearGradient id="face" x2=".8" y2="1">
+<stop stop-color="#fffdf5"/>
+<stop offset=".6" stop-color="#e9f4f6"/>
+<stop offset="1" stop-color="#9ebdcc"/>
+</linearGradient>
+<linearGradient id="suit" x2="1" y2="1">
+<stop stop-color="#36607f"/>
+<stop offset=".6" stop-color="#152c49"/>
+<stop offset="1" stop-color="#081b33"/>
+</linearGradient>
+<linearGradient id="gold" x2="0" y2="1">
+<stop stop-color="#ffdf84"/>
+<stop offset=".5" stop-color="#e9a837"/>
+<stop offset="1" stop-color="#b9601c"/>
+</linearGradient>
+<radialGradient id="iris">
+<stop stop-color="#95eafa"/>
+<stop offset=".65" stop-color="#2385ba"/>
+<stop offset="1" stop-color="#123a68"/>
+</radialGradient>
+<clipPath id="portraitClip">
+<circle cx="64" cy="64" r="59"/>
+</clipPath>
+<g id="portraitBase">
+<circle cx="64" cy="64" r="62" fill="#092944"/>
+<circle cx="64" cy="64" r="60" fill="url(#back)" stroke="#95d5e7" stroke-width="1.2"/>
+<g clip-path="url(#portraitClip)">
+<ellipse cx="39" cy="19" rx="53" ry="35" fill="#b6f9ff" opacity=".08"/>
+<path d="M15 128v-19Q20 83 46 83h36q26 0 31 26v19" fill="url(#suit)" stroke="#6a9bad" stroke-width="1"/>
+<path d="M46 83 64 115 82 83Z" fill="url(#face)"/>
+<path d="m46 83-11 14 17 3-6 8 18 13-12-34m30-4 11 14-17 3 6 8-18 13 12-34" fill="#254866" stroke="#89acba" stroke-width=".7"/>
+<ellipse cx="64" cy="55" rx="39" ry="42" fill="url(#feathers)"/>
+<path d="M38 46c0-19 18-19 26-7 9-12 27-12 27 7 12 24-1 45-27 45S25 70 38 46" fill="url(#face)"/>
+<path d="M31 43q0-28 26-28" fill="none" stroke="#91dae1" stroke-width="2" opacity=".5"/>
+<path d="m60 16 2-9q9 2 10 10m-3 0 9-7 2 11" fill="url(#feathers)"/>
+<ellipse cx="48" cy="56" rx="12" ry="14" fill="#fafdff" stroke="#95adb9"/>
+<ellipse cx="80" cy="56" rx="12" ry="14" fill="#fafdff" stroke="#95adb9"/>
+<ellipse cx="50" cy="58" rx="8" ry="10" fill="url(#iris)"/>
+<ellipse cx="78" cy="58" rx="8" ry="10" fill="url(#iris)"/>
+<ellipse cx="51" cy="58" rx="4.5" ry="7" fill="#041426"/>
+<ellipse cx="77" cy="58" rx="4.5" ry="7" fill="#041426"/>
+<g fill="white">
+<circle cx="48" cy="54" r="3"/>
+<circle cx="74" cy="54" r="3"/>
+<circle cx="54" cy="62" r="1.3"/>
+<circle cx="80" cy="62" r="1.3"/>
+</g>
+<path d="M54 72q10-12 20 0-10 14-20 0" fill="url(#gold)" stroke="#b47425" stroke-width=".8"/>
+<path d="M57 73q7 3 14 0" fill="none" stroke="#7e481c" stroke-width="1"/>
+<path d="M40 40q7-5 14 0m20 0q7-5 14 0" fill="none" stroke="#102e45" stroke-width="2" stroke-linecap="round"/>
+</g>
+<circle cx="64" cy="64" r="60" fill="none" stroke="#b0e6f1" stroke-opacity=".6"/>
+</g>
+<g id="glasses" fill="none" stroke="#dabd79" stroke-width="2">
+<circle cx="48" cy="56" r="15"/>
+<circle cx="80" cy="56" r="15"/>
+<path d="M63 55h2M33 53l-6-3m68 3 6-3"/>
+</g>
+</defs>
+<symbol id="avatar-classic" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<path d="m51 96 13 5 13-5v14l-13-6-13 6Z" fill="#268d9c" stroke="#d9f3ff" stroke-width=".6"/>
+<circle cx="64" cy="102" r="3.5" fill="url(#gold)"/>
+</symbol>
+<symbol id="avatar-lady" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<g transform="translate(91 29)">
+<g fill="#cf7d9e" stroke="#ffe9f1" stroke-width=".6">
+<ellipse cy="-6" rx="4" ry="7"/>
+<ellipse cy="6" rx="4" ry="7"/>
+<ellipse cx="-6" rx="7" ry="4"/>
+<ellipse cx="6" rx="7" ry="4"/>
+</g>
+<circle r="4" fill="url(#gold)"/>
+</g>
+<path d="m51 96 13 5 13-5v14l-13-6-13 6Z" fill="#b65c80" stroke="#d9f3ff" stroke-width=".6"/>
+<circle cx="64" cy="102" r="3.5" fill="url(#gold)"/>
+</symbol>
+<symbol id="avatar-tough" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<path d="M29 35q35-15 70 0l-1 7q-34-10-68 0Z" fill="#9e4352" stroke="#ecad98"/>
+<path d="m97 38 12-5-5 15-7-3" fill="#9e4352"/>
+<path d="m51 96 13 5 13-5v14l-13-6-13 6Z" fill="#20364f" stroke="#d9f3ff" stroke-width=".6"/>
+<circle cx="64" cy="102" r="3.5" fill="url(#gold)"/>
+</symbol>
+<symbol id="avatar-cute" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<g transform="translate(91 29)">
+<g fill="#e1a3c0" stroke="#ffe9f1" stroke-width=".6">
+<ellipse cy="-6" rx="4" ry="7"/>
+<ellipse cy="6" rx="4" ry="7"/>
+<ellipse cx="-6" rx="7" ry="4"/>
+<ellipse cx="6" rx="7" ry="4"/>
+</g>
+<circle r="4" fill="url(#gold)"/>
+</g>
+<path d="M57 99c-7-9-17 2 7 14 24-12 14-23 7-14l-7 5Z" fill="#d67b9e" stroke="#ffdce9"/>
+</symbol>
+<symbol id="avatar-happy" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<path d="M30 30q33-30 68 0l-1 9q-31-14-65 0Z" fill="url(#gold)"/>
+<path d="M34 29q30-14 61 0" fill="none" stroke="#fff0b4"/>
+<path d="m51 96 13 5 13-5v14l-13-6-13 6Z" fill="#299ca0" stroke="#d9f3ff" stroke-width=".6"/>
+<circle cx="64" cy="102" r="3.5" fill="url(#gold)"/>
+</symbol>
+<symbol id="avatar-cool" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<path d="M32 48h30l-3 15q-19 10-24-4Zm34 0h30l-3 11q-5 14-24 4Z" fill="#102c48" stroke="#a6dee9" stroke-width="2"/>
+<path d="M62 51h4m-26 1h13m21 0h13" stroke="#7cc6d9" stroke-width="2"/>
+<path d="m51 96 13 5 13-5v14l-13-6-13 6Z" fill="#419baa" stroke="#d9f3ff" stroke-width=".6"/>
+<circle cx="64" cy="102" r="3.5" fill="url(#gold)"/>
+</symbol>
+<symbol id="avatar-boss" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<use href="#glasses"/>
+<path d="m60 95 4-3 4 3-2 5 4 14-6 7-6-7 4-14Z" fill="url(#gold)"/>
+<path d="M86 106h13v9H86Z" fill="#204660" stroke="#d5b86c"/>
+<path d="m91 108 3 1-1 4-2 1-2-1-1-4Z" fill="#e6c876"/>
+</symbol>
+<symbol id="avatar-smart-lady" viewBox="0 0 128 128">
+<use href="#portraitBase"/>
+<use href="#glasses"/>
+<g transform="translate(91 29)">
+<g fill="#9f8fcd" stroke="#ffe9f1" stroke-width=".6">
+<ellipse cy="-6" rx="4" ry="7"/>
+<ellipse cy="6" rx="4" ry="7"/>
+<ellipse cx="-6" rx="7" ry="4"/>
+<ellipse cx="6" rx="7" ry="4"/>
+</g>
+<circle r="4" fill="url(#gold)"/>
+</g>
+<path d="m51 96 13 5 13-5v14l-13-6-13 6Z" fill="#8974ac" stroke="#d9f3ff" stroke-width=".6"/>
+<circle cx="64" cy="102" r="3.5" fill="url(#gold)"/>
+</symbol>
 </svg>

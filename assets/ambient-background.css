@@ -14,7 +14,7 @@ body:not(.light-mode) {
 body.light-mode, body:not(.light-mode) { background-color:var(--lf-blue) !important; }
 body.portal-active::before, body.portal-active::after,
 #authSection::before, #authSection::after { content:none !important; }
-.ambient-background { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; background:url('/assets/video/little-feet-ambient-poster.jpg') center/cover; }
+.ambient-background { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; background:url('/assets/video/little-feet-login-clean.jpg') center/cover; }
 .ambient-background video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; transition:opacity .22s ease, visibility .22s ease; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
 .ambient-background .login-background-video { opacity:1; visibility:visible; }
 .ambient-background .portal-background-video { opacity:0; visibility:hidden; }

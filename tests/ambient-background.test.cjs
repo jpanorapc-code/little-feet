@@ -159,6 +159,15 @@ async function main() {
         return login?.paused && portal?.readyState >= 2 && !portal.paused && portal.currentTime > 0;
       });
     }
+    if (role === 'admin') {
+      const mediaSources = await page.evaluate(() => ['loginBackgroundVideo','ambientBackgroundVideo'].map(id => document.getElementById(id).currentSrc));
+      assert.equal(mediaSources[0], mediaSources[1], 'Login and portal must use the same clean video');
+      for (const icon of ['classic','lady','tough','cute','happy','cool','boss','smart-lady']) {
+        await page.evaluate(icon => selectProfileIcon(icon), icon);
+        const selected = await page.locator('.user-avatar use').first().getAttribute('href');
+        assert.ok(selected.endsWith('#avatar-' + icon), 'Selected portrait must appear in the header');
+      }
+    }
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();
       for (const element of document.querySelectorAll('[onclick], [onchange], [onsubmit]')) {
