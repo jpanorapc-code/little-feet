@@ -78,7 +78,7 @@ assert.match(client, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2#ava
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
 assert.match(serviceWorker, /little-feet-shell-v48-antarctic-audio-clean/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2/);
-assert.match(serviceWorker, /backup\.js\?v=20261002-parent-contacts-v2/);
+assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-clean-v1/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
 assert.match(page, /id="schoolSetupCard" class="card role-admin school-setup-card"/);
 assert.match(client, /function executiveChartMarkup\(/);
@@ -95,7 +95,7 @@ assert.match(page, /<option value="crm">CRM<\/option>/);
 assert.match(page, /<option value="school_accounts">School Accounts<\/option>/);
 assert.match(page, /<option value="accounts">Little Feet Accounts<\/option>/);
 assert.match(page, /<option value="support">Software Support<\/option>/);
-assert.match(page, /backup\.js\?v=20261002-parent-contacts-v2/);
+assert.match(page, /backup\.js\?v=20261004-antarctic-audio-clean-v1/);
 for (const asset of ['my-day','staff-work','approvals','staff-notices','meeting-minutes','maintenance','resource-booking','purchase-requests']) {
   assert.match(page, new RegExp('assets/' + asset + '\\.js\\?v=20261001-startup-dedupe-v1'));
 }
@@ -275,6 +275,10 @@ assert.match(page, /data-mute-label="Sound On" data-unmute-label="Muted"/);
 assert.match(page, /\.login-audio-compact \.ui-icon \{[\s\S]*width:1\.28rem/);
 assert.match(client, /const iconId = portalAudioMuted \? 'icon-volume-off' : 'icon-volume'/);
 assert.match(client, /classList\.toggle\('is-muted', portalAudioMuted\)/);
+assert.match(client, /little-feet-antarctic-mix\.mp3\?v=20261004-audio-clean-v1/);
+assert.match(client, /function startLittleFeetAntarcticAudioFromGesture\(\)/);
+assert.match(client, /function pauseLittleFeetAntarcticAudio\(\)/);
+assert.match(serviceWorker, /little-feet-antarctic-mix\.mp3\?v=20261004-audio-clean-v1/);
 assert.match(page, /class="login-info-runner"/);
 assert.match(page, /aria-label="About Little Feet"/);
 assert.match(page, /Little Feet<\/strong>[\s\S]*secure ECD, primary and secondary school operations platform/);
@@ -329,7 +333,7 @@ assert.doesNotMatch(page, /animation:portalAuroraDrift/);
 assert.doesNotMatch(page, /auroraStrobe/);
 assert.match(page, /prefers-reduced-motion: reduce/);
 assert.match(page, /body\.portal-active\.light-mode \{ background-color:var\(--bg-dark\); \}/);
-assert.match(page, /backup\.js\?v=20261002-parent-contacts-v2/);
+assert.match(page, /backup\.js\?v=20261004-antarctic-audio-clean-v1/);
 assert.match(page, /id="stickyNoteForm"/);
 assert.doesNotMatch(page, /onsubmit="saveStickyNote\(event\)"/);
 assert.match(client, /function bindStickyNoteForm\(\)/);
