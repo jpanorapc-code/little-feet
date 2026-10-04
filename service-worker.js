@@ -6,7 +6,6 @@ const SHELL_ASSETS = [
   '/assets/ambient-background.js?v=20261003-login-wallpaper-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-wallpaper.mp4?v=20261003-clarity-v2',
-  '/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1',
   '/assets/brand/iceberg-blue-eyes.webp',
   '/assets/brand/iceberg-wave-backing.webp',
   '/logo.png',
@@ -66,7 +65,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (/\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?|mp3)$/i.test(url.pathname)) {
+  if (/\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
         if (!response.ok) return response;
