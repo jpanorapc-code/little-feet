@@ -99,9 +99,7 @@ let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
-let littleFeetAntarcticAudio = null;
 let littleFeetAntarcticAudioPlaying = false;
-const LITTLE_FEET_ANTARCTIC_AUDIO_SRC = '/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1';
 let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
@@ -269,14 +267,12 @@ function unlockPortalAudio() {
 }
 
 function getLittleFeetAntarcticAudio() {
-  if (!littleFeetAntarcticAudio) {
-    littleFeetAntarcticAudio = new Audio(LITTLE_FEET_ANTARCTIC_AUDIO_SRC);
-    littleFeetAntarcticAudio.preload = 'auto';
-    littleFeetAntarcticAudio.loop = true;
-    littleFeetAntarcticAudio.volume = 0.56;
-    littleFeetAntarcticAudio.muted = portalAudioMuted;
-  }
-  return littleFeetAntarcticAudio;
+  const audio = document.getElementById('littleFeetAntarcticAudio');
+  if (!audio) return null;
+  audio.loop = true;
+  audio.volume = 0.56;
+  audio.muted = portalAudioMuted;
+  return audio;
 }
 
 function removeLittleFeetAntarcticUnlockListeners() {
@@ -293,6 +289,7 @@ function installLittleFeetAntarcticUnlockListeners() {
 function startLittleFeetAntarcticAudioFromGesture() {
   if (portalAudioMuted) return;
   const audio = getLittleFeetAntarcticAudio();
+  if (!audio) return;
   audio.muted = false;
   const playAttempt = audio.play();
   if (!playAttempt?.then) {
@@ -310,13 +307,14 @@ function startLittleFeetAntarcticAudioFromGesture() {
 }
 
 function pauseLittleFeetAntarcticAudio() {
-  if (!littleFeetAntarcticAudio) return;
-  littleFeetAntarcticAudio.muted = true;
-  littleFeetAntarcticAudio.pause();
+  const audio = getLittleFeetAntarcticAudio();
+  if (!audio) return;
+  audio.muted = true;
+  audio.pause();
   littleFeetAntarcticAudioPlaying = false;
 }
 
-window.getLittleFeetAntarcticAudio = () => littleFeetAntarcticAudio;
+window.getLittleFeetAntarcticAudio = getLittleFeetAntarcticAudio;
 
 function southAfricaNow(date = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-ZA', {
