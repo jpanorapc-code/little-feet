@@ -580,19 +580,25 @@ function reportLittleFeetAntarcticAudioIssue(code, error) {
 
 function getLittleFeetAntarcticMixAudio() {
   if (!littleFeetAntarcticMixAudio) {
-    littleFeetAntarcticMixAudio = new Audio(LITTLE_FEET_ANTARCTIC_MIX_SRC);
-    littleFeetAntarcticMixAudio.preload = 'auto';
-    littleFeetAntarcticMixAudio.loop = true;
-    littleFeetAntarcticMixAudio.volume = 0.56;
-    littleFeetAntarcticMixAudio.muted = portalAudioMuted;
-    littleFeetAntarcticMixAudio.addEventListener('playing', () => {
+    const audio = document.createElement('audio');
+    audio.id = 'littleFeetAntarcticMixAudio';
+    audio.src = LITTLE_FEET_ANTARCTIC_MIX_SRC;
+    audio.preload = 'auto';
+    audio.loop = true;
+    audio.volume = 0.56;
+    audio.muted = portalAudioMuted;
+    audio.hidden = true;
+    audio.setAttribute('aria-hidden', 'true');
+    audio.addEventListener('playing', () => {
       littleFeetAntarcticMixPlaybackConfirmed = true;
       littleFeetAntarcticMixLastError = '';
       removeLittleFeetAntarcticUnlockListeners();
     });
-    littleFeetAntarcticMixAudio.addEventListener('error', () => {
-      reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', littleFeetAntarcticMixAudio?.error || new Error('Audio element failed to load'));
+    audio.addEventListener('error', () => {
+      reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', audio.error || new Error('Audio element failed to load'));
     });
+    (document.body || document.documentElement).appendChild(audio);
+    littleFeetAntarcticMixAudio = audio;
   }
   return littleFeetAntarcticMixAudio;
 }
