@@ -275,7 +275,7 @@ assert.match(page, /data-mute-label="Sound On" data-unmute-label="Muted"/);
 assert.match(page, /\.login-audio-compact \.ui-icon \{[\s\S]*width:1\.28rem/);
 assert.match(client, /const iconId = portalAudioMuted \? 'icon-volume-off' : 'icon-volume'/);
 assert.match(client, /classList\.toggle\('is-muted', portalAudioMuted\)/);
-assert.match(client, /little-feet-antarctic-mix\.mp3\?v=20261004-audio-clean-v1/);
+assert.match(page, /id="littleFeetAntarcticAudio"[\s\S]*little-feet-antarctic-mix\.mp3\?v=20261004-audio-clean-v1/);
 assert.match(client, /function startLittleFeetAntarcticAudioFromGesture\(\)/);
 assert.match(client, /function pauseLittleFeetAntarcticAudio\(\)/);
 assert.match(page, /class="login-info-runner"/);
