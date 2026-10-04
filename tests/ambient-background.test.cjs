@@ -98,12 +98,36 @@ async function main() {
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Sound On');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
+
+      // The combined Antarctic soundtrack must be one persistent looping
+      // audio instance shared by login and the signed-in portal.
+      const loginMix = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        if (!audio) return null;
+        audio.__littleFeetRegressionMarker = 'same-audio-instance';
+        return {
+          src: audio.currentSrc || audio.src,
+          loop: audio.loop,
+          muted: audio.muted,
+          volume: audio.volume
+        };
+      });
+      assert.ok(loginMix, 'Combined Antarctic soundtrack must be initialised on the login page');
+      assert.ok(loginMix.src.includes('little-feet-antarctic-mix.mp3'), JSON.stringify(loginMix));
+      assert.equal(loginMix.loop, true, 'Combined Antarctic soundtrack must loop');
+      assert.equal(loginMix.muted, false, 'Combined Antarctic soundtrack should start unmuted when Little Feet sound is on');
+      assert.ok(loginMix.volume > 0 && loginMix.volume <= 1, JSON.stringify(loginMix));
+
       await page.locator('.login-audio-compact').click();
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Muted');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume-off');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'true');
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), true, 'Login mute button must pause the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), true, 'Login mute button must mute the Antarctic mix');
+
       await page.locator('.login-audio-compact').click();
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), false, 'Login unmute button must unmute the Antarctic mix');
       await page.setViewportSize({width:390,height:844});
       const mobileLoginState = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -158,6 +182,27 @@ async function main() {
         const portal = document.getElementById('ambientBackgroundVideo');
         return login?.paused && portal?.readyState >= 2 && !portal.paused && portal.currentTime > 0;
       });
+      const portalMix = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio ? {
+          marker: audio.__littleFeetRegressionMarker,
+          src: audio.currentSrc || audio.src,
+          loop: audio.loop,
+          muted: audio.muted
+        } : null;
+      });
+      assert.ok(portalMix, 'Combined Antarctic soundtrack must remain available inside the portal');
+      assert.equal(portalMix.marker, 'same-audio-instance', 'Login and portal must share the same Antarctic audio instance');
+      assert.ok(portalMix.src.includes('little-feet-antarctic-mix.mp3'), JSON.stringify(portalMix));
+      assert.equal(portalMix.loop, true);
+      assert.equal(portalMix.muted, false);
+
+      const portalMute = page.locator('#dashboardSection [data-portal-audio-mute]').first();
+      await portalMute.click();
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), true, 'Portal mute button must pause the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), true, 'Portal mute button must mute the Antarctic mix');
+      await portalMute.click();
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), false, 'Portal unmute button must unmute the Antarctic mix');
     }
     if (role === 'admin') {
       const mediaSources = await page.evaluate(() => ['loginBackgroundVideo','ambientBackgroundVideo'].map(id => document.getElementById(id).currentSrc));
