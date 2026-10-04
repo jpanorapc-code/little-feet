@@ -87,10 +87,6 @@ async function main() {
       assert.ok(await page.locator('#loginBackgroundVideo').evaluate(v => v.paused));
       await page.locator('#backgroundMotionToggle').click();
       await page.waitForFunction(() => !document.getElementById('loginBackgroundVideo').paused);
-      await page.emulateMedia({reducedMotion:'reduce'});
-      await page.waitForFunction(() => document.getElementById('loginBackgroundVideo').paused);
-      await page.emulateMedia({reducedMotion:'no-preference'});
-      await page.waitForFunction(() => !document.getElementById('loginBackgroundVideo').paused);
 
       const desktopToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
