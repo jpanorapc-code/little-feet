@@ -581,13 +581,15 @@ function reportLittleFeetAntarcticAudioIssue(code, error) {
 function getLittleFeetAntarcticMixAudio() {
   if (!littleFeetAntarcticMixAudio) {
     const audio = document.createElement('audio');
+    // Keep the shared instance first so a browser-specific setup failure can
+    // never make the soundtrack silently disappear behind a swallowed error.
+    littleFeetAntarcticMixAudio = audio;
     audio.id = 'littleFeetAntarcticMixAudio';
     audio.src = LITTLE_FEET_ANTARCTIC_MIX_SRC;
     audio.preload = 'auto';
     audio.loop = true;
     audio.volume = 0.56;
     audio.muted = portalAudioMuted;
-    audio.hidden = true;
     audio.setAttribute('aria-hidden', 'true');
     audio.addEventListener('playing', () => {
       littleFeetAntarcticMixPlaybackConfirmed = true;
@@ -597,8 +599,6 @@ function getLittleFeetAntarcticMixAudio() {
     audio.addEventListener('error', () => {
       reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', audio.error || new Error('Audio element failed to load'));
     });
-    (document.body || document.documentElement).appendChild(audio);
-    littleFeetAntarcticMixAudio = audio;
   }
   return littleFeetAntarcticMixAudio;
 }
