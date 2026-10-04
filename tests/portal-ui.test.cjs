@@ -56,7 +56,11 @@ async function main() {
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
   assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
-  browser = await chromium.launch({ headless: true, ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {}) });
+  browser = await chromium.launch({
+    headless: true,
+    args: ['--autoplay-policy=no-user-gesture-required'],
+    ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {})
+  });
   const summary = [];
   for (const role of roles) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
