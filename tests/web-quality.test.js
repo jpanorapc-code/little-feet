@@ -285,7 +285,7 @@ assert.match(client, /const iconId = portalAudioMuted \? 'icon-volume-off' : 'ic
 assert.match(client, /classList\.toggle\('is-muted', portalAudioMuted\)/);
 assert.ok(fs.existsSync(antarcticMix), 'Combined Antarctic soundtrack must exist.');
 assert.ok(fs.statSync(antarcticMix).size > 500000, 'Combined Antarctic soundtrack must contain the full mixed loop.');
-assert.match(page, /id=\"littleFeetAntarcticMixAudio\"[\\s\\S]*little-feet-antarctic-mix\\.mp3/);
+assert.match(page, /id="littleFeetAntarcticMixAudio"[\s\S]*little-feet-antarctic-mix\.mp3/);
 assert.match(client, /LITTLE_FEET_ANTARCTIC_MIX_SRC = '\/assets\/audio\/little-feet-antarctic-mix\.mp3\?v=20261004-antarctic-mix-v1'/);
 assert.match(client, /audio\.loop = true/);
 assert.match(client, /function syncLittleFeetAntarcticMix\(\)/);
