@@ -56,7 +56,15 @@ async function main() {
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
   assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
-  browser = await chromium.launch({ headless: true, ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {}) });
+  const antarcticResponse = await fetch(`${origin}/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1`);
+  assert.equal(antarcticResponse.status, 200, 'Antarctic soundtrack must be served');
+  assert.match(antarcticResponse.headers.get('content-type') || '', /audio\/mpeg/i, 'Antarctic soundtrack must be served as MPEG audio');
+  assert.ok(Number(antarcticResponse.headers.get('content-length') || 0) > 100000, 'Antarctic soundtrack response must contain the real audio file');
+  browser = await chromium.launch({
+    headless: true,
+    args: ['--autoplay-policy=no-user-gesture-required'],
+    ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {})
+  });
   const summary = [];
   for (const role of roles) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -109,6 +117,24 @@ async function main() {
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'true');
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
       await page.locator('.login-audio-compact').click();
+      await page.waitForTimeout(1200);
+      const antarcticState = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticAudio?.();
+        return audio ? {
+          paused:audio.paused,
+          muted:audio.muted,
+          readyState:audio.readyState,
+          networkState:audio.networkState,
+          currentTime:audio.currentTime,
+          duration:audio.duration,
+          errorCode:audio.error?.code || null,
+          errorMessage:audio.error?.message || '',
+          currentSrc:audio.currentSrc || audio.src,
+          userActivationActive:navigator.userActivation?.isActive ?? null,
+          userActivationSeen:navigator.userActivation?.hasBeenActive ?? null
+        } : null;
+      });
+      assert.ok(antarcticState && !antarcticState.paused && !antarcticState.muted, `Antarctic audio did not enter playback: ${JSON.stringify(antarcticState)}`);
       await page.setViewportSize({width:390,height:844});
       const mobileToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -135,8 +161,20 @@ async function main() {
       await page.locator('.nav-btn[onclick="switchTab(\'settingsTab\', this)"]').click();
       await page.locator('#settingsTab').waitFor({ state: 'visible' });
       assert.equal(await page.locator('.profile-icon-choice').count(), 8, 'Settings should expose eight penguin profile avatars');
-      await page.waitForTimeout(150);
-      const requestsBeforeAvatar = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+      // Initial dashboard loaders can still be settling when Settings first opens.
+      // Wait for a short quiet window so this assertion measures the avatar click
+      // itself rather than unrelated startup API traffic.
+      let requestsBeforeAvatar = 0;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const before = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+        await page.waitForTimeout(150);
+        const after = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+        if (after === before) {
+          requestsBeforeAvatar = after;
+          break;
+        }
+        requestsBeforeAvatar = after;
+      }
       await page.locator('.profile-icon-choice[data-profile-icon="lady"]').click();
       await page.waitForTimeout(100);
       const requestsAfterAvatar = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
