@@ -678,16 +678,6 @@ function pauseLittleFeetAntarcticMix() {
   littleFeetAntarcticMixAudio.pause();
 }
 
-function primeLittleFeetAntarcticMix() {
-  try {
-    const audio = getLittleFeetAntarcticMixAudio();
-    audio.muted = portalAudioMuted;
-    if (!portalAudioMuted) installLittleFeetAntarcticUnlockListeners();
-  } catch (error) {
-    reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', error);
-  }
-}
-
 window.getLittleFeetAntarcticMixAudio = () => window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
 window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
 window.getLittleFeetAntarcticAudioDiagnostics = () => ({
@@ -697,10 +687,7 @@ window.getLittleFeetAntarcticAudioDiagnostics = () => ({
   readyState:document.readyState
 });
 
-// Prime immediately while the deferred client script is evaluated. Constructing
-// HTMLAudioElement does not start sound, but guarantees the object and trusted
-// gesture listeners exist before the login form can receive its first click.
-primeLittleFeetAntarcticMix();
+installLittleFeetAntarcticUnlockListeners();
 
 function portalAudioPreferenceKey() {
   const username = String(currentUser?.username || '').trim().toLowerCase();
