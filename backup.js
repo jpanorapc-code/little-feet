@@ -679,8 +679,9 @@ function portalAudioPreferenceKey() {
 
 function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
-    const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
-    const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
+    const isLoginAudioControl = button.classList.contains('login-audio-compact');
+    const muteLabel = button.dataset.muteLabel || (isLoginAudioControl ? 'Sound On' : 'Mute Little Feet');
+    const unmuteLabel = button.dataset.unmuteLabel || (isLoginAudioControl ? 'Muted' : 'Unmute Little Feet');
     const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
     button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
     button.classList.toggle('is-muted', portalAudioMuted);
