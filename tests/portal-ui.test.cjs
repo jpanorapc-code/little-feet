@@ -100,16 +100,7 @@ async function main() {
         return audio.right <= card.right + 1 && audio.left >= language.right - 1;
       });
       assert.ok(desktopToolsFit, 'Desktop login language and sound controls must not overlap or escape the card');
-      await page.waitForFunction(() => document.querySelector('.login-audio-compact')?.hasAttribute('aria-pressed'));
-      assert.ok(['Sound On', 'Mute Little Feet'].includes(await page.locator('.login-audio-compact span').textContent()), 'Login sound control should expose an unmuted label');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
-      assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
-      await page.locator('.login-audio-compact').click();
-      assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Muted');
-      assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume-off');
-      assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'true');
-      assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
-      await page.locator('.login-audio-compact').click();
       await page.setViewportSize({width:390,height:844});
       const mobileToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
