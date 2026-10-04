@@ -598,16 +598,18 @@ function getLittleFeetAntarcticMixAudio() {
 }
 
 function removeLittleFeetAntarcticUnlockListeners() {
-  document.removeEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
-  document.removeEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
+  window.removeEventListener('pointerup', handleLittleFeetAntarcticUnlockGesture, true);
+  window.removeEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
+  window.removeEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
 }
 
 function installLittleFeetAntarcticUnlockListeners() {
   if (littleFeetAntarcticMixPlaybackConfirmed || portalAudioMuted) return;
-  // Use click rather than pointerdown: Chrome grants transient media
-  // activation by the time the trusted click fires, including touch taps.
-  document.addEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
-  document.addEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
+  // Capture at window level so unrelated UI handlers cannot swallow the
+  // first trusted gesture before the soundtrack gets its playback attempt.
+  window.addEventListener('pointerup', handleLittleFeetAntarcticUnlockGesture, true);
+  window.addEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
+  window.addEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
 }
 
 function handleLittleFeetAntarcticUnlockGesture() {
@@ -664,13 +666,30 @@ function syncLittleFeetAntarcticMix() {
 }
 
 function pauseLittleFeetAntarcticMix() {
+  removeLittleFeetAntarcticUnlockListeners();
   if (!littleFeetAntarcticMixAudio) return;
   littleFeetAntarcticMixAudio.muted = true;
   littleFeetAntarcticMixAudio.pause();
 }
 
+function primeLittleFeetAntarcticMix() {
+  try {
+    const audio = getLittleFeetAntarcticMixAudio();
+    audio.muted = portalAudioMuted;
+    if (!portalAudioMuted) installLittleFeetAntarcticUnlockListeners();
+  } catch (error) {
+    reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', error);
+  }
+}
+
 window.getLittleFeetAntarcticMixAudio = () => littleFeetAntarcticMixAudio;
 window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', primeLittleFeetAntarcticMix, { once:true });
+} else {
+  primeLittleFeetAntarcticMix();
+}
 
 function portalAudioPreferenceKey() {
   const username = String(currentUser?.username || '').trim().toLowerCase();
