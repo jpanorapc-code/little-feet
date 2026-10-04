@@ -118,6 +118,18 @@ async function main() {
       assert.equal(loginMix.muted, false, 'Combined Antarctic soundtrack should start unmuted when Little Feet sound is on');
       assert.ok(loginMix.volume > 0 && loginMix.volume <= 1, JSON.stringify(loginMix));
 
+      // A real user gesture must unlock audible playback, not just create
+      // an Audio element with the right metadata.
+      await page.locator('#loginUsername').click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      });
+      const loginPlaybackStart = await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.currentTime || 0);
+      await page.waitForTimeout(180);
+      const loginPlaybackAfter = await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.currentTime || 0);
+      assert.ok(loginPlaybackAfter > loginPlaybackStart, 'Antarctic mix currentTime must advance after login-page user interaction');
+
       await page.locator('.login-audio-compact').click();
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Muted');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume-off');
@@ -127,7 +139,12 @@ async function main() {
       assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), true, 'Login mute button must mute the Antarctic mix');
 
       await page.locator('.login-audio-compact').click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      });
       assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), false, 'Login unmute button must unmute the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), false, 'Login unmute button must restart audible Antarctic playback');
       await page.setViewportSize({width:390,height:844});
       const mobileLoginState = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -202,7 +219,12 @@ async function main() {
       assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), true, 'Portal mute button must pause the Antarctic mix');
       assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), true, 'Portal mute button must mute the Antarctic mix');
       await portalMute.click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      });
       assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), false, 'Portal unmute button must unmute the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), false, 'Portal unmute button must restart audible Antarctic playback');
     }
     if (role === 'admin') {
       const mediaSources = await page.evaluate(() => ['loginBackgroundVideo','ambientBackgroundVideo'].map(id => document.getElementById(id).currentSrc));
