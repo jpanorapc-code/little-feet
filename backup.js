@@ -99,6 +99,9 @@ let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
+let littleFeetAntarcticAudio = null;
+let littleFeetAntarcticAudioPlaying = false;
+const LITTLE_FEET_ANTARCTIC_AUDIO_SRC = '/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-audio-clean-v1';
 let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
@@ -265,6 +268,56 @@ function unlockPortalAudio() {
   } catch { /* Sound remains optional when unavailable on a device. */ }
 }
 
+function getLittleFeetAntarcticAudio() {
+  if (!littleFeetAntarcticAudio) {
+    littleFeetAntarcticAudio = new Audio(LITTLE_FEET_ANTARCTIC_AUDIO_SRC);
+    littleFeetAntarcticAudio.preload = 'auto';
+    littleFeetAntarcticAudio.loop = true;
+    littleFeetAntarcticAudio.volume = 0.56;
+    littleFeetAntarcticAudio.muted = portalAudioMuted;
+  }
+  return littleFeetAntarcticAudio;
+}
+
+function removeLittleFeetAntarcticUnlockListeners() {
+  document.removeEventListener('pointerdown', startLittleFeetAntarcticAudioFromGesture, true);
+  document.removeEventListener('keydown', startLittleFeetAntarcticAudioFromGesture, true);
+}
+
+function installLittleFeetAntarcticUnlockListeners() {
+  if (portalAudioMuted || littleFeetAntarcticAudioPlaying) return;
+  document.addEventListener('pointerdown', startLittleFeetAntarcticAudioFromGesture, true);
+  document.addEventListener('keydown', startLittleFeetAntarcticAudioFromGesture, true);
+}
+
+function startLittleFeetAntarcticAudioFromGesture() {
+  if (portalAudioMuted) return;
+  const audio = getLittleFeetAntarcticAudio();
+  audio.muted = false;
+  const playAttempt = audio.play();
+  if (!playAttempt?.then) {
+    littleFeetAntarcticAudioPlaying = true;
+    removeLittleFeetAntarcticUnlockListeners();
+    return;
+  }
+  playAttempt.then(() => {
+    littleFeetAntarcticAudioPlaying = true;
+    removeLittleFeetAntarcticUnlockListeners();
+  }).catch(() => {
+    littleFeetAntarcticAudioPlaying = false;
+    installLittleFeetAntarcticUnlockListeners();
+  });
+}
+
+function pauseLittleFeetAntarcticAudio() {
+  if (!littleFeetAntarcticAudio) return;
+  littleFeetAntarcticAudio.muted = true;
+  littleFeetAntarcticAudio.pause();
+  littleFeetAntarcticAudioPlaying = false;
+}
+
+window.getLittleFeetAntarcticAudio = () => littleFeetAntarcticAudio;
+
 function southAfricaNow(date = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-ZA', {
     timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -361,6 +414,7 @@ window.addEventListener('DOMContentLoaded', () => {
   upgradeLegacyIcons();
   observeProfessionalIcons();
   document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
+  installLittleFeetAntarcticUnlockListeners();
   try {
     if (localStorage.getItem('lf_wallpaper_muted') === 'true' && localStorage.getItem('lf_portal_audio_muted_last') === null) localStorage.setItem('lf_portal_audio_muted_last', 'true');
   } catch {}
@@ -577,6 +631,7 @@ function updatePortalAudioControls() {
 }
 
 function stopAllPortalAudio() {
+  pauseLittleFeetAntarcticAudio();
   stopWindtLegacyNote();
   stopWallpaperTheme();
 }
@@ -593,6 +648,7 @@ function loadPortalAudioPreference() {
     }
   } catch { portalAudioMuted = false; }
   if (portalAudioMuted) stopAllPortalAudio();
+  else installLittleFeetAntarcticUnlockListeners();
   updatePortalAudioControls();
   announcePortalAudioState();
 }
@@ -607,8 +663,10 @@ function togglePortalAudioMute() {
   } catch {}
   if (portalAudioMuted) {
     stopAllPortalAudio();
-  } else if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) {
-    startWallpaperTheme();
+  } else {
+    unlockPortalAudio();
+    startLittleFeetAntarcticAudioFromGesture();
+    if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) startWallpaperTheme();
   }
   updatePortalAudioControls();
   announcePortalAudioState();
