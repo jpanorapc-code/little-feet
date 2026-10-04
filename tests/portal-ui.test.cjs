@@ -146,8 +146,9 @@ async function main() {
         return audio.right <= card.right + 1 && audio.left >= language.right - 1;
       });
       assert.ok(mobileToolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      const rememberWidth = await page.locator('#rememberLogin').evaluate(el => el.getBoundingClientRect().width);
+      assert.ok(rememberWidth <= 24, 'Remember-email checkbox must not stretch across the mobile form');
       await page.screenshot({ path:path.join(root,'tmp','mobile-login-video.png') });
-      await page.setViewportSize({width:1440,height:1000});
     }
     await page.locator('#loginPinToggle').click();
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'text');
@@ -157,9 +158,11 @@ async function main() {
     await page.locator('#loginPin').fill(pin);
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
+    await page.locator('#authSection').waitFor({ state: 'hidden' });
     if (role === 'admin') {
       const t = await page.locator('#littleFeetAntarcticAudio').evaluate(a => a.currentTime);
       await page.waitForFunction(t => {const a = document.getElementById('littleFeetAntarcticAudio');return !a.paused && !a.muted && a.currentTime > t + .2;}, t);
+      await page.setViewportSize({width:1440,height:1000});
     }
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
