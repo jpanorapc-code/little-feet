@@ -690,6 +690,12 @@ function primeLittleFeetAntarcticMix() {
 
 window.getLittleFeetAntarcticMixAudio = () => littleFeetAntarcticMixAudio;
 window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
+window.getLittleFeetAntarcticAudioDiagnostics = () => ({
+  lastError:littleFeetAntarcticMixLastError,
+  playbackConfirmed:littleFeetAntarcticMixPlaybackConfirmed,
+  hasAudio:Boolean(littleFeetAntarcticMixAudio),
+  readyState:document.readyState
+});
 
 // Prime immediately while the deferred client script is evaluated. Constructing
 // HTMLAudioElement does not start sound, but guarantees the object and trusted
