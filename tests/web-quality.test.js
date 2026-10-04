@@ -77,7 +77,7 @@ assert.match(client, /const legacyProfileIconMap = Object\.freeze\(/);
 assert.match(client, /function normalizeProfileIcon\(icon\)/);
 assert.match(client, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3#avatar-\$\{selectedIcon\}/);
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
-assert.match(serviceWorker, /little-feet-shell-v51-antarctic-audio-unlock/);
+assert.match(serviceWorker, /little-feet-shell-v52-antarctic-audio-click/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-v2/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
@@ -547,7 +547,7 @@ assert.match(page, /id="ambientBackgroundVideo"[\s\S]*little-feet-login-clean\.m
 assert.match(ambientBackground, /littlefeet:session-ready/);
 assert.match(ambientBackground, /littlefeet:session-ended/);
 assert.match(ambientBackground, /document\.body\.classList\.contains\('portal-active'\)/);
-assert.match(serviceWorker, /little-feet-shell-v51-antarctic-audio-unlock/);
+assert.match(serviceWorker, /little-feet-shell-v52-antarctic-audio-click/);
 assert.match(serviceWorker, /little-feet-login-clean\.jpg/);
 assert.match(page, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
 assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);
