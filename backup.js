@@ -99,6 +99,7 @@ let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
+let littleFeetAntarcticMixAudio = null;
 let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
@@ -262,6 +263,7 @@ function unlockPortalAudio() {
     if (portalAudioMuted) return;
     const ctx = getPortalAudioContext();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    syncLittleFeetAntarcticMix();
   } catch { /* Sound remains optional when unavailable on a device. */ }
 }
 
@@ -558,6 +560,39 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
+const LITTLE_FEET_ANTARCTIC_MIX_SRC = '/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-antarctic-mix-v1';
+
+function getLittleFeetAntarcticMixAudio() {
+  if (!littleFeetAntarcticMixAudio) {
+    littleFeetAntarcticMixAudio = new Audio(LITTLE_FEET_ANTARCTIC_MIX_SRC);
+    littleFeetAntarcticMixAudio.preload = 'auto';
+    littleFeetAntarcticMixAudio.loop = true;
+    littleFeetAntarcticMixAudio.volume = 0.56;
+    littleFeetAntarcticMixAudio.muted = portalAudioMuted;
+  }
+  return littleFeetAntarcticMixAudio;
+}
+
+function syncLittleFeetAntarcticMix() {
+  try {
+    const audio = getLittleFeetAntarcticMixAudio();
+    audio.muted = portalAudioMuted;
+    if (portalAudioMuted) {
+      audio.pause();
+      return;
+    }
+    audio.play().catch(() => {});
+  } catch { /* Ambient audio remains optional when playback is unavailable. */ }
+}
+
+function pauseLittleFeetAntarcticMix() {
+  if (!littleFeetAntarcticMixAudio) return;
+  littleFeetAntarcticMixAudio.muted = true;
+  littleFeetAntarcticMixAudio.pause();
+}
+
+window.getLittleFeetAntarcticMixAudio = () => littleFeetAntarcticMixAudio;
+
 function portalAudioPreferenceKey() {
   const username = String(currentUser?.username || '').trim().toLowerCase();
   return username ? `lf_portal_audio_muted:${username}` : '';
@@ -577,6 +612,7 @@ function updatePortalAudioControls() {
 }
 
 function stopAllPortalAudio() {
+  pauseLittleFeetAntarcticMix();
   stopWindtLegacyNote();
   stopWallpaperTheme();
 }
@@ -593,6 +629,7 @@ function loadPortalAudioPreference() {
     }
   } catch { portalAudioMuted = false; }
   if (portalAudioMuted) stopAllPortalAudio();
+  else syncLittleFeetAntarcticMix();
   updatePortalAudioControls();
   announcePortalAudioState();
 }
@@ -607,8 +644,9 @@ function togglePortalAudioMute() {
   } catch {}
   if (portalAudioMuted) {
     stopAllPortalAudio();
-  } else if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) {
-    startWallpaperTheme();
+  } else {
+    syncLittleFeetAntarcticMix();
+    if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) startWallpaperTheme();
   }
   updatePortalAudioControls();
   announcePortalAudioState();
