@@ -113,6 +113,7 @@ async function main() {
           hasGetter:typeof window.getLittleFeetAntarcticMixAudio === 'function',
           hasStarter:typeof window.startLittleFeetAntarcticMixFromGesture === 'function',
           userActive:navigator.userActivation?.hasBeenActive ?? null,
+          diagnostics:window.getLittleFeetAntarcticAudioDiagnostics?.() || null,
           audio:audio ? {
             paused:audio.paused,
             muted:audio.muted,
