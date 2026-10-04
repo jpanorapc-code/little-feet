@@ -581,10 +581,13 @@ function reportLittleFeetAntarcticAudioIssue(code, error) {
 }
 
 function getLittleFeetAntarcticMixAudio() {
-  if (!littleFeetAntarcticMixAudio) {
-    const audio = document.createElement('audio');
-    // Keep the shared instance first so a browser-specific setup failure can
-    // never make the soundtrack silently disappear behind a swallowed error.
+  let audio = window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
+  if (!audio) {
+    audio = document.createElement('audio');
+    // Keep the authoritative instance on window as well as the local client
+    // reference. This avoids any browser named-property/DOM lifecycle quirk
+    // from collapsing the shared soundtrack reference back to null.
+    window.__littleFeetAntarcticMixAudio = audio;
     littleFeetAntarcticMixAudio = audio;
     audio.id = 'littleFeetAntarcticMixAudio';
     audio.src = LITTLE_FEET_ANTARCTIC_MIX_SRC;
@@ -602,7 +605,8 @@ function getLittleFeetAntarcticMixAudio() {
       reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', audio.error || new Error('Audio element failed to load'));
     });
   }
-  return littleFeetAntarcticMixAudio;
+  littleFeetAntarcticMixAudio = audio;
+  return audio;
 }
 
 function removeLittleFeetAntarcticUnlockListeners() {
@@ -690,12 +694,12 @@ function primeLittleFeetAntarcticMix() {
   }
 }
 
-window.getLittleFeetAntarcticMixAudio = () => littleFeetAntarcticMixAudio;
+window.getLittleFeetAntarcticMixAudio = () => window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
 window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
 window.getLittleFeetAntarcticAudioDiagnostics = () => ({
   lastError:littleFeetAntarcticMixLastError,
   playbackConfirmed:littleFeetAntarcticMixPlaybackConfirmed,
-  hasAudio:Boolean(littleFeetAntarcticMixAudio),
+  hasAudio:Boolean(window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio),
   readyState:document.readyState
 });
 
