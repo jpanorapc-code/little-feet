@@ -99,6 +99,7 @@ let visitorScannerStream = null;
 let wallpaperIdleTimer = null;
 let windtLegacyAudio = null;
 let wallpaperThemeAudio = null;
+let littleFeetAntarcticMixAudio = null;
 let customWallpaperObjectUrl = '';
 let portalAudioMuted = false;
 let portalAudioChangedBeforeLogin = false;
@@ -258,11 +259,12 @@ function announcePortalAudioState() {
 }
 
 function unlockPortalAudio() {
+  if (portalAudioMuted) return;
   try {
-    if (portalAudioMuted) return;
     const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-  } catch { /* Sound remains optional when unavailable on a device. */ }
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+  } catch { /* Web Audio is optional; HTML audio still gets its own unlock attempt. */ }
+  void startLittleFeetAntarcticMixFromGesture();
 }
 
 function southAfricaNow(date = new Date()) {
@@ -360,7 +362,7 @@ function playTicketAlert() {
 window.addEventListener('DOMContentLoaded', () => {
   upgradeLegacyIcons();
   observeProfessionalIcons();
-  document.addEventListener('pointerdown', unlockPortalAudio, { once: true, passive: true });
+  installLittleFeetAntarcticUnlockListeners();
   try {
     if (localStorage.getItem('lf_wallpaper_muted') === 'true' && localStorage.getItem('lf_portal_audio_muted_last') === null) localStorage.setItem('lf_portal_audio_muted_last', 'true');
   } catch {}
@@ -558,6 +560,138 @@ function showPortalTourSlide(index) {
   dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
 }
 
+const LITTLE_FEET_ANTARCTIC_MIX_SRC = '/assets/audio/little-feet-antarctic-mix.mp3?v=20261004-antarctic-mix-v1';
+let littleFeetAntarcticMixPlayPromise = null;
+let littleFeetAntarcticMixPlaybackConfirmed = false;
+let littleFeetAntarcticMixLastError = '';
+
+function reportLittleFeetAntarcticAudioIssue(code, error) {
+  const name = String(error?.name || 'Error').slice(0,60);
+  const detail = String(error?.message || '').slice(0,180);
+  const description = detail ? `${name}: ${detail}` : name;
+  const fingerprint = code + ':' + description;
+  if (fingerprint === littleFeetAntarcticMixLastError) return;
+  littleFeetAntarcticMixLastError = fingerprint;
+  void window.reportLittleFeetClientLog?.({
+    severity: code === 'ANTARCTIC_AUDIO_LOAD_FAILED' ? 'warn' : 'info',
+    code,
+    message:description,
+    source:'backup.js'
+  });
+}
+
+function getLittleFeetAntarcticMixAudio() {
+  const audio = document.getElementById('littleFeetAntarcticMixAudio');
+  if (!audio) throw new Error('Persistent Antarctic audio element is missing');
+  window.__littleFeetAntarcticMixAudio = audio;
+  littleFeetAntarcticMixAudio = audio;
+  audio.preload = 'auto';
+  audio.loop = true;
+  audio.volume = 0.56;
+  audio.muted = portalAudioMuted;
+  if (!audio.dataset.lfAntarcticBound) {
+    audio.dataset.lfAntarcticBound = 'true';
+    audio.addEventListener('playing', () => {
+      littleFeetAntarcticMixPlaybackConfirmed = true;
+      littleFeetAntarcticMixLastError = '';
+      removeLittleFeetAntarcticUnlockListeners();
+    });
+    audio.addEventListener('error', () => {
+      reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_LOAD_FAILED', audio.error || new Error('Audio element failed to load'));
+    });
+  }
+  return audio;
+}
+
+function removeLittleFeetAntarcticUnlockListeners() {
+  window.removeEventListener('pointerup', handleLittleFeetAntarcticUnlockGesture, true);
+  window.removeEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
+  window.removeEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
+}
+
+function installLittleFeetAntarcticUnlockListeners() {
+  if (littleFeetAntarcticMixPlaybackConfirmed || portalAudioMuted) return;
+  // Capture at window level so unrelated UI handlers cannot swallow the
+  // first trusted gesture before the soundtrack gets its playback attempt.
+  window.addEventListener('pointerup', handleLittleFeetAntarcticUnlockGesture, true);
+  window.addEventListener('click', handleLittleFeetAntarcticUnlockGesture, true);
+  window.addEventListener('keydown', handleLittleFeetAntarcticUnlockGesture, true);
+}
+
+function handleLittleFeetAntarcticUnlockGesture() {
+  if (portalAudioMuted) return;
+  void startLittleFeetAntarcticMixFromGesture();
+}
+
+function startLittleFeetAntarcticMixFromGesture() {
+  if (portalAudioMuted) return Promise.resolve(false);
+  const audio = getLittleFeetAntarcticMixAudio();
+  audio.muted = false;
+  if (!audio.paused && !audio.ended) {
+    littleFeetAntarcticMixPlaybackConfirmed = true;
+    removeLittleFeetAntarcticUnlockListeners();
+    return Promise.resolve(true);
+  }
+  if (littleFeetAntarcticMixPlayPromise) return littleFeetAntarcticMixPlayPromise;
+
+  littleFeetAntarcticMixPlayPromise = audio.play()
+    .then(() => {
+      littleFeetAntarcticMixPlaybackConfirmed = true;
+      littleFeetAntarcticMixLastError = '';
+      removeLittleFeetAntarcticUnlockListeners();
+      return true;
+    })
+    .catch(error => {
+      littleFeetAntarcticMixPlaybackConfirmed = false;
+      reportLittleFeetAntarcticAudioIssue('ANTARCTIC_AUDIO_PLAYBACK_BLOCKED', error);
+      installLittleFeetAntarcticUnlockListeners();
+      return false;
+    })
+    .finally(() => {
+      littleFeetAntarcticMixPlayPromise = null;
+    });
+  return littleFeetAntarcticMixPlayPromise;
+}
+
+function syncLittleFeetAntarcticMix() {
+  const audio = getLittleFeetAntarcticMixAudio();
+  audio.muted = portalAudioMuted;
+  if (portalAudioMuted) {
+    audio.pause();
+    return;
+  }
+
+  // Autoplay with sound is intentionally restricted by modern browsers.
+  // Try immediately when activation already exists, otherwise keep retry
+  // listeners armed until a real user gesture successfully starts playback.
+  if (littleFeetAntarcticMixPlaybackConfirmed || navigator.userActivation?.hasBeenActive) {
+    void startLittleFeetAntarcticMixFromGesture();
+  } else {
+    installLittleFeetAntarcticUnlockListeners();
+  }
+}
+
+function pauseLittleFeetAntarcticMix() {
+  removeLittleFeetAntarcticUnlockListeners();
+  const audio = document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
+  if (!audio) return;
+  window.__littleFeetAntarcticMixAudio = audio;
+  littleFeetAntarcticMixAudio = audio;
+  audio.muted = true;
+  audio.pause();
+}
+
+window.getLittleFeetAntarcticMixAudio = () => document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio;
+window.startLittleFeetAntarcticMixFromGesture = startLittleFeetAntarcticMixFromGesture;
+window.getLittleFeetAntarcticAudioDiagnostics = () => ({
+  lastError:littleFeetAntarcticMixLastError,
+  playbackConfirmed:littleFeetAntarcticMixPlaybackConfirmed,
+  hasAudio:Boolean(document.getElementById('littleFeetAntarcticMixAudio') || window.__littleFeetAntarcticMixAudio || littleFeetAntarcticMixAudio),
+  readyState:document.readyState
+});
+
+installLittleFeetAntarcticUnlockListeners();
+
 function portalAudioPreferenceKey() {
   const username = String(currentUser?.username || '').trim().toLowerCase();
   return username ? `lf_portal_audio_muted:${username}` : '';
@@ -565,8 +699,9 @@ function portalAudioPreferenceKey() {
 
 function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
-    const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
-    const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
+    const isLoginAudioControl = button.classList.contains('login-audio-compact');
+    const muteLabel = button.dataset.muteLabel || (isLoginAudioControl ? 'Sound On' : 'Mute Little Feet');
+    const unmuteLabel = button.dataset.unmuteLabel || (isLoginAudioControl ? 'Muted' : 'Unmute Little Feet');
     const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
     button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
     button.classList.toggle('is-muted', portalAudioMuted);
@@ -577,6 +712,7 @@ function updatePortalAudioControls() {
 }
 
 function stopAllPortalAudio() {
+  pauseLittleFeetAntarcticMix();
   stopWindtLegacyNote();
   stopWallpaperTheme();
 }
@@ -593,6 +729,7 @@ function loadPortalAudioPreference() {
     }
   } catch { portalAudioMuted = false; }
   if (portalAudioMuted) stopAllPortalAudio();
+  else syncLittleFeetAntarcticMix();
   updatePortalAudioControls();
   announcePortalAudioState();
 }
@@ -607,8 +744,9 @@ function togglePortalAudioMute() {
   } catch {}
   if (portalAudioMuted) {
     stopAllPortalAudio();
-  } else if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) {
-    startWallpaperTheme();
+  } else {
+    unlockPortalAudio();
+    if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) startWallpaperTheme();
   }
   updatePortalAudioControls();
   announcePortalAudioState();
@@ -911,22 +1049,38 @@ if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     unlockPortalAudio();
-    const username = document.getElementById('loginUsername').value;
-    const pin = document.getElementById('loginPin').value;
+
+    const usernameInput = document.getElementById('loginUsername');
+    const pinInput = document.getElementById('loginPin');
+    const username = usernameInput?.value.trim() || '';
+    const pin = pinInput?.value || '';
     const rememberLogin = document.getElementById('rememberLogin')?.checked === true;
+
+    if (!username || !pin) {
+      loginForm.reportValidity();
+      return;
+    }
+    if (usernameInput && usernameInput.value !== username) usernameInput.value = username;
     if (!rememberLogin) clearRememberedLogin();
 
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, pin })
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.user) {
         currentUser = data.user;
-        if (rememberLogin) await saveRememberedLogin(username, pin);
+
+        // Enter the portal immediately after the server accepts the login.
+        // Mobile credential managers can keep navigator.credentials.store()
+        // pending while their native save-password UI is open, so saving the
+        // optional remembered credential must never block session startup.
         setupSession();
+        if (rememberLogin) void saveRememberedLogin(username, pin);
       } else {
         alert(data.message || 'Login failed.');
       }
@@ -1493,7 +1647,7 @@ function normalizeProfileIcon(icon) {
 
 function profileIconMarkup(icon) {
   const selectedIcon = normalizeProfileIcon(icon);
-  return `<svg class="profile-avatar-image profile-avatar-${selectedIcon}" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-${selectedIcon}"></use></svg>`;
+  return `<svg class="profile-avatar-image profile-avatar-${selectedIcon}" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-${selectedIcon}"></use></svg>`;
 }
 
 function getProfileIconStorageKey() {

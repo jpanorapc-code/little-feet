@@ -21,21 +21,22 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      .my-day-hero{position:relative;overflow:hidden;margin-bottom:18px;padding:24px;border:1px solid rgba(94,234,212,.32);border-radius:16px;background:linear-gradient(135deg,rgba(13,148,136,.18),rgba(15,43,72,.94));}
+      .my-day-hero,.my-day-attention,.my-day-action{--text-dark:#f7fbff;--text-muted:#d8eaff;color:#f7fbff;}
+      .my-day-hero{position:relative;overflow:hidden;margin-bottom:18px;padding:24px;border:1px solid rgba(94,234,212,.32);border-radius:16px;background:linear-gradient(155deg,#08287f,#061d5b);}
       .my-day-hero::after{content:"";position:absolute;right:-28px;bottom:-36px;width:180px;height:180px;background:url('/assets/4k/sidebar-penguin-hq.png') center/contain no-repeat;opacity:.18;pointer-events:none;}
       .my-day-kicker{color:#99f6e4;font-size:.72rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;}
       .my-day-hero h2{position:relative;z-index:1;margin:5px 0 6px;font-size:clamp(1.35rem,3vw,2rem);}
       .my-day-hero p{position:relative;z-index:1;max-width:700px;color:var(--text-muted);line-height:1.5;}
       .my-day-date{display:inline-flex;margin-top:14px;padding:6px 10px;border:1px solid rgba(94,234,212,.25);border-radius:999px;background:rgba(7,17,30,.3);color:#ccfbf1;font-size:.8rem;font-weight:700;}
       .my-day-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px;margin-bottom:20px;align-items:stretch;}
-      .my-day-action{min-width:0;min-height:132px;height:100%;text-align:left;padding:16px 17px;border:1px solid rgba(94,234,212,.26);border-radius:12px;background:linear-gradient(145deg,rgba(13,42,92,.94),rgba(10,36,77,.9));color:var(--text-dark);cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease;display:flex;flex-direction:column;}
+      .my-day-action{min-width:0;min-height:132px;height:100%;text-align:left;padding:16px 17px;border:1px solid rgba(94,234,212,.26);border-radius:12px;background:linear-gradient(155deg,#08287f,#061d5b);color:var(--text-dark);cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease;display:flex;flex-direction:column;}
       .my-day-action:hover,.my-day-action:focus-visible{transform:translateY(-2px);border-color:rgba(94,234,212,.7);outline:none;}
       .my-day-action strong{display:block;margin-bottom:6px;color:#5eead4;font-size:.94rem;line-height:1.25;}
       .my-day-action span{display:block;color:var(--text-muted);font-size:.80rem;line-height:1.42;}
       .my-day-action b{display:inline-block;margin-top:auto;padding-top:11px;color:#99f6e4;font-size:.74rem;}
       .my-day-section-title{margin:4px 0 12px;font-size:1rem;color:var(--text-dark);}
       .my-day-note{padding:14px 16px;border-left:3px solid var(--primary-color);border-radius:8px;background:rgba(13,148,136,.08);color:var(--text-muted);font-size:.84rem;line-height:1.45;}
-      .my-day-attention{margin-bottom:18px;padding:18px;border:1px solid rgba(94,234,212,.3);border-radius:14px;background:linear-gradient(145deg,rgba(13,148,136,.11),rgba(15,43,72,.72));}
+      .my-day-attention{margin-bottom:18px;padding:18px;border:1px solid rgba(94,234,212,.3);border-radius:14px;background:linear-gradient(155deg,#08287f,#061d5b);}
       .my-day-attention-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
       .my-day-attention-head h3{margin:0;font-size:1rem;}
       .my-day-attention-count{min-width:32px;padding:5px 9px;border-radius:999px;background:var(--primary-color);color:#fff;text-align:center;font-size:.78rem;font-weight:800;}

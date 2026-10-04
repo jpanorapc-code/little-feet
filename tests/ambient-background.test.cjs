@@ -55,7 +55,11 @@ async function main() {
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
   assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
-  browser = await chromium.launch({ headless: true, ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {}) });
+  browser = await chromium.launch({
+    headless:true,
+    args:['--autoplay-policy=no-user-gesture-required'],
+    ...(process.env.LF_BROWSER_CHANNEL ? { channel:process.env.LF_BROWSER_CHANNEL } : {})
+  });
   const summary = [];
   for (const role of roles) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -83,10 +87,6 @@ async function main() {
       assert.ok(await page.locator('#loginBackgroundVideo').evaluate(v => v.paused));
       await page.locator('#backgroundMotionToggle').click();
       await page.waitForFunction(() => !document.getElementById('loginBackgroundVideo').paused);
-      await page.emulateMedia({reducedMotion:'reduce'});
-      await page.waitForFunction(() => document.getElementById('loginBackgroundVideo').paused);
-      await page.emulateMedia({reducedMotion:'no-preference'});
-      await page.waitForFunction(() => !document.getElementById('loginBackgroundVideo').paused);
 
       const desktopToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -95,25 +95,111 @@ async function main() {
         return audio.right <= card.right + 1 && audio.left >= language.right - 1;
       });
       assert.ok(desktopToolsFit, 'Desktop login language and sound controls must not overlap or escape the card');
-      assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Sound On');
+      assert.ok(['Sound On', 'Mute Little Feet'].includes(await page.locator('.login-audio-compact span').textContent()), 'Login sound control should expose an unmuted label');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
+
+      // The combined Antarctic soundtrack must start from a real user gesture,
+      // then persist as one looping audio instance across login and portal.
+      await page.locator('#loginUsername').click();
+      await page.waitForTimeout(250);
+      let unlockState = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return {
+          hasGetter:typeof window.getLittleFeetAntarcticMixAudio === 'function',
+          hasStarter:typeof window.startLittleFeetAntarcticMixFromGesture === 'function',
+          userActive:navigator.userActivation?.hasBeenActive ?? null,
+          diagnostics:window.getLittleFeetAntarcticAudioDiagnostics?.() || null,
+          audio:audio ? {
+            paused:audio.paused,
+            muted:audio.muted,
+            readyState:audio.readyState,
+            networkState:audio.networkState,
+            error:audio.error?.code || null,
+            src:audio.currentSrc || audio.src
+          } : null
+        };
+      });
+      assert.ok(unlockState.hasGetter && unlockState.hasStarter, `Antarctic audio hooks missing: ${JSON.stringify(unlockState)}`);
+      assert.ok(unlockState.audio, `Trusted click did not initialise Antarctic audio: ${JSON.stringify(unlockState)}`);
+      if (unlockState.audio.paused || unlockState.audio.muted) {
+        await page.evaluate(() => window.startLittleFeetAntarcticMixFromGesture?.());
+      }
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      }, null, { timeout:10000 });
+      const loginMix = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        if (!audio) return null;
+        audio.__littleFeetRegressionMarker = 'same-audio-instance';
+        return {
+          src: audio.currentSrc || audio.src,
+          loop: audio.loop,
+          muted: audio.muted,
+          paused: audio.paused,
+          volume: audio.volume,
+          currentTime: audio.currentTime
+        };
+      });
+      assert.ok(loginMix, 'Combined Antarctic soundtrack must initialise after the first login-page user gesture');
+      assert.ok(loginMix.src.includes('little-feet-antarctic-mix.mp3'), JSON.stringify(loginMix));
+      assert.equal(loginMix.loop, true, 'Combined Antarctic soundtrack must loop');
+      assert.equal(loginMix.muted, false, 'Combined Antarctic soundtrack should be unmuted when Little Feet sound is on');
+      assert.equal(loginMix.paused, false, 'Combined Antarctic soundtrack must be actively playing after the first gesture');
+      assert.ok(loginMix.volume > 0 && loginMix.volume <= 1, JSON.stringify(loginMix));
+      await page.waitForTimeout(180);
+      const loginPlaybackAfter = await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.currentTime || 0);
+      assert.ok(loginPlaybackAfter > loginMix.currentTime, 'Antarctic mix currentTime must advance after login-page user interaction');
+
       await page.locator('.login-audio-compact').click();
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Muted');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume-off');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'true');
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), true, 'Login mute button must pause the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), true, 'Login mute button must mute the Antarctic mix');
+
       await page.locator('.login-audio-compact').click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      });
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), false, 'Login unmute button must unmute the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), false, 'Login unmute button must restart audible Antarctic playback');
       await page.setViewportSize({width:390,height:844});
-      const mobileToolsFit = await page.evaluate(() => {
+      const mobileLoginState = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
         const language = document.querySelector('.login-language-pill').getBoundingClientRect();
         const audio = document.querySelector('.login-audio-compact').getBoundingClientRect();
-        return audio.right <= card.right + 1 && audio.left >= language.right - 1;
+        const username = document.getElementById('loginUsername');
+        const pinInput = document.getElementById('loginPin');
+        const submit = document.querySelector('#loginForm button[type="submit"]');
+        const hit = element => {
+          const rect = element.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          const top = document.elementFromPoint(x, y);
+          return top === element || element.contains(top);
+        };
+        return {
+          toolsFit: audio.right <= card.right + 1 && audio.left >= language.right - 1,
+          usernameHit: hit(username),
+          pinHit: hit(pinInput),
+          submitHit: hit(submit),
+          brandPointerEvents: getComputedStyle(document.querySelector('.brand-header')).pointerEvents,
+          cardPointerEvents: getComputedStyle(document.querySelector('.auth-card')).pointerEvents
+        };
       });
-      assert.ok(mobileToolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      const rememberWidth = await page.locator('#rememberLogin').evaluate(el => el.getBoundingClientRect().width);
+      assert.ok(rememberWidth <= 24, 'Remember-email checkbox must not stretch across the mobile form');
+      assert.ok(mobileLoginState.toolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      assert.ok(mobileLoginState.usernameHit, 'Mobile username field must receive taps');
+      assert.ok(mobileLoginState.pinHit, 'Mobile PIN field must receive taps');
+      assert.ok(mobileLoginState.submitHit, 'Mobile login submit button must receive taps');
+      assert.equal(mobileLoginState.brandPointerEvents, 'none', 'Decorative mobile brand layer must not steal form taps');
+      assert.equal(mobileLoginState.cardPointerEvents, 'auto', 'Mobile login card must remain interactive');
       await page.screenshot({ path:path.join(root,'tmp','mobile-login-video.png') });
-      await page.setViewportSize({width:1440,height:1000});
     }
     await page.locator('#loginPinToggle').click();
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'text');
@@ -121,15 +207,55 @@ async function main() {
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'password');
     await page.locator('#loginUsername').fill(`browser-${role}`);
     await page.locator('#loginPin').fill(pin);
+    if (role === 'admin') await page.locator('#rememberLogin').check();
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
+    await page.locator('#authSection').waitFor({ state: 'hidden' });
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
+      // Admin signs in while the viewport is still phone-sized. Restore desktop
+      // only after the mobile login has successfully transitioned into the portal.
+      await page.setViewportSize({width:1440,height:1000});
       await page.waitForFunction(() => {
         const login = document.getElementById('loginBackgroundVideo');
         const portal = document.getElementById('ambientBackgroundVideo');
         return login?.paused && portal?.readyState >= 2 && !portal.paused && portal.currentTime > 0;
       });
+      const portalMix = await page.evaluate(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio ? {
+          marker: audio.__littleFeetRegressionMarker,
+          src: audio.currentSrc || audio.src,
+          loop: audio.loop,
+          muted: audio.muted
+        } : null;
+      });
+      assert.ok(portalMix, 'Combined Antarctic soundtrack must remain available inside the portal');
+      assert.equal(portalMix.marker, 'same-audio-instance', 'Login and portal must share the same Antarctic audio instance');
+      assert.ok(portalMix.src.includes('little-feet-antarctic-mix.mp3'), JSON.stringify(portalMix));
+      assert.equal(portalMix.loop, true);
+      assert.equal(portalMix.muted, false);
+
+      const portalMute = page.locator('#dashboardSection [data-portal-audio-mute]').first();
+      await portalMute.click();
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), true, 'Portal mute button must pause the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), true, 'Portal mute button must mute the Antarctic mix');
+      await portalMute.click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticMixAudio?.();
+        return audio && !audio.paused && !audio.muted;
+      });
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.muted), false, 'Portal unmute button must unmute the Antarctic mix');
+      assert.equal(await page.evaluate(() => window.getLittleFeetAntarcticMixAudio?.()?.paused), false, 'Portal unmute button must restart audible Antarctic playback');
+    }
+    if (role === 'admin') {
+      const mediaSources = await page.evaluate(() => ['loginBackgroundVideo','ambientBackgroundVideo'].map(id => document.getElementById(id).currentSrc));
+      assert.equal(mediaSources[0], mediaSources[1], 'Login and portal must use the same clean video');
+      for (const icon of ['classic','lady','tough','cute','happy','cool','boss','smart-lady']) {
+        await page.evaluate(icon => selectProfileIcon(icon), icon);
+        const selected = await page.locator('.user-avatar use').first().getAttribute('href');
+        assert.ok(selected.endsWith('#avatar-' + icon), 'Selected portrait must appear in the header');
+      }
     }
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();

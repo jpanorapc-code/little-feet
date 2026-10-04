@@ -16,7 +16,7 @@ const swimAction = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'penguin
 const compactRigEncoded = fs.readFileSync(path.join(root, 'assets', 'models', 'penguin-swim-rig-v2.json.gz.b64'), 'utf8').trim();
 const compactRig = JSON.parse(zlib.gunzipSync(Buffer.from(compactRigEncoded, 'base64')).toString('utf8'));
 const thirdPartyAssets = fs.readFileSync(path.join(root, 'THIRD_PARTY_ASSETS.md'), 'utf8');
-const pausedArtworkPath = path.join(root, 'assets', 'images', 'little-feet-cinematic-paused-school.avif');
+const pausedArtworkPath = path.join(root, 'assets', 'images', 'little-feet-underwater-cover.webp');
 const pausedArtwork = fs.readFileSync(pausedArtworkPath);
 const pausedArtworkStat = fs.statSync(pausedArtworkPath);
 
@@ -219,15 +219,14 @@ assert.doesNotMatch(page, /id="cinematicOpenCurrent"/);
 assert.doesNotMatch(page, /id="cinematicPause"/);
 assert.doesNotMatch(page, /id="cinematicSkip"/);
 assert.match(page, /class="cinematic-paused-picture"/);
-assert.match(page, /little-feet-cinematic-paused-school\.avif\?v=20261001-paused-v3/);
+assert.match(page, /little-feet-underwater-cover\.webp/);
 assert.match(styles, /\.cinematic-paused-picture \{[\s\S]*z-index: 3/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-paused-picture \{[\s\S]*opacity: 1[\s\S]*visibility: visible/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-loading \{[\s\S]*display: none/);
 assert.match(styles, /\.cinematic-journey\.is-user-paused \.cinematic-copy,[\s\S]*\.cinematic-progress-shell/);
-assert.ok(pausedArtworkStat.size > 30000, 'Paused artwork must retain the full optimized AVIF asset.');
-assert.equal(crypto.createHash('sha256').update(pausedArtwork).digest('hex'), '2f51ae3b418af9e58f917be621535d1d5212d0905503c9c8765598951b18443e');
-assert.equal(pausedArtwork.subarray(4, 8).toString('ascii'), 'ftyp');
-assert.match(pausedArtwork.subarray(8, 16).toString('ascii'), /avif/);
+assert.ok(pausedArtworkStat.size > 30000, 'Paused artwork must retain the full optimized cover asset.');
+assert.equal(pausedArtwork.subarray(0, 4).toString('ascii'), 'RIFF');
+assert.match(pausedArtwork.subarray(8, 12).toString('ascii'), /WEBP/);
 assert.match(page, /id="cinematicDepthBackdrop"/);
 assert.match(page, /id="cinematicFish2dA"/);
 assert.match(page, /id="cinematicFish2dB"/);
