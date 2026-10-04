@@ -100,6 +100,7 @@ async function main() {
         return audio.right <= card.right + 1 && audio.left >= language.right - 1;
       });
       assert.ok(desktopToolsFit, 'Desktop login language and sound controls must not overlap or escape the card');
+      await page.waitForFunction(() => document.querySelector('.login-audio-compact')?.hasAttribute('aria-pressed'));
       assert.ok(['Sound On', 'Mute Little Feet'].includes(await page.locator('.login-audio-compact span').textContent()), 'Login sound control should expose an unmuted label');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
