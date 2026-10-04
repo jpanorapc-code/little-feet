@@ -77,7 +77,7 @@ assert.match(client, /const legacyProfileIconMap = Object\.freeze\(/);
 assert.match(client, /function normalizeProfileIcon\(icon\)/);
 assert.match(client, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3#avatar-\$\{selectedIcon\}/);
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
-assert.match(serviceWorker, /little-feet-shell-v49-portal-portraits/);
+assert.match(serviceWorker, /little-feet-shell-v50-antarctic-audio/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 assert.match(serviceWorker, /backup\.js\?v=20261004-profile-portraits-v1/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
