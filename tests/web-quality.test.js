@@ -547,7 +547,7 @@ assert.match(page, /id="ambientBackgroundVideo"[\s\S]*little-feet-login-clean\.m
 assert.match(ambientBackground, /littlefeet:session-ready/);
 assert.match(ambientBackground, /littlefeet:session-ended/);
 assert.match(ambientBackground, /document\.body\.classList\.contains\('portal-active'\)/);
-assert.match(serviceWorker, /little-feet-shell-v49-portal-portraits/);
+assert.match(serviceWorker, /little-feet-shell-v51-antarctic-audio-unlock/);
 assert.match(serviceWorker, /little-feet-login-clean\.jpg/);
 assert.match(page, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
 assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);
