@@ -109,6 +109,10 @@ async function main() {
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'true');
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
       await page.locator('.login-audio-compact').click();
+      await page.waitForFunction(() => {
+        const audio = window.getLittleFeetAntarcticAudio?.();
+        return audio && !audio.paused && !audio.muted && audio.currentTime > 0;
+      }, null, { timeout:10000 });
       await page.setViewportSize({width:390,height:844});
       const mobileToolsFit = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
@@ -135,8 +139,20 @@ async function main() {
       await page.locator('.nav-btn[onclick="switchTab(\'settingsTab\', this)"]').click();
       await page.locator('#settingsTab').waitFor({ state: 'visible' });
       assert.equal(await page.locator('.profile-icon-choice').count(), 8, 'Settings should expose eight penguin profile avatars');
-      await page.waitForTimeout(150);
-      const requestsBeforeAvatar = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+      // Initial dashboard loaders can still be settling when Settings first opens.
+      // Wait for a short quiet window so this assertion measures the avatar click
+      // itself rather than unrelated startup API traffic.
+      let requestsBeforeAvatar = 0;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const before = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+        await page.waitForTimeout(150);
+        const after = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
+        if (after === before) {
+          requestsBeforeAvatar = after;
+          break;
+        }
+        requestsBeforeAvatar = after;
+      }
       await page.locator('.profile-icon-choice[data-profile-icon="lady"]').click();
       await page.waitForTimeout(100);
       const requestsAfterAvatar = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);
