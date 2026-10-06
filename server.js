@@ -594,23 +594,58 @@ const sendSuccessfulLoginEmail = async (req, account, authMethod = 'password') =
   const to = accountSecurityEmail(account);
   if (!to) return false;
   const requestSummary = loginSecurityRequestSummary(req);
+  const signedInAt = new Date().toISOString();
+  const accountName = String(account?.name || 'Little Feet user').trim();
+  const imageUrl = 'https://littlefeet.co.za/assets/security/login-security-alert.jpg';
+  const text = [
+    `Hello ${accountName},`,
+    '',
+    'A successful sign-in to your Little Feet account was detected.',
+    `Time: ${signedInAt}`,
+    `Sign-in method: ${authMethod}`,
+    `Network address: ${requestSummary.network}`,
+    `Browser/device: ${requestSummary.device}`,
+    '',
+    'If this was you, no action is needed.',
+    'If this was not you, change your password or PIN and contact your school administrator immediately.',
+    '',
+    'Little Feet security'
+  ].join('\n');
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#071426;font-family:Arial,Helvetica,sans-serif;color:#eef7ff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#071426;padding:24px 12px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#0d2038;border:1px solid #1f4d70;border-radius:16px;overflow:hidden;">
+          <tr><td style="padding:0;">
+            <img src="${imageUrl}" width="620" alt="Little Feet login security alert" style="display:block;width:100%;max-width:620px;height:auto;border:0;">
+          </td></tr>
+          <tr><td style="padding:24px 28px 28px;">
+            <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:14px;">New sign-in detected</div>
+            <p style="margin:0 0 16px;line-height:1.6;color:#d8e9f7;">Hello ${emailHtmlText(accountName)},</p>
+            <p style="margin:0 0 18px;line-height:1.6;color:#d8e9f7;">A successful sign-in to your Little Feet account was detected.</p>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#09192c;border-radius:10px;margin:0 0 18px;">
+              <tr><td style="padding:14px 16px;color:#b9d5e9;line-height:1.7;">
+                <strong style="color:#ffffff;">Time:</strong> ${emailHtmlText(signedInAt)}<br>
+                <strong style="color:#ffffff;">Sign-in method:</strong> ${emailHtmlText(authMethod)}<br>
+                <strong style="color:#ffffff;">Network address:</strong> ${emailHtmlText(requestSummary.network)}<br>
+                <strong style="color:#ffffff;">Browser/device:</strong> ${emailHtmlText(requestSummary.device)}
+              </td></tr>
+            </table>
+            <p style="margin:0 0 8px;line-height:1.6;color:#d8e9f7;">If this was you, no action is needed.</p>
+            <p style="margin:0;line-height:1.6;color:#ffd4d4;"><strong>If this was not you:</strong> change your password or PIN and contact your school administrator immediately.</p>
+            <p style="margin:22px 0 0;color:#7fb4d7;font-size:13px;">Little Feet security</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
   return sendLittleFeetEmail({
     to,
     subject: 'Little Feet security: new sign-in',
-    text: [
-      `Hello ${String(account?.name || 'Little Feet user').trim()},`,
-      '',
-      'A successful sign-in to your Little Feet account was detected.',
-      `Time: ${new Date().toISOString()}`,
-      `Sign-in method: ${authMethod}`,
-      `Network address: ${requestSummary.network}`,
-      `Browser/device: ${requestSummary.device}`,
-      '',
-      'If this was you, no action is needed.',
-      'If this was not you, change your password or PIN and contact your school administrator immediately.',
-      '',
-      'Little Feet security'
-    ].join('\n')
+    text,
+    html
   });
 };
 
@@ -4746,7 +4781,14 @@ const emailDeliveryProvider = () => {
   return 'Not configured';
 };
 
-const smtpSend = async ({to,subject,text}) => {
+const emailHtmlText = value => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const smtpSend = async ({to,subject,text,html}) => {
   const config = smtpConfig();
   if (!smtpEmailConfigured()) return false;
   if (config.port !== 465) throw new Error('Little Feet SMTP currently requires implicit TLS on port 465.');
@@ -4828,19 +4870,38 @@ const smtpSend = async ({to,subject,text}) => {
     await command('DATA', [354], 'data');
 
     const cleanSubject = emailHeaderText(subject || 'Little Feet');
-    const cleanText = String(text || '').replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+    const cleanText = String(text || '').replace(/\r?\n/g, '\r\n');
+    const cleanHtml = String(html || '').replace(/\r?\n/g, '\r\n');
     const fromHeader = config.fromName ? `${config.fromName} <${config.from}>` : config.from;
-    const message = [
+    const messageHeaders = [
       `From: ${fromHeader}`,
       `To: ${to}`,
       `Subject: ${cleanSubject}`,
       'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=utf-8',
-      'Content-Transfer-Encoding: 8bit',
-      `Date: ${new Date().toUTCString()}`,
-      '',
-      cleanText
-    ].join('\r\n');
+      `Date: ${new Date().toUTCString()}`
+    ];
+    let messageBody;
+    if (cleanHtml) {
+      const boundary = `lf-alt-${crypto.randomBytes(12).toString('hex')}`;
+      messageHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+      messageBody = [
+        `--${boundary}`,
+        'Content-Type: text/plain; charset=utf-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        cleanText,
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        cleanHtml,
+        `--${boundary}--`
+      ].join('\r\n');
+    } else {
+      messageHeaders.push('Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit');
+      messageBody = cleanText;
+    }
+    const message = `${messageHeaders.join('\r\n')}\r\n\r\n${messageBody}`.replace(/^\./gm, '..');
     socket.write(`${message}\r\n.\r\n`);
     await expect([250], 'message delivery');
     socket.write('QUIT\r\n');
@@ -4853,9 +4914,9 @@ const smtpSend = async ({to,subject,text}) => {
   }
 };
 
-const sendLittleFeetEmail = async ({to,subject,text}) => {
+const sendLittleFeetEmail = async ({to,subject,text,html}) => {
   if (!looksLikeEmailAddress(to)) return false;
-  if (smtpEmailConfigured()) return smtpSend({to,subject,text});
+  if (smtpEmailConfigured()) return smtpSend({to,subject,text,html});
 
   const from=String(process.env.LF_EMAIL_FROM||'').trim(),apiKey=String(process.env.LF_EMAIL_API_KEY||'').trim();
   if(!looksLikeEmailAddress(from)||!apiKey)return false;
@@ -4865,7 +4926,9 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
     : '';
   const endpoint=safeHttpsUrl(rawEndpoint)||testLoopbackEndpoint;
   if(!endpoint)throw new Error('Invalid LF_EMAIL_API_URL');
-  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({from,to:[to],subject:emailHeaderText(subject),text:String(text||'')})});
+  const payload={from,to:[to],subject:emailHeaderText(subject),text:String(text||'')};
+  if(String(html||'').trim())payload.html=String(html);
+  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify(payload)});
   if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
   return true;
 };
