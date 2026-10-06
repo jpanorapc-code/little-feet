@@ -2,7 +2,7 @@ name: Little Feet CI
 
 on:
   push:
-    branches: [main, fix/subscription-enforcement-payfast-89c6f75]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
