@@ -6227,6 +6227,15 @@ app.post('/api/registry', (req, res) => {
   if (actor.role === 'teacher' && (!className || !normaliseAssignedClasses(actor.assignedClasses).includes(normalizeComparableText(className)))) {
     return res.status(403).json({ message: 'Teachers can register learners only in their assigned classes.' });
   }
+  let learner = tenantRecords(db.students, actor).find(student =>
+    normalizeComparableText(student.studentName) === normalizeComparableText(learnerName)
+    && normalizeComparableText(student.className) === normalizeComparableText(className)
+  );
+  if (!learner) {
+    const capacityError = schoolLearnerCapacityError(actor, 1);
+    if (capacityError) return res.status(409).json({ code: 'LEARNER_CAPACITY_REACHED', message: capacityError });
+  }
+
   const record = tagSchoolRecord(actor, {
     id: crypto.randomUUID(),
     learnerName,
@@ -6244,13 +6253,7 @@ app.post('/api/registry', (req, res) => {
   });
   db.registry.unshift(record);
 
-  let learner = tenantRecords(db.students, actor).find(student =>
-    normalizeComparableText(student.studentName) === normalizeComparableText(learnerName)
-    && normalizeComparableText(student.className) === normalizeComparableText(className)
-  );
   if (!learner) {
-    const capacityError = schoolLearnerCapacityError(actor, 1);
-    if (capacityError) return res.status(409).json({ code: 'LEARNER_CAPACITY_REACHED', message: capacityError });
     learner = tagSchoolRecord(actor, {
       id: crypto.randomUUID(),
       studentName: learnerName,
