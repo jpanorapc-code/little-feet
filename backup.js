@@ -894,6 +894,38 @@ async function saveRememberedLogin(username, pin) {
   } catch { /* The browser may choose its own password-save prompt instead. */ }
 }
 
+async function loadLoginHumanCheck() {
+  const prompt = document.getElementById('loginHumanCheckPrompt');
+  const answer = document.getElementById('loginHumanCheckAnswer');
+  const challengeId = document.getElementById('loginHumanCheckId');
+  const submit = document.querySelector('#loginForm button[type="submit"]');
+  if (!prompt || !answer || !challengeId) return false;
+
+  prompt.textContent = 'Loading security check…';
+  answer.value = '';
+  answer.disabled = true;
+  challengeId.value = '';
+  if (submit) submit.disabled = true;
+
+  try {
+    const response = await fetch('/api/auth/human-check', {
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
+    prompt.textContent = data.prompt;
+    challengeId.value = data.challengeId;
+    answer.disabled = false;
+    if (submit) submit.disabled = false;
+    return true;
+  } catch {
+    prompt.textContent = 'Security check unavailable. Refresh the page and try again.';
+    if (submit) submit.disabled = true;
+    return false;
+  }
+}
+
 function showSignupForm() {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('signupForm').classList.remove('hidden');
@@ -903,6 +935,7 @@ function hideSignupForm() {
   document.getElementById('signupForm').classList.add('hidden');
   document.getElementById('loginForm').classList.remove('hidden');
   document.getElementById('signupForm').reset();
+  void loadLoginHumanCheck();
 }
 
 // Authentication
@@ -916,9 +949,12 @@ if (loginForm) {
     const pinInput = document.getElementById('loginPin');
     const username = usernameInput?.value.trim() || '';
     const pin = pinInput?.value || '';
+    const humanCheckId = document.getElementById('loginHumanCheckId')?.value || '';
+    const humanCheckAnswer = document.getElementById('loginHumanCheckAnswer')?.value.trim() || '';
+    const companyWebsite = document.getElementById('loginCompanyWebsite')?.value || '';
     const rememberLogin = document.getElementById('rememberLogin')?.checked === true;
 
-    if (!username || !pin) {
+    if (!username || !pin || !humanCheckId || !humanCheckAnswer) {
       loginForm.reportValidity();
       return;
     }
@@ -931,7 +967,7 @@ if (loginForm) {
         credentials: 'same-origin',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, pin })
+        body: JSON.stringify({ username, pin, humanCheckId, humanCheckAnswer, companyWebsite })
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.user) {
@@ -945,11 +981,14 @@ if (loginForm) {
         if (rememberLogin) void saveRememberedLogin(username, pin);
       } else {
         alert(data.message || 'Login failed.');
+        void loadLoginHumanCheck();
       }
     } catch {
       alert('Unable to connect to login server.');
+      void loadLoginHumanCheck();
     }
   });
+  void loadLoginHumanCheck();
 }
 
 const signupForm = document.getElementById('signupForm');
