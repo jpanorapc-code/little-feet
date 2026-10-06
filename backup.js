@@ -871,6 +871,19 @@ function toggleLoginPinVisibility() {
   input.focus({ preventScroll: true });
 }
 
+function refreshLoginPasswordLanguage() {
+  const input = document.getElementById('loginPin');
+  const button = document.getElementById('loginPinToggle');
+  if (!input || !button) return;
+  const key = input.type === 'text' ? 'hidePassword' : 'showPassword';
+  const fallback = input.type === 'text' ? 'Hide password' : 'Show password';
+  const label = window.translateLittleFeetText?.(key) || fallback;
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+}
+
+window.addEventListener('littlefeet:languagechange', refreshLoginPasswordLanguage);
+
 function clearRememberedLogin() {
   try { localStorage.removeItem(SAVED_LOGIN_USERNAME_KEY); } catch {}
 }
@@ -912,6 +925,7 @@ async function loadLoginHumanCheck() {
 
   const loadVersion = ++loginHumanCheckLoadVersion;
   loginHumanCheckAbortController?.abort();
+  prompt.dataset.lfI18n = 'loadingSecurityCheck';
   prompt.textContent = window.translateLittleFeetText?.('loadingSecurityCheck') || 'Loading security check…';
   delete prompt.dataset.humanLeft;
   delete prompt.dataset.humanRight;
@@ -953,6 +967,7 @@ async function loadLoginHumanCheck() {
       document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
       answer.required = true;
       if (Number.isFinite(Number(data.left)) && Number.isFinite(Number(data.right)) && ['+', '−'].includes(data.operator)) {
+        prompt.dataset.lfI18n = 'humanCheckQuestion';
         prompt.dataset.humanLeft = String(data.left);
         prompt.dataset.humanRight = String(data.right);
         prompt.dataset.humanOperator = data.operator;
@@ -973,10 +988,12 @@ async function loadLoginHumanCheck() {
     } catch (error) {
       if (loadVersion !== loginHumanCheckLoadVersion) return false;
       if (attempt === 0) {
+        prompt.dataset.lfI18n = 'retryingSecurityCheck';
         prompt.textContent = window.translateLittleFeetText?.('retryingSecurityCheck') || 'Retrying security check…';
         await new Promise(resolve => window.setTimeout(resolve, 150));
         continue;
       }
+      prompt.dataset.lfI18n = 'securityUnavailable';
       prompt.textContent = window.translateLittleFeetText?.('securityUnavailable') || 'Security check unavailable. Select New check to retry.';
       if (submit) submit.disabled = true;
       if (refresh) refresh.disabled = false;
