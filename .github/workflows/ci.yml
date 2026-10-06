@@ -2,7 +2,7 @@ name: Little Feet CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/real-subscriptions-payfast-89c6f75]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -50,6 +50,7 @@ jobs:
           node --check backup.js
           node --check backup-server.js
           node --check tests/shared-db-failover.integration.test.js
+          node --check tests/subscription-payfast.test.js
           node --check auth-crypto.js
           node --check service-worker.js
           node --check assets/mobile-pwa.js
