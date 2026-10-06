@@ -107,6 +107,12 @@ async function main() {
       assert.equal((await page.locator('[data-lf-i18n="aboutLittleFeet"]').textContent()).trim(), 'Oor Little Feet');
       assert.equal((await page.locator('[data-lf-i18n="tickerLearning"]').first().textContent()).trim(), 'Leer & ontwikkeling');
       assert.equal((await page.locator('#backgroundMotionToggle').textContent()).trim(), 'Pouseer agtergrond');
+      await page.locator('.login-new-account button').click();
+      assert.equal((await page.locator('[data-lf-i18n="signupTitle"]').textContent()).trim(), 'Skep jou rekening');
+      assert.equal((await page.locator('[data-lf-i18n="fullName"]').textContent()).trim(), 'Volle naam');
+      assert.equal(await page.locator('#signupSchool').getAttribute('placeholder'), 'Voer jou skoolnaam in');
+      assert.equal((await page.locator('[data-lf-i18n="cancel"]').textContent()).trim(), 'Kanselleer');
+      await page.locator('[data-lf-i18n="cancel"]').click();
 
       await page.locator('#loginLanguagePreference').selectOption('zu');
       await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.includes('Iphothali'));
