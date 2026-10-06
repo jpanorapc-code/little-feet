@@ -1597,6 +1597,21 @@ function openSelectedWorkspace() {
   button.click();
 }
 
+function showSchoolSubscriptionRestriction() {
+  const access = currentUser?.schoolSubscription;
+  if (!access || access.allowed !== false) return false;
+  const canRenew = ['admin', 'principal', 'school_accounts'].includes(currentUser?.role);
+  const title = access.status === 'trial_expired' ? '14-day trial ended' : 'School subscription expired';
+  const detail = access.status === 'trial_expired'
+    ? 'The school trial has ended. A paid school subscription is required before normal portal work can continue.'
+    : 'The school subscription is no longer active. Renew it to restore normal portal work.';
+  const action = canRenew
+    ? '<button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionCheckout();">Choose plan & pay</button>'
+    : '<p class="meta" style="margin-top:12px;">Ask your principal or school administrator to renew the Little Feet subscription.</p>';
+  window.setTimeout(() => openModal(title, `<p style="margin:0;line-height:1.6;">${detail}</p>${action}`), 0);
+  return true;
+}
+
 function setupSession() {
   markServerSessionValidated();
   loadPortalAudioPreference();
@@ -1628,14 +1643,16 @@ function setupSession() {
   applyUserPreferences();
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
-  loadAllData();
+  const subscriptionRestricted = showSchoolSubscriptionRestriction();
+  if (!subscriptionRestricted) loadAllData();
+  else if (['admin', 'principal', 'school_accounts'].includes(currentUser?.role)) loadSubscriptionBillingOverview();
   window.setTimeout(() => window.restoreDashboardDrafts?.(), 120);
   document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
   if (alertMonitorId) clearInterval(alertMonitorId);
   alertMonitorId = null;
   if (ticketMonitorId) clearInterval(ticketMonitorId);
   ticketMonitorId = null;
-  startPortalBackgroundRefresh();
+  if (!currentUser?.schoolSubscription || currentUser.schoolSubscription.allowed !== false) startPortalBackgroundRefresh();
 }
 
 function applyRolePermissions(role) {
@@ -4207,20 +4224,38 @@ function setupFormListeners() {
   }
 }
 
-function paymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
+function manualPaymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
+  if (!payment) return '';
   const primary = payment.paymentLink
     ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">${escapeWorkspaceText(linkLabel)}</a>`
-    : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
+    : payment.bankName
+      ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`
+      : '';
   const capitec = payment.capitecPayMePayload
     ? `<div style="margin-top:12px;padding:12px;border:1px solid #2dd4bf;border-radius:8px;text-align:center;background:rgba(45,212,191,.08);"><strong>Pay with the Capitec app</strong><div id="capitecPayMeQr" style="width:190px;min-height:190px;margin:10px auto;background:#fff;padding:5px;"></div><span class="meta">Capitec customers can scan this Pay Me code. Other banks can use the EFT details above.</span></div>`
     : '';
   return `${primary}${capitec}`;
 }
 
+function paymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
+  if (payment?.provider === 'payfast' && payment.checkoutUrl && payment.fields) {
+    const hiddenFields = Object.entries(payment.fields)
+      .map(([name, value]) => `<input type="hidden" name="${escapeWorkspaceText(name)}" value="${escapeWorkspaceText(value)}">`)
+      .join('');
+    const payfast = `<form method="post" action="${escapeWorkspaceText(payment.checkoutUrl)}" style="display:grid;gap:8px;">${hiddenFields}<button type="submit" class="submit-btn">${escapeWorkspaceText(linkLabel)}</button><span class="meta">Payment is confirmed by PayFast directly with Little Feet before access is activated.</span></form>`;
+    const fallback = payment.fallback
+      ? `<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:700;">Use fallback payment method</summary><div style="margin-top:10px;">${manualPaymentDestinationMarkup(payment.fallback, linkLabel)}</div></details>`
+      : '';
+    return payfast + fallback;
+  }
+  return manualPaymentDestinationMarkup(payment, linkLabel);
+}
+
 function renderCapitecPayMeQr(payment) {
   const holder = document.getElementById('capitecPayMeQr');
-  if (!holder || !payment?.capitecPayMePayload || !window.QRCode) return;
-  new window.QRCode(holder, { text: payment.capitecPayMePayload, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M });
+  const manual = payment?.fallback || payment;
+  if (!holder || !manual?.capitecPayMePayload || !window.QRCode) return;
+  new window.QRCode(holder, { text: manual.capitecPayMePayload, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M });
 }
 
 async function openDonationModal() {
@@ -4279,8 +4314,11 @@ async function loadSubscriptionBillingOverview() {
         : '';
       return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(paymentStatus)}${reconcile}</li>`;
     }).join('') || '<li>No payment requests yet.</li>';
-    const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : escapeWorkspaceText(String(data.subscription?.status || 'trial').toUpperCase());
-    container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
+    const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}`
+      : data.subscription?.status === 'trial' ? `TRIAL · ${Number(data.subscription.trialDaysRemaining || 0)} DAY(S) LEFT`
+        : escapeWorkspaceText(String(data.subscription?.status || 'unverified').replaceAll('_', ' ').toUpperCase());
+    const learnerAccess = `${Number(data.subscription?.learnerCount || 0).toLocaleString('en-ZA')} learners${data.subscription?.learnerCapacity ? ` / ${Number(data.subscription.learnerCapacity).toLocaleString('en-ZA')} paid capacity` : ''}`;
+    container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><p class="meta" style="margin:8px 0 0;">${escapeWorkspaceText(learnerAccess)}${data.automaticPaymentProvider ? ` · Automatic confirmation: ${escapeWorkspaceText(data.automaticPaymentProvider)}` : ''}</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
   } catch (error) {
     container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load subscription information.'))}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
   }
@@ -4340,30 +4378,37 @@ async function saveSubscriptionBillingConfig(event) {
 }
 
 async function openSubscriptionCheckout() {
-  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can create a subscription payment request.');
+  if (!(isFullAccessUser() || ['principal', 'school_accounts'].includes(currentUser?.role))) return alert('Only a principal, administrator, or school accounts user can create a subscription payment request.');
   let data;
   try {
     const response = await fetch('/api/subscription-billing');
     data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Unable to load subscription pricing.');
   } catch (error) { return alert(safeUserFacingError(error, 'Unable to load subscription pricing.')); }
-  if (!data.paymentConfigured) return alert('An administrator still needs to configure the payment destination.');
+  if (!data.paymentConfigured) return alert('PayFast or an approved fallback payment destination must be configured first.');
   const plans = Array.isArray(data.plans) ? data.plans : [];
   if (!plans.length) return alert('The published school plans are temporarily unavailable.');
-  const options = plans.map(plan => `<option value="${escapeWorkspaceText(plan.code)}">${escapeWorkspaceText(plan.name)} — up to ${Number(plan.maxLearners).toLocaleString('en-ZA')} learners — ${formatSubscriptionMoney(plan.monthlyPrice)}/month</option>`).join('');
-  openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Choose the published plan that matches your school size. Little Feet will create a unique Capitec payment reference.</p><label>School plan<select name="planCode">${options}</select></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
+  const currentLearners = Number(data.subscription?.learnerCount || 0);
+  const options = plans.map(plan => {
+    const overage = Number(plan.overagePerLearner || 0) > 0 ? ` + ${formatSubscriptionMoney(plan.overagePerLearner)} per learner above ${Number(plan.maxLearners).toLocaleString('en-ZA')}` : ' · no overage';
+    return `<option value="${escapeWorkspaceText(plan.code)}">${escapeWorkspaceText(plan.name)} — includes ${Number(plan.maxLearners).toLocaleString('en-ZA')} — ${formatSubscriptionMoney(plan.monthlyPrice)}/month${overage}</option>`;
+  }).join('');
+  openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Little Feet currently has <strong>${currentLearners.toLocaleString('en-ZA')}</strong> learner records for this school. Choose the plan and the learner capacity you want covered for this billing period. Overage is calculated by the server from the published rate.</p><label>School plan<select name="planCode">${options}</select></label><label>Learner capacity to cover<input name="learnerCapacity" type="number" min="${currentLearners}" step="1" value="${Math.max(currentLearners, 1)}" required></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
 }
 
 async function createSubscriptionOrder(event) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
-    const response = await fetch('/api/subscription-billing/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ planCode: form.elements.planCode?.value || '', bundleCapacity: form.elements.bundleCapacity?.value || 0, lateFeeAccepted: Boolean(form.elements.lateFeeAccepted?.checked) }) });
+    const response = await fetch('/api/subscription-billing/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ planCode: form.elements.planCode?.value || '', learnerCapacity: Number(form.elements.learnerCapacity?.value || 0), bundleCapacity: form.elements.bundleCapacity?.value || 0, lateFeeAccepted: Boolean(form.elements.lateFeeAccepted?.checked) }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to create payment request.');
     const payment = result.payment;
     const destination = paymentDestinationMarkup(payment);
-    openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
+    const overage = Number(result.order.overageLearners || 0) > 0
+      ? `<br><span style="color:var(--text-muted);">${Number(result.order.overageLearners).toLocaleString('en-ZA')} extra learner(s) × ${formatSubscriptionMoney(result.order.overageRate)} = ${formatSubscriptionMoney(result.order.overageTotal)}</span>`
+      : '';
+    openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting confirmed payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Covered learner capacity: <strong>${Number(result.order.learnerCapacity || 0).toLocaleString('en-ZA')}</strong>${overage}<br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">The subscription activates only after Little Feet receives a verified payment confirmation. Keep the reference exactly as shown for any fallback payment.</p>`);
     renderCapitecPayMeQr(payment);
   } catch (error) { alert(safeUserFacingError(error, 'Unable to create payment request.')); }
 }
