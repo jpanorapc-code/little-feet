@@ -11,6 +11,7 @@ const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
+const { payFastConfig, createPayFastCheckout, validatePayFastItn } = require('./lib/payfast');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
 const { createStructuredLogger, redactSensitiveLogText } = require('./lib/structured-logger');
 const { PROVIDERS: MAILBOX_PROVIDERS, PROVIDER_LABELS: MAILBOX_PROVIDER_LABELS, createAuthorization: createMailboxAuthorization, exchangeCode: exchangeMailboxCode, refreshAccessToken: refreshMailboxAccessToken, fetchMailbox, sendMailboxMessage, revokeMailboxAccess } = require('./lib/mailbox-oauth');
@@ -310,14 +311,54 @@ const isParentLinkedToLearner = (parent, learner) => {
 const normaliseAssignedClasses = (value) => [...new Set((Array.isArray(value) ? value : String(value || '').split(',')).map(normalizeComparableText).filter(Boolean))];
 const schoolKey = (value) => normalizeComparableText(value).replace(/\s+/g, ' ');
 const createSchoolId = () => `school_${crypto.randomUUID()}`;
+const SCHOOL_TRIAL_DAYS = 14;
+const SCHOOL_TRIAL_MAX_LEARNERS = 1000;
+const dateKeyInSouthAfrica = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date());
+const initialiseSchoolSubscriptionLifecycle = school => {
+  if (!school || typeof school !== 'object') return school;
+  const now = new Date();
+  if (!Number.isFinite(Date.parse(school.trialStartedAt || ''))) school.trialStartedAt = now.toISOString();
+  if (!Number.isFinite(Date.parse(school.trialEndsAt || ''))) {
+    const start = new Date(school.trialStartedAt);
+    start.setUTCDate(start.getUTCDate() + SCHOOL_TRIAL_DAYS);
+    school.trialEndsAt = start.toISOString();
+  }
+  return school;
+};
+const schoolSubscriptionAccessForSchool = school => {
+  if (!school) return { allowed: false, status: 'unverified', trialEndsAt: '', activeUntil: '', daysRemaining: 0 };
+  initialiseSchoolSubscriptionLifecycle(school);
+  const today = dateKeyInSouthAfrica();
+  const activeUntil = /^\d{4}-\d{2}-\d{2}$/.test(String(school.subscriptionActiveUntil || '')) ? String(school.subscriptionActiveUntil) : '';
+  const paidActive = String(school.subscriptionStatus || '').toLowerCase() === 'active' && (!activeUntil || activeUntil >= today);
+  if (paidActive) return { allowed: true, status: 'active', trialEndsAt: school.trialEndsAt, activeUntil, daysRemaining: 0 };
+  const trialEndMs = Date.parse(school.trialEndsAt || '');
+  const trialActive = String(school.subscriptionStatus || '').toLowerCase() !== 'refunded'
+    && Number.isFinite(trialEndMs) && Date.now() <= trialEndMs;
+  if (trialActive) {
+    return {
+      allowed: true,
+      status: 'trial',
+      trialEndsAt: school.trialEndsAt,
+      activeUntil,
+      daysRemaining: Math.max(0, Math.ceil((trialEndMs - Date.now()) / 86400000))
+    };
+  }
+  const status = String(school.subscriptionStatus || '').toLowerCase() === 'active' ? 'expired'
+    : String(school.subscriptionStatus || '').toLowerCase() === 'refunded' ? 'refunded'
+      : 'trial_expired';
+  return { allowed: false, status, trialEndsAt: school.trialEndsAt, activeUntil, daysRemaining: 0 };
+};
 const ensureSchool = (schoolName) => {
   const cleanName = String(schoolName || '').trim() || 'Your School';
   if (!Array.isArray(db.schools)) db.schools = [];
   let school = db.schools.find(entry => schoolKey(entry.name) === schoolKey(cleanName));
   if (!school) {
-    school = { id: createSchoolId(), name: cleanName, status: 'active', createdAt: new Date().toISOString() };
+    school = initialiseSchoolSubscriptionLifecycle({ id: createSchoolId(), name: cleanName, status: 'active', createdAt: new Date().toISOString() });
     db.schools.push(school);
-  }
+  } else initialiseSchoolSubscriptionLifecycle(school);
   return school;
 };
 const accountSchoolId = (account) => {
@@ -655,7 +696,7 @@ app.use(express.json({
   limit: `${MAX_API_BODY_MB}mb`,
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
-app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
+app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb`, verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); } }));
 const STANDARD_IMPORT_API_PATHS = new Set([
   '/api/schedules/import',
   '/api/attendance/import',
@@ -1094,6 +1135,7 @@ const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/email/inbound/resend',
   '/api/email/mailbox/sync',
   '/api/payments/webhook',
+  '/api/payments/payfast/notify',
   '/api/payments/reconcile',
   '/api/finance/recurring-runs',
   '/api/finance/reconciliation/apply',
@@ -1909,8 +1951,11 @@ app.get('/api/production-readiness', (req, res) => {
   if (!actor) return res.status(403).json({ message: 'Administrator access is required.' });
   const billing = subscriptionBillingState(actor);
   const readiness = runtimeReadiness();
+  const payfast = payFastConfig();
   const integrations = {
-    paymentDestination: billingPaymentConfigured(billing.payment),
+    paymentDestination: billingPaymentConfigured(billing.payment) || payfast.configured,
+    automaticPaymentProvider: payfast.configured,
+    paymentProvider: payfast.configured ? 'PayFast' : '',
     signedPaymentWebhook: Boolean(process.env.LF_PAYMENT_WEBHOOK_SECRET),
     emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
     smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
@@ -1974,8 +2019,15 @@ app.post('/api/signup', (req, res) => {
   res.status(201).json({ success: true, account: safeAccount });
 });
 
+const schoolSubscriptionAccessForAccount = account => {
+  if (!account || hasPlatformAccess(account)) return { allowed: true, status: 'platform', trialEndsAt: '', activeUntil: '', daysRemaining: 0 };
+  const schoolId = accountSchoolId(account);
+  const school = schoolId ? db.schools.find(entry => entry.id === schoolId) : null;
+  return schoolSubscriptionAccessForSchool(school);
+};
 const safeAccount = ({ pin, pinHash, reportSigningPinHash, mailboxConnection, emailForwarding, ...account }) => ({
   ...account,
+  schoolSubscription: schoolSubscriptionAccessForAccount(account),
   ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {})
 });
 const getSessionAccount = (req) => {
@@ -1994,6 +2046,30 @@ const requireCompanyStaff = (req) => {
   const account = getSessionAccount(req);
   return isCompanyStaffRole(account) ? account : null;
 };
+const SCHOOL_SUBSCRIPTION_RECOVERY_PATHS = new Set([
+  '/api/auth/session',
+  '/api/auth/logout',
+  '/api/subscription-billing',
+  '/api/subscription-billing/orders',
+  '/api/payments/reconcile',
+  '/api/payments/ledger',
+  '/api/release-notes'
+]);
+app.use('/api', (req, res, next) => {
+  const actor = getSessionAccount(req);
+  if (!actor || hasPlatformAccess(actor) || !accountSchoolId(actor)) return next();
+  const access = schoolSubscriptionAccessForAccount(actor);
+  if (access.allowed) return next();
+  const requestPath = String(req.originalUrl || req.path || '').split('?')[0];
+  if (SCHOOL_SUBSCRIPTION_RECOVERY_PATHS.has(requestPath)) return next();
+  return res.status(402).json({
+    code: 'SCHOOL_SUBSCRIPTION_REQUIRED',
+    message: access.status === 'trial_expired'
+      ? 'Your 14-day Little Feet trial has ended. A school subscription is required to continue.'
+      : 'Your Little Feet school subscription has expired. Renew the school subscription to continue.',
+    subscription: access
+  });
+});
 const learnerRecordsVisibleTo = (records, actor) => {
   const schoolRecords = tenantRecords(records, actor);
   if (actor?.role === 'parent') {
@@ -2499,10 +2575,33 @@ app.patch('/api/system-errors/:id', (req, res) => {
 
 const billingBundleSizes = [5, 20, 100];
 const schoolSubscriptionPlans = Object.freeze([
-  Object.freeze({ code: 'micro', name: 'Micro / ECD', maxLearners: 30, monthlyPrice: 350 }),
-  Object.freeze({ code: 'standard', name: 'Standard Primary', maxLearners: 250, monthlyPrice: 1500 }),
-  Object.freeze({ code: 'enterprise', name: 'Enterprise Campus', maxLearners: 1000, monthlyPrice: 7500 })
+  Object.freeze({ code: 'micro', name: 'Micro / ECD', maxLearners: 30, hardMaxLearners: 250, monthlyPrice: 350, overagePerLearner: 10 }),
+  Object.freeze({ code: 'standard', name: 'Standard Primary', maxLearners: 250, hardMaxLearners: 1000, monthlyPrice: 1500, overagePerLearner: 6 }),
+  Object.freeze({ code: 'enterprise', name: 'Enterprise Campus', maxLearners: 1000, hardMaxLearners: 1000, monthlyPrice: 7500, overagePerLearner: 0 })
 ]);
+const schoolLearnerCount = schoolId => (db.students || []).filter(student => student.schoolId === schoolId).length;
+const schoolPlanForCode = code => schoolSubscriptionPlans.find(plan => plan.code === String(code || '').trim().toLowerCase()) || null;
+const schoolLearnerCapacityState = actor => {
+  if (!actor || hasPlatformAccess(actor)) return { limit: null, current: 0, status: 'platform' };
+  const schoolId = accountSchoolId(actor);
+  const school = db.schools.find(entry => entry.id === schoolId);
+  const access = schoolSubscriptionAccessForSchool(school);
+  const current = schoolLearnerCount(schoolId);
+  if (!access.allowed) return { limit: 0, current, status: access.status };
+  if (access.status === 'trial') return { limit: SCHOOL_TRIAL_MAX_LEARNERS, current, status: 'trial' };
+  const plan = schoolPlanForCode(school?.subscriptionPlanCode);
+  const storedCapacity = Number(school?.subscriptionLearnerCapacity);
+  const limit = Number.isSafeInteger(storedCapacity) && storedCapacity > 0
+    ? storedCapacity
+    : plan?.maxLearners || SCHOOL_TRIAL_MAX_LEARNERS;
+  return { limit, current, status: 'active', planCode: plan?.code || '' };
+};
+const schoolLearnerCapacityError = (actor, additionalLearners = 1) => {
+  const state = schoolLearnerCapacityState(actor);
+  if (state.limit === null || state.current + additionalLearners <= state.limit) return null;
+  if (state.status === 'trial') return `The 14-day trial supports up to ${state.limit.toLocaleString('en-ZA')} learners. Contact Little Feet for a larger deployment.`;
+  return `Your paid learner capacity is ${state.limit.toLocaleString('en-ZA')}. Increase the learner capacity on the school subscription before adding more learners.`;
+};
 const billingDefaults = () => ({
   pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
   payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', payMePayloadEncrypted: '', branchCode: '', referencePrefix: 'LF' },
@@ -2560,7 +2659,7 @@ const donationBillingState = () => {
   const configuredSchoolBilling = Object.values(db.schoolBilling || {}).find(state => billingPaymentConfigured(state?.payment || {}));
   return configuredSchoolBilling || globalBilling;
 };
-const paymentInstructions = (billing, reference) => {
+const manualPaymentInstructions = (billing, reference) => {
   const payment = billing.payment;
   if (payment.method === 'payment_link') return { method: 'Online payment', paymentLink: payment.paymentLink, reference };
   return {
@@ -2569,9 +2668,22 @@ const paymentInstructions = (billing, reference) => {
     capitecPayMePayload: decryptField(payment.payMePayloadEncrypted)
   };
 };
-const dateKeyInSouthAfrica = () => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit'
-}).format(new Date());
+const subscriptionPaymentConfigured = billing => payFastConfig().configured || billingPaymentConfigured(billing.payment);
+const paymentInstructions = (billing, reference, options = {}) => {
+  const manual = billingPaymentConfigured(billing.payment) ? manualPaymentInstructions(billing, reference) : null;
+  if (options.useGateway && payFastConfig().configured) {
+    const checkout = createPayFastCheckout({
+      reference,
+      amount: options.amount,
+      itemName: options.itemName,
+      publicOrigin: publicOrigin(),
+      buyerName: options.buyerName,
+      buyerEmail: options.buyerEmail
+    });
+    return { ...checkout, reference, fallback: manual };
+  }
+  return manual || { method: 'Unavailable', reference };
+};
 const parentSubscriptionActive = account => {
   if (!account || account.role !== 'parent') return true;
   const grantedUntil = validDateKey(account.parentSubscriptionGrantedUntil);
@@ -2723,7 +2835,11 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
     const school = db.schools.find(entry => entry.id === target.schoolId);
     if (school && normalStatus === 'paid') {
       school.subscriptionStatus = 'active';
-      school.subscriptionPlanCode = target.record.planCode || '';
+      if (target.record.planCode) school.subscriptionPlanCode = target.record.planCode;
+      if (Number.isSafeInteger(Number(target.record.learnerCapacity)) && Number(target.record.learnerCapacity) > 0) {
+        school.subscriptionLearnerCapacity = Number(target.record.learnerCapacity);
+      }
+      school.subscriptionMonthlyAmount = numericAmount;
       school.subscriptionActivatedAt = timestamp;
       school.subscriptionActiveUntil = extendSubscriptionDate(school.subscriptionActiveUntil, timestamp);
       target.record.activeUntil = school.subscriptionActiveUntil;
@@ -2748,17 +2864,25 @@ app.get('/api/subscription-billing', (req, res) => {
   const billing = subscriptionBillingState(actor);
   const isAdmin = isAdminLike(actor);
   const school = db.schools.find(entry => entry.id === accountSchoolId(actor));
+  const access = schoolSubscriptionAccessForSchool(school);
+  const learnerCount = schoolLearnerCount(accountSchoolId(actor));
   const { accountNumberEncrypted, payMePayloadEncrypted, ...adminPayment } = billing.payment;
   res.json({
     pricing: publicBillingPricing(billing, isAdmin),
     plans: schoolSubscriptionPlans.map(plan => ({ ...plan })),
-    paymentConfigured: billingPaymentConfigured(billing.payment),
+    paymentConfigured: subscriptionPaymentConfigured(billing),
+    automaticPaymentProvider: payFastConfig().configured ? 'PayFast' : '',
     subscription: school ? {
-      active: school.subscriptionStatus === 'active' && (!validDateKey(school.subscriptionActiveUntil) || school.subscriptionActiveUntil >= dateKeyInSouthAfrica()),
-      status: school.subscriptionStatus || 'trial',
+      active: access.status === 'active' && access.allowed,
+      accessAllowed: access.allowed,
+      status: access.status,
       planCode: school.subscriptionPlanCode || '',
-      activeUntil: validDateKey(school.subscriptionActiveUntil)
-    } : { active: false, status: 'unverified', planCode: '', activeUntil: '' },
+      activeUntil: access.activeUntil,
+      trialEndsAt: access.trialEndsAt,
+      trialDaysRemaining: access.daysRemaining,
+      learnerCount,
+      learnerCapacity: Number(school.subscriptionLearnerCapacity) || null
+    } : { active: false, accessAllowed: false, status: 'unverified', planCode: '', activeUntil: '', trialEndsAt: '', trialDaysRemaining: 0, learnerCount: 0, learnerCapacity: null },
     payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted), capitecPayMeConfigured: Boolean(decryptField(payMePayloadEncrypted)) } : undefined,
     orders: billing.orders.filter(order => !order.schoolId || order.schoolId === accountSchoolId(actor)).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
   });
@@ -2839,22 +2963,52 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   const requestedBundle = Number(req.body?.bundleCapacity || 0);
   if (!requestedPlan && ![0, ...billingBundleSizes].includes(requestedBundle)) return res.status(400).json({ message: 'Choose a valid extra-learner bundle.' });
   const billing = subscriptionBillingState(actor);
-  if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The payment destination must be configured by an administrator first.' });
+  if (!subscriptionPaymentConfigured(billing)) return res.status(409).json({ message: 'Configure PayFast or an approved fallback payment destination before creating subscription requests.' });
   const bundle = requestedBundle ? billing.pricing.bundles[requestedBundle] : { costPrice: 0, sellingPrice: 0 };
   if (!requestedPlan && billing.pricing.baseMonthly <= 0) return res.status(409).json({ message: 'Choose one of the published school plans.' });
   if (!requestedPlan && requestedBundle && bundle.sellingPrice <= 0) return res.status(409).json({ message: 'That learner bundle is not available yet. Ask an administrator to set its selling price.' });
-  const reference = `${billing.payment.referencePrefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const monthlyTotal = requestedPlan ? requestedPlan.monthlyPrice : Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
+
+  const currentLearners = schoolLearnerCount(accountSchoolId(actor));
+  const requestedCapacityInput = Number(req.body?.learnerCapacity || 0);
+  if (requestedPlan && requestedCapacityInput && (!Number.isSafeInteger(requestedCapacityInput) || requestedCapacityInput < currentLearners)) {
+    return res.status(400).json({ message: `Learner capacity must be a whole number of at least the school's current ${currentLearners} learner records.` });
+  }
+  const requestedCapacity = requestedPlan ? Math.max(currentLearners, requestedCapacityInput || currentLearners, requestedPlan.maxLearners) : 0;
+  if (requestedPlan && requestedCapacity > requestedPlan.hardMaxLearners) {
+    const nextPlan = requestedPlan.code === 'micro' ? 'Standard Primary' : requestedPlan.code === 'standard' ? 'Enterprise Campus' : 'a custom Little Feet deployment';
+    return res.status(409).json({ message: `${requestedPlan.name} supports billing up to ${requestedPlan.hardMaxLearners.toLocaleString('en-ZA')} learners. Choose ${nextPlan} for ${requestedCapacity.toLocaleString('en-ZA')} learners.` });
+  }
+
+  const referencePrefix = String(billing.payment.referencePrefix || 'LF').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 16) || 'LF';
+  const reference = `${referencePrefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+  const overageLearners = requestedPlan ? Math.max(0, requestedCapacity - requestedPlan.maxLearners) : 0;
+  const overageRate = requestedPlan?.overagePerLearner || 0;
+  const overageTotal = Math.round(overageLearners * overageRate * 100) / 100;
+  const monthlyTotal = requestedPlan
+    ? Math.round((requestedPlan.monthlyPrice + overageTotal) * 100) / 100
+    : Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
   const order = {
     id: crypto.randomUUID(), reference, schoolId: accountSchoolId(actor), schoolName: actor.schoolName, requestedBy: actor.username,
-    planCode: requestedPlan?.code || '', planName: requestedPlan?.name || '', learnerCapacity: requestedPlan?.maxLearners || 0,
+    planCode: requestedPlan?.code || '', planName: requestedPlan?.name || '', learnerCountAtOrder: currentLearners,
+    learnerCapacity: requestedPlan ? requestedCapacity : 0, includedLearners: requestedPlan?.maxLearners || 0,
+    overageLearners, overageRate, overageTotal,
     baseMonthly: requestedPlan ? requestedPlan.monthlyPrice : billing.pricing.baseMonthly, bundleCapacity: requestedPlan ? 0 : requestedBundle, bundlePrice: requestedPlan ? 0 : bundle.sellingPrice,
     monthlyTotal, lateFeeAccepted: Boolean(req.body?.lateFeeAccepted), lateFee: Boolean(req.body?.lateFeeAccepted) && billing.pricing.lateFeeEnabled ? billing.pricing.lateFee : 0,
     profitMargin: requestedPlan ? 0 : Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
     status: 'awaiting_payment', paymentStatus: 'awaiting_payment', createdAt: new Date().toISOString()
   };
   billing.orders.unshift(order);
-  res.status(201).json({ success: true, order: { ...order, profitMargin: undefined }, payment: paymentInstructions(billing, reference) });
+  res.status(201).json({
+    success: true,
+    order: { ...order, profitMargin: undefined },
+    payment: paymentInstructions(billing, reference, {
+      useGateway: true,
+      amount: monthlyTotal,
+      itemName: `Little Feet ${order.planName || 'school subscription'}`,
+      buyerName: actor.name || actor.username,
+      buyerEmail: /@/.test(actor.username || '') ? actor.username : ''
+    })
+  });
 });
 
 const allowedParentPaymentRoles = new Set(['parent', 'principal', 'admin', 'school_accounts']);
@@ -2936,21 +3090,31 @@ app.get('/api/parent-subscription', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !(hasPlatformAccess(actor) || ['parent', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'Parent subscription access is required.' });
   const records = (db.parentSubscriptions || []).filter(record => recordInSchool(record, actor) && (isAdminLike(actor) || normalizeUsername(record.parentUsername) === normalizeUsername(actor.username)));
-  res.json({ active: isAdminLike(actor) ? undefined : parentSubscriptionActive(actor), pricePerChild: 29, latest: records[0] ? { reference: records[0].reference, status: records[0].paymentStatus, amount: records[0].amount, createdAt: records[0].createdAt } : null, parents: isAdminLike(actor) ? db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name, active: parentSubscriptionActive(account), status: account.parentSubscriptionStatus || 'basic', grantedUntil: account.parentSubscriptionGrantedUntil || '' })) : undefined, paymentConfigured: billingPaymentConfigured(subscriptionBillingState(actor).payment) });
+  res.json({ active: isAdminLike(actor) ? undefined : parentSubscriptionActive(actor), pricePerChild: 29, latest: records[0] ? { reference: records[0].reference, status: records[0].paymentStatus, amount: records[0].amount, createdAt: records[0].createdAt } : null, parents: isAdminLike(actor) ? db.users.filter(account => account.role === 'parent' && isSameSchool(actor, account)).map(account => ({ username: account.username, name: account.name, active: parentSubscriptionActive(account), status: account.parentSubscriptionStatus || 'basic', grantedUntil: account.parentSubscriptionGrantedUntil || '' })) : undefined, paymentConfigured: subscriptionPaymentConfigured(subscriptionBillingState(actor)) });
 });
 
 app.post('/api/parent-subscription/orders', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || actor.role !== 'parent') return res.status(403).json({ message: 'Only a parent can start a parent subscription.' });
   const billing = subscriptionBillingState(actor);
-  if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The school payment destination is not configured yet.' });
+  if (!subscriptionPaymentConfigured(billing)) return res.status(409).json({ message: 'The subscription payment destination is not configured yet.' });
   const children = Math.max(1, Math.min(4, (actor.linkedLearners || []).length));
   const amount = children * 29;
   const reference = `${billing.payment.referencePrefix}-PLUS-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
   const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, parentUsername: actor.username, parentName: actor.name || actor.username, children, amount, paymentStatus: 'awaiting_payment', termDays: 30, createdAt: new Date().toISOString() });
   if (!Array.isArray(db.parentSubscriptions)) db.parentSubscriptions = [];
   db.parentSubscriptions.unshift(order);
-  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
+  res.status(201).json({
+    success: true,
+    order,
+    payment: paymentInstructions(billing, reference, {
+      useGateway: true,
+      amount,
+      itemName: 'LittleSteps Plus',
+      buyerName: actor.name || actor.username,
+      buyerEmail: /@/.test(actor.username || '') ? actor.username : ''
+    })
+  });
 });
 
 app.patch('/api/accounts/:username/parent-subscription', (req, res) => {
@@ -3137,6 +3301,48 @@ app.post('/api/payments/webhook', (req, res) => {
   if (result.error) return res.status(400).json({ message: result.error });
   res.status(result.duplicate ? 200 : 201).json({ success: true, duplicate: result.duplicate });
 });
+
+app.post('/api/payments/payfast/notify', async (req, res) => {
+  if (!payFastConfig().configured) return res.status(503).json({ message: 'PayFast payment processing is not configured.' });
+  const reference = String(req.body?.m_payment_id || '').trim();
+  const target = findPaymentTarget(reference);
+  if (!target) return res.status(400).json({ message: 'Payment reference was not found.' });
+  const expectedAmount = expectedPaymentAmount(target);
+
+  let validation;
+  try {
+    validation = await validatePayFastItn({ body: req.body, requestIp: req.ip, expectedAmount });
+  } catch (error) {
+    logStructured('error', 'payment.payfast_validation_failed', {
+      category: 'payment', source: 'payfast', result: 'retry_required', message: error.message
+    });
+    return res.status(503).json({ message: 'Payment confirmation could not be validated yet.' });
+  }
+  if (!validation.ok) {
+    logStructured('warn', 'payment.payfast_rejected', {
+      category: 'payment', source: 'payfast', result: validation.reason, details: reference
+    });
+    return res.status(400).json({ message: 'Invalid PayFast payment notification.' });
+  }
+
+  const mappedStatus = validation.paymentStatus === 'COMPLETE' ? 'paid'
+    : validation.paymentStatus === 'CANCELLED' ? 'failed'
+      : null;
+  if (!mappedStatus) return res.status(200).json({ success: true, ignored: true });
+
+  const result = applyPaymentEvent({
+    eventId: `payfast:${validation.providerTransactionId || crypto.createHash('sha256').update(reference + ':' + validation.paymentStatus).digest('hex')}`,
+    reference,
+    status: mappedStatus,
+    amount: validation.amount,
+    providerTransactionId: validation.providerTransactionId,
+    source: 'payfast-itn',
+    receivedAt: new Date().toISOString()
+  });
+  if (result.error) return res.status(400).json({ message: result.error });
+  res.status(200).json({ success: true, duplicate: result.duplicate });
+});
+
 
 app.get('/api/donations/payment', (req, res) => {
   const billing = donationBillingState();
@@ -6043,6 +6249,8 @@ app.post('/api/registry', (req, res) => {
     && normalizeComparableText(student.className) === normalizeComparableText(className)
   );
   if (!learner) {
+    const capacityError = schoolLearnerCapacityError(actor, 1);
+    if (capacityError) return res.status(409).json({ code: 'LEARNER_CAPACITY_REACHED', message: capacityError });
     learner = tagSchoolRecord(actor, {
       id: crypto.randomUUID(),
       studentName: learnerName,
@@ -6440,6 +6648,8 @@ app.post('/api/students/import', (req, res) => {
   const seenInFile = new Set();
   const rejected = [];
   let imported = 0;
+  const capacityState = schoolLearnerCapacityState(actor);
+  let availableLearnerSeats = capacityState.limit === null ? Number.POSITIVE_INFINITY : Math.max(0, capacityState.limit - capacityState.current);
 
   incoming.forEach((row, index) => {
     const studentName = boundedText(row?.studentName, 160);
@@ -6454,6 +6664,12 @@ app.post('/api/students/import', (req, res) => {
     const key = recordKey(candidate);
     if (knownRecords.has(key) || seenInFile.has(key)) {
       rejected.push({ row: batchNumber * 500 + index + 2, reason: 'Duplicate learner record already exists.' });
+      return;
+    }
+    if (availableLearnerSeats <= 0) {
+      rejected.push({ row: batchNumber * 500 + index + 2, reason: capacityState.status === 'trial'
+        ? `Trial learner capacity reached (${capacityState.limit}).`
+        : `Paid learner capacity reached (${capacityState.limit}). Increase the school subscription capacity first.` });
       return;
     }
     seenInFile.add(key);
@@ -6473,6 +6689,7 @@ app.post('/api/students/import', (req, res) => {
     db.students.push(learner);
     ensureLearnerAccessCode(actor, learner);
     imported += 1;
+    availableLearnerSeats -= 1;
   });
 
   job.processedBatches.push({ batchNumber, imported, rejected: rejected.length, rejectedRows: rejected.slice(0, 100), rejectedRowsTruncated: rejected.length > 100, processedAt: new Date().toISOString() });
