@@ -894,6 +894,8 @@ async function saveRememberedLogin(username, pin) {
   } catch { /* The browser may choose its own password-save prompt instead. */ }
 }
 
+let loginHumanCheckEnabled = true;
+
 async function loadLoginHumanCheck() {
   const prompt = document.getElementById('loginHumanCheckPrompt');
   const answer = document.getElementById('loginHumanCheckAnswer');
@@ -913,7 +915,17 @@ async function loadLoginHumanCheck() {
       cache: 'no-store'
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
+    if (!response.ok) throw new Error('Security check unavailable.');
+    if (data.required === false) {
+      loginHumanCheckEnabled = false;
+      document.getElementById('loginHumanCheckPanel')?.classList.add('hidden');
+      answer.disabled = false;
+      if (submit) submit.disabled = false;
+      return true;
+    }
+    if (!data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
+    loginHumanCheckEnabled = true;
+    document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
     prompt.textContent = data.prompt;
     challengeId.value = data.challengeId;
     answer.disabled = false;
@@ -954,7 +966,7 @@ if (loginForm) {
     const companyWebsite = document.getElementById('loginCompanyWebsite')?.value || '';
     const rememberLogin = document.getElementById('rememberLogin')?.checked === true;
 
-    if (!username || !pin || !humanCheckId || !humanCheckAnswer) {
+    if (!username || !pin || (loginHumanCheckEnabled && (!humanCheckId || !humanCheckAnswer))) {
       loginForm.reportValidity();
       return;
     }
