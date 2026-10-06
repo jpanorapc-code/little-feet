@@ -1148,7 +1148,7 @@ const loginHumanCheckClientHash = req => crypto.createHash('sha256')
   .digest('hex');
 const loginHumanCheckSignature = ({ nonce, expiresAt, clientHash, answer }) => crypto
   .createHmac('sha256', loginHumanCheckKey)
-  .update(`${nonce}\n${expiresAt}\n${clientHash}\n${String(answer || '').trim()}`)
+  .update(`${nonce}\n${expiresAt}\n${clientHash}\n${String(answer ?? '').trim()}`)
   .digest('hex');
 
 const pruneUsedLoginHumanChecks = (now = Date.now()) => {
