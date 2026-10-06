@@ -536,55 +536,6 @@ const sendLoginLockoutEmail = async account => {
   });
 };
 
-const LOGIN_HUMAN_CHECK_TTL_MS = 5 * 60 * 1000;
-const loginHumanCheckRequired = () => process.env.NODE_ENV !== 'test' || process.env.LF_TEST_REQUIRE_HUMAN_CHECK === '1';
-const loginHumanCheckDigest = (nonce, answer) => crypto.createHash('sha256')
-  .update(`${nonce}\n${String(answer || '').trim()}`)
-  .digest('hex');
-const loginHumanCheckClientHash = req => crypto.createHash('sha256')
-  .update(String(req.get('user-agent') || '').slice(0, 500))
-  .digest('hex');
-
-const issueLoginHumanCheck = req => {
-  const first = crypto.randomInt(2, 10);
-  const second = crypto.randomInt(1, 9);
-  const subtract = crypto.randomInt(0, 2) === 1;
-  const left = subtract ? Math.max(first, second) : first;
-  const right = subtract ? Math.min(first, second) : second;
-  const answer = subtract ? left - right : left + right;
-  const challengeId = crypto.randomBytes(18).toString('hex');
-  const nonce = crypto.randomBytes(18).toString('hex');
-  const issuedAt = Date.now();
-  req.session.loginHumanCheck = {
-    challengeId,
-    answerDigest: loginHumanCheckDigest(nonce, answer),
-    nonce,
-    clientHash: loginHumanCheckClientHash(req),
-    issuedAt,
-    expiresAt: issuedAt + LOGIN_HUMAN_CHECK_TTL_MS
-  };
-  return {
-    challengeId,
-    prompt: `What is ${left} ${subtract ? '−' : '+'} ${right}?`,
-    expiresInSeconds: Math.floor(LOGIN_HUMAN_CHECK_TTL_MS / 1000)
-  };
-};
-
-const verifyLoginHumanCheck = (req, body) => {
-  if (!loginHumanCheckRequired()) return true;
-  const challenge = req.session?.loginHumanCheck;
-  if (req.session) delete req.session.loginHumanCheck;
-  const challengeId = limitedText(body?.humanCheckId, 80);
-  const answer = limitedText(body?.humanCheckAnswer, 20);
-  const honeypot = limitedText(body?.companyWebsite, 200);
-  if (honeypot || !challenge || !challengeId || !answer) return false;
-  if (challenge.challengeId !== challengeId || Number(challenge.expiresAt) < Date.now()) return false;
-  if (challenge.clientHash !== loginHumanCheckClientHash(req)) return false;
-  const expected = Buffer.from(String(challenge.answerDigest || ''), 'hex');
-  const actual = Buffer.from(loginHumanCheckDigest(challenge.nonce, answer), 'hex');
-  return expected.length === actual.length && expected.length > 0 && crypto.timingSafeEqual(expected, actual);
-};
-
 const loginSecurityRequestSummary = req => ({
   network: boundedText(req.ip || 'Unavailable', 96) || 'Unavailable',
   device: boundedText(req.get('user-agent') || 'Unknown browser or device', 300) || 'Unknown browser or device'
@@ -1184,6 +1135,89 @@ class PostgresSessionStore extends session.Store {
       .then(() => callback()).catch(callback);
   }
 }
+
+const LOGIN_HUMAN_CHECK_TTL_MS = 5 * 60 * 1000;
+const LOGIN_HUMAN_CHECK_USED_MAX = 10000;
+const usedLoginHumanChecks = new Map();
+const loginHumanCheckRequired = () => process.env.NODE_ENV !== 'test' || process.env.LF_TEST_REQUIRE_HUMAN_CHECK === '1';
+const loginHumanCheckKey = crypto.createHash('sha256')
+  .update(`${process.env.SESSION_SECRET || 'little-feet-session-secret'}\nlogin-human-check-v2`)
+  .digest();
+const loginHumanCheckClientHash = req => crypto.createHash('sha256')
+  .update(String(req.get('user-agent') || '').slice(0, 500))
+  .digest('hex');
+const loginHumanCheckSignature = ({ nonce, expiresAt, clientHash, answer }) => crypto
+  .createHmac('sha256', loginHumanCheckKey)
+  .update(`${nonce}\n${expiresAt}\n${clientHash}\n${String(answer || '').trim()}`)
+  .digest('hex');
+
+const pruneUsedLoginHumanChecks = (now = Date.now()) => {
+  for (const [key, expiresAt] of usedLoginHumanChecks) {
+    if (Number(expiresAt) < now) usedLoginHumanChecks.delete(key);
+  }
+  while (usedLoginHumanChecks.size > LOGIN_HUMAN_CHECK_USED_MAX) {
+    usedLoginHumanChecks.delete(usedLoginHumanChecks.keys().next().value);
+  }
+};
+
+const issueLoginHumanCheck = req => {
+  const first = crypto.randomInt(2, 10);
+  const second = crypto.randomInt(1, 9);
+  const subtract = crypto.randomInt(0, 2) === 1;
+  const left = subtract ? Math.max(first, second) : first;
+  const right = subtract ? Math.min(first, second) : second;
+  const answer = subtract ? left - right : left + right;
+  const nonce = crypto.randomBytes(18).toString('hex');
+  const expiresAt = Date.now() + LOGIN_HUMAN_CHECK_TTL_MS;
+  const clientHash = loginHumanCheckClientHash(req);
+  const signature = loginHumanCheckSignature({ nonce, expiresAt, clientHash, answer });
+  return {
+    challengeId: `${nonce}.${expiresAt}.${signature}`,
+    prompt: `What is ${left} ${subtract ? '−' : '+'} ${right}?`,
+    expiresInSeconds: Math.floor(LOGIN_HUMAN_CHECK_TTL_MS / 1000)
+  };
+};
+
+const verifyLoginHumanCheck = (req, body) => {
+  if (!loginHumanCheckRequired()) return true;
+  const challengeId = limitedText(body?.humanCheckId, 180);
+  const answer = limitedText(body?.humanCheckAnswer, 20);
+  const honeypot = limitedText(body?.companyWebsite, 200);
+  if (honeypot || !challengeId || !answer) return false;
+
+  const parts = challengeId.split('.');
+  if (parts.length !== 3) return false;
+  const [nonce, expiresText, suppliedSignature] = parts;
+  if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{13}$/.test(expiresText) || !/^[a-f0-9]{64}$/.test(suppliedSignature)) return false;
+
+  const expiresAt = Number(expiresText);
+  const now = Date.now();
+  if (!Number.isSafeInteger(expiresAt) || expiresAt < now || expiresAt > now + LOGIN_HUMAN_CHECK_TTL_MS + 30000) return false;
+
+  pruneUsedLoginHumanChecks(now);
+  const fingerprint = crypto.createHash('sha256').update(challengeId).digest('hex');
+  if (usedLoginHumanChecks.has(fingerprint)) return false;
+  usedLoginHumanChecks.set(fingerprint, expiresAt);
+
+  const expectedSignature = loginHumanCheckSignature({
+    nonce,
+    expiresAt,
+    clientHash: loginHumanCheckClientHash(req),
+    answer
+  });
+  const expected = Buffer.from(expectedSignature, 'hex');
+  const actual = Buffer.from(suppliedSignature, 'hex');
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+};
+
+// Serve this before express-session so the login page does not wait for the
+// database-backed session store just to display the human-verification prompt.
+app.get('/api/auth/human-check', (req, res) => {
+  if (!enforcePublicRateLimit(req, res, 'login-human-check', 60, 10 * 60 * 1000)) return;
+  res.set('Cache-Control', 'no-store');
+  if (!loginHumanCheckRequired()) return res.json({ required: false });
+  res.json({ required: true, ...issueLoginHumanCheck(req) });
+});
 
 app.use(session({
   store: process.env.DATABASE_URL ? new PostgresSessionStore() : undefined,
@@ -1905,13 +1939,6 @@ const establishAuthenticatedSession = (req, account, callback, authMethod = 'pas
     });
   });
 };
-
-app.get('/api/auth/human-check', (req, res) => {
-  if (!enforcePublicRateLimit(req, res, 'login-human-check', 60, 10 * 60 * 1000)) return;
-  res.set('Cache-Control', 'no-store');
-  if (!loginHumanCheckRequired()) return res.json({ required: false });
-  res.json({ required: true, ...issueLoginHumanCheck(req) });
-});
 
 app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
