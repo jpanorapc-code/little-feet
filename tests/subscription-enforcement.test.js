@@ -221,6 +221,27 @@ async function request(route, { method = 'GET', body, cookie } = {}) {
     assert.equal(finalBilling.data.subscription.learnerCount, 35);
     assert.equal(finalBilling.data.subscription.learnerCapacity, 35);
 
+    const registerAtCapacity = await request('/api/registry', {
+      method: 'POST',
+      cookie,
+      body: {
+        learnerName: 'Blocked Learner',
+        className: 'Class C',
+        dateOfBirth: '2020-01-01',
+        guardianName: 'Capacity Parent',
+        guardianPhone: '0600000000',
+        guardianEmail: 'capacity@example.test',
+        address: 'Test address',
+        emergencyContact: '0600000001',
+        medicalNotes: '',
+        consent: 'Pending verification'
+      }
+    });
+    assert.equal(registerAtCapacity.response.status, 409);
+    assert.equal(registerAtCapacity.data.code, 'LEARNER_CAPACITY_REACHED');
+    const billingStillAtCapacity = await request('/api/subscription-billing', { cookie });
+    assert.equal(billingStillAtCapacity.data.subscription.learnerCount, 35);
+
     console.log('Subscription enforcement regression test passed.');
   } catch (error) {
     console.error(error);
