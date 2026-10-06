@@ -674,7 +674,7 @@ app.use((req, res, next) => {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "frame-src 'none'",
-    "form-action 'self'",
+    "form-action 'self' https://www.payfast.co.za",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://unpkg.com",
     "img-src 'self' data: blob: https:",
@@ -2020,7 +2020,7 @@ app.post('/api/signup', (req, res) => {
 });
 
 const schoolSubscriptionAccessForAccount = account => {
-  if (!account || hasPlatformAccess(account)) return { allowed: true, status: 'platform', trialEndsAt: '', activeUntil: '', daysRemaining: 0 };
+  if (!account || hasPlatformAccess(account) || PLATFORM_INTERNAL_ROLES.has(account.role)) return { allowed: true, status: 'platform', trialEndsAt: '', activeUntil: '', daysRemaining: 0 };
   const schoolId = accountSchoolId(account);
   const school = schoolId ? db.schools.find(entry => entry.id === schoolId) : null;
   return schoolSubscriptionAccessForSchool(school);
