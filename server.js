@@ -1174,6 +1174,9 @@ const issueLoginHumanCheck = req => {
   return {
     challengeId: `${nonce}.${expiresAt}.${signature}`,
     prompt: `What is ${left} ${subtract ? '−' : '+'} ${right}?`,
+    left,
+    right,
+    operator: subtract ? '−' : '+',
     expiresInSeconds: Math.floor(LOGIN_HUMAN_CHECK_TTL_MS / 1000)
   };
 };
