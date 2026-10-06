@@ -1605,7 +1605,9 @@ function enforceSchoolSubscriptionUi() {
     const statusLabel = String(access.status || 'expired').replaceAll('_', ' ');
     const detail = access.status === 'trial_expired'
       ? `The 14-day Little Feet trial for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> has ended.`
-      : `The Little Feet subscription for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> is ${escapeWorkspaceText(statusLabel)}.`;
+      : access.status === 'trial_pending'
+        ? `The 14-day Little Feet trial for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> has not been activated yet.`
+        : `The Little Feet subscription for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> is ${escapeWorkspaceText(statusLabel)}.`;
     if (canRenew) {
       const financeButton = [...document.querySelectorAll('.nav-btn')].find(button => String(button.getAttribute('onclick') || '').includes("'financeTab'"));
       if (financeButton) switchTab('financeTab', financeButton);
