@@ -13,7 +13,7 @@ const port = 7900 + Math.floor(Math.random() * 100);
 const validationPort = 8000 + Math.floor(Math.random() * 100);
 const base = 'http://127.0.0.1:' + port;
 const merchantId = '10000100';
-const merchantKey = '46f0cd694581a';
+const merchantKey = 'test-merchant-key';
 const passphrase = 'LittleFeetRealIntegrationTest';
 const pinHash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
@@ -245,7 +245,7 @@ const sign = entries => crypto.createHash('md5')
     assert.match(imported.data.rejected[0].reason, /learner limit reached/i);
 
     const ceilingOrder = await request('/api/subscription-billing/orders', {
-      method:'POST', cookie:alpha, body:{ planCode:'micro' }
+      method:'POST', cookie:alpha, body:{ planCode:'micro', lateFeeAccepted:true }
     });
     assert.equal(ceilingOrder.response.status, 201, ceilingOrder.text);
     assert.equal(ceilingOrder.data.order.learnerCount, 250);
