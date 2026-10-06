@@ -52,6 +52,7 @@ jobs:
           node --check tests/shared-db-failover.integration.test.js
           node --check tests/subscription-payfast.test.js
           node --check tests/login-security.test.js
+          node --check tests/login-language.test.js
           node --check auth-crypto.js
           node --check service-worker.js
           node --check assets/mobile-pwa.js
