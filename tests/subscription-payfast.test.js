@@ -55,12 +55,16 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
     { id:'school-paid-expired', name:'Expired Paid School', status:'active', createdAt:'2026-01-01T00:00:00.000Z', subscriptionStatus:'active', subscriptionPlanCode:'standard', subscriptionActiveUntil:'2026-01-31', trialStartedAt:'2026-01-01T00:00:00.000Z', trialEndsAt:'2026-01-15T00:00:00.000Z' }
   ],
   users: [
+    { username:'alpha-admin@example.test', pinHash:pinHash('AdminPass1'), name:'Alpha Administrator', role:'admin', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
     { username:'alpha-principal@example.test', pinHash:pinHash('AlphaPass1'), name:'Alpha Principal', role:'principal', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active' },
+    { username:'alpha-parent@example.test', pinHash:pinHash('ParentPass1'), name:'Alpha Parent', role:'parent', schoolId:'school-alpha', schoolName:'Alpha School', verificationStatus:'Active', parentRelationshipStatus:'Administrator approved', linkedLearners:[] },
     { username:'expired-trial@example.test', pinHash:pinHash('TrialPass1'), name:'Expired Trial Principal', role:'principal', schoolId:'school-trial-expired', schoolName:'Expired Trial School', verificationStatus:'Active' },
     { username:'expired-paid@example.test', pinHash:pinHash('PaidPass1'), name:'Expired Paid Principal', role:'principal', schoolId:'school-paid-expired', schoolName:'Expired Paid School', verificationStatus:'Active' }
   ],
   students,
-  learnerAccessCodes:[], storeProducts:[], storeOrders:[], parentPayments:[], parentSubscriptions:[], bookRegister:[], registry:[],
+  learnerAccessCodes:[],
+  storeProducts:[{ id:'alpha-shirt', schoolId:'school-alpha', schoolName:'Alpha School', name:'Alpha School Shirt', price:50, stockQuantity:10, reservedQuantity:0, active:true, createdAt:iso(now), createdBy:'alpha-admin@example.test' }],
+  storeOrders:[], parentPayments:[], parentSubscriptions:[], bookRegister:[], registry:[],
   schoolBilling: {
     'school-alpha': payfastBilling('ALPHA'),
     'school-trial-expired': payfastBilling('TRIAL'),
@@ -216,6 +220,138 @@ const sign = entries => crypto.createHash('md5')
     const badItn = await request('/api/payments/payfast/itn', { method:'POST', form:badSignatureForm });
     assert.equal(badItn.response.status, 401);
 
+    const alphaAdmin = await login('alpha-admin@example.test','AdminPass1');
+    const alphaParent = await login('alpha-parent@example.test','ParentPass1');
+
+    const initialStore = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(initialStore.response.status, 200);
+    assert.equal(initialStore.data.products[0].stockQuantity, 10);
+    assert.equal(initialStore.data.products[0].physicalStockQuantity, 10);
+    assert.equal(initialStore.data.products[0].reservedQuantity, 0);
+
+    const storeOrder = await request('/api/store/orders', {
+      method:'POST', cookie:alphaParent, body:{ productId:'alpha-shirt', quantity:2 }
+    });
+    assert.equal(storeOrder.response.status, 201, storeOrder.text);
+    assert.equal(storeOrder.data.order.amount, 100);
+    assert.equal(storeOrder.data.order.stockReservationStatus, 'reserved');
+    assert.ok(Date.parse(storeOrder.data.reservationExpiresAt) > Date.now());
+
+    const reservedStore = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(reservedStore.data.products[0].stockQuantity, 8);
+    assert.equal(reservedStore.data.products[0].physicalStockQuantity, 10);
+    assert.equal(reservedStore.data.products[0].reservedQuantity, 2);
+
+    const storePaid = await request('/api/payments/reconcile', {
+      method:'POST', cookie:alphaAdmin, body:{
+        eventId:'store-paid-one', reference:storeOrder.data.order.reference,
+        status:'paid', amount:100, bankReference:'BANK-STORE-001'
+      }
+    });
+    assert.equal(storePaid.response.status, 201, storePaid.text);
+
+    const paidInventory = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(paidInventory.data.products[0].stockQuantity, 8);
+    assert.equal(paidInventory.data.products[0].physicalStockQuantity, 8);
+    assert.equal(paidInventory.data.products[0].reservedQuantity, 0);
+    let storeOrders = await request('/api/store/orders', { cookie:alphaAdmin });
+    const paidOrder = storeOrders.data.find(order => order.id === storeOrder.data.order.id);
+    assert.equal(paidOrder.paymentStatus, 'paid');
+    assert.equal(paidOrder.fulfilmentStatus, 'ready_to_prepare');
+    assert.match(paidOrder.status, /ready to prepare/i);
+
+    const preparing = await request('/api/store/orders/' + encodeURIComponent(paidOrder.id) + '/fulfilment', {
+      method:'PATCH', cookie:alphaAdmin, body:{status:'preparing'}
+    });
+    assert.equal(preparing.response.status, 200, preparing.text);
+    assert.equal(preparing.data.order.fulfilmentStatus, 'preparing');
+
+    const refunded = await request('/api/payments/reconcile', {
+      method:'POST', cookie:alphaAdmin, body:{
+        eventId:'store-refund-one', reference:storeOrder.data.order.reference,
+        status:'refunded', amount:100, bankReference:'REFUND-STORE-001'
+      }
+    });
+    assert.equal(refunded.response.status, 201, refunded.text);
+    const refundedInventory = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(refundedInventory.data.products[0].physicalStockQuantity, 10);
+    assert.equal(refundedInventory.data.products[0].reservedQuantity, 0);
+    storeOrders = await request('/api/store/orders', { cookie:alphaAdmin });
+    const refundedOrder = storeOrders.data.find(order => order.id === storeOrder.data.order.id);
+    assert.equal(refundedOrder.paymentStatus, 'refunded');
+    assert.equal(refundedOrder.fulfilmentStatus, 'refunded');
+    assert.match(refundedOrder.status, /stock returned/i);
+
+    const duplicateRefund = await request('/api/payments/reconcile', {
+      method:'POST', cookie:alphaAdmin, body:{
+        eventId:'store-refund-second-provider-event', reference:storeOrder.data.order.reference,
+        status:'refunded', amount:100, bankReference:'REFUND-STORE-001-DUP'
+      }
+    });
+    assert.equal(duplicateRefund.response.status, 200, duplicateRefund.text);
+    assert.equal(duplicateRefund.data.duplicate, true);
+    const afterDuplicateRefund = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(afterDuplicateRefund.data.products[0].physicalStockQuantity, 10);
+
+    const failedOrder = await request('/api/store/orders', {
+      method:'POST', cookie:alphaParent, body:{ productId:'alpha-shirt', quantity:3 }
+    });
+    assert.equal(failedOrder.response.status, 201, failedOrder.text);
+    const failedReserved = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(failedReserved.data.products[0].stockQuantity, 7);
+    assert.equal(failedReserved.data.products[0].physicalStockQuantity, 10);
+    assert.equal(failedReserved.data.products[0].reservedQuantity, 3);
+
+    const failedPayment = await request('/api/payments/reconcile', {
+      method:'POST', cookie:alphaAdmin, body:{
+        eventId:'store-failed-one', reference:failedOrder.data.order.reference,
+        status:'failed', amount:150, bankReference:'FAILED-STORE-001'
+      }
+    });
+    assert.equal(failedPayment.response.status, 201, failedPayment.text);
+    const afterFailed = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(afterFailed.data.products[0].stockQuantity, 10);
+    assert.equal(afterFailed.data.products[0].physicalStockQuantity, 10);
+    assert.equal(afterFailed.data.products[0].reservedQuantity, 0);
+
+    const latePaid = await request('/api/payments/reconcile', {
+      method:'POST', cookie:alphaAdmin, body:{
+        eventId:'store-late-paid-one', reference:failedOrder.data.order.reference,
+        status:'paid', amount:150, bankReference:'BANK-STORE-LATE-001'
+      }
+    });
+    assert.equal(latePaid.response.status, 201, latePaid.text);
+    const afterLatePaid = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(afterLatePaid.data.products[0].physicalStockQuantity, 7);
+    assert.equal(afterLatePaid.data.products[0].reservedQuantity, 0);
+
+    const lateRefund = await request('/api/payments/reconcile', {
+      method:'POST', cookie:alphaAdmin, body:{
+        eventId:'store-late-refund-one', reference:failedOrder.data.order.reference,
+        status:'refunded', amount:150, bankReference:'REFUND-STORE-LATE-001'
+      }
+    });
+    assert.equal(lateRefund.response.status, 201, lateRefund.text);
+    const afterLateRefund = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(afterLateRefund.data.products[0].physicalStockQuantity, 10);
+
+    const cancelledOrder = await request('/api/store/orders', {
+      method:'POST', cookie:alphaParent, body:{ productId:'alpha-shirt', quantity:4 }
+    });
+    assert.equal(cancelledOrder.response.status, 201, cancelledOrder.text);
+    const beforeCancel = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(beforeCancel.data.products[0].stockQuantity, 6);
+    assert.equal(beforeCancel.data.products[0].physicalStockQuantity, 10);
+    assert.equal(beforeCancel.data.products[0].reservedQuantity, 4);
+    const cancelled = await request('/api/store/orders/' + encodeURIComponent(cancelledOrder.data.order.id) + '/cancel', {
+      method:'POST', cookie:alphaParent, body:{}
+    });
+    assert.equal(cancelled.response.status, 200, cancelled.text);
+    const afterCancel = await request('/api/store', { cookie:alphaAdmin });
+    assert.equal(afterCancel.data.products[0].stockQuantity, 10);
+    assert.equal(afterCancel.data.products[0].physicalStockQuantity, 10);
+    assert.equal(afterCancel.data.products[0].reservedQuantity, 0);
+
     const expiredTrial = await login('expired-trial@example.test','TrialPass1');
     const expiredTrialSession = await request('/api/auth/session', { cookie:expiredTrial });
     assert.equal(expiredTrialSession.data.user.schoolSubscriptionAccess.status, 'trial_expired');
@@ -252,7 +388,7 @@ const sign = entries => crypto.createHash('md5')
     assert.equal(ceilingOrder.data.order.overageLearners, 220);
     assert.equal(ceilingOrder.data.order.monthlyTotal, 2550);
 
-    console.log('Real subscription, expiry, overage, package-limit and PayFast ITN regression test passed.');
+    console.log('Real subscription, expiry, overage, package-limit, PayFast ITN, and school-store stock/payment lifecycle regression test passed.');
   } catch (error) {
     console.error(error);
     if (stderr) console.error(stderr);
