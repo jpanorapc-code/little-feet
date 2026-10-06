@@ -2890,6 +2890,11 @@ const releaseStoreReservation = (order, timestamp, reason = 'failed') => {
     order.status = 'payment expired - stock released';
     order.fulfilmentStatus = 'payment_expired';
     updateStoreRoomRecord(order, 'Payment expired · stock released', `Store payment expired · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  } else if (reason === 'cancelled') {
+    order.status = 'cancelled - stock released';
+    order.fulfilmentStatus = 'cancelled';
+    order.cancelledAt = timestamp;
+    updateStoreRoomRecord(order, 'Cancelled · stock released', `Store order cancelled · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
   } else if (reason === 'refunded') {
     order.status = 'refunded - stock returned';
     order.fulfilmentStatus = 'refunded';
@@ -6253,9 +6258,33 @@ app.post('/api/store/orders', (req, res) => {
 });
 app.get('/api/store/orders', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Stock-room access is required.' });
+  if (!actor || !(hasPlatformAccess(actor) || ['parent', 'teacher', 'principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'School-store order access is required.' });
   releaseExpiredStoreReservations(accountSchoolId(actor));
-  res.json(tenantRecords(db.storeOrders || [], actor));
+  let orders = tenantRecords(db.storeOrders || [], actor);
+  if (actor.role === 'parent') orders = orders.filter(order => normalizeUsername(order.parentUsername) === normalizeUsername(actor.username));
+  res.json(orders.map(order => ({
+    id: order.id, reference: order.reference, productId: order.productId, productName: order.productName,
+    quantity: order.quantity, amount: order.amount, parentName: order.parentName,
+    status: order.status, paymentStatus: order.paymentStatus || 'awaiting_payment',
+    fulfilmentStatus: order.fulfilmentStatus || '', stockReservationStatus: order.stockReservationStatus || '',
+    createdAt: order.createdAt, paidAt: order.paidAt || '', refundedAt: order.refundedAt || '',
+    stockReservedAt: order.stockReservedAt || '', stockReleasedAt: order.stockReleasedAt || '',
+    fulfilmentUpdatedAt: order.fulfilmentUpdatedAt || ''
+  })));
+});
+
+app.post('/api/store/orders/:id/cancel', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to cancel a store order.' });
+  const order = (db.storeOrders || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!order) return res.status(404).json({ message: 'Store order not found.' });
+  const ownsOrder = actor.role === 'parent' && normalizeUsername(order.parentUsername) === normalizeUsername(actor.username);
+  const canManage = hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role);
+  if (!ownsOrder && !canManage) return res.status(403).json({ message: 'You cannot cancel this store order.' });
+  if (order.paymentStatus === 'paid') return res.status(409).json({ message: 'A paid order cannot be cancelled. Confirm the actual refund first, then record that refund in Little Feet.' });
+  if (['cancelled', 'refunded', 'collected'].includes(String(order.fulfilmentStatus || '').toLowerCase())) return res.json({ success: true, order });
+  releaseStoreReservation(order, new Date().toISOString(), 'cancelled');
+  res.json({ success: true, order });
 });
 
 app.patch('/api/store/orders/:id/fulfilment', (req, res) => {
