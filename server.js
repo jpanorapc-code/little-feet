@@ -2852,6 +2852,129 @@ const findPaymentTarget = (reference, actor = null) => {
   return null;
 };
 const expectedPaymentAmount = target => Number(target.type === 'subscription' ? target.record.monthlyTotal : target.type === 'parent_payment' ? parentPaymentAmount(target.record) : target.record.amount);
+
+const STORE_RESERVATION_TTL_MS = 30 * 60 * 1000;
+const storeProductForOrder = order => (db.storeProducts || []).find(product =>
+  product.id === order?.productId && (!order?.schoolId || product.schoolId === order.schoolId)
+) || null;
+const storeAvailableQuantity = product => Math.max(0, (Number(product?.stockQuantity) || 0) - (Number(product?.reservedQuantity) || 0));
+const updateStoreRoomRecord = (order, status, details) => {
+  const records = Array.isArray(db.moduleRecords?.stock) ? db.moduleRecords.stock : [];
+  const reference = String(order?.reference || '').toUpperCase();
+  const record = records.find(entry =>
+    entry.orderId === order?.id
+    || String(entry.reference || '').toUpperCase() === reference
+    || (reference && String(entry.details || '').toUpperCase().includes(`REF ${reference}`))
+  );
+  if (!record) return;
+  record.status = status;
+  if (details) record.details = details;
+  record.updatedAt = new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' });
+};
+const releaseStoreReservation = (order, timestamp, reason = 'failed') => {
+  const quantity = Math.max(0, Number.parseInt(order?.quantity, 10) || 0);
+  const product = storeProductForOrder(order);
+  if (order?.stockAccountingVersion === 2) {
+    if (order.stockReservationStatus === 'reserved') {
+      if (product) product.reservedQuantity = Math.max(0, (Number(product.reservedQuantity) || 0) - quantity);
+      order.stockReservationStatus = reason === 'expired' ? 'expired' : 'released';
+      order.stockReleasedAt = timestamp;
+    }
+  } else if (!order?.legacyStockRestoredAt) {
+    // Legacy store orders reduced stock at checkout. Restore it once when a payment fails or is refunded.
+    if (product) product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) + quantity);
+    order.legacyStockRestoredAt = timestamp;
+    order.stockReservationStatus = 'returned_legacy';
+  }
+  if (reason === 'expired') {
+    order.status = 'payment expired - stock released';
+    order.fulfilmentStatus = 'payment_expired';
+    updateStoreRoomRecord(order, 'Payment expired · stock released', `Store payment expired · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  } else if (reason === 'refunded') {
+    order.status = 'refunded - stock returned';
+    order.fulfilmentStatus = 'refunded';
+    updateStoreRoomRecord(order, 'Refunded · stock returned', `Store refund confirmed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  } else {
+    order.status = 'payment failed - stock released';
+    order.fulfilmentStatus = 'payment_failed';
+    updateStoreRoomRecord(order, 'Payment failed · stock released', `Store payment failed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  }
+};
+const releaseExpiredStoreReservations = (schoolId = '') => {
+  const now = Date.now();
+  (db.storeOrders || []).forEach(order => {
+    if (order.stockAccountingVersion !== 2 || order.stockReservationStatus !== 'reserved') return;
+    if (schoolId && order.schoolId !== schoolId) return;
+    const reservedAt = Date.parse(order.stockReservedAt || order.createdAt || '');
+    if (!Number.isFinite(reservedAt) || now - reservedAt < STORE_RESERVATION_TTL_MS) return;
+    const hasPaidEvent = (db.paymentEvents || []).some(event =>
+      event.status === 'paid' && event.targetType === 'store' && event.schoolId === order.schoolId
+      && String(event.reference || '').toUpperCase() === String(order.reference || '').toUpperCase()
+    );
+    if (!hasPaidEvent) releaseStoreReservation(order, new Date().toISOString(), 'expired');
+  });
+};
+const applyStorePaymentState = (target, normalStatus, timestamp) => {
+  const order = target.record;
+  const quantity = Math.max(0, Number.parseInt(order?.quantity, 10) || 0);
+  const product = storeProductForOrder(order);
+
+  if (normalStatus === 'paid') {
+    if (order.stockAccountingVersion === 2) {
+      if (order.stockReservationStatus === 'reserved') {
+        if (product) {
+          product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) - quantity);
+          product.reservedQuantity = Math.max(0, (Number(product.reservedQuantity) || 0) - quantity);
+        }
+        order.stockReservationStatus = 'consumed';
+        order.stockConsumedAt = timestamp;
+      } else if (['released', 'expired'].includes(order.stockReservationStatus)) {
+        if (product && storeAvailableQuantity(product) >= quantity) {
+          product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) - quantity);
+          order.stockReservationStatus = 'consumed_after_release';
+          order.stockConsumedAt = timestamp;
+        } else {
+          order.stockReservationStatus = 'paid_stock_review';
+        }
+      }
+    } else {
+      order.stockReservationStatus = order.stockReservationStatus || 'consumed_legacy';
+    }
+    const needsReview = order.stockReservationStatus === 'paid_stock_review';
+    order.status = needsReview ? 'paid - stock review required' : 'paid - ready to prepare';
+    order.fulfilmentStatus = needsReview ? 'stock_review_required' : 'ready_to_prepare';
+    updateStoreRoomRecord(
+      order,
+      needsReview ? 'PAID · STOCK REVIEW REQUIRED' : 'PAID · READY TO PREPARE',
+      `Paid store order · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`
+    );
+    return;
+  }
+
+  if (normalStatus === 'failed') {
+    releaseStoreReservation(order, timestamp, 'failed');
+    return;
+  }
+
+  if (normalStatus === 'refunded') {
+    if (order.stockAccountingVersion === 2 && ['consumed', 'consumed_after_release'].includes(order.stockReservationStatus)) {
+      if (product) product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) + quantity);
+      order.stockReservationStatus = 'returned';
+      order.stockReturnedAt = timestamp;
+      order.status = 'refunded - stock returned';
+      order.fulfilmentStatus = 'refunded';
+      updateStoreRoomRecord(order, 'Refunded · stock returned', `Store refund confirmed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+    } else if (order.stockReservationStatus === 'paid_stock_review') {
+      order.status = 'refunded - no stock adjustment required';
+      order.fulfilmentStatus = 'refunded';
+      order.stockReservationStatus = 'refunded_without_stock';
+      order.stockReturnedAt = timestamp;
+      updateStoreRoomRecord(order, 'Refunded · no stock adjustment', `Store refund confirmed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+    } else {
+      releaseStoreReservation(order, timestamp, 'refunded');
+    }
+  }
+};
 const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransactionId, source, receivedAt }, actor = null) => {
   if (!Array.isArray(db.paymentEvents)) db.paymentEvents = [];
   if (!Array.isArray(db.paymentLedger)) db.paymentLedger = [];
@@ -2866,7 +2989,13 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
   const settledEvent = db.paymentEvents.find(event => event.status === 'paid'
     && event.targetType === target.type && event.schoolId === target.schoolId
     && String(event.reference || '').toUpperCase() === String(target.record.reference || '').toUpperCase());
+  const refundedEvent = db.paymentEvents.find(event => event.status === 'refunded'
+    && event.targetType === target.type && event.schoolId === target.schoolId
+    && String(event.reference || '').toUpperCase() === String(target.record.reference || '').toUpperCase());
   if (normalStatus === 'paid' && settledEvent) return { duplicate: true, event: settledEvent, target: target.record };
+  if (normalStatus === 'refunded' && target.type !== 'parent_payment' && refundedEvent) return { duplicate: true, event: refundedEvent, target: target.record };
+  if (normalStatus === 'refunded' && target.type !== 'parent_payment' && !settledEvent) return { error: 'A payment can be refunded only after it has been confirmed as paid.' };
+  if (target.type === 'store' && normalStatus === 'failed' && settledEvent) return { error: 'A paid store order cannot be changed back to failed.' };
   if (numericAmount === null || numericAmount <= 0) return { error: 'Payment amount must be greater than zero.' };
   if (target.type === 'parent_payment') {
     const current = parentPaymentFinancials(target.record);
@@ -2909,6 +3038,8 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
       school.subscriptionStatus = 'refunded';
       school.subscriptionActiveUntil = '';
     }
+  } else if (target.type === 'store') {
+    applyStorePaymentState(target, normalStatus, timestamp);
   }
   db.paymentEvents.unshift(event);
   db.paymentLedger.unshift({
@@ -6055,8 +6186,19 @@ app.get('/api/store', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view the school store.' });
   const schoolName = user.schoolName || 'Your school';
-  const products = tenantRecords(db.storeProducts || [], user).filter(product => product.active !== false).map(({ schoolName: _schoolName, schoolId: _schoolId, ...product }) => product);
-  res.json({ schoolName, products, canManage: isAdminLike(user), webStoreUrl: user.schoolStoreUrl || null });
+  const schoolId = accountSchoolId(user);
+  releaseExpiredStoreReservations(schoolId);
+  const canManage = isAdminLike(user);
+  const products = tenantRecords(db.storeProducts || [], user).filter(product => product.active !== false).map(({ schoolName: _schoolName, schoolId: _schoolId, ...product }) => {
+    const physicalStockQuantity = Math.max(0, Number(product.stockQuantity) || 0);
+    const reservedQuantity = Math.max(0, Number(product.reservedQuantity) || 0);
+    return {
+      ...product,
+      stockQuantity: Math.max(0, physicalStockQuantity - reservedQuantity),
+      ...(canManage ? { physicalStockQuantity, reservedQuantity } : {})
+    };
+  });
+  res.json({ schoolName, products, canManage, webStoreUrl: user.schoolStoreUrl || null });
 });
 app.post('/api/store/products', (req, res) => {
   const actor = requireAdmin(req);
@@ -6066,7 +6208,7 @@ app.post('/api/store/products', (req, res) => {
   const stockQuantity = Number.parseInt(req.body?.stockQuantity, 10);
   if (!name || price === null || price <= 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) return res.status(400).json({ message: 'Enter an item name, a price greater than zero, and a valid stock quantity.' });
   if (!Array.isArray(db.storeProducts)) db.storeProducts = [];
-  const product = tagSchoolRecord(actor, { id: crypto.randomUUID(), name, price, stockQuantity, active: true, createdAt: new Date().toISOString(), createdBy: actor.username });
+  const product = tagSchoolRecord(actor, { id: crypto.randomUUID(), name, price, stockQuantity, reservedQuantity: 0, active: true, createdAt: new Date().toISOString(), createdBy: actor.username });
   db.storeProducts.unshift(product);
   res.status(201).json({ success: true, product });
 });
@@ -6084,21 +6226,58 @@ app.post('/api/store/orders', (req, res) => {
   const product = (db.storeProducts || []).find(entry => entry.id === req.body?.productId && entry.active !== false && recordInSchool(entry, actor));
   const quantity = Number.parseInt(req.body?.quantity, 10);
   if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) return res.status(400).json({ message: 'Choose an available store item and quantity.' });
-  if (product.stockQuantity < quantity) return res.status(409).json({ message: 'The requested quantity is not currently available.' });
+  const schoolId = accountSchoolId(actor);
+  releaseExpiredStoreReservations(schoolId);
+  if (storeAvailableQuantity(product) < quantity) return res.status(409).json({ message: 'The requested quantity is not currently available.' });
   const billing = subscriptionBillingState(actor);
   if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The school payment destination is not configured yet.' });
-  product.stockQuantity -= quantity;
+  product.reservedQuantity = Math.max(0, Number(product.reservedQuantity) || 0) + quantity;
   const reference = `${billing.payment.referencePrefix}-STORE-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, productId: product.id, productName: product.name, quantity, amount: Math.round(product.price * quantity * 100) / 100, parentUsername: actor.username, parentName: actor.name || actor.username, status: 'awaiting payment and preparation', createdAt: new Date().toISOString() });
+  const timestamp = new Date().toISOString();
+  const order = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), reference, productId: product.id, productName: product.name, quantity,
+    amount: Math.round(product.price * quantity * 100) / 100,
+    parentUsername: actor.username, parentName: actor.name || actor.username,
+    status: 'awaiting payment', paymentStatus: 'awaiting_payment', fulfilmentStatus: 'awaiting_payment',
+    stockAccountingVersion: 2, stockReservationStatus: 'reserved', stockReservedAt: timestamp,
+    createdAt: timestamp
+  });
   if (!Array.isArray(db.storeOrders)) db.storeOrders = [];
   db.storeOrders.unshift(order);
-  db.moduleRecords.stock.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), details: `Store order to prepare · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`, source: 'school-store', status: 'Awaiting payment and preparation', createdAt: new Date().toLocaleString() }));
-  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
+  db.moduleRecords.stock.unshift(tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), orderId: order.id, reference,
+    details: `Store order awaiting payment · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`,
+    source: 'school-store', status: 'Awaiting payment', createdAt: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })
+  }));
+  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference), reservationExpiresAt: new Date(Date.parse(timestamp) + STORE_RESERVATION_TTL_MS).toISOString() });
 });
 app.get('/api/store/orders', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !(hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Stock-room access is required.' });
+  releaseExpiredStoreReservations(accountSchoolId(actor));
   res.json(tenantRecords(db.storeOrders || [], actor));
+});
+
+app.patch('/api/store/orders/:id/fulfilment', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Only authorised store staff can update order fulfilment.' });
+  const order = (db.storeOrders || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!order) return res.status(404).json({ message: 'Store order not found.' });
+  if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'The order must have a confirmed payment before fulfilment can change.' });
+  if (order.fulfilmentStatus === 'refunded') return res.status(409).json({ message: 'A refunded order cannot be fulfilled.' });
+  const next = String(req.body?.status || '').trim().toLowerCase();
+  const labels = {
+    preparing: ['preparing', 'PAID · PREPARING'],
+    ready_for_collection: ['ready for collection', 'PAID · READY FOR COLLECTION'],
+    collected: ['collected', 'PAID · COLLECTED']
+  };
+  if (!labels[next]) return res.status(400).json({ message: 'Choose preparing, ready for collection, or collected.' });
+  order.fulfilmentStatus = next;
+  order.status = labels[next][0];
+  order.fulfilmentUpdatedAt = new Date().toISOString();
+  order.fulfilmentUpdatedBy = actor.username;
+  updateStoreRoomRecord(order, labels[next][1], `Store order ${labels[next][0]} · ${order.productName} × ${order.quantity} · ${order.parentName} · Ref ${order.reference}`);
+  res.json({ success: true, order });
 });
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
