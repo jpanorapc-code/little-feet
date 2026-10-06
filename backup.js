@@ -905,6 +905,7 @@ async function loadLoginHumanCheck() {
 
   prompt.textContent = 'Loading security check…';
   answer.value = '';
+  answer.required = true;
   answer.disabled = true;
   challengeId.value = '';
   if (submit) submit.disabled = true;
@@ -919,13 +920,15 @@ async function loadLoginHumanCheck() {
     if (data.required === false) {
       loginHumanCheckEnabled = false;
       document.getElementById('loginHumanCheckPanel')?.classList.add('hidden');
-      answer.disabled = false;
+      answer.required = false;
+      answer.disabled = true;
       if (submit) submit.disabled = false;
       return true;
     }
     if (!data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
     loginHumanCheckEnabled = true;
     document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
+    answer.required = true;
     prompt.textContent = data.prompt;
     challengeId.value = data.challengeId;
     answer.disabled = false;
