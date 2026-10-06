@@ -6389,14 +6389,14 @@
 <g class="penguin-wave"><image href="assets/brand/iceberg-blue-eyes.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
 </svg></button></div>
 <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
-        <p class="slogan"><span>Every Little Step Matters</span></p>
+        <p class="slogan"><span data-lf-i18n="tagline">Every Little Step Matters</span></p>
       </div>
       <div class="login-card-tools">
         <span class="login-secure-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="securePortal">Secure school portal</span></span>
         <div class="login-card-actions">
-          <label class="login-language-pill" for="loginLanguagePreference" title="Display language">
+          <label class="login-language-pill" for="loginLanguagePreference" title="Display language" data-lf-i18n-title="displayLanguage">
             <svg class="ui-icon" aria-hidden="true"><use href="#icon-globe"></use></svg>
-            <select id="loginLanguagePreference" data-no-draft aria-label="Display language">
+            <select id="loginLanguagePreference" data-no-draft aria-label="Display language" data-lf-i18n-aria-label="displayLanguage">
               <option value="en">English</option>
               <option value="af">Afrikaans</option>
               <option value="zu">isiZulu</option>
@@ -6410,8 +6410,8 @@
               <option value="nr">isiNdebele</option>
             </select>
           </label>
-          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Sound On</span></button>
-          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="loginBackgroundVideo ambientBackgroundVideo" aria-pressed="false">Play background</button>
+          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span data-lf-i18n="soundOn">Sound On</span></button>
+          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="loginBackgroundVideo ambientBackgroundVideo" aria-pressed="false" data-lf-i18n="playBackground">Play background</button>
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
@@ -6419,24 +6419,24 @@
       <form id="loginForm">
         <div>
           <label for="loginUsername"><span data-lf-i18n="usernameLabel">Staff ID or Parent Email</span> <span class="req">*</span></label>
-          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" autocomplete="username" required>
+          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" data-lf-i18n-placeholder="usernamePlaceholder" autocomplete="username" required>
         </div>
         <div>
           <label for="loginPin"><span data-lf-i18n="passwordLabel">Security PIN / Password</span> <span class="req">*</span></label>
           <div class="password-field">
             <input type="password" id="loginPin" placeholder="••••••••" autocomplete="current-password" required>
-            <button type="button" class="password-toggle" id="loginPinToggle" aria-label="Show password" aria-controls="loginPin" aria-pressed="false" title="Show password" onclick="toggleLoginPinVisibility()">
+            <button type="button" class="password-toggle" id="loginPinToggle" aria-label="Show password" data-lf-i18n-aria-label="showPassword" aria-controls="loginPin" aria-pressed="false" title="Show password" data-lf-i18n-title="showPassword" onclick="toggleLoginPinVisibility()">
               <svg class="ui-icon icon-eye" aria-hidden="true"><use href="#icon-eye"></use></svg>
               <svg class="ui-icon icon-eye-off" aria-hidden="true"><use href="#icon-eye-off"></use></svg>
             </button>
           </div>
         </div>
         <div id="loginHumanCheckPanel" class="login-human-check" aria-live="polite">
-          <label for="loginHumanCheckAnswer">Security check <span class="req">*</span></label>
-          <span id="loginHumanCheckPrompt" class="login-human-check-prompt">Loading security check…</span>
+          <label for="loginHumanCheckAnswer"><span data-lf-i18n="securityCheck">Security check</span> <span class="req">*</span></label>
+          <span id="loginHumanCheckPrompt" class="login-human-check-prompt" data-lf-i18n="loadingSecurityCheck">Loading security check…</span>
           <div class="login-human-check-row">
-            <input type="text" id="loginHumanCheckAnswer" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="Answer" required disabled>
-            <button type="button" class="action-btn btn-blue" onclick="loadLoginHumanCheck()">New check</button>
+            <input type="text" id="loginHumanCheckAnswer" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="Answer" data-lf-i18n-placeholder="answerPlaceholder" required disabled>
+            <button type="button" class="action-btn btn-blue" onclick="loadLoginHumanCheck()" data-lf-i18n="newCheck">New check</button>
           </div>
           <input type="hidden" id="loginHumanCheckId">
           <div class="login-human-trap" aria-hidden="true">
@@ -6454,10 +6454,10 @@
         <button type="submit" class="submit-btn"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="signIn">Secure Account Login</span></button>
 
         <div class="login-divider"><span data-lf-i18n="otherSignIn">Other sign-in options</span></div>
-        <div class="social-signin" aria-label="Sign in with a connected provider">
-          <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')">Continue with Google</button>
-          <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
-          <button type="button" data-provider-signin="microsoft" onclick="startProviderSignIn('microsoft')">Continue with Microsoft</button>
+        <div class="social-signin" aria-label="Sign in with a connected provider" data-lf-i18n-aria-label="providerLabel">
+          <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')" data-lf-i18n="continueGoogle">Continue with Google</button>
+          <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')" data-lf-i18n="continueYahoo">Continue with Yahoo</button>
+          <button type="button" data-provider-signin="microsoft" onclick="startProviderSignIn('microsoft')" data-lf-i18n="continueMicrosoft">Continue with Microsoft</button>
         </div>
       </form>
 
@@ -6472,7 +6472,7 @@
           <span aria-hidden="true">•</span>
           <button type="button" class="legal-inline-link" onclick="openTermsOfService()" data-lf-i18n="termsLink">Terms</button>
           <span aria-hidden="true">•</span>
-          <button type="button" class="legal-inline-link" onclick="openAboutLittleFeet()">About Little Feet</button>
+          <button type="button" class="legal-inline-link" onclick="openAboutLittleFeet()" data-lf-i18n="aboutLittleFeet">About Little Feet</button>
         </div>
       </div>
 
@@ -6490,40 +6490,40 @@
       </form>
 
     </div>
-    <div class="login-info-runner" role="region" aria-label="About Little Feet">
+    <div class="login-info-runner" role="region" aria-label="About Little Feet" data-lf-i18n-aria-label="aboutLittleFeet">
       <div class="login-info-runner-track">
         <div class="login-info-runner-group">
           <strong>Little Feet</strong>
-          <span>is a secure ECD, primary and secondary school operations platform</span>
+          <span data-lf-i18n="tickerPlatform">is a secure ECD, primary and secondary school operations platform</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Learning &amp; development</span>
+          <span data-lf-i18n="tickerLearning">Learning &amp; development</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Attendance &amp; daily care</span>
+          <span data-lf-i18n="tickerAttendance">Attendance &amp; daily care</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Family communication</span>
+          <span data-lf-i18n="tickerFamily">Family communication</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Finance &amp; school operations</span>
+          <span data-lf-i18n="tickerFinance">Finance &amp; school operations</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Safeguarding, privacy &amp; support</span>
+          <span data-lf-i18n="tickerSafeguarding">Safeguarding, privacy &amp; support</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>One connected place for everyday school life</span>
+          <span data-lf-i18n="tickerConnected">One connected place for everyday school life</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
         </div>
         <div class="login-info-runner-group" aria-hidden="true">
           <strong>Little Feet</strong>
-          <span>is a secure ECD, primary and secondary school operations platform</span>
+          <span data-lf-i18n="tickerPlatform">is a secure ECD, primary and secondary school operations platform</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Learning &amp; development</span>
+          <span data-lf-i18n="tickerLearning">Learning &amp; development</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Attendance &amp; daily care</span>
+          <span data-lf-i18n="tickerAttendance">Attendance &amp; daily care</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Family communication</span>
+          <span data-lf-i18n="tickerFamily">Family communication</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Finance &amp; school operations</span>
+          <span data-lf-i18n="tickerFinance">Finance &amp; school operations</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Safeguarding, privacy &amp; support</span>
+          <span data-lf-i18n="tickerSafeguarding">Safeguarding, privacy &amp; support</span>
           <span class="login-info-runner-dot">●</span>
-          <span>One connected place for everyday school life</span>
+          <span data-lf-i18n="tickerConnected">One connected place for everyday school life</span>
           <span class="login-info-runner-dot">●</span>
         </div>
       </div>
