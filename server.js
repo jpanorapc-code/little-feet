@@ -1874,7 +1874,8 @@ const establishAuthenticatedSession = (req, account, callback, authMethod = 'pas
 app.get('/api/auth/human-check', (req, res) => {
   if (!enforcePublicRateLimit(req, res, 'login-human-check', 60, 10 * 60 * 1000)) return;
   res.set('Cache-Control', 'no-store');
-  res.json(issueLoginHumanCheck(req));
+  if (!loginHumanCheckRequired()) return res.json({ required: false });
+  res.json({ required: true, ...issueLoginHumanCheck(req) });
 });
 
 app.post('/api/login', (req, res) => {
