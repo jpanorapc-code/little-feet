@@ -29,7 +29,10 @@ const authKeys = [
   'securityUnavailable','answerPlaceholder','newCheck','humanCheckQuestion','providerLabel',
   'continueGoogle','continueYahoo','continueMicrosoft','aboutLittleFeet','tickerPlatform',
   'tickerLearning','tickerAttendance','tickerFamily','tickerFinance','tickerSafeguarding',
-  'tickerConnected'
+  'tickerConnected','signupTitle','signupIntro','fullName','emailUsername','signupPassword',
+  'iAmA','roleParent','roleTeacher','rolePrincipal','linkedSchoolName','schoolNamePlaceholder',
+  'learnerNames','parentsOnly','learnerPlaceholder','learnerPrivacy','signupAgreementIntro',
+  'privacyNotice','agreementAnd','termsService','signupAgreementEnd','cancel'
 ];
 const existingLoginKeys = [
   'securePortal','accessNote','usernameLabel','passwordLabel','rememberEmail','loginHelp',
@@ -57,13 +60,18 @@ const visibleAuthKeys = [
   'loadingSecurityCheck','newCheck','rememberEmail','loginHelp','signIn','otherSignIn',
   'continueGoogle','continueYahoo','continueMicrosoft','newAccount','createAccount',
   'privacyLink','termsLink','aboutLittleFeet','tickerPlatform','tickerLearning',
-  'tickerAttendance','tickerFamily','tickerFinance','tickerSafeguarding','tickerConnected'
+  'tickerAttendance','tickerFamily','tickerFinance','tickerSafeguarding','tickerConnected',
+  'signupTitle','signupIntro','fullName','emailUsername','signupPassword','iAmA','roleParent',
+  'roleTeacher','rolePrincipal','linkedSchoolName','learnerNames','parentsOnly','learnerPrivacy',
+  'signupAgreementIntro','privacyNotice','agreementAnd','termsService','signupAgreementEnd','cancel'
 ];
 for (const key of visibleAuthKeys) {
   assert.match(page, new RegExp('data-lf-i18n=["\\\']' + key + '["\\\']'), 'Login page must wire visible text to translation key ' + key);
 }
 assert.match(page, /data-lf-i18n-placeholder="usernamePlaceholder"/);
 assert.match(page, /data-lf-i18n-placeholder="answerPlaceholder"/);
+assert.match(page, /data-lf-i18n-placeholder="schoolNamePlaceholder"/);
+assert.match(page, /data-lf-i18n-placeholder="learnerPlaceholder"/);
 assert.match(page, /data-lf-i18n-aria-label="displayLanguage"/);
 assert.match(page, /data-lf-i18n-aria-label="providerLabel"/);
 assert.match(page, /data-lf-i18n-title="displayLanguage"/);
