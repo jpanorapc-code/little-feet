@@ -565,8 +565,8 @@ function portalAudioPreferenceKey() {
 
 function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
-    const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
-    const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
+    const muteLabel = window.translateLittleFeetText?.('soundOn') || button.dataset.muteLabel || 'Sound On';
+    const unmuteLabel = window.translateLittleFeetText?.('muted') || button.dataset.unmuteLabel || 'Muted';
     const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
     button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
     button.classList.toggle('is-muted', portalAudioMuted);
@@ -575,6 +575,8 @@ function updatePortalAudioControls() {
     button.title = portalAudioMuted ? 'Sound muted — click to turn sound on' : 'Sound on — click to mute';
   });
 }
+
+window.addEventListener('littlefeet:languagechange', updatePortalAudioControls);
 
 function stopAllPortalAudio() {
   stopWindtLegacyNote();
@@ -860,7 +862,9 @@ function toggleLoginPinVisibility() {
   if (!input || !button) return;
   const shouldShow = input.type === 'password';
   input.type = shouldShow ? 'text' : 'password';
-  const label = shouldShow ? 'Hide password' : 'Show password';
+  const label = shouldShow
+    ? (window.translateLittleFeetText?.('hidePassword') || 'Hide password')
+    : (window.translateLittleFeetText?.('showPassword') || 'Show password');
   button.setAttribute('aria-pressed', String(shouldShow));
   button.setAttribute('aria-label', label);
   button.setAttribute('title', label);
@@ -908,7 +912,10 @@ async function loadLoginHumanCheck() {
 
   const loadVersion = ++loginHumanCheckLoadVersion;
   loginHumanCheckAbortController?.abort();
-  prompt.textContent = 'Loading security check…';
+  prompt.textContent = window.translateLittleFeetText?.('loadingSecurityCheck') || 'Loading security check…';
+  delete prompt.dataset.humanLeft;
+  delete prompt.dataset.humanRight;
+  delete prompt.dataset.humanOperator;
   answer.value = '';
   answer.required = true;
   answer.disabled = true;
@@ -945,7 +952,18 @@ async function loadLoginHumanCheck() {
       loginHumanCheckEnabled = true;
       document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
       answer.required = true;
-      prompt.textContent = data.prompt;
+      if (Number.isFinite(Number(data.left)) && Number.isFinite(Number(data.right)) && ['+', '−'].includes(data.operator)) {
+        prompt.dataset.humanLeft = String(data.left);
+        prompt.dataset.humanRight = String(data.right);
+        prompt.dataset.humanOperator = data.operator;
+        prompt.textContent = window.translateLittleFeetText?.('humanCheckQuestion', {
+          left: data.left,
+          operator: data.operator,
+          right: data.right
+        }) || data.prompt;
+      } else {
+        prompt.textContent = data.prompt;
+      }
       challengeId.value = data.challengeId;
       answer.disabled = false;
       if (submit) submit.disabled = false;
@@ -955,11 +973,11 @@ async function loadLoginHumanCheck() {
     } catch (error) {
       if (loadVersion !== loginHumanCheckLoadVersion) return false;
       if (attempt === 0) {
-        prompt.textContent = 'Retrying security check…';
+        prompt.textContent = window.translateLittleFeetText?.('retryingSecurityCheck') || 'Retrying security check…';
         await new Promise(resolve => window.setTimeout(resolve, 150));
         continue;
       }
-      prompt.textContent = 'Security check unavailable. Select New check to retry.';
+      prompt.textContent = window.translateLittleFeetText?.('securityUnavailable') || 'Security check unavailable. Select New check to retry.';
       if (submit) submit.disabled = true;
       if (refresh) refresh.disabled = false;
       return false;
