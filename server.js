@@ -319,8 +319,7 @@ const ensureSchool = (schoolName) => {
     const createdAt = new Date().toISOString();
     school = {
       id: createSchoolId(), name: cleanName, status: 'active', createdAt,
-      subscriptionStatus: 'trial', trialStartedAt: createdAt,
-      trialEndsAt: new Date(Date.now() + (14 * 24 * 60 * 60 * 1000)).toISOString()
+      subscriptionStatus: 'trial_pending', trialStartedAt: '', trialEndsAt: ''
     };
     db.schools.push(school);
   }
@@ -333,6 +332,16 @@ const accountSchoolId = (account) => {
   if (!schoolName) return '';
   account.schoolId = ensureSchool(schoolName).id;
   return account.schoolId;
+};
+const ensureSchoolTrialStarted = account => {
+  if (!account || hasPlatformAccess(account) || !['principal', 'admin', 'school_accounts'].includes(account.role)) return null;
+  const school = db.schools.find(entry => entry.id === accountSchoolId(account));
+  if (!school || school.subscriptionStatus !== 'trial_pending') return school || null;
+  const startedAt = new Date().toISOString();
+  school.subscriptionStatus = 'trial';
+  school.trialStartedAt = startedAt;
+  school.trialEndsAt = new Date(Date.now() + (14 * 24 * 60 * 60 * 1000)).toISOString();
+  return school;
 };
 const isSameSchool = (first, second) => {
   if (!first || !second) return false;
@@ -1298,6 +1307,7 @@ function migrateSchoolSubscriptionTrials() {
   const trialMs = 14 * 24 * 60 * 60 * 1000;
   db.schools.forEach(school => {
     if (!school || typeof school !== 'object') return;
+    if (school.subscriptionStatus === 'trial_pending') return;
     if (!school.subscriptionStatus) school.subscriptionStatus = 'trial';
     if (school.trialStartedAt && Number.isFinite(Date.parse(school.trialEndsAt || ''))) return;
     const createdAtMs = Date.parse(school.createdAt || '');
@@ -1733,6 +1743,7 @@ persistenceReady = initialisePersistence();
 // API Endpoints
 // Auth
 const establishAuthenticatedSession = (req, account, callback) => {
+  ensureSchoolTrialStarted(account);
   const safeUser = safeAccount(account);
   req.session.regenerate(regenerateError => {
     if (regenerateError) return callback(regenerateError);
@@ -2727,6 +2738,9 @@ const schoolSubscriptionAccessState = account => {
   }
   if (['refunded', 'expired', 'cancelled', 'canceled'].includes(String(school.subscriptionStatus || '').toLowerCase())) {
     return { allowed: false, active: false, status: String(school.subscriptionStatus).toLowerCase(), planCode: school.subscriptionPlanCode || '', activeUntil, trialEndsAt: school.trialEndsAt || '' };
+  }
+  if (school.subscriptionStatus === 'trial_pending') {
+    return { allowed: false, active: false, status: 'trial_pending', planCode: '', activeUntil, trialStartedAt: '', trialEndsAt: '' };
   }
   const trialEndMs = Date.parse(school.trialEndsAt || '');
   const allowed = Number.isFinite(trialEndMs) && trialEndMs >= Date.now();
