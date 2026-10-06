@@ -101,13 +101,17 @@ const solvePrompt = prompt => {
 };
 
 const challenge = async cookie => {
+  const startedAt = Date.now();
   const result = await request('/api/auth/human-check', { cookie });
+  const elapsedMs = Date.now() - startedAt;
   assert.equal(result.response.status, 200);
   assert.equal(result.data.required, true);
   assert.match(result.response.headers.get('cache-control') || '', /no-store/i);
+  assert.equal(result.response.headers.get('set-cookie'), null, 'human check must not create or touch a login session');
+  assert.ok(elapsedMs < 2000, `human check should return quickly; took ${elapsedMs}ms`);
   assert.ok(result.data.challengeId);
   return {
-    cookie: result.cookie,
+    cookie,
     id: result.data.challengeId,
     answer: solvePrompt(result.data.prompt)
   };
@@ -166,6 +170,11 @@ const waitForMail = async subjectPart => {
       await wait(100);
       if (attempt === 119) throw new Error('Login security test server did not start. ' + stderr);
     }
+
+    // A stale browser session cookie must not make the pre-login human check
+    // wait for or depend on the database-backed session store.
+    const staleCookieChallenge = await challenge('littlefeet.sid=s%3Astale.invalid');
+    assert.ok(staleCookieChallenge.id);
 
     const missingCheck = await request('/api/login', {
       method: 'POST',
