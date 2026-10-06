@@ -895,50 +895,80 @@ async function saveRememberedLogin(username, pin) {
 }
 
 let loginHumanCheckEnabled = true;
+let loginHumanCheckLoadVersion = 0;
+let loginHumanCheckAbortController = null;
 
 async function loadLoginHumanCheck() {
   const prompt = document.getElementById('loginHumanCheckPrompt');
   const answer = document.getElementById('loginHumanCheckAnswer');
   const challengeId = document.getElementById('loginHumanCheckId');
   const submit = document.querySelector('#loginForm button[type="submit"]');
+  const refresh = document.querySelector('#loginHumanCheckPanel .action-btn');
   if (!prompt || !answer || !challengeId) return false;
 
+  const loadVersion = ++loginHumanCheckLoadVersion;
+  loginHumanCheckAbortController?.abort();
   prompt.textContent = 'Loading security check…';
   answer.value = '';
   answer.required = true;
   answer.disabled = true;
   challengeId.value = '';
   if (submit) submit.disabled = true;
+  if (refresh) refresh.disabled = true;
 
-  try {
-    const response = await fetch('/api/auth/human-check', {
-      credentials: 'same-origin',
-      cache: 'no-store'
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error('Security check unavailable.');
-    if (data.required === false) {
-      loginHumanCheckEnabled = false;
-      document.getElementById('loginHumanCheckPanel')?.classList.add('hidden');
-      answer.required = false;
-      answer.disabled = true;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    loginHumanCheckAbortController = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 2500);
+
+    try {
+      const response = await fetch('/api/auth/human-check', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      if (loadVersion !== loginHumanCheckLoadVersion) return false;
+      if (!response.ok) throw new Error('Security check unavailable.');
+
+      if (data.required === false) {
+        loginHumanCheckEnabled = false;
+        document.getElementById('loginHumanCheckPanel')?.classList.add('hidden');
+        answer.required = false;
+        answer.disabled = true;
+        if (submit) submit.disabled = false;
+        if (refresh) refresh.disabled = false;
+        return true;
+      }
+
+      if (!data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
+      loginHumanCheckEnabled = true;
+      document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
+      answer.required = true;
+      prompt.textContent = data.prompt;
+      challengeId.value = data.challengeId;
+      answer.disabled = false;
       if (submit) submit.disabled = false;
+      if (refresh) refresh.disabled = false;
+      answer.focus({ preventScroll: true });
       return true;
+    } catch (error) {
+      if (loadVersion !== loginHumanCheckLoadVersion) return false;
+      if (attempt === 0) {
+        prompt.textContent = 'Retrying security check…';
+        await new Promise(resolve => window.setTimeout(resolve, 150));
+        continue;
+      }
+      prompt.textContent = 'Security check unavailable. Select New check to retry.';
+      if (submit) submit.disabled = true;
+      if (refresh) refresh.disabled = false;
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+      if (loginHumanCheckAbortController === controller) loginHumanCheckAbortController = null;
     }
-    if (!data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
-    loginHumanCheckEnabled = true;
-    document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
-    answer.required = true;
-    prompt.textContent = data.prompt;
-    challengeId.value = data.challengeId;
-    answer.disabled = false;
-    if (submit) submit.disabled = false;
-    return true;
-  } catch {
-    prompt.textContent = 'Security check unavailable. Refresh the page and try again.';
-    if (submit) submit.disabled = true;
-    return false;
   }
+  return false;
 }
 
 function showSignupForm() {
