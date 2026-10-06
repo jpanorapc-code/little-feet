@@ -11,6 +11,7 @@ fs.mkdirSync(tempRoot, { recursive: true });
 const temp = fs.mkdtempSync(path.join(tempRoot, 'login-security-'));
 const port = 6750 + Math.floor(Math.random() * 200);
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
+assert.equal(fs.existsSync(path.join(root, 'assets', 'security', 'login-security-alert.jpg')), true, 'login security artwork must exist');
 
 for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js']) {
   fs.copyFileSync(path.join(root, file), path.join(temp, file));
@@ -191,6 +192,9 @@ const waitForMail = async subjectPart => {
     assert.match(String(notification.text || ''), /Sign-in method: password/i);
     assert.match(String(notification.text || ''), /Network address:/i);
     assert.match(String(notification.text || ''), /Browser\/device:/i);
+    assert.match(String(notification.html || ''), /New sign-in detected/i);
+    assert.match(String(notification.html || ''), /https:\/\/littlefeet\.co\.za\/assets\/security\/login-security-alert\.jpg/);
+    assert.match(String(notification.html || ''), /Little Feet security/i);
     assert.doesNotMatch(JSON.stringify(notification), /SecurePass1|WrongPass1/);
 
     const protectedBeforeLogout = await request('/api/registry', { cookie: successful.cookie });
