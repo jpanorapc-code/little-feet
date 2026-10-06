@@ -52,9 +52,9 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v49-portal-portraits/);
-assert.match(serviceWorker, /backup\.js\?v=20261004-profile-portraits-v1/);
-assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
+assert.match(serviceWorker, /little-feet-shell-v50-login-security/);
+assert.match(serviceWorker, /backup\.js\?v=20261006-login-human-check-v2/);
+assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 
 assert.match(page, /id="loginLanguagePreference"/);
