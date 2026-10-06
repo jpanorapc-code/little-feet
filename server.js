@@ -2051,7 +2051,9 @@ app.use('/api', (req, res, next) => {
     code: 'SCHOOL_SUBSCRIPTION_REQUIRED',
     message: access.status === 'trial_expired'
       ? 'The school\'s 14-day Little Feet trial has ended. A principal or administrator must activate a school subscription to continue.'
-      : 'The school subscription has expired or is inactive. A principal or administrator must renew it to continue.',
+      : access.status === 'trial_pending'
+        ? 'The school\'s 14-day Little Feet trial has not started yet. A principal or administrator must sign in to activate it.'
+        : 'The school subscription has expired or is inactive. A principal or administrator must renew it to continue.',
     subscription: access
   });
 });
