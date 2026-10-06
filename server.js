@@ -3331,7 +3331,7 @@ app.post('/api/payments/payfast/notify', async (req, res) => {
   if (!mappedStatus) return res.status(200).json({ success: true, ignored: true });
 
   const result = applyPaymentEvent({
-    eventId: `payfast:${validation.providerTransactionId || crypto.createHash('sha256').update(reference + ':' + validation.paymentStatus).digest('hex')}`,
+    eventId: `payfast:${validation.providerTransactionId || crypto.createHash('sha256').update(reference).digest('hex')}:${validation.paymentStatus}`,
     reference,
     status: mappedStatus,
     amount: validation.amount,
