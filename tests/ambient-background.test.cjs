@@ -95,6 +95,28 @@ async function main() {
         return audio.right <= card.right + 1 && audio.left >= language.right - 1;
       });
       assert.ok(desktopToolsFit, 'Desktop login language and sound controls must not overlap or escape the card');
+
+      await page.locator('#loginLanguagePreference').selectOption('af');
+      await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.includes('Veilige'));
+      assert.equal((await page.locator('.slogan').textContent()).trim(), 'Elke klein tree maak saak');
+      assert.equal((await page.locator('[data-lf-i18n="securePortal"]').textContent()).trim(), 'Veilige skoolportaal');
+      assert.equal((await page.locator('[data-lf-i18n="securityCheck"]').textContent()).trim(), 'Sekuriteitskontrole');
+      assert.equal(await page.locator('#loginHumanCheckAnswer').getAttribute('placeholder'), 'Antwoord');
+      assert.equal((await page.locator('[data-lf-i18n="newCheck"]').textContent()).trim(), 'Nuwe kontrole');
+      assert.equal((await page.locator('[data-lf-i18n="continueGoogle"]').textContent()).trim(), 'Gaan voort met Google');
+      assert.equal((await page.locator('[data-lf-i18n="aboutLittleFeet"]').textContent()).trim(), 'Oor Little Feet');
+      assert.equal((await page.locator('[data-lf-i18n="tickerLearning"]').first().textContent()).trim(), 'Leer & ontwikkeling');
+      assert.equal((await page.locator('#backgroundMotionToggle').textContent()).trim(), 'Pouseer agtergrond');
+
+      await page.locator('#loginLanguagePreference').selectOption('zu');
+      await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.includes('Iphothali'));
+      assert.equal((await page.locator('.slogan').textContent()).trim(), 'Zonke izinyathelo ezincane zibalulekile');
+      assert.equal((await page.locator('[data-lf-i18n="securityCheck"]').textContent()).trim(), 'Ukuhlola ukuphepha');
+      assert.equal(await page.locator('#loginHumanCheckAnswer').getAttribute('placeholder'), 'Impendulo');
+      assert.equal((await page.locator('[data-lf-i18n="tickerFamily"]').first().textContent()).trim(), 'Ukuxhumana nomndeni');
+
+      await page.locator('#loginLanguagePreference').selectOption('en');
+      await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.trim() === 'Secure school portal');
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Sound On');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
