@@ -1,9 +1,9 @@
-const CACHE_NAME = 'little-feet-shell-v49-portal-portraits';
+const CACHE_NAME = 'little-feet-shell-v50-login-security';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20261004-portal-portraits-v1',
-  '/assets/ambient-background.js?v=20261004-portal-portraits-v1',
+  '/assets/ambient-background.js?v=20261006-login-cache-v2',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-clean.jpg',
   '/assets/brand/iceberg-blue-eyes.webp',
@@ -14,11 +14,11 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
   '/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3',
-  '/backup.js?v=20261004-profile-portraits-v1',
+  '/backup.js?v=20261006-login-human-check-v2',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
-  '/assets/preferences-enhancements.js?v=20261001-api-refresh-flood-v1',
+  '/assets/preferences-enhancements.js?v=20261006-login-i18n-v2',
   '/assets/legal-notices.js?v=20261002-about-v1',
   '/assets/finance-automation.js?v=20260925-finance-v1'
 ];
@@ -65,7 +65,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (/\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?)$/i.test(url.pathname)) {
+  if (/\.(?:js|css)$/i.test(url.pathname)) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (!response.ok) return response;
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  if (/\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
         if (!response.ok) return response;
