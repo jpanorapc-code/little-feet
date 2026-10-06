@@ -536,6 +536,84 @@ const sendLoginLockoutEmail = async account => {
   });
 };
 
+const LOGIN_HUMAN_CHECK_TTL_MS = 5 * 60 * 1000;
+const loginHumanCheckRequired = () => process.env.NODE_ENV !== 'test' || process.env.LF_TEST_REQUIRE_HUMAN_CHECK === '1';
+const loginHumanCheckDigest = (nonce, answer) => crypto.createHash('sha256')
+  .update(`${nonce}\n${String(answer || '').trim()}`)
+  .digest('hex');
+const loginHumanCheckClientHash = req => crypto.createHash('sha256')
+  .update(String(req.get('user-agent') || '').slice(0, 500))
+  .digest('hex');
+
+const issueLoginHumanCheck = req => {
+  const first = crypto.randomInt(2, 10);
+  const second = crypto.randomInt(1, 9);
+  const subtract = crypto.randomInt(0, 2) === 1;
+  const left = subtract ? Math.max(first, second) : first;
+  const right = subtract ? Math.min(first, second) : second;
+  const answer = subtract ? left - right : left + right;
+  const challengeId = crypto.randomBytes(18).toString('hex');
+  const nonce = crypto.randomBytes(18).toString('hex');
+  const issuedAt = Date.now();
+  req.session.loginHumanCheck = {
+    challengeId,
+    answerDigest: loginHumanCheckDigest(nonce, answer),
+    nonce,
+    clientHash: loginHumanCheckClientHash(req),
+    issuedAt,
+    expiresAt: issuedAt + LOGIN_HUMAN_CHECK_TTL_MS
+  };
+  return {
+    challengeId,
+    prompt: `What is ${left} ${subtract ? '−' : '+'} ${right}?`,
+    expiresInSeconds: Math.floor(LOGIN_HUMAN_CHECK_TTL_MS / 1000)
+  };
+};
+
+const verifyLoginHumanCheck = (req, body) => {
+  if (!loginHumanCheckRequired()) return true;
+  const challenge = req.session?.loginHumanCheck;
+  if (req.session) delete req.session.loginHumanCheck;
+  const challengeId = limitedText(body?.humanCheckId, 80);
+  const answer = limitedText(body?.humanCheckAnswer, 20);
+  const honeypot = limitedText(body?.companyWebsite, 200);
+  if (honeypot || !challenge || !challengeId || !answer) return false;
+  if (challenge.challengeId !== challengeId || Number(challenge.expiresAt) < Date.now()) return false;
+  if (challenge.clientHash !== loginHumanCheckClientHash(req)) return false;
+  const expected = Buffer.from(String(challenge.answerDigest || ''), 'hex');
+  const actual = Buffer.from(loginHumanCheckDigest(challenge.nonce, answer), 'hex');
+  return expected.length === actual.length && expected.length > 0 && crypto.timingSafeEqual(expected, actual);
+};
+
+const loginSecurityRequestSummary = req => ({
+  network: boundedText(req.ip || 'Unavailable', 96) || 'Unavailable',
+  device: boundedText(req.get('user-agent') || 'Unknown browser or device', 300) || 'Unknown browser or device'
+});
+
+const sendSuccessfulLoginEmail = async (req, account, authMethod = 'password') => {
+  const to = accountSecurityEmail(account);
+  if (!to) return false;
+  const requestSummary = loginSecurityRequestSummary(req);
+  return sendLittleFeetEmail({
+    to,
+    subject: 'Little Feet security: new sign-in',
+    text: [
+      `Hello ${String(account?.name || 'Little Feet user').trim()},`,
+      '',
+      'A successful sign-in to your Little Feet account was detected.',
+      `Time: ${new Date().toISOString()}`,
+      `Sign-in method: ${authMethod}`,
+      `Network address: ${requestSummary.network}`,
+      `Browser/device: ${requestSummary.device}`,
+      '',
+      'If this was you, no action is needed.',
+      'If this was not you, change your password or PIN and contact your school administrator immediately.',
+      '',
+      'Little Feet security'
+    ].join('\n')
+  });
+};
+
 const pruneLoginAttempts = (now = Date.now()) => {
   for (const [key, entry] of loginAttempts) {
     if (!entry || now >= loginAttemptExpiry(entry)) loginAttempts.delete(key);
@@ -1742,18 +1820,78 @@ persistenceReady = initialisePersistence();
 
 // API Endpoints
 // Auth
-const establishAuthenticatedSession = (req, account, callback) => {
+const establishAuthenticatedSession = (req, account, callback, authMethod = 'password') => {
   ensureSchoolTrialStarted(account);
   const safeUser = safeAccount(account);
   req.session.regenerate(regenerateError => {
     if (regenerateError) return callback(regenerateError);
     req.session.littleFeetUser = safeUser;
-    req.session.save(saveError => callback(saveError, safeUser));
+    req.session.save(saveError => {
+      if (!saveError) {
+        logStructured('info', 'auth.login_succeeded', {
+          category: 'authentication',
+          requestId: req.requestId,
+          user: account?.username || '',
+          role: account?.role || '',
+          schoolId: account ? accountSchoolId(account) : '',
+          schoolName: account?.schoolName || '',
+          method: req.method,
+          route: req.path,
+          result: 'success',
+          details: `Sign-in method: ${authMethod}`
+        });
+        void sendSuccessfulLoginEmail(req, account, authMethod).then(sent => {
+          if (sent) logStructured('info', 'auth.login_notification_sent', {
+            category: 'authentication',
+            requestId: req.requestId,
+            user: account?.username || '',
+            role: account?.role || '',
+            schoolId: account ? accountSchoolId(account) : '',
+            schoolName: account?.schoolName || '',
+            method: req.method,
+            route: req.path,
+            result: 'sent'
+          });
+        }).catch(error => {
+          logStructured('error', 'auth.login_notification_failed', {
+            category: 'authentication',
+            requestId: req.requestId,
+            user: account?.username || '',
+            role: account?.role || '',
+            schoolId: account ? accountSchoolId(account) : '',
+            schoolName: account?.schoolName || '',
+            method: req.method,
+            route: req.path,
+            message: error.message
+          });
+        });
+      }
+      callback(saveError, safeUser);
+    });
   });
 };
 
+app.get('/api/auth/human-check', (req, res) => {
+  if (!enforcePublicRateLimit(req, res, 'login-human-check', 60, 10 * 60 * 1000)) return;
+  res.set('Cache-Control', 'no-store');
+  res.json(issueLoginHumanCheck(req));
+});
+
 app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
+  if (!verifyLoginHumanCheck(req, req.body)) {
+    logStructured('warn', 'auth.human_check_failed', {
+      category: 'authentication',
+      requestId: req.requestId,
+      method: req.method,
+      route: req.path,
+      result: 'rejected'
+    });
+    return res.status(400).json({
+      message: 'Please complete the security check and try again.',
+      humanCheckRequired: true
+    });
+  }
   const loginUsername = limitedText(username, 160);
   const normalizedUsername = loginUsername ? normalizeUsername(loginUsername) : '';
 
@@ -4720,7 +4858,11 @@ const sendLittleFeetEmail = async ({to,subject,text}) => {
 
   const from=String(process.env.LF_EMAIL_FROM||'').trim(),apiKey=String(process.env.LF_EMAIL_API_KEY||'').trim();
   if(!looksLikeEmailAddress(from)||!apiKey)return false;
-  const endpoint=safeHttpsUrl(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails');
+  const rawEndpoint=String(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails').trim();
+  const testLoopbackEndpoint=process.env.NODE_ENV==='test' && /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/i.test(rawEndpoint)
+    ? rawEndpoint
+    : '';
+  const endpoint=safeHttpsUrl(rawEndpoint)||testLoopbackEndpoint;
   if(!endpoint)throw new Error('Invalid LF_EMAIL_API_URL');
   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({from,to:[to],subject:emailHeaderText(subject),text:String(text||'')})});
   if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
@@ -7036,7 +7178,7 @@ app.get('/auth/google/callback',
   (req, res) => {
     const { account, error } = resolveOAuthAccount('google', req.user, db.users);
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
-    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=google'));
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=google'), 'google');
   }
 );
 
@@ -7078,7 +7220,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     if (!profileResponse.ok) throw new Error('Yahoo profile request failed');
     const { account, error } = resolveOAuthAccount('yahoo', profile, db.users);
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
-    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'));
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'), 'yahoo');
   } catch (error) {
     logStructured('error', 'oauth.yahoo_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=yahoo-sign-in-failed');
@@ -7136,7 +7278,7 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     if (!profileResponse.ok) throw new Error('Microsoft profile request failed');
     const { account, error } = resolveOAuthAccount('microsoft', profile, db.users);
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
-    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'));
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'), 'microsoft');
   } catch (error) {
     logStructured('error', 'oauth.microsoft_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=microsoft-sign-in-failed');
