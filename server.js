@@ -3329,11 +3329,7 @@ app.post('/api/payments/payfast/itn', async (req, res) => {
   const amount = Number(data.amount_gross);
   if (merchantId !== String(process.env.LF_PAYFAST_MERCHANT_ID || '').trim()) return res.status(401).send('Invalid merchant.');
   if (!/^[0-9a-f]{32}$/.test(suppliedSignature)) return res.status(401).send('Invalid signature.');
-  const unsignedEntries = [];
-  for (const [key, value] of entries) {
-    if (key === 'signature') break;
-    unsignedEntries.push([key, value]);
-  }
+  const unsignedEntries = entries.filter(([key]) => key !== 'signature');
   const paramString = payFastParamString(unsignedEntries);
   const expectedSignature = crypto.createHash('md5').update(`${paramString}&passphrase=${payFastUrlEncode(String(process.env.LF_PAYFAST_PASSPHRASE || ''))}`).digest('hex');
   const suppliedBuffer = Buffer.from(suppliedSignature, 'hex'), expectedBuffer = Buffer.from(expectedSignature, 'hex');
