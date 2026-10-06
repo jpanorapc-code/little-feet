@@ -475,6 +475,11 @@
     .login-section-label { width:min(100%,360px); margin:0 auto 9px; color:#94a3b8; font-size:.65rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; text-align:left; }
     .field-help { display:block; margin:-6px 0 10px; color:var(--text-muted); font-size:.68rem; line-height:1.35; }
     .login-device-note { width:100%; margin:-7px 0 12px; color:var(--text-muted); font-size:.68rem; line-height:1.35; }
+    .login-human-check { margin:2px 0 10px; padding:10px 11px; border:1px solid rgba(94,234,212,.20); border-radius:10px; background:rgba(7,25,43,.36); }
+    .login-human-check-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+    .login-human-check-prompt { display:block; margin:0 0 6px; color:var(--text-muted); font-size:.72rem; line-height:1.35; }
+    .login-human-check .action-btn { min-height:40px; margin:0 0 10px; }
+    .login-human-trap { position:absolute !important; left:-10000px !important; width:1px !important; height:1px !important; overflow:hidden !important; opacity:0 !important; pointer-events:none !important; }
     .login-help-panel { width:min(100%,360px); margin:12px auto 0; padding:10px 11px; border:1px solid rgba(125,211,252,.18); border-radius:10px; background:rgba(2,15,28,.28); color:var(--text-muted); text-align:left; }
     .login-help-panel strong { display:block; margin-bottom:3px; color:var(--text-dark); font-size:.75rem; }
     .login-help-panel span { display:block; font-size:.70rem; line-height:1.4; }
@@ -6424,6 +6429,19 @@
               <svg class="ui-icon icon-eye" aria-hidden="true"><use href="#icon-eye"></use></svg>
               <svg class="ui-icon icon-eye-off" aria-hidden="true"><use href="#icon-eye-off"></use></svg>
             </button>
+          </div>
+        </div>
+        <div id="loginHumanCheckPanel" class="login-human-check" aria-live="polite">
+          <label for="loginHumanCheckAnswer">Security check <span class="req">*</span></label>
+          <span id="loginHumanCheckPrompt" class="login-human-check-prompt">Loading security check…</span>
+          <div class="login-human-check-row">
+            <input type="text" id="loginHumanCheckAnswer" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="Answer" required disabled>
+            <button type="button" class="action-btn btn-blue" onclick="loadLoginHumanCheck()">New check</button>
+          </div>
+          <input type="hidden" id="loginHumanCheckId">
+          <div class="login-human-trap" aria-hidden="true">
+            <label for="loginCompanyWebsite">Leave this field empty</label>
+            <input type="text" id="loginCompanyWebsite" tabindex="-1" autocomplete="off">
           </div>
         </div>
         <div class="login-utility-row">
