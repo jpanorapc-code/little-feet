@@ -242,13 +242,23 @@ const sign = entries => crypto.createHash('md5')
     assert.equal(reservedStore.data.products[0].physicalStockQuantity, 10);
     assert.equal(reservedStore.data.products[0].reservedQuantity, 2);
 
-    const storePaid = await request('/api/payments/reconcile', {
-      method:'POST', cookie:alphaAdmin, body:{
-        eventId:'store-paid-one', reference:storeOrder.data.order.reference,
-        status:'paid', amount:100, bankReference:'BANK-STORE-001'
-      }
+    const storePaidFields = [
+      ['m_payment_id', storeOrder.data.order.reference],
+      ['pf_payment_id', 'PF-STORE-001'],
+      ['payment_status', 'COMPLETE'],
+      ['item_name', 'Alpha School Shirt'],
+      ['item_description', 'Little Feet store order'],
+      ['amount_gross', '100.00'],
+      ['amount_fee', '-2.30'],
+      ['amount_net', '97.70'],
+      ['merchant_id', merchantId]
+    ];
+    const storePaidSignature = sign(storePaidFields);
+    const storePaid = await request('/api/payments/payfast/itn', {
+      method:'POST', form:parameterString(storePaidFields) + '&signature=' + storePaidSignature
     });
-    assert.equal(storePaid.response.status, 201, storePaid.text);
+    assert.equal(storePaid.response.status, 200, storePaid.text);
+    assert.equal(storePaid.data.success, true);
 
     const paidInventory = await request('/api/store', { cookie:alphaAdmin });
     assert.equal(paidInventory.data.products[0].stockQuantity, 8);
@@ -302,13 +312,23 @@ const sign = entries => crypto.createHash('md5')
     assert.equal(failedReserved.data.products[0].physicalStockQuantity, 10);
     assert.equal(failedReserved.data.products[0].reservedQuantity, 3);
 
-    const failedPayment = await request('/api/payments/reconcile', {
-      method:'POST', cookie:alphaAdmin, body:{
-        eventId:'store-failed-one', reference:failedOrder.data.order.reference,
-        status:'failed', amount:150, bankReference:'FAILED-STORE-001'
-      }
+    const failedFields = [
+      ['m_payment_id', failedOrder.data.order.reference],
+      ['pf_payment_id', 'PF-STORE-CANCELLED-001'],
+      ['payment_status', 'CANCELLED'],
+      ['item_name', 'Alpha School Shirt'],
+      ['item_description', 'Little Feet store order'],
+      ['amount_gross', '150.00'],
+      ['amount_fee', '0.00'],
+      ['amount_net', '150.00'],
+      ['merchant_id', merchantId]
+    ];
+    const failedSignature = sign(failedFields);
+    const failedPayment = await request('/api/payments/payfast/itn', {
+      method:'POST', form:parameterString(failedFields) + '&signature=' + failedSignature
     });
-    assert.equal(failedPayment.response.status, 201, failedPayment.text);
+    assert.equal(failedPayment.response.status, 200, failedPayment.text);
+    assert.equal(failedPayment.data.success, true);
     const afterFailed = await request('/api/store', { cookie:alphaAdmin });
     assert.equal(afterFailed.data.products[0].stockQuantity, 10);
     assert.equal(afterFailed.data.products[0].physicalStockQuantity, 10);
