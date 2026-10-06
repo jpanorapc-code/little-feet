@@ -33,7 +33,6 @@ for (const file of [
 
 const now = Date.now();
 const iso = value => new Date(value).toISOString();
-const futureTrial = iso(now + 14 * 24 * 60 * 60 * 1000);
 const students = Array.from({ length: 35 }, (_, index) => ({
   id: 'alpha-student-' + index,
   schoolId: 'school-alpha',
@@ -51,7 +50,7 @@ const payfastBilling = prefix => ({
 
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({
   schools: [
-    { id:'school-alpha', name:'Alpha School', status:'active', createdAt:iso(now), subscriptionStatus:'trial', trialStartedAt:iso(now), trialEndsAt:futureTrial },
+    { id:'school-alpha', name:'Alpha School', status:'active', createdAt:iso(now), subscriptionStatus:'trial_pending', trialStartedAt:'', trialEndsAt:'' },
     { id:'school-trial-expired', name:'Expired Trial School', status:'active', createdAt:'2026-01-01T00:00:00.000Z', subscriptionStatus:'trial', trialStartedAt:'2026-01-01T00:00:00.000Z', trialEndsAt:'2026-01-15T00:00:00.000Z' },
     { id:'school-paid-expired', name:'Expired Paid School', status:'active', createdAt:'2026-01-01T00:00:00.000Z', subscriptionStatus:'active', subscriptionPlanCode:'standard', subscriptionActiveUntil:'2026-01-31', trialStartedAt:'2026-01-01T00:00:00.000Z', trialEndsAt:'2026-01-15T00:00:00.000Z' }
   ],
@@ -160,6 +159,7 @@ const sign = entries => crypto.createHash('md5')
     assert.equal(alphaBilling.response.status, 200);
     assert.equal(alphaBilling.data.subscription.status, 'trial');
     assert.equal(alphaBilling.data.subscription.allowed, true);
+    assert.ok(Date.parse(alphaBilling.data.subscription.trialEndsAt) > Date.now());
     assert.equal(alphaBilling.data.subscription.learnerCount, 35);
     assert.equal(alphaBilling.data.payfastAvailable, true);
 
