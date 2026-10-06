@@ -714,10 +714,16 @@ app.use('/api', (req, res, next) => {
     message: 'This import is too large. Use a spreadsheet up to 5 MB. Large school-register imports must use School Integration.'
   });
 });
+const MODERATION_EXEMPT_API_PATHS = new Set([
+  '/api/email/inbound/resend',
+  '/api/payments/webhook',
+  '/api/payments/payfast/notify'
+]);
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
-  if (String(req.originalUrl || '').split('?')[0] === '/api/email/inbound/resend') return next();
+  const requestPath = String(req.originalUrl || '').split('?')[0];
   if (requestPayloadTooComplex(req.body)) return res.status(400).json({ message: 'Request structure is too deeply nested or complex.' });
+  if (MODERATION_EXEMPT_API_PATHS.has(requestPath)) return next();
   if (!requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
 });
