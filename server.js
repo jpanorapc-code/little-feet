@@ -735,6 +735,9 @@ app.use((req, res, next) => {
     "block-all-mixed-content"
   ].join('; '));
   if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  }
   if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
     res.setHeader('Cache-Control', 'no-store, private');
   }
@@ -2490,6 +2493,7 @@ app.delete('/api/system-inspect-history', async (req, res, next) => {
   try {
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     logStructured('info', 'inspection.history_cleared', {
       category: 'error-management',
       requestId: req.requestId,
@@ -3947,6 +3951,7 @@ app.delete('/api/accounts/:username', async (req, res, next) => {
       if (!cleaned) return res.status(503).json({ message: 'The account was deleted, but its private-file cleanup requires an automatic retry.', cleanupJobId: cleanupJob.id });
     }
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.json({ success: true });
   } catch (error) { next(error); }
 });
@@ -4333,6 +4338,7 @@ app.post('/api/files', async (req, res, next) => {
     if(['learner','admission_application'].includes(entityType))db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:file.schoolId,entityType,recordId,fileId:file.id,action:'uploaded',by:actor.username,at:new Date().toISOString(),details:file.originalFilename});
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.status(201).json({ success: true, file: publicFileMetadata(file) });
   } catch (error) {
     if (file) await rollbackStoredFile(file);
@@ -4369,7 +4375,9 @@ app.put('/api/files/:id', async (req, res, next) => {
   try {
     replacement = await createStoredFile(actor, {
       entityType: previous.entityType, recordId: previous.recordId, purpose: previous.purpose,
-      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl
+      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl,
+      schoolIdOverride: previous.schoolId || accountSchoolId(actor),
+      schoolNameOverride: previous.schoolName || actor.schoolName || ''
     });
     replacement.replacesFileId = previous.id;
     previous.accessState = 'replaced'; previous.replacedByFileId = replacement.id; previous.updatedAt = new Date().toISOString();
@@ -4382,6 +4390,7 @@ app.put('/api/files/:id', async (req, res, next) => {
     previous.accessState = 'deleted'; previous.deletedAt = new Date().toISOString();
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.json({ success: true, file: publicFileMetadata(replacement) });
   } catch (error) {
     if (replacement && !previousObjectDeleted) await rollbackStoredFile(replacement);
@@ -4430,6 +4439,7 @@ app.delete('/api/files/:id', async (req, res, next) => {
     file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); file.deletedBy = actor.username;
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.json({ success: true });
   } catch (error) {
     file.accessState = 'active'; delete file.deletedAt; delete file.deletedBy;
@@ -4510,6 +4520,8 @@ app.post('/api/admissions/applications/:id/withdraw',(req,res)=>{
   if(['Enrolled','Rejected','Withdrawn'].includes(application.status))return res.status(409).json({message:'This application can no longer be withdrawn.'});
   const previous=application.status;application.status='Withdrawn';application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
   db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:'Withdrawn',changedBy:actor.username,changedAt:application.updatedAt,note:'Withdrawn by parent'});
+  const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&item.schoolId===application.schoolId);
+  if(ticket){ticket.status='Completed';ticket.updatedAt=application.updatedAt;ticket.feedback='Application withdrawn by parent.';}
   res.json({success:true,application:admissionApiView(application)});
 });
 app.put('/api/admissions/applications/:id/checklist',(req,res)=>{
@@ -4550,7 +4562,7 @@ app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
   const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
   if(!application)return res.status(404).json({message:'Application not found.'});
   if(application.status==='Enrolled')return res.status(409).json({message:'This application is already enrolled.',learnerId:application.convertedLearnerId});
-  if(!['Approved','Under review','Documents required','Waitlisted','Submitted'].includes(application.status))return res.status(409).json({message:'This application cannot be enrolled from its current status.'});
+  if(application.status!=='Approved')return res.status(409).json({message:'Approve this application before enrolling the learner.'});
   const documentState=admissionDocumentState(application);
   if(!documentState.complete)return res.status(409).json({message:'Verify all required admission documents before enrolment.',missingRequired:documentState.missingRequired});
   const className=limitedText(req.body?.className||application.gradeOrAgeGroup,120),address=limitedText(req.body?.address||decryptStoredField(application.homeArea),500);
@@ -4652,7 +4664,7 @@ app.post('/api/posts', async (req, res, next) => {
       post.mediaFileId = file.id; post.mediaUrl = null;
     }
     db.posts.unshift(post);
-    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; }
+    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot(); }
     res.json({ success: true, post: { ...post, mediaUrl: file ? fileContentPath(file) : post.mediaUrl } });
   } catch (error) {
     db.posts = db.posts.filter(item => item !== post);
@@ -4671,7 +4683,7 @@ app.delete('/api/posts/:id', async (req, res, next) => {
     db.posts = db.posts.filter(p => p !== post);
     if (file) {
       await saveDatabaseState(); await objectStorage.delete({ key: file.objectKey });
-      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true;
+      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot();
     }
     res.json({ success: true });
   } catch (error) {
@@ -4753,7 +4765,7 @@ app.post('/api/worksheets', async (req, res, next) => {
       item.photoFileId = file.id; item.photoUrl = null;
     }
     db.worksheets.unshift(item);
-    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; }
+    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot(); }
     res.json({ success: true, item: { ...item, photoUrl: file ? fileContentPath(file) : item.photoUrl } });
   } catch (error) {
     db.worksheets = db.worksheets.filter(record => record !== item);
@@ -4771,7 +4783,7 @@ app.delete('/api/worksheets/:id', async (req, res, next) => {
     db.worksheets = db.worksheets.filter(w => w !== item);
     if (file) {
       await saveDatabaseState(); await objectStorage.delete({ key: file.objectKey });
-      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true;
+      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot();
     }
     res.json({ success: true });
   } catch (error) {
@@ -6383,6 +6395,7 @@ app.post('/api/school-deletion/execute', async (req, res) => {
   }
 
   req.persistenceCommitted = true;
+  scheduleReplicaSnapshot();
   res.json({ success: true, deletedSchoolId: schoolId, deletedSchoolName: schoolName });
 });
 
@@ -7700,7 +7713,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Wildcard Catch-All (Serves Frontend)
+// Error handler and public frontend entry point.
 app.use((error, req, res, _next) => {
   const report = recordSystemError(error, req);
   if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
@@ -7711,10 +7724,20 @@ app.use((error, req, res, _next) => {
   });
 });
 
-app.get(/(.*)/, (req, res) => {
-  if (path.extname(req.path)) return res.status(404).end();
+// Little Feet is a single-page shell at the canonical root. Unknown API routes
+// must never fall through to HTML, and unknown public paths must not become
+// crawlable soft-404 pages.
+app.all(/^\/api(?:\/|$)/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(404).json({ message: 'API route not found.' });
+});
+app.get('/', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+app.get(/(.*)/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(404).end();
 });
 
 // Start Server

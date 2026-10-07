@@ -30,7 +30,8 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-parent-one', pinHash: pinHash('ParentPass1'), name: 'Parent One', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: [] },
     { username: 'alpha-parent-two', pinHash: pinHash('ParentPass2'), name: 'Parent Two', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: ['Other Learner'] },
-    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
+    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
+    { username: 'bravo-parent', pinHash: pinHash('BravoParent1'), name: 'Bravo Parent', role: 'parent', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active', linkedLearners: [] }
   ],
   students: [{ id: 'other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-alpha', schoolName: 'Alpha School' }], registry: [], tickets: [],
   posts: [], worksheets: [], fileRecords: [], storageCleanupJobs: [], admissionsApplications: [], admissionsStatusHistory: [], documentAudit: [],
@@ -145,6 +146,28 @@ const login = async (username, pin) => {
     assert.equal(audit.data.some(row => row.action === 'uploaded'), true);
     assert.equal(audit.data.some(row => row.action === 'metadata_updated'), true);
     assert.equal(audit.data.some(row => row.action === 'verified'), true);
+
+    const bravoParentCookie = await login('bravo-parent', 'BravoParent1');
+    const crossSubmitted = await request('/api/school-applications', { method: 'POST', cookie: bravoParentCookie, body: {
+      schoolName: 'Alpha School', guardianName: 'Bravo Parent', contactPhone: '0830000000', contactEmail: 'bravo-parent@example.test',
+      learnerName: 'Cross School Learner', dateOfBirth: '2020-05-20', intendedStart: '2027-01-15', gradeOrAgeGroup: 'Grade 1',
+      homeArea: 'Other Area', notes: 'Cross-school application tenant test'
+    } });
+    assert.equal(crossSubmitted.response.status, 201, crossSubmitted.data?.message);
+    const crossUpload = await request('/api/files', { method: 'POST', cookie: bravoParentCookie, body: {
+      entityType: 'admission_application', recordId: crossSubmitted.data.application.id, purpose: 'birth_certificate', originalFilename: 'cross.png', dataUrl: pngA
+    } });
+    assert.equal(crossUpload.response.status, 201, crossUpload.data?.message);
+    const crossReplacement = await request('/api/files/' + crossUpload.data.file.id, { method: 'PUT', cookie: bravoParentCookie, body: { originalFilename: 'cross-replacement.png', dataUrl: pngB } });
+    assert.equal(crossReplacement.response.status, 200, crossReplacement.data?.message);
+    let persistedReplacement;
+    for (let attempt = 0; attempt < 20 && !persistedReplacement; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const persistedState = JSON.parse(fs.readFileSync(path.join(temp, 'littlefeet-replica.json'), 'utf8'));
+      persistedReplacement = persistedState.fileRecords.find(file => file.id === crossReplacement.data.file.id);
+    }
+    assert.ok(persistedReplacement, 'Replacement metadata must reach the replica snapshot.');
+    assert.equal(persistedReplacement.schoolId, 'school-alpha', 'Replacing an admission document must preserve the target school tenant.');
 
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
     assert.equal(staffUpload.response.status, 201, staffUpload.data?.message);
