@@ -19,7 +19,7 @@ function registerAdvancedSchoolOperations(app, deps) {
   const collections = [
     'eldaSkillCatalogue','eldaAssessments','aftercareSettings','aftercarePlans','aftercareSessions',
     'staffClockSessions','staffRatioSettings','dayCareBookings','dayCareCapacitySettings',
-    'mealPlans','dietaryProfiles','learnerGroups','pickupPasses','academicAnalyticsSettings','schoolGroups','communicationTemplates'
+    'mealPlans','dietaryProfiles','learnerGroups','learnerSubjectAssignments','pickupPasses','academicAnalyticsSettings','schoolGroups','communicationTemplates'
   ];
   collections.forEach(name => { if (!Array.isArray(db[name])) db[name] = []; });
 
@@ -197,7 +197,14 @@ function registerAdvancedSchoolOperations(app, deps) {
     const childName=limitedText(req.body?.childName,160),className=limitedText(req.body?.className,120),date=safeDate(req.body?.date),rate=cleanMoney(req.body?.rate||0);if(!childName||!className||!date||rate===null)return res.status(400).json({message:'Enter child, class, date and valid rate.'});
     const capacity=capacityFor(actor,className,date),confirmed=schoolRecords('dayCareBookings',actor).filter(r=>r.date===date&&normalizeComparableText(r.className)===normalizeComparableText(className)&&r.status==='confirmed').length;
     const status=confirmed>=capacity?'waitlisted':'confirmed';
-    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),childName,className,date,rate,status,parentUsername:actor.role==='parent'?actor.username:boundedText(req.body?.parentUsername,160),extras:Array.isArray(req.body?.extras)?req.body.extras.map(x=>boundedText(x,120)).filter(Boolean).slice(0,20):[],createdAt:nowIso(),createdBy:actor.username});db.dayCareBookings.unshift(row);res.status(201).json({success:true,booking:row,capacity,confirmed});
+    const parentUsername=actor.role==='parent'?actor.username:boundedText(req.body?.parentUsername,160);
+    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),childName,className,date,rate,status,parentUsername,extras:Array.isArray(req.body?.extras)?req.body.extras.map(x=>boundedText(x,120)).filter(Boolean).slice(0,20):[],billingStatus:rate>0?'pending':'not_due',createdAt:nowIso(),createdBy:actor.username});
+    if(status==='confirmed'&&rate>0&&parentUsername&&typeof createParentPaymentRecord==='function'){
+      const result=createParentPaymentRecord({parentUsername,learnerName:childName,description:'Day / holiday care booking · '+date,amountDue:rate,dueDate:date},actor);
+      if(!result.error){db.parentPayments.unshift(result.record);row.billingStatus='invoice_created';row.parentPaymentId=result.record.id;}
+      else{row.billingStatus='billing_pending_configuration';row.billingMessage=boundedText(result.error,240);}
+    }
+    db.dayCareBookings.unshift(row);res.status(201).json({success:true,booking:row,capacity,confirmed});
   });
   app.patch('/api/day-care/bookings/:id',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const row=schoolRecords('dayCareBookings',actor).find(x=>x.id===req.params.id);if(!row)return res.status(404).json({message:'Booking not found.'});if(['confirmed','waitlisted','cancelled','attended'].includes(req.body?.status))row.status=req.body.status;row.updatedAt=nowIso();row.updatedBy=actor.username;res.json({success:true,booking:row});});
 
@@ -215,6 +222,10 @@ function registerAdvancedSchoolOperations(app, deps) {
   app.post('/api/learner-groups/:id/members',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const group=schoolRecords('learnerGroups',actor).find(r=>r.id===req.params.id);if(!group)return res.status(404).json({message:'Group not found.'});const names=[...new Set((Array.isArray(req.body?.learnerNames)?req.body.learnerNames:[]).map(x=>boundedText(x,160)).filter(Boolean))];for(const name of names)if(!findLearner(actor,name))return res.status(404).json({message:'Learner not found: '+name});group.members=names;group.updatedAt=nowIso();group.updatedBy=actor.username;res.json({success:true,group});});
   app.delete('/api/learner-groups/:id',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const before=db.learnerGroups.length;db.learnerGroups=db.learnerGroups.filter(r=>!(r.id===req.params.id&&recordInSchool(r,actor)));if(db.learnerGroups.length===before)return res.status(404).json({message:'Group not found.'});res.json({success:true});});
 
+  // Learner subject assignments and change history.
+  app.get('/api/academics/subject-assignments',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});let rows=schoolRecords('learnerSubjectAssignments',actor);const learner=boundedText(req.query?.learnerName,160);if(learner)rows=rows.filter(r=>normalizeComparableText(r.learnerName)===normalizeComparableText(learner));res.json(rows);});
+  app.post('/api/academics/subject-assignments',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const learner=findLearner(actor,req.body?.learnerName),subject=limitedText(req.body?.subject,120),action=['add','remove','change'].includes(req.body?.action)?req.body.action:null;if(!learner||!subject||!action)return res.status(400).json({message:'Choose a learner, subject and assignment action.'});const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,subject,action,fromSubject:boundedText(req.body?.fromSubject,120),effectiveDate:safeDate(req.body?.effectiveDate)||dateKeyInSouthAfrica(),reason:boundedText(req.body?.reason,600),createdAt:nowIso(),createdBy:actor.username});db.learnerSubjectAssignments.unshift(row);res.status(201).json({success:true,assignment:row});});
+
   // Heavy academic analytics over the real subject-mark records.
   const analyticsSetting=actor=>{let row=schoolRecords('academicAnalyticsSettings',actor)[0];if(!row){row=tagSchoolRecord(actor,{id:crypto.randomUUID(),passMark:50,distinctionMark:80,updatedAt:nowIso()});db.academicAnalyticsSettings.unshift(row);}return row;};
   app.get('/api/academics/analytics/settings',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});res.json(analyticsSetting(actor));});
@@ -223,11 +234,17 @@ function registerAdvancedSchoolOperations(app, deps) {
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
     let marks=schoolRecords('subjectMarks',actor);const term=boundedText(req.query?.term,80),year=Number(req.query?.year)||0,subject=boundedText(req.query?.subject,120);if(term)marks=marks.filter(r=>normalizeComparableText(r.term)===normalizeComparableText(term));if(year)marks=marks.filter(r=>Number(r.year)===year);if(subject)marks=marks.filter(r=>normalizeComparableText(r.subject)===normalizeComparableText(subject));
     const byLearner=new Map();for(const mark of marks){const key=mark.learnerName,arr=byLearner.get(key)||[];arr.push(mark);byLearner.set(key,arr);}
-    const rows=[...byLearner.entries()].map(([learnerName,items])=>({learnerName,average:Math.round(items.reduce((a,b)=>a+Number(b.percentage||0),0)/items.length*10)/10,assessments:items.length})).sort((a,b)=>b.average-a.average);
-    const set=analyticsSetting(actor);rows.forEach((r,i)=>{r.rank=i+1;r.outcome=r.average>=set.distinctionMark?'Distinction':r.average>=set.passMark?'Pass':'At risk';});
+    const rows=[...byLearner.entries()].map(([learnerName,items])=>{
+      const ordered=[...items].sort((a,b)=>Date.parse(a.createdAt||a.assessmentDate||0)-Date.parse(b.createdAt||b.assessmentDate||0));
+      const average=Math.round(items.reduce((a,b)=>a+Number(b.percentage||0),0)/items.length*10)/10;
+      const first=Number(ordered[0]?.percentage||0),latest=Number(ordered.at(-1)?.percentage||0);
+      return {learnerName,average,assessments:items.length,change:Math.round((latest-first)*10)/10,firstScore:first,latestScore:latest};
+    }).sort((a,b)=>b.average-a.average);
+    const set=analyticsSetting(actor);rows.forEach((r,i)=>{r.rank=i+1;r.outcome=r.average>=set.distinctionMark?'Distinction':r.average>=set.passMark?'Pass':'At risk';r.promotionRecommendation=r.average>=set.passMark?'Meets configured academic threshold':'Review required';});
     const subjects={};for(const mark of marks){const key=mark.subject;const arr=subjects[key]||[];arr.push(Number(mark.percentage||0));subjects[key]=arr;}
     const subjectDistribution=Object.entries(subjects).map(([name,vals])=>({subject:name,average:Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10,distinctions:vals.filter(v=>v>=set.distinctionMark).length,failures:vals.filter(v=>v<set.passMark).length,count:vals.length}));
-    res.json({settings:set,learners:rows,subjectDistribution,distinctions:rows.filter(r=>r.outcome==='Distinction'),failures:rows.filter(r=>r.outcome==='At risk')});
+    const changed=[...rows].sort((a,b)=>b.change-a.change);
+    res.json({settings:set,learners:rows,subjectDistribution,distinctions:rows.filter(r=>r.outcome==='Distinction'),failures:rows.filter(r=>r.outcome==='At risk'),biggestImprovement:changed[0]||null,biggestDrop:[...changed].reverse()[0]||null,subjectChanges:schoolRecords('learnerSubjectAssignments',actor).slice(0,100)});
   });
 
   // Parent QR pickup token. Only a hash is persisted; plaintext exists only in the creation response/QR.
