@@ -20,7 +20,7 @@ fs.writeFileSync(path.join(tmp,'littlefeet-replica.json'),JSON.stringify({
   users:[
     {username:'a-admin',pinHash,name:'A Admin',role:'admin',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
     {username:'a-teacher',pinHash,name:'A Teacher',role:'teacher',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
-    {username:'a-parent',pinHash,name:'A Parent',role:'parent',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active',linkedLearners:['Learner A']},
+    {username:'a-parent',pinHash,name:'A Parent',role:'parent',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Learner A']},
     {username:'b-admin',pinHash,name:'B Admin',role:'admin',schoolId:'s-b',schoolName:'School B',verificationStatus:'Active'},
     {username:'platform',pinHash,name:'Platform',role:'staff',platformAccess:true,schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'}
   ],
@@ -109,4 +109,4 @@ async function login(username){const r=await request('/api/login',{method:'POST'
 
   console.log('Advanced school operations regression passed');
  }finally{await stop();fs.rmSync(tmp,{recursive:true,force:true});}
-})().catch(async error=>{console.error(error);await stop().catch(()=>{});process.exitCode=1;});
+})().catch(async error=>{console.error(error);await stop().catch(()=>{});process.exit(1);});
