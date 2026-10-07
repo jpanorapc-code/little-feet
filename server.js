@@ -4572,6 +4572,9 @@ app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
   if(parent){
     const links=new Set(Array.isArray(parent.linkedLearners)?parent.linkedLearners:[]);
     links.add(application.learnerName);parent.linkedLearners=[...links];
+    parent.parentRelationshipStatus='Administrator approved';
+    parent.parentRelationshipApprovedAt=new Date().toISOString();
+    parent.parentRelationshipApprovedBy=actor.username;
     if(!parent.schoolId){parent.schoolId=application.schoolId;parent.schoolName=application.schoolName;}
   }
   const priorStatus=application.status;application.status='Enrolled';application.convertedLearnerId=learner.id;application.convertedRegistryId=registry.id;application.enrolledAt=new Date().toISOString();application.enrolledBy=actor.username;application.updatedAt=application.enrolledAt;
