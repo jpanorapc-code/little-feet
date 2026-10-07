@@ -183,14 +183,17 @@ function registerSchoolCoreUpgrades(app, deps) {
     const year = Math.trunc(Number(body?.year));
     const term = limitedText(body?.term,60);
     if (!Number.isInteger(year) || year < 2000 || year > 2100 || !term) return {error:'Choose a valid year and term.'};
+    const periodStart=validDateKey(body?.periodStart)||'',periodEnd=validDateKey(body?.periodEnd)||'';
+    if((periodStart&&!periodEnd)||(!periodStart&&periodEnd)|| (periodStart&&periodEnd&&periodStart>periodEnd)) return {error:'Choose both report start and end dates, with the start before the end.'};
     const marks = schoolRecords('subjectMarks',actor).filter(row => normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName) && Number(row.year)===year && String(row.term)===term);
     const subjects = weightedSubjectSummary(marks);
     const average = subjects.length ? Math.round((subjects.reduce((sum,row)=>sum+row.percentage,0)/subjects.length)*100)/100 : 0;
-    const attendance = schoolRecords('attendance',actor).filter(row => normalizeComparableText(row.studentName)===normalizeComparableText(learner.studentName) && String(row.date||row.createdAt||'').startsWith(String(year)));
+    const inReportDates=value=>{const key=String(value||'').slice(0,10);return periodStart&&periodEnd?key>=periodStart&&key<=periodEnd:key.startsWith(String(year));};
+    const attendance = schoolRecords('attendance',actor).filter(row => normalizeComparableText(row.studentName)===normalizeComparableText(learner.studentName) && inReportDates(row.date||row.createdAt));
     const attendanceSummary = attendance.reduce((out,row)=>{const key=String(row.status||'Present');out[key]=(out[key]||0)+1;return out;},{});
-    const discipline = schoolRecords('disciplineRecords',actor).filter(row => normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName) && String(row.createdAt||'').startsWith(String(year)));
+    const discipline = schoolRecords('disciplineRecords',actor).filter(row => normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName) && inReportDates(row.createdAt));
     const disciplinePoints = discipline.reduce((sum,row)=>sum+Number(row.pointDelta||0),0);
-    return {year,term,subjects,average,attendanceSummary,disciplinePoints};
+    return {year,term,periodStart,periodEnd,subjects,average,attendanceSummary,disciplinePoints};
   };
 
   app.get('/api/academics/report-cards', (req,res) => {
@@ -491,6 +494,18 @@ function registerSchoolCoreUpgrades(app, deps) {
     sms:Boolean(providerEndpoint('LF_SMS_API_URL')&&String(process.env.LF_SMS_API_KEY||'').trim()&&String(process.env.LF_SMS_FROM||'').trim()),
     push:Boolean(providerEndpoint('LF_PUSH_API_URL')&&String(process.env.LF_PUSH_API_KEY||'').trim())
   });
+  const communicationPhone=(actor,recipient)=>{
+    const direct=boundedText(recipient.phone||recipient.mobile||recipient.contactPhone,60);
+    if(direct)return direct;
+    if(recipient.role!=='parent')return '';
+    const emailCandidates=[recipient.email,recipient.username,...(recipient.loginAliases||[])].filter(Boolean).map(normalizeUsername);
+    const registry=tenantRecords(db.registry||[],actor).find(row=>{
+      const guardianEmail=normalizeUsername(decryptStoredField(row.guardianEmail)||'');
+      const guardianName=normalizeComparableText(row.guardianName||'');
+      return (guardianEmail&&emailCandidates.includes(guardianEmail)) || (guardianName&&guardianName===normalizeComparableText(recipient.name||''));
+    });
+    return registry?boundedText(decryptStoredField(registry.guardianPhone)||'',60):'';
+  };
   const communicationRecipients=(actor,audience,className)=>{
     const users=(db.users||[]).filter(account=>isSameSchool(actor,account)&&account.verificationStatus==='Active');
     let selected=users;
@@ -529,7 +544,7 @@ function registerSchoolCoreUpgrades(app, deps) {
               if(!to) delivery.status='no_address';
               else delivery.status=(await sendLittleFeetEmail({to,subject:title,text:message,html:'<p>'+String(message).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])).replace(/\n/g,'<br>')+'</p>'}))?'sent':'not_configured';
             } else if(channel==='sms'){
-              const phone=boundedText(recipient.phone||recipient.mobile||recipient.contactPhone,60);
+              const phone=communicationPhone(actor,recipient);
               if(!phone) delivery.status='no_address';
               else delivery.status=(await sendGateway('sms',{from:String(process.env.LF_SMS_FROM||''),to:phone,message,reference:campaign.id})).status;
             } else {
