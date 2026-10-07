@@ -177,9 +177,19 @@
   }
   function setupCommunication(){
     if(!staff())return;
-    const card=addCard('engagementTab','lfCommunicationHub','<div class="card-header-bar"><div><h2>Email + SMS + Push</h2><p class="meta">One real send flow. A channel cannot be selected unless its server provider is configured.</p></div><span class="badge-tag info">DELIVERY</span></div><div id="lfCommunicationStatus" class="meta">Checking providers…</div><form id="lfCampaignForm" class="workspace-grid" style="margin-top:12px;"><input name="title" placeholder="Message title" required><textarea name="message" placeholder="Message" required></textarea><select name="audience"><option value="all">All school accounts</option><option value="parents">Parents</option><option value="teachers">Teachers</option><option value="staff">Staff</option><option value="class">One class</option></select><input name="className" placeholder="Class name if needed"><div style="display:flex;gap:12px;flex-wrap:wrap;"><label><input type="checkbox" name="channels" value="email"> Email</label><label><input type="checkbox" name="channels" value="sms"> SMS</label><label><input type="checkbox" name="channels" value="push"> Push</label></div><button class="submit-btn">Send campaign</button></form><div id="lfCampaignList" class="record-list"></div>');
-    if(!card)return;
-    card.querySelector('#lfCampaignForm').addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.channels=[...e.currentTarget.querySelectorAll('input[name="channels"]:checked')].map(x=>x.value);await api('/api/communications/campaigns',{method:'POST',body:JSON.stringify(body)});e.currentTarget.reset();await refreshCommunication();}catch(err){alert(err.message);}});
+    const mount=document.getElementById('lfCommunicationHubMount');
+    if(!mount||document.getElementById('lfCommunicationHub'))return;
+    const card=document.createElement('div');
+    card.id='lfCommunicationHub';
+    card.className='workspace-card';
+    card.style.marginTop='16px';
+    card.innerHTML='<div class="card-header-bar"><div><h3>Direct Message Campaigns</h3><p class="meta">Send one message by Email, SMS or Push. Only channels with a real configured provider can be selected.</p></div><span class="badge-tag info">DELIVERY</span></div><div id="lfCommunicationStatus" class="meta">Checking available channels…</div><form id="lfCampaignForm" class="workspace-grid" style="margin-top:12px;"><input name="title" placeholder="Message title" required><textarea name="message" placeholder="Message" required></textarea><select name="audience" aria-label="Campaign audience"><option value="all">All school accounts</option><option value="parents">Parents</option><option value="teachers">Teachers</option><option value="staff">Staff</option><option value="class">One class</option></select><input name="className" placeholder="Class name" hidden disabled><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;"><strong class="meta">Send by:</strong><label><input type="checkbox" name="channels" value="email"> Email</label><label><input type="checkbox" name="channels" value="sms"> SMS</label><label><input type="checkbox" name="channels" value="push"> Push</label></div><button class="submit-btn">Send campaign</button></form><h4 style="margin-top:16px;">Campaign history</h4><div id="lfCampaignList" class="record-list"></div>';
+    mount.appendChild(card);
+    const form=card.querySelector('#lfCampaignForm');
+    const audience=form.elements.audience,className=form.elements.className;
+    const syncClassField=()=>{const show=audience.value==='class';className.hidden=!show;className.disabled=!show;className.required=show;if(!show)className.value='';};
+    audience.addEventListener('change',syncClassField);syncClassField();
+    form.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.channels=[...e.currentTarget.querySelectorAll('input[name="channels"]:checked')].map(x=>x.value);await api('/api/communications/campaigns',{method:'POST',body:JSON.stringify(body)});e.currentTarget.reset();syncClassField();await refreshCommunication();}catch(err){alert(err.message);}});
     refreshCommunication().catch(()=>{});
   }
 
