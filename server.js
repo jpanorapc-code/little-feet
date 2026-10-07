@@ -4369,7 +4369,9 @@ app.put('/api/files/:id', async (req, res, next) => {
   try {
     replacement = await createStoredFile(actor, {
       entityType: previous.entityType, recordId: previous.recordId, purpose: previous.purpose,
-      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl
+      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl,
+      schoolIdOverride: previous.schoolId || accountSchoolId(actor),
+      schoolNameOverride: previous.schoolName || actor.schoolName || ''
     });
     replacement.replacesFileId = previous.id;
     previous.accessState = 'replaced'; previous.replacedByFileId = replacement.id; previous.updatedAt = new Date().toISOString();
@@ -4550,7 +4552,7 @@ app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
   const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
   if(!application)return res.status(404).json({message:'Application not found.'});
   if(application.status==='Enrolled')return res.status(409).json({message:'This application is already enrolled.',learnerId:application.convertedLearnerId});
-  if(!['Approved','Under review','Documents required','Waitlisted','Submitted'].includes(application.status))return res.status(409).json({message:'This application cannot be enrolled from its current status.'});
+  if(application.status!=='Approved')return res.status(409).json({message:'Approve the application before enrolment.'});
   const documentState=admissionDocumentState(application);
   if(!documentState.complete)return res.status(409).json({message:'Verify all required admission documents before enrolment.',missingRequired:documentState.missingRequired});
   const className=limitedText(req.body?.className||application.gradeOrAgeGroup,120),address=limitedText(req.body?.address||decryptStoredField(application.homeArea),500);
