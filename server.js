@@ -735,6 +735,9 @@ app.use((req, res, next) => {
     "block-all-mixed-content"
   ].join('; '));
   if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  }
   if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
     res.setHeader('Cache-Control', 'no-store, private');
   }
