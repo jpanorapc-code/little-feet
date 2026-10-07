@@ -570,7 +570,7 @@ assert.match(client, /function resetWorkspaceLoads\(\)/);
 assert.match(client, /runPortalRefreshJob\('workspace:' \+ sessionKey \+ ':' \+ tabId/);
 assert.match(client, /currentUser = null;[\s\S]{0,80}resetWorkspaceLoads\(\)/);
 for (const [name, source] of Object.entries(startupWorkspaces)) {
-  assert.match(source, new RegExp("registerLittleFeetWorkspace\\('" + name.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\assert.match(client, /function runPortalRefreshJob\(key, task\)/);') + "'"));
+  assert.match(source, new RegExp("registerLittleFeetWorkspace\\('" + name.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\  assert.match(source, new RegExp("registerLittleFeetWorkspace\\('" + name.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\assert.match(client, /function runPortalRefreshJob\(key, task\)/);') + "'"));') + "'"));
   assert.doesNotMatch(source, /window\.addEventListener\('load',\(\)=>setTimeout\(init,/);
 }
 assert.match(startupWorkspaces['staff-notices'], /form\.dataset\.bound='1'/);
