@@ -3444,16 +3444,6 @@ registerFinanceAutomation(app, {
   scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
 });
 
-if (typeof registerSchoolCoreUpgrades === 'function') {
-  registerSchoolCoreUpgrades(app, {
-    db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
-    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
-    isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
-    validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
-    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured
-  });
-}
-
 app.get('/api/parent-payments/parents', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School finance access is required.' });
@@ -7408,6 +7398,16 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     res.redirect('/?oauthError=microsoft-sign-in-failed');
   }
 });
+
+if (typeof registerSchoolCoreUpgrades === 'function') {
+  registerSchoolCoreUpgrades(app, {
+    db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
+    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+    isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
+    validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
+    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured
+  });
+}
 
 app.use((req, res, next) => {
   const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
