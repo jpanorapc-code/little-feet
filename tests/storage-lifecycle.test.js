@@ -29,10 +29,13 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-principal', pinHash: pinHash('Principal1'), name: 'Alpha Principal', role: 'principal', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-parent-one', pinHash: pinHash('ParentPass1'), name: 'Parent One', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: [] },
-    { username: 'alpha-parent-two', pinHash: pinHash('ParentPass2'), name: 'Parent Two', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: ['Other Learner'] },
+    { username: 'alpha-parent-two', pinHash: pinHash('ParentPass2'), name: 'Parent Two', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Other Learner'] },
     { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
   ],
-  students: [{ id: 'other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-alpha', schoolName: 'Alpha School' }], registry: [], tickets: [],
+  students: [
+    { id: 'other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-alpha', schoolName: 'Alpha School' },
+    { id: 'bravo-other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-bravo', schoolName: 'Bravo School' }
+  ], registry: [], tickets: [],
   posts: [], worksheets: [], fileRecords: [], storageCleanupJobs: [], admissionsApplications: [], admissionsStatusHistory: [], documentAudit: [],
   importJobs: [], learnerAccessCodes: [], emailInbox: [], emailDismissals: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}
 }));
@@ -94,6 +97,15 @@ const login = async (username, pin) => {
     const principalCookie = await login('alpha-principal', 'Principal1');
     const parentCookie = await login('alpha-parent-one', 'ParentPass1');
     const otherParentCookie = await login('alpha-parent-two', 'ParentPass2');
+
+    const bravoDuplicateUpload = await request('/api/files', { method: 'POST', cookie: bravoCookie, body: { entityType: 'learner', recordId: 'bravo-other-learner', purpose: 'cross-school-probe', originalFilename: 'bravo-report.png', dataUrl: pngA } });
+    assert.equal(bravoDuplicateUpload.response.status, 201, bravoDuplicateUpload.data?.message);
+    const crossSchoolList = await request('/api/files?entityType=learner&recordId=bravo-other-learner', { cookie: otherParentCookie });
+    assert.equal(crossSchoolList.response.status, 200);
+    assert.equal(crossSchoolList.data.length, 0, 'A same-name learner link must never cross the school boundary.');
+    assert.equal((await fetch(origin + bravoDuplicateUpload.data.file.contentUrl, { headers: { cookie: otherParentCookie } })).status, 404, 'A parent must not download a same-name learner document from another school.');
+    const crossSchoolUpload = await request('/api/files', { method: 'POST', cookie: otherParentCookie, body: { entityType: 'learner', recordId: 'bravo-other-learner', purpose: 'cross-school-probe', originalFilename: 'blocked.png', dataUrl: pngA } });
+    assert.equal(crossSchoolUpload.response.status, 404, 'A parent must not upload to a same-name learner record in another school.');
     const submitted = await request('/api/school-applications', { method: 'POST', cookie: parentCookie, body: {
       schoolName: 'Alpha School', guardianName: 'Parent One', contactPhone: '0820000000', contactEmail: 'parent@example.test',
       learnerName: 'New Learner', dateOfBirth: '2020-04-20', intendedStart: '2027-01-15', gradeOrAgeGroup: 'Grade 1',
