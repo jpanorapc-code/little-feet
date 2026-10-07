@@ -2493,6 +2493,7 @@ app.delete('/api/system-inspect-history', async (req, res, next) => {
   try {
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     logStructured('info', 'inspection.history_cleared', {
       category: 'error-management',
       requestId: req.requestId,
@@ -3950,6 +3951,7 @@ app.delete('/api/accounts/:username', async (req, res, next) => {
       if (!cleaned) return res.status(503).json({ message: 'The account was deleted, but its private-file cleanup requires an automatic retry.', cleanupJobId: cleanupJob.id });
     }
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.json({ success: true });
   } catch (error) { next(error); }
 });
@@ -4336,6 +4338,7 @@ app.post('/api/files', async (req, res, next) => {
     if(['learner','admission_application'].includes(entityType))db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:file.schoolId,entityType,recordId,fileId:file.id,action:'uploaded',by:actor.username,at:new Date().toISOString(),details:file.originalFilename});
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.status(201).json({ success: true, file: publicFileMetadata(file) });
   } catch (error) {
     if (file) await rollbackStoredFile(file);
@@ -4387,6 +4390,7 @@ app.put('/api/files/:id', async (req, res, next) => {
     previous.accessState = 'deleted'; previous.deletedAt = new Date().toISOString();
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.json({ success: true, file: publicFileMetadata(replacement) });
   } catch (error) {
     if (replacement && !previousObjectDeleted) await rollbackStoredFile(replacement);
@@ -4435,6 +4439,7 @@ app.delete('/api/files/:id', async (req, res, next) => {
     file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); file.deletedBy = actor.username;
     await saveDatabaseState();
     req.persistenceCommitted = true;
+    scheduleReplicaSnapshot();
     res.json({ success: true });
   } catch (error) {
     file.accessState = 'active'; delete file.deletedAt; delete file.deletedBy;
@@ -4659,7 +4664,7 @@ app.post('/api/posts', async (req, res, next) => {
       post.mediaFileId = file.id; post.mediaUrl = null;
     }
     db.posts.unshift(post);
-    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; }
+    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot(); }
     res.json({ success: true, post: { ...post, mediaUrl: file ? fileContentPath(file) : post.mediaUrl } });
   } catch (error) {
     db.posts = db.posts.filter(item => item !== post);
@@ -4678,7 +4683,7 @@ app.delete('/api/posts/:id', async (req, res, next) => {
     db.posts = db.posts.filter(p => p !== post);
     if (file) {
       await saveDatabaseState(); await objectStorage.delete({ key: file.objectKey });
-      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true;
+      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot();
     }
     res.json({ success: true });
   } catch (error) {
@@ -4760,7 +4765,7 @@ app.post('/api/worksheets', async (req, res, next) => {
       item.photoFileId = file.id; item.photoUrl = null;
     }
     db.worksheets.unshift(item);
-    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; }
+    if (file) { await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot(); }
     res.json({ success: true, item: { ...item, photoUrl: file ? fileContentPath(file) : item.photoUrl } });
   } catch (error) {
     db.worksheets = db.worksheets.filter(record => record !== item);
@@ -4778,7 +4783,7 @@ app.delete('/api/worksheets/:id', async (req, res, next) => {
     db.worksheets = db.worksheets.filter(w => w !== item);
     if (file) {
       await saveDatabaseState(); await objectStorage.delete({ key: file.objectKey });
-      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true;
+      file.accessState = 'deleted'; file.deletedAt = new Date().toISOString(); await saveDatabaseState(); req.persistenceCommitted = true; scheduleReplicaSnapshot();
     }
     res.json({ success: true });
   } catch (error) {
@@ -6390,6 +6395,7 @@ app.post('/api/school-deletion/execute', async (req, res) => {
   }
 
   req.persistenceCommitted = true;
+  scheduleReplicaSnapshot();
   res.json({ success: true, deletedSchoolId: schoolId, deletedSchoolName: schoolName });
 });
 
