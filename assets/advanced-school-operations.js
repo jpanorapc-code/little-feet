@@ -191,6 +191,7 @@
       staffHost.querySelectorAll('[data-reject-file]').forEach(btn=>btn.addEventListener('click',async()=>{const reason=prompt('Why is this document rejected?');if(!reason)return;try{await api('/api/admissions/applications/'+encodeURIComponent(btn.dataset.app)+'/documents/'+encodeURIComponent(btn.dataset.rejectFile)+'/verify',{method:'POST',body:JSON.stringify({status:'Rejected',reason})});await refreshAdmissions();}catch(error){waitAlert(error);}}));
     }
   }
+  window.refreshLittleFeetAdmissions=()=>refreshAdmissions().catch(()=>{});
   function setupAdmissions(){
     const u=user();if(!u)return;
     if(u.role==='parent'){
