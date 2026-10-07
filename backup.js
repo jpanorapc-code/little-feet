@@ -2950,6 +2950,7 @@ async function submitSchoolApplication(event, index) {
     closeModal();
     alert(`Application sent to ${result.application.assignedTo}. Your admissions reference is ${result.application.applicationNumber}.`);
     loadTickets();
+    window.refreshLittleFeetAdmissions?.();
   } catch (error) { alert(safeUserFacingError(error, 'Unable to send the school application.')); }
 }
 
