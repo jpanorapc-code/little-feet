@@ -63,6 +63,7 @@ jobs:
           node --check school-core-upgrades-server.js
           node --check assets/school-core-upgrades.js
           node --check tests/school-core-upgrades.test.js
+          node --check tests/school-core-browser.test.cjs
           node --check lib/storage/object-storage.js
           node --check assets/finance-automation.js
           node --check assets/preferences-enhancements.js
@@ -116,6 +117,9 @@ jobs:
 
       - name: Portal role and navigation regression
         run: node tests/portal-ui.test.cjs
+
+      - name: School core browser regression
+        run: node tests/school-core-browser.test.cjs
 
       - name: Responsive layout regression
         run: node tests/responsive-layout.test.cjs
