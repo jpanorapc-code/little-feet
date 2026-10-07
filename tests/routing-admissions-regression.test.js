@@ -4,6 +4,11 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
+const { normaliseApiArgument } = require('../scripts/audit-route-connections');
+
+assert.equal(normaliseApiArgument('`/api/broadcasts${locationQuery}`'), '/api/broadcasts');
+assert.equal(normaliseApiArgument("'/api/academics/marks'+(learner?'?learnerName='+encodeURIComponent(learner):'')"), '/api/academics/marks');
+assert.equal(normaliseApiArgument("'/api/aftercare/sessions/'+encodeURIComponent(id)+'/check-out'"), '/api/aftercare/sessions/value/check-out');
 
 const root = path.resolve(__dirname, '..');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-routing-admissions-'));
