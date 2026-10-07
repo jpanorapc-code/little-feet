@@ -4246,7 +4246,7 @@ const relatedRecordForFile = (file, actor) => {
     if(!learner)return null;
     if(hasPlatformAccess(actor) || (recordInSchool(learner,actor)&&['principal','admin','staff'].includes(actor.role)))return learner;
     if(actor.role==='teacher')return learnerRecordsVisibleTo(db.students,actor).some(item=>item.id===learner.id)?learner:null;
-    return actor.role==='parent'&&isParentLinkedToLearner(actor,learner)?learner:null;
+    return actor.role==='parent'&&recordInSchool(learner,actor)&&isParentLinkedToLearner(actor,learner)?learner:null;
   }
   if (!recordInSchool(file, actor)) return null;
   if (file.entityType === 'staff') return db.users.find(item => normalizeUsername(item.username) === normalizeUsername(file.recordId) && isSameSchool(item, actor));
