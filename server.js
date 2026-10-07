@@ -5900,6 +5900,16 @@ app.post('/api/attendance/clear', (req, res) => {
 });
 
 // Tickets
+const ADMISSION_STATUSES = new Set(['Submitted','Under review','Documents required','Waitlisted','Approved','Rejected','Enrolled','Withdrawn']);
+const admissionChecklistDefaults = () => [
+  { key:'birth_certificate', label:'Birth certificate', required:true },
+  { key:'guardian_id', label:'Parent / guardian identity document', required:true },
+  { key:'proof_of_address', label:'Proof of address', required:false },
+  { key:'immunisation_record', label:'Immunisation record', required:false },
+  { key:'previous_report', label:'Previous school report', required:false },
+  { key:'transfer_card', label:'Transfer card', required:false }
+].map(item=>({...item,status:'missing',verifiedAt:'',verifiedBy:''}));
+
 app.post('/api/school-applications', (req, res) => {
   const applicant = getSessionAccount(req);
   if (!applicant || String(applicant.verificationStatus || '').toLowerCase().includes('pending')) {
@@ -5928,14 +5938,29 @@ app.post('/api/school-applications', (req, res) => {
   if (!validDateKey(intendedStart)) return res.status(400).json({ message: 'Enter a valid intended start date.' });
   const principal = db.users.find(account => account.role === 'principal' && normalizeComparableText(account.schoolName) === normalizeComparableText(schoolName) && !String(account.verificationStatus || '').toLowerCase().includes('pending'));
   if (!principal) return res.status(409).json({ message: 'This school is not yet available for Little Feet applications. Ask the school to activate its principal account first.' });
-  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, educationStage, homeArea, notes };
+  const targetSchoolId=accountSchoolId(principal);
+  const duplicate=(db.admissionsApplications||[]).find(item=>item.schoolId===targetSchoolId&&normalizeUsername(item.createdBy)===normalizeUsername(applicant.username)&&normalizeComparableText(item.learnerName)===normalizeComparableText(learnerName)&&!['Rejected','Withdrawn','Enrolled'].includes(item.status));
+  if(duplicate)return res.status(409).json({message:'An active application for this learner already exists at this school.',applicationId:duplicate.id,status:duplicate.status});
+  const createdAt=new Date().toISOString();
+  const application = {
+    id:crypto.randomUUID(), applicationNumber:'LF-'+new Date().getUTCFullYear()+'-'+crypto.randomBytes(4).toString('hex').toUpperCase(),
+    schoolId:targetSchoolId, schoolName, guardianName,
+    contactPhone:encryptField(contactPhone), contactEmail:encryptField(contactEmail),
+    learnerName, dateOfBirth:encryptField(dateOfBirth), intendedStart,
+    gradeOrAgeGroup, educationStage, homeArea:encryptField(homeArea), notes:encryptField(notes),
+    checklist:admissionChecklistDefaults(), status:'Submitted', createdBy:applicant.username,
+    createdByName:applicant.name||applicant.username, assignedTo:principal.username,
+    createdAt, updatedAt:createdAt, convertedLearnerId:'', convertedRegistryId:''
+  };
+  db.admissionsApplications.unshift(application);
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:targetSchoolId,fromStatus:'',toStatus:'Submitted',changedBy:applicant.username,changedAt:createdAt,note:'Application submitted'});
   const ticket = {
     id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
-    message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
-    assignedTo: principal.username, schoolId: accountSchoolId(principal), status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt: new Date().toISOString()
+    message: `Application ${application.applicationNumber} for ${schoolName}`, applicationId:application.id, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
+    assignedTo: principal.username, schoolId: targetSchoolId, status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt
   };
   db.tickets.unshift(ticket);
-  res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: principal.name || principal.username, status: ticket.status } });
+  res.status(201).json({ success: true, application: { id:application.id, applicationNumber:application.applicationNumber, assignedTo: principal.name || principal.username, status: application.status }, ticketId:ticket.id });
 });
 
 app.post('/api/account-deletion-request', (req, res) => {
