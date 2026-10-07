@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v57-learning-support';
+const CACHE_NAME = 'little-feet-shell-v58-repo-audit';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -17,6 +17,16 @@ const SHELL_ASSETS = [
   '/backup.js?v=20261007-learning-support-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
+  '/assets/sa-sams-integration.js?v=20260929-sasams-v1',
+  '/assets/my-day.js?v=20261004-navy-v1',
+  '/assets/staff-work.js?v=20261001-startup-dedupe-v1',
+  '/assets/approvals.js?v=20261001-startup-dedupe-v1',
+  '/assets/staff-notices.js?v=20261001-startup-dedupe-v1',
+  '/assets/meeting-minutes.js?v=20261001-startup-dedupe-v1',
+  '/assets/maintenance.js?v=20261001-startup-dedupe-v1',
+  '/assets/resource-booking.js?v=20261001-startup-dedupe-v1',
+  '/assets/purchase-requests.js?v=20261001-startup-dedupe-v1',
+  '/assets/workplace-extended.js?v=20261002-responsive-header-v1',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
   '/assets/preferences-enhancements.js?v=20261006-login-i18n-v2',
   '/assets/legal-notices.js?v=20261002-about-v1',
