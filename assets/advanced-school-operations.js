@@ -141,6 +141,22 @@
     card.querySelector('#lfPickupPassForm').addEventListener('submit',async e=>{e.preventDefault();try{const result=await api('/api/pickup-passes',{method:'POST',body:JSON.stringify(body(e.currentTarget))});const out=card.querySelector('#lfPickupQrOutput');out.innerHTML='<div class="workspace-card"><strong>One-time pickup token</strong><p class="meta">Show this QR/token at collection. It expires automatically and can only be used once.</p><div id="lfPickupQrCanvas"></div><code style="word-break:break-all;">'+esc(result.pass.token)+'</code></div>';if(window.QRCode)new QRCode(out.querySelector('#lfPickupQrCanvas'),{text:result.pass.token,width:180,height:180});await refreshPickupPasses();}catch(error){waitAlert(error);}});refreshPickupPasses().catch(()=>{});
   }
 
+  async function refreshCommunicationInbox(){
+    const host=document.getElementById('lfCommunicationInboxList');if(!host)return;
+    const rows=await api('/api/communications/inbox');
+    host.innerHTML=rows.length?rows.map(row=>'<button type="button" class="item-row" style="width:100%;text-align:left;" onclick="openLittleFeetDeliveredMessage(\''+esc(row.id)+'\')"><div><strong>'+esc(row.title)+'</strong><p>'+esc(row.message)+'</p><span class="meta">'+esc((row.channels||[]).join(', '))+' · '+(row.readAt?'Read '+esc(row.readAt):'Unread')+'</span></div></button>').join(''):'<p class="meta">No delivered campaigns yet.</p>';
+    window.__lfCommunicationInbox=rows;
+  }
+  window.openLittleFeetDeliveredMessage=async id=>{
+    const row=(window.__lfCommunicationInbox||[]).find(x=>x.id===id);if(!row)return;
+    try{await api('/api/communications/campaigns/'+encodeURIComponent(id)+'/read',{method:'POST',body:'{}'});alert(row.title+'\n\n'+row.message);await refreshCommunicationInbox();}catch(error){waitAlert(error);}
+  };
+  function setupCommunicationInbox(){
+    if(!user())return;
+    const card=mountCard('engagementTab','lfCommunicationInboxCard','<div class="card-header-bar"><div><h2>Delivered Messages</h2><p class="meta">Messages sent to your Little Feet account. Opening a message records its read receipt.</p></div><span class="badge-tag info">INBOX</span></div><div id="lfCommunicationInboxList" class="record-list"></div>');
+    if(card)refreshCommunicationInbox().catch(()=>{});
+  }
+
   function setupMultiSite(){
     if(!full())return;const card=mountCard('homeTab','lfMultiSiteCard','<div class="card-header-bar"><div><h2>Multi-Site School Group</h2><p class="meta">Platform-level owner view across selected Little Feet school tenants. Cross-school access remains restricted to Little Feet platform roles.</p></div><span class="badge-tag info">MULTI-SITE</span></div><form id="lfSchoolGroupForm" class="workspace-grid"><input name="name" placeholder="Group name" required><textarea name="schoolIds" placeholder="School IDs, one per line" required></textarea><button class="submit-btn">Create school group</button></form><select id="lfSchoolGroupSelect"></select><button id="lfLoadSchoolGroup" type="button" class="action-btn btn-blue">Load group dashboard</button><div id="lfSchoolGroupDashboard" class="record-list"></div>');if(!card)return;
     const refresh=async()=>{const groups=await api('/api/school-groups');card.querySelector('#lfSchoolGroupSelect').innerHTML=groups.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');};
@@ -149,7 +165,7 @@
   }
 
   function setupAdvancedSchoolOperations(){
-    setupElda();setupAftercare();setupRatio();setupClock();setupDayCare();setupMeals();setupGroups();setupAcademicAnalytics();setupPickupPass();setupMultiSite();
+    setupElda();setupAftercare();setupRatio();setupClock();setupDayCare();setupMeals();setupGroups();setupAcademicAnalytics();setupPickupPass();setupCommunicationInbox();setupMultiSite();
   }
   document.addEventListener('littlefeet:session-ready',setupAdvancedSchoolOperations);
   window.addEventListener('DOMContentLoaded',()=>setTimeout(setupAdvancedSchoolOperations,900));
