@@ -56,7 +56,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({state:'visible'});
 
-    for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard','#lfAdvancedEldaCard','#lfAftercareCard','#lfStaffRatioCard','#lfStaffClockCard','#lfDayCareCard','#lfMealsCard','#lfLearnerGroupsCard','#lfAdvancedAcademicAnalytics','#lfPickupQrCard','#lfCommunicationInboxCard','#lfStaffAdmissionsCard','#lfLearnerDocumentVault']){
+    for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard','#lfAdvancedEldaCard','#lfAftercareCard','#lfStaffRatioCard','#lfStaffClockCard','#lfDayCareCard','#lfMealsCard','#lfLearnerGroupsCard','#lfAdvancedAcademicAnalytics','#lfPickupQrCard','#lfLearningSupportCard','#lfCommunicationInboxCard','#lfStaffAdmissionsCard','#lfLearnerDocumentVault']){
       await page.locator(selector).waitFor({state:'attached'});
     }
 
@@ -96,6 +96,18 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
     await openTab('progressTab');
     assert.equal(await page.locator('#lfEldaAiAssist').isDisabled(),true,'AI assist must stay disabled when no approved provider is configured');
+    await page.locator('#lfSupportProfileForm input[name="learnerName"]').fill('Core Learner');
+    await page.locator('#lfSupportProfileForm input[name="supportArea"][value="Literacy"]').check();
+    await page.locator('#lfSupportProfileForm textarea[name="supportNeeds"]').fill('Needs structured literacy support');
+    await page.locator('#lfSupportProfileForm textarea[name="parentSummary"]').fill('Structured literacy support is in place.');
+    await page.locator('#lfSupportProfileForm textarea[name="staffNotes"]').fill('Internal support note');
+    await page.locator('#lfSupportProfileForm input[name="reviewDate"]').fill('2026-11-15');
+    await page.locator('#lfSupportProfileForm button[type="submit"]').click();
+    await page.locator('#lfLearningSupportList').getByText('Core Learner').first().waitFor({state:'visible'});
+    await page.locator('#lfLearningSupportList .lfAccommodationForm select[name="type"]').first().selectOption({label:'Extra time'});
+    await page.locator('#lfLearningSupportList .lfAccommodationForm input[name="details"]').first().fill('Extra time for assessment tasks');
+    await page.locator('#lfLearningSupportList .lfAccommodationForm button[type="submit"]').first().click();
+    await page.locator('#lfLearningSupportList').getByText('Extra time').first().waitFor({state:'visible'});
 
     await openTab('operationsTab');
     await page.locator('#lfAssetForm input[name="assetCode"]').fill('CORE-001');
