@@ -61,8 +61,11 @@ jobs:
           node --check assets/education-stages.js
           node --check finance-automation-server.js
           node --check school-core-upgrades-server.js
+          node --check advanced-school-operations-server.js
           node --check assets/school-core-upgrades.js
+          node --check assets/advanced-school-operations.js
           node --check tests/school-core-upgrades.test.js
+          node --check tests/advanced-school-operations.test.js
           node --check tests/school-core-browser.test.cjs
           node --check lib/storage/object-storage.js
           node --check assets/finance-automation.js

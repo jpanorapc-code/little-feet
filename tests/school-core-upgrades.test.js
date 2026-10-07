@@ -18,7 +18,7 @@ gateway.listen(gatewayPort,'127.0.0.1');
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 const signature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-for (const file of ['server.js','school-core-upgrades-server.js','finance-automation-server.js','failover-mode.js','auth-crypto.js','backup.js']) {
+for (const file of ['server.js','school-core-upgrades-server.js','advanced-school-operations-server.js','finance-automation-server.js','failover-mode.js','auth-crypto.js','backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(tmp, file));
 }
 for (const dir of [['lib','storage'],['lib']]) fs.mkdirSync(path.join(tmp,...dir), { recursive: true });
@@ -52,7 +52,7 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
 
 const child=spawn(process.execPath,['server.js'],{
   cwd:tmp,
-  env:{...process.env,PORT:String(port),NODE_ENV:'test',LF_REPLICA_MODE:'1',LF_TEST_ALLOW_REPLICA_WRITES:'1',LF_EMAIL_FROM:'noreply@littlefeet.test',LF_EMAIL_API_KEY:'email-test',LF_EMAIL_API_URL:'http://127.0.0.1:'+gatewayPort+'/email',LF_SMS_FROM:'LittleFeet',LF_SMS_API_KEY:'sms-test',LF_SMS_API_URL:'http://127.0.0.1:'+gatewayPort+'/sms',LF_PUSH_API_KEY:'push-test',LF_PUSH_API_URL:'http://127.0.0.1:'+gatewayPort+'/push'},
+  env:{...process.env,PORT:String(port),NODE_ENV:'test',LF_REPLICA_MODE:'1',LF_TEST_ALLOW_REPLICA_WRITES:'1',LF_EMAIL_FROM:'noreply@littlefeet.test',LF_EMAIL_API_KEY:'email-test',LF_EMAIL_API_URL:'http://127.0.0.1:'+gatewayPort+'/email',LF_SMS_FROM:'LittleFeet',LF_SMS_API_KEY:'sms-test',LF_SMS_API_URL:'http://127.0.0.1:'+gatewayPort+'/sms',LF_PUSH_API_KEY:'push-test',LF_PUSH_API_URL:'http://127.0.0.1:'+gatewayPort+'/push',LF_WHATSAPP_FROM:'LittleFeet',LF_WHATSAPP_API_KEY:'whatsapp-test',LF_WHATSAPP_API_URL:'http://127.0.0.1:'+gatewayPort+'/whatsapp'},
   stdio:['ignore','ignore','pipe']
 });
 let stderr=''; child.stderr.on('data',chunk=>{stderr+=chunk.toString();});
@@ -216,14 +216,29 @@ async function login(username,pin){
 
     const config=await request('/api/communications/config',{cookie:teacher});
     assert.equal(config.response.status,200);
-    assert.deepEqual(config,{email:true,sms:true,push:true});
-    const campaign=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'School update',message:'Real provider test',audience:'parents',channels:['email','sms','push']}});
+    assert.deepEqual(config,{email:true,sms:true,push:true,whatsapp:true});
+    const campaign=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'School update',message:'Real provider test',audience:'parents',channels:['email','sms','push','whatsapp']}});
     assert.equal(campaign.response.status,201,campaign.text);
-    assert.equal(campaign.data.campaign.deliveries.length,3);
+    assert.equal(campaign.data.campaign.deliveries.length,4);
     assert.equal(campaign.data.campaign.deliveries.every(row=>row.status==='sent'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/sms'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/sms'&&row.body.to==='+27110000001'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/push'),true);
+    assert.equal(gatewayRequests.some(row=>row.url==='/whatsapp'),true);
+    const parentInbox=await request('/api/communications/inbox',{cookie:parent});
+    assert.equal(parentInbox.response.status,200,parentInbox.text);
+    assert.equal(parentInbox.data.some(row=>row.id===campaign.data.campaign.id),true);
+    const readReceipt=await request('/api/communications/campaigns/'+campaign.data.campaign.id+'/read',{method:'POST',cookie:parent,body:{}});
+    assert.equal(readReceipt.response.status,200,readReceipt.text);
+    const parentInboxAfterRead=await request('/api/communications/inbox',{cookie:parent});
+    assert.ok(parentInboxAfterRead.data.find(row=>row.id===campaign.data.campaign.id).readAt);
+    const scheduledAt=new Date(Date.now()+10*60*1000).toISOString();
+    const scheduled=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'Later update',message:'Scheduled provider test',audience:'parents',channels:['email'],scheduledAt}});
+    assert.equal(scheduled.response.status,201,scheduled.text);
+    assert.equal(scheduled.data.campaign.status,'scheduled');
+    assert.equal(scheduled.data.campaign.deliveries.length,0);
+    const template=await request('/api/communications/templates',{method:'POST',cookie:teacher,body:{name:'Reminder',title:'Reminder title',message:'Reminder body'}});
+    assert.equal(template.response.status,201,template.text);
 
     const classCampaign=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'Grade R update',message:'Class-only test',audience:'class',className:'Grade R',channels:['push']}});
     assert.equal(classCampaign.response.status,201,classCampaign.text);

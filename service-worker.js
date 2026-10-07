@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v54-school-core-audio';
+const CACHE_NAME = 'little-feet-shell-v55-advanced-school';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -21,7 +21,8 @@ const SHELL_ASSETS = [
   '/assets/preferences-enhancements.js?v=20261006-login-i18n-v2',
   '/assets/legal-notices.js?v=20261002-about-v1',
   '/assets/finance-automation.js?v=20260925-finance-v1',
-  '/assets/school-core-upgrades.js?v=20261007-school-core-v3'
+  '/assets/school-core-upgrades.js?v=20261007-school-core-v3',
+  '/assets/advanced-school-operations.js?v=20261007-advanced-school-v1'
 ];
 
 self.addEventListener('install', event => {
