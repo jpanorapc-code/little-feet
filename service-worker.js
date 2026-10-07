@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v50-login-security';
+const CACHE_NAME = 'little-feet-shell-v51-school-core';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -20,7 +20,8 @@ const SHELL_ASSETS = [
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
   '/assets/preferences-enhancements.js?v=20261006-login-i18n-v2',
   '/assets/legal-notices.js?v=20261002-about-v1',
-  '/assets/finance-automation.js?v=20260925-finance-v1'
+  '/assets/finance-automation.js?v=20260925-finance-v1',
+  '/assets/school-core-upgrades.js?v=20261007-school-core-v1'
 ];
 
 self.addEventListener('install', event => {
