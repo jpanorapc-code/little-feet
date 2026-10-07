@@ -11,11 +11,13 @@ const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
 let registerSchoolCoreUpgrades = null;
+let registerAdvancedSchoolOperations = null;
 try {
   ({ registerSchoolCoreUpgrades } = require('./school-core-upgrades-server'));
+  ({ registerAdvancedSchoolOperations } = require('./advanced-school-operations-server'));
 } catch (error) {
   const missingOwnModule = error?.code === 'MODULE_NOT_FOUND'
-    && String(error.message || '').includes('school-core-upgrades-server');
+    && (String(error.message || '').includes('school-core-upgrades-server') || String(error.message || '').includes('advanced-school-operations-server'));
   if (!missingOwnModule || process.env.NODE_ENV !== 'test') throw error;
 }
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
@@ -1072,6 +1074,21 @@ const db = {
   dsdIncidents: [],
   communicationCampaigns: [],
   attendanceAutomationSettings: [],
+  eldaSkillCatalogue: [],
+  eldaAssessments: [],
+  aftercareSettings: [],
+  aftercarePlans: [],
+  aftercareSessions: [],
+  staffClockSessions: [],
+  staffRatioSettings: [],
+  dayCareBookings: [],
+  dayCareCapacitySettings: [],
+  mealPlans: [],
+  dietaryProfiles: [],
+  learnerGroups: [],
+  pickupPasses: [],
+  academicAnalyticsSettings: [],
+  schoolGroups: [],
   systemErrors: [],
   schoolBilling: {},
   schoolTerms: {},
@@ -1452,7 +1469,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'eldaSkillCatalogue', 'eldaAssessments', 'aftercareSettings', 'aftercarePlans', 'aftercareSessions', 'staffClockSessions', 'staffRatioSettings', 'dayCareBookings', 'dayCareCapacitySettings', 'mealPlans', 'dietaryProfiles', 'learnerGroups', 'pickupPasses', 'academicAnalyticsSettings', 'schoolGroups', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -7416,8 +7433,16 @@ if (typeof registerSchoolCoreUpgrades === 'function') {
   });
 }
 
+if (typeof registerAdvancedSchoolOperations === 'function') {
+  registerAdvancedSchoolOperations(app, {
+    db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
+    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+    isParentLinkedToLearner, validDateKey, createParentPaymentRecord, logStructured
+  });
+}
+
 app.use((req, res, next) => {
-  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|school-core-upgrades-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
+  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|school-core-upgrades-server\.js|advanced-school-operations-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
   const blockedDirectory = /^\/(?:\.git|\.github|node_modules|output|tests|tmp|uploads|scripts|lib)(?:\/|$)/i.test(req.path);
   const blockedSourceMap = /\.map$/i.test(req.path);
   if (blockedFile || blockedDirectory || blockedSourceMap) {
