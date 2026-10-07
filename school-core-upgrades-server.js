@@ -45,7 +45,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
     isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
     validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
-    scheduleReplicaSnapshot, logStructured
+    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured
   } = deps;
 
   const nowIso = () => new Date().toISOString();
@@ -415,7 +415,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     return {ok:true,status:'sent'};
   };
   const communicationConfig = () => ({
-    email:Boolean(String(process.env.LF_EMAIL_FROM||'').trim() && String(process.env.LF_EMAIL_API_KEY||'').trim()) || Boolean(String(process.env.LF_SMTP_HOST||'').trim()),
+    email:Boolean(smtpEmailConfigured?.() || apiEmailConfigured?.()),
     sms:Boolean(providerEndpoint('LF_SMS_API_URL')&&String(process.env.LF_SMS_API_KEY||'').trim()&&String(process.env.LF_SMS_FROM||'').trim()),
     push:Boolean(providerEndpoint('LF_PUSH_API_URL')&&String(process.env.LF_PUSH_API_KEY||'').trim())
   });
