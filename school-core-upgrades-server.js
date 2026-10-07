@@ -579,10 +579,11 @@ function registerSchoolCoreUpgrades(app, deps) {
   };
   const runAttendanceAutomation=async actor=>{
     const setting=attendanceSettingFor(actor),date=dateKeyInSouthAfrica();
-    if(!isSchoolDate(date))return {date,created:0,notified:0,staffReminded:0,skipped:'school_closed'};
+    let stateChanged=false;
+    if(!isSchoolDate(date))return {date,created:0,notified:0,staffReminded:0,stateChanged,skipped:'school_closed'};
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Johannesburg',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()).split(':').map(Number);
     const nowMinutes=parts[0]*60+parts[1],cut=setting.cutoffTime.split(':').map(Number),cutMinutes=cut[0]*60+cut[1];
-    if(nowMinutes<cutMinutes)return {date,created:0,notified:0,staffReminded:0,skipped:'before_cutoff'};
+    if(nowMinutes<cutMinutes)return {date,created:0,notified:0,staffReminded:0,stateChanged,skipped:'before_cutoff'};
     const existing=new Set(schoolRecords('attendance',actor).filter(row=>String(row.date||'')===date).map(row=>normalizeComparableText(row.studentName)));
     const missing=schoolLearners(actor).filter(learner=>!existing.has(normalizeComparableText(learner.studentName)));
     let staffReminded=0;
@@ -596,19 +597,19 @@ function registerSchoolCoreUpgrades(app, deps) {
           if(sent)staffReminded++;
         }catch(error){logStructured?.('warn','attendance.staff_reminder_failed',{category:'attendance',schoolId:accountSchoolId(actor),message:error.message});}
       }
-      setting.lastReminderDate=date;setting.lastReminderAt=nowIso();
+      setting.lastReminderDate=date;setting.lastReminderAt=nowIso();stateChanged=true;
     }
-    if(!setting.autoAbsent)return {date,created:0,notified:0,staffReminded,missing:missing.length,skipped:'auto_absent_disabled'};
+    if(!setting.autoAbsent)return {date,created:0,notified:0,staffReminded,missing:missing.length,stateChanged,skipped:'auto_absent_disabled'};
     let created=0,notified=0;
     for(const learner of missing){
       db.attendance.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),studentName:learner.studentName,status:'Absent',date,time:setting.cutoffTime,recordedBy:'attendance-automation',createdAt:nowIso(),automation:true}));
-      existing.add(normalizeComparableText(learner.studentName));created++;
+      existing.add(normalizeComparableText(learner.studentName));created++;stateChanged=true;
       if(setting.notifyParents){
         const parent=parentForLearner(actor,learner),to=parent&&[parent.email,parent.username,...(parent.loginAliases||[])].find(looksLikeEmailAddress);
         if(to&&(smtpEmailConfigured?.()||apiEmailConfigured?.())){try{if(await sendLittleFeetEmail({to,subject:'Little Feet attendance: '+learner.studentName+' marked absent',text:learner.studentName+' was marked absent after the school attendance cutoff. Contact the school if this is incorrect.'}))notified++;}catch(error){logStructured?.('warn','attendance.parent_notification_failed',{category:'attendance',schoolId:accountSchoolId(actor),message:error.message});}}
       }
     }
-    setting.lastRunDate=date;setting.lastRunAt=nowIso();return {date,created,notified,staffReminded,missing:missing.length};
+    setting.lastRunDate=date;setting.lastRunAt=nowIso();stateChanged=true;return {date,created,notified,staffReminded,missing:missing.length,stateChanged};
   };
   app.post('/api/attendance/automation/run',async(req,res,next)=>{
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
@@ -627,7 +628,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     for(const schoolId of schools){
       const actor=(db.users||[]).find(u=>u.schoolId===schoolId&&u.verificationStatus==='Active'&&['principal','admin'].includes(u.role));
       if(!actor)continue;
-      try{const result=await runAttendanceAutomation(actor);if(result.created){await saveDatabaseState();scheduleReplicaSnapshot?.();}}catch(error){logStructured?.('error','attendance.automation_failed',{category:'attendance',schoolId,message:error.message});}
+      try{const result=await runAttendanceAutomation(actor);if(result.stateChanged){await saveDatabaseState();scheduleReplicaSnapshot?.();}}catch(error){logStructured?.('error','attendance.automation_failed',{category:'attendance',schoolId,message:error.message});}
     }
   },5*60*1000);
   automationTimer.unref?.();
