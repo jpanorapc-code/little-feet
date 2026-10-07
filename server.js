@@ -16,7 +16,7 @@ try {
 } catch (error) {
   const missingOwnModule = error?.code === 'MODULE_NOT_FOUND'
     && String(error.message || '').includes('school-core-upgrades-server');
-  if (!missingOwnModule) throw error;
+  if (!missingOwnModule || process.env.NODE_ENV !== 'test') throw error;
 }
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
@@ -2174,8 +2174,9 @@ app.get('/api/production-readiness', (req, res) => {
     paymentDestination: billingPaymentConfigured(billing.payment),
     signedPaymentWebhook: Boolean(process.env.LF_PAYMENT_WEBHOOK_SECRET),
     payfastAutomaticConfirmation: payFastConfigured(),
-    emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
-    smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
+    emailDelivery: Boolean(smtpEmailConfigured() || apiEmailConfigured()),
+    smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY && safeHttpsUrl(process.env.LF_SMS_API_URL)),
+    pushDelivery: Boolean(process.env.LF_PUSH_API_KEY && safeHttpsUrl(process.env.LF_PUSH_API_URL)),
     monitoring: Boolean(process.env.LF_MONITORING_DSN || process.env.LF_MONITORING_PROVIDER),
     monitoringProvider: boundedText(process.env.LF_MONITORING_PROVIDER || (process.env.LF_MONITORING_DSN ? 'external-dsn' : ''), 80),
     privateObjectStorage: objectStorage.configured,
