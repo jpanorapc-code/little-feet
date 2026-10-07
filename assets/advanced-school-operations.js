@@ -142,6 +142,6 @@
   function setupAdvancedSchoolOperations(){
     setupElda();setupAftercare();setupRatio();setupClock();setupDayCare();setupMeals();setupGroups();setupAcademicAnalytics();setupPickupPass();setupMultiSite();
   }
-  window.addEventListener('littlefeet:session-ready',setupAdvancedSchoolOperations);
+  document.addEventListener('littlefeet:session-ready',setupAdvancedSchoolOperations);
   window.addEventListener('DOMContentLoaded',()=>setTimeout(setupAdvancedSchoolOperations,900));
 })();
