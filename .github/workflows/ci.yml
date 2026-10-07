@@ -66,6 +66,7 @@ jobs:
           node --check assets/advanced-school-operations.js
           node --check tests/school-core-upgrades.test.js
           node --check tests/advanced-school-operations.test.js
+          node --check tests/routing-admissions-regression.test.js
           node --check tests/school-core-browser.test.cjs
           node --check lib/storage/object-storage.js
           node --check assets/finance-automation.js
