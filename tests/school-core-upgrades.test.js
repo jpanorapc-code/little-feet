@@ -35,14 +35,18 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
   users:[
     {username:'alpha-admin',pinHash:hash('AdminPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Admin',role:'admin',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
     {username:'alpha-teacher',pinHash:hash('TeacherPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
-    {username:'alpha-parent',email:'parent@alpha.test',phone:'+27110000001',pinHash:hash('ParentPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
+    {username:'alpha-parent',email:'parent@alpha.test',pinHash:hash('ParentPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
     {username:'bravo-admin',pinHash:hash('BravoPass1'),name:'Bravo Admin',role:'admin',schoolId:'school-bravo',schoolName:'Bravo School',verificationStatus:'Active'}
   ],
   students:[
     {id:'alpha-learner',studentName:'Alpha Learner',className:'Grade R',schoolId:'school-alpha',schoolName:'Alpha School'},
     {id:'bravo-learner',studentName:'Bravo Learner',className:'Grade R',schoolId:'school-bravo',schoolName:'Bravo School'}
   ],
-  attendance:[], moduleRecords:{}, directMessages:[], chatGroups:[], groupMessages:{}
+  registry:[{id:'alpha-registry',learnerName:'Alpha Learner',guardianName:'Alpha Parent',guardianEmail:'parent@alpha.test',guardianPhone:'+27110000001',schoolId:'school-alpha',schoolName:'Alpha School'}],
+  attendance:[
+    {id:'att-in',studentName:'Alpha Learner',status:'Present',date:'2026-10-07',schoolId:'school-alpha',schoolName:'Alpha School'},
+    {id:'att-out',studentName:'Alpha Learner',status:'Absent',date:'2026-09-01',schoolId:'school-alpha',schoolName:'Alpha School'}
+  ], moduleRecords:{}, directMessages:[], chatGroups:[], groupMessages:{}
 }));
 
 const child=spawn(process.execPath,['server.js'],{
@@ -114,10 +118,12 @@ async function login(username,pin){
     assert.equal(history.data.length,2);
 
     const report=await request('/api/academics/report-cards',{method:'POST',cookie:teacher,body:{
-      learnerName:'Alpha Learner',term:'Term 4',year:2026,teacherComment:'Steady progress',promotionOutcome:'Progress to next phase'
+      learnerName:'Alpha Learner',term:'Term 4',year:2026,periodStart:'2026-10-01',periodEnd:'2026-10-31',teacherComment:'Steady progress',promotionOutcome:'Progress to next phase'
     }});
     assert.equal(report.response.status,201,report.text);
     assert.equal(report.data.reportCard.subjects[0].percentage,95);
+    assert.equal(report.data.reportCard.attendanceSummary.Present,1);
+    assert.equal(report.data.reportCard.attendanceSummary.Absent,undefined);
     const parentReports=await request('/api/academics/report-cards',{cookie:parent});
     assert.equal(parentReports.response.status,200);
     assert.equal(parentReports.data.length,1);
@@ -204,6 +210,7 @@ async function login(username,pin){
     assert.equal(campaign.data.campaign.deliveries.length,3);
     assert.equal(campaign.data.campaign.deliveries.every(row=>row.status==='sent'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/sms'),true);
+    assert.equal(gatewayRequests.some(row=>row.url==='/sms'&&row.body.to==='+27110000001'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/push'),true);
 
     console.log('School core upgrades test passed');
