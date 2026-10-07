@@ -91,6 +91,18 @@ const login = async (username, pin) => {
     alphaCookie = await login('alpha-admin', 'AlphaPass1');
     assert.equal((await fetch(origin + replacementUrl, { headers: { cookie: alphaCookie } })).status, 200, 'File must survive an application restart.');
 
+    const principalCookie = await login('alpha-principal', 'Principal1');
+    const parentCookie = await login('alpha-parent-one', 'ParentPass1');
+    const otherParentCookie = await login('alpha-parent-two', 'ParentPass2');
+    const submitted = await request('/api/school-applications', { method: 'POST', cookie: parentCookie, body: {
+      schoolName: 'Alpha School', guardianName: 'Parent One', contactPhone: '0820000000', contactEmail: 'parent@example.test',
+      learnerName: 'New Learner', dateOfBirth: '2020-04-20', intendedStart: '2027-01-15', gradeOrAgeGroup: 'Grade 1',
+      homeArea: 'Test Area', notes: 'Standard application'
+    } });
+    assert.equal(submitted.response.status, 201, submitted.data?.message);
+    const applicationId = submitted.data.application.id;
+    assert.equal((await request('/api/admissions/applications', { cookie: otherParentCookie })).data.length, 0, 'Another parent must not see this application.');
+
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
     assert.equal(staffUpload.response.status, 201, staffUpload.data?.message);
     const staffFileUrl = staffUpload.data.file.contentUrl;
