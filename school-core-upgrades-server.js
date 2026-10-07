@@ -287,6 +287,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     const all=schoolRecords('disciplineRecords',actor).filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learnerName));
     const total=all.reduce((sum,row)=>sum+Number(row.pointDelta||0),0), settings=disciplineSettingsFor(actor);
     const action=total>=settings.principalReview?'Principal review':total>=settings.parentMeeting?'Parent meeting':total>=settings.warning?'Warning':'Normal';
+    record.requiredAction=action;
     if(record.parentNotified){
       const parent=parentForLearner(actor,learner),to=parent&&[parent.email,parent.username,...(parent.loginAliases||[])].find(looksLikeEmailAddress);
       if(!to) record.parentNotificationStatus='no_parent_email';
@@ -306,6 +307,16 @@ function registerSchoolCoreUpgrades(app, deps) {
     }
     res.status(201).json({success:true,record,totalPoints:total,action});
   });
+  app.get('/api/discipline/:id/print',(req,res)=>{
+    const actor=getSessionAccount(req),row=actor&&(db.disciplineRecords||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    if(!row)return res.status(404).send('Discipline record not found.');
+    const learner=findLearner(actor,row.learnerName);
+    if(!(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor.role)||parentCanSeeLearner(actor,learner)))return res.status(403).send('Not allowed.');
+    const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    res.setHeader('Cache-Control','private, no-store');
+    res.type('html').send('<!doctype html><html><head><meta charset="utf-8"><title>Little Feet conduct record</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#102a43}.box{border:1px solid #b8c8d8;padding:14px;margin:12px 0}@media print{button{display:none}}</style></head><body><h1>Learner Conduct Record</h1><p><strong>'+esc(row.learnerName)+'</strong> · '+esc(row.className||'')+'</p><div class="box"><strong>'+esc(row.kind)+' · '+esc(row.category)+'</strong><p>'+esc(row.details)+'</p><p>Points: '+esc(row.points)+' · Required action: '+esc(row.requiredAction||'Normal')+'</p></div><div class="box"><strong>Action taken</strong><p>'+esc(row.actionTaken||'Not recorded')+'</p></div><p>Parent notice: '+esc(row.parentNotificationStatus||'not requested')+'</p><p>Recorded by '+esc(row.recordedBy)+' on '+esc(row.createdAt)+'</p><button onclick="window.print()">Print / Save PDF</button></body></html>');
+  });
+
   app.patch('/api/discipline/:id',(req,res)=>{
     const actor=staffActor(req), row=actor&&(db.disciplineRecords||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
     if(!row)return res.status(404).json({message:'Discipline record not found.'});
@@ -423,16 +434,29 @@ function registerSchoolCoreUpgrades(app, deps) {
       id:crypto.randomUUID(),incidentNumber:String(incidentDate).replaceAll('-','')+'-'+String(sequence).padStart(4,'0'),
       learnerName,learnerKey:learner.id||'',className:boundedText(learner.className,120),
       incidentDate,incidentTime,location,incidentType:boundedText(req.body?.incidentType,120),description,
-      witnesses:boundedText(req.body?.witnesses,1000),bodyRegions,firstAid:boundedText(req.body?.firstAid,1600),
-      treatment:boundedText(req.body?.treatment,1600),medicalReferral:boundedText(req.body?.medicalReferral,1000),
-      parentNotification:boundedText(req.body?.parentNotification,1000),correctiveAction:boundedText(req.body?.correctiveAction,1600),
-      staffStatement:boundedText(req.body?.staffStatement,2000),principalReview:boundedText(req.body?.principalReview,1600),
+      witnesses:boundedText(req.body?.witnesses,1000),bodyRegions,injuriesOrSymptoms:boundedText(req.body?.injuriesOrSymptoms,1600),
+      bloodPresent:Boolean(req.body?.bloodPresent),bloodAmount:boundedText(req.body?.bloodAmount,240),bloodLocation:boundedText(req.body?.bloodLocation,500),
+      firstAid:boundedText(req.body?.firstAid,1600),treatment:boundedText(req.body?.treatment,1600),medicalReferral:boundedText(req.body?.medicalReferral,1000),
+      parentNotification:boundedText(req.body?.parentNotification,1000),parentNotifiedAt:boundedText(req.body?.parentNotifiedAt,120),
+      parentCollectedAt:boundedText(req.body?.parentCollectedAt,120),parentAdvice:boundedText(req.body?.parentAdvice,1200),
+      personInCharge:boundedText(req.body?.personInCharge,240),correctiveAction:boundedText(req.body?.correctiveAction,1600),
+      preventiveMeasures:boundedText(req.body?.preventiveMeasures,1600),staffStatement:boundedText(req.body?.staffStatement,2000),principalReview:boundedText(req.body?.principalReview,1600),
       parentAcknowledgement:'',evidenceFileIds:[],staffUsername:actor.username,staffSignature:signatureData?encryptField(signatureData):null,
       staffSignedAt:signatureData?nowIso():null,principalSignature:null,principalSignedAt:null,parentSignature:null,parentSignedAt:null,
       status:'Open',createdAt:nowIso(),updatedAt:nowIso()
     });
     db.dsdIncidents.unshift(record);res.status(201).json({success:true,incident:incidentView(record)});
   });
+  app.get('/api/dsd-incidents/:id/print',(req,res)=>{
+    const actor=getSessionAccount(req),row=actor&&(db.dsdIncidents||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    const learner=row&&findLearner(actor,row.learnerName);
+    if(!row||!(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor?.role)||parentCanSeeLearner(actor,learner)))return res.status(404).send('Incident not found.');
+    const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const line=(label,value)=>'<div class="line"><strong>'+esc(label)+':</strong> '+esc(value||'Not recorded')+'</div>';
+    res.setHeader('Cache-Control','private, no-store');
+    res.type('html').send('<!doctype html><html><head><meta charset="utf-8"><title>Little Feet incident report</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#102a43}.line{padding:7px 0;border-bottom:1px solid #d9e2ec}.sig{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.box{border:1px solid #b8c8d8;padding:12px;margin:12px 0}@media print{button{display:none}}</style></head><body><h1>Incident / Injury Report</h1><p>'+esc(row.schoolName||'')+' · '+esc(row.incidentNumber)+'</p>'+line('Child',row.learnerName)+line('Date',row.incidentDate)+line('Time',row.incidentTime)+line('Where did it occur',row.location)+line('Description',row.description)+line('Witnesses',row.witnesses)+line('Injuries or symptoms',row.injuriesOrSymptoms)+line('Body areas',(row.bodyRegions||[]).join(', '))+line('Blood present',row.bloodPresent?'Yes':'No')+line('Amount of blood',row.bloodAmount)+line('Where was the blood',row.bloodLocation)+line('First aid / what was done',row.firstAid)+line('Further medical attention',row.medicalReferral)+line('Parent notified',row.parentNotification)+line('When parent was notified',row.parentNotifiedAt)+line('When parent collected child',row.parentCollectedAt)+line('Advice given to parent',row.parentAdvice)+line('Person in charge',row.personInCharge)+line('Measures to prevent repeat',row.preventiveMeasures||row.correctiveAction)+'<div class="sig"><div class="box"><strong>Staff</strong><p>'+esc(row.staffSignedAt?'Signed '+row.staffSignedAt:'Not signed')+'</p></div><div class="box"><strong>Principal</strong><p>'+esc(row.principalSignedAt?'Signed '+row.principalSignedAt:'Not signed')+'</p></div><div class="box"><strong>Parent</strong><p>'+esc(row.parentSignedAt?'Signed '+row.parentSignedAt:'Not signed')+'</p></div></div><button onclick="window.print()">Print / Save PDF copy</button></body></html>');
+  });
+
   app.post('/api/dsd-incidents/:id/principal-sign',(req,res)=>{
     const actor=managementActor(req),row=actor&&(db.dsdIncidents||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
     if(!row)return res.status(404).json({message:'Incident not found.'});
@@ -584,7 +608,7 @@ function registerSchoolCoreUpgrades(app, deps) {
   });
 
   const automationTimer=setInterval(async()=>{
-    const schools=[...new Set((db.attendanceAutomationSettings||[]).filter(s=>s.autoAbsent).map(s=>s.schoolId).filter(Boolean))];
+    const schools=[...new Set((db.attendanceAutomationSettings||[]).filter(s=>s.autoAbsent||s.remindStaff).map(s=>s.schoolId).filter(Boolean))];
     for(const schoolId of schools){
       const actor=(db.users||[]).find(u=>u.schoolId===schoolId&&u.verificationStatus==='Active'&&['principal','admin'].includes(u.role));
       if(!actor)continue;
