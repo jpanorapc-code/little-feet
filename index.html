@@ -7762,11 +7762,14 @@
 
       <!-- Engagement -->
       <div id="engagementTab" class="tab-content">
-        <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><span>Communication &amp; Engagement</span></h2><span class="badge-tag info">SCHOOL COMMUNITY</span></div>
+        <div class="card"><div class="card-header-bar"><div><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg></span><span>Communication &amp; Engagement</span></h2><p class="meta">School alerts, community requests and direct message campaigns in one place.</p></div><span class="badge-tag info">SCHOOL COMMUNITY</span></div>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Read Receipts & Broadcasts</h3><p>Use Alerts for current area-based notifications. The current portal records deliveries locally; external SMS fallback needs provider setup.</p><button type="button" class="action-btn btn-green" onclick="openAlertsTab()">Open alerts</button></div>
-            <div class="workspace-card"><h3>Events & Order Requests</h3><p>Record a fundraiser, tuckshop, ticket, or permission-slip request for staff follow-up.</p><form onsubmit="saveWorkspaceRecord(event,'engagement','Event or order request')"><input name="details" placeholder="Event, order, or permission request" required><button class="submit-btn">Save request</button></form></div>
-          </div><div id="engagementRecords" class="record-list"></div>
+            <div class="workspace-card"><h3>School Alerts &amp; Broadcasts</h3><p>Open the existing Alerts area for urgent school notices, read receipts and current in-app broadcasts.</p><button type="button" class="action-btn btn-green" onclick="openAlertsTab()">Open alerts</button></div>
+            <div class="workspace-card"><h3>Events &amp; Requests</h3><p>Record a fundraiser, tuckshop, ticket, permission slip or other community request for staff follow-up.</p><form onsubmit="saveWorkspaceRecord(event,'engagement','Event or order request')"><input name="details" placeholder="Event, order, or permission request" required><button class="submit-btn">Save request</button></form></div>
+          </div>
+          <div id="lfCommunicationHubMount"></div>
+          <h3 class="workspace-heading">Saved engagement requests</h3>
+          <div id="engagementRecords" class="record-list"></div>
         </div>
       </div>
 

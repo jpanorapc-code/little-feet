@@ -130,6 +130,16 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.equal(await page.locator('#lfAttendanceSettings input[name="remindStaff"]').isChecked(),true);
 
     await openTab('engagementTab');
+    assert.equal(await page.locator('#lfCommunicationHubMount #lfCommunicationHub').count(),1,'Campaign sender must be embedded inside Communication & Engagement');
+    assert.equal(await page.locator('#engagementTab > #lfCommunicationHub').count(),0,'Campaign sender must not render as a separate top-level card');
+    await page.locator('#lfCommunicationHub').getByText('Direct Message Campaigns').waitFor({state:'visible'});
+    const classField=page.locator('#lfCampaignForm input[name="className"]');
+    assert.equal(await classField.isHidden(),true,'Class name must stay hidden for broad audiences');
+    await page.locator('#lfCampaignForm select[name="audience"]').selectOption('class');
+    assert.equal(await classField.isVisible(),true,'Class name must appear for one-class campaigns');
+    assert.equal(await classField.isEnabled(),true,'Class name must be enabled for one-class campaigns');
+    await page.locator('#lfCampaignForm select[name="audience"]').selectOption('all');
+    assert.equal(await classField.isHidden(),true,'Class name must hide again when class audience is not selected');
     assert.equal(await page.locator('#lfCampaignForm input[value="sms"]').isDisabled(),true,'SMS must not pretend to be ready without provider config');
     assert.equal(await page.locator('#lfCampaignForm input[value="push"]').isDisabled(),true,'Push must not pretend to be ready without provider config');
 
