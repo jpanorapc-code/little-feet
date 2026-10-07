@@ -7439,7 +7439,8 @@ if (typeof registerAdvancedSchoolOperations === 'function') {
   registerAdvancedSchoolOperations(app, {
     db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
     tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
-    isParentLinkedToLearner, validDateKey, createParentPaymentRecord, encryptField, decryptStoredField, logStructured
+    isParentLinkedToLearner, validDateKey, createParentPaymentRecord, encryptField, decryptStoredField,
+    saveDatabaseState, scheduleReplicaSnapshot, logStructured
   });
 }
 
