@@ -20,7 +20,8 @@ function registerAdvancedSchoolOperations(app, deps) {
   const collections = [
     'eldaSkillCatalogue','eldaAssessments','aftercareSettings','aftercarePlans','aftercareSessions',
     'staffClockSessions','staffRatioSettings','dayCareBookings','dayCareCapacitySettings',
-    'mealPlans','dietaryProfiles','learnerGroups','learnerSubjectAssignments','pickupPasses','academicAnalyticsSettings','schoolGroups','communicationTemplates'
+    'mealPlans','dietaryProfiles','learnerGroups','learnerSubjectAssignments','pickupPasses','academicAnalyticsSettings','schoolGroups','communicationTemplates',
+    'learnerSupportProfiles','learnerSupportInterventions','learnerSupportHistory'
   ];
   collections.forEach(name => { if (!Array.isArray(db[name])) db[name] = []; });
 
@@ -304,12 +305,132 @@ function registerAdvancedSchoolOperations(app, deps) {
   app.post('/api/communications/templates',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const name=limitedText(req.body?.name,160),title=limitedText(req.body?.title,180),message=limitedText(req.body?.message,3000);if(!name||!title||!message)return res.status(400).json({message:'Enter template name, title and message.'});const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),name,title,message,createdAt:nowIso(),createdBy:actor.username});db.communicationTemplates.unshift(row);res.status(201).json({success:true,template:row});});
   app.delete('/api/communications/templates/:id',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const before=db.communicationTemplates.length;db.communicationTemplates=db.communicationTemplates.filter(r=>!(r.id===req.params.id&&recordInSchool(r,actor)));if(before===db.communicationTemplates.length)return res.status(404).json({message:'Template not found.'});res.json({success:true});});
 
+  // Learning Support & Accommodations. This records educational support,
+  // not diagnoses. Sensitive support content is encrypted at rest.
+  const SUPPORT_AREAS=Object.freeze(['Literacy','Numeracy','Communication','Attention & organisation','Sensory / environmental','Mobility / access','Social-emotional','Language support','Other']);
+  const ACCOMMODATION_TYPES=Object.freeze(['Extra time','Reader','Scribe','Separate venue','Preferential seating','Rest breaks','Enlarged print','Assistive technology','Oral instructions','Reduced-distraction workspace','Alternative response format','Other']);
+  const decodeSupportJson=value=>{try{const parsed=JSON.parse(decryptStoredField(value)||'[]');return Array.isArray(parsed)?parsed:[];}catch{return [];}};
+  const supportProfileView=(row,actor)=>{
+    const base={id:row.id,learnerName:row.learnerName,status:row.status||'Active',reviewDate:row.reviewDate||'',supportAreas:decodeSupportJson(row.supportAreas),accommodations:decodeSupportJson(row.accommodations),parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,createdBy:row.createdBy,updatedAt:row.updatedAt||row.createdAt,updatedBy:row.updatedBy||row.createdBy};
+    if(actor?.role!=='parent'){base.supportNeeds=decryptStoredField(row.supportNeeds);base.staffNotes=decryptStoredField(row.staffNotes);}
+    return base;
+  };
+  const interventionView=(row,actor)=>{
+    const base={id:row.id,profileId:row.profileId,learnerName:row.learnerName,title:row.title,owner:row.owner,startDate:row.startDate,reviewDate:row.reviewDate,status:row.status,parentVisible:Boolean(row.parentVisible),parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,createdBy:row.createdBy,updatedAt:row.updatedAt||row.createdAt};
+    if(actor?.role!=='parent'){base.strategy=decryptStoredField(row.strategy);base.outcomeMeasure=decryptStoredField(row.outcomeMeasure);base.staffNotes=decryptStoredField(row.staffNotes);base.outcome=decryptStoredField(row.outcome);}
+    return base;
+  };
+  const supportProfileFor=(actor,id)=>schoolRecords('learnerSupportProfiles',actor).find(row=>row.id===id);
+  const supportHistory=(actor,profileId)=>schoolRecords('learnerSupportHistory',actor).filter(row=>row.profileId===profileId).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
+  const pushSupportHistory=(actor,profileId,learnerName,action,details)=>db.learnerSupportHistory.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),profileId,learnerName,action,details:boundedText(details,800),by:actor.username,at:nowIso()}));
+
+  app.get('/api/learning-support/catalogue',(req,res)=>{
+    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+    res.json({supportAreas:SUPPORT_AREAS,accommodationTypes:ACCOMMODATION_TYPES});
+  });
+  app.get('/api/learning-support/profiles',(req,res)=>{
+    const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view learner support.'});
+    let rows=schoolRecords('learnerSupportProfiles',actor);
+    if(actor.role==='parent')rows=rows.filter(row=>parentCanSee(actor,findLearner(actor,row.learnerName)));
+    else if(!staffActor(req))return res.status(403).json({message:'School staff or linked parent access is required.'});
+    const learnerName=boundedText(req.query?.learnerName,160);if(learnerName)rows=rows.filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learnerName));
+    res.json(rows.map(row=>supportProfileView(row,actor)));
+  });
+  app.post('/api/learning-support/profiles',(req,res)=>{
+    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+    const learner=findLearner(actor,req.body?.learnerName);if(!learner)return res.status(404).json({message:'Learner not found in this school.'});
+    const areas=[...new Set((Array.isArray(req.body?.supportAreas)?req.body.supportAreas:[]).map(x=>boundedText(x,80)).filter(x=>SUPPORT_AREAS.includes(x)))];
+    const supportNeeds=limitedText(req.body?.supportNeeds,2400),parentSummary=limitedText(req.body?.parentSummary,1600),staffNotes=limitedText(req.body?.staffNotes,2400),reviewDate=safeDate(req.body?.reviewDate);
+    if(!areas.length||!supportNeeds)return res.status(400).json({message:'Choose at least one support area and describe the learner support need.'});
+    const existing=schoolRecords('learnerSupportProfiles',actor).find(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName)&&row.status!=='Closed');
+    if(existing)return res.status(409).json({message:'This learner already has an open support profile.',profileId:existing.id});
+    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,status:'Active',supportAreas:encryptField(JSON.stringify(areas)),supportNeeds:encryptField(supportNeeds),staffNotes:encryptField(staffNotes),parentSummary:encryptField(parentSummary),accommodations:encryptField('[]'),reviewDate,createdAt:nowIso(),createdBy:actor.username});
+    db.learnerSupportProfiles.unshift(row);pushSupportHistory(actor,row.id,row.learnerName,'profile_created','Learning support profile created');
+    res.status(201).json({success:true,profile:supportProfileView(row,actor)});
+  });
+  app.patch('/api/learning-support/profiles/:id',(req,res)=>{
+    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+    const row=supportProfileFor(actor,req.params.id);if(!row)return res.status(404).json({message:'Support profile not found.'});
+    if(req.body?.supportAreas!==undefined){const areas=[...new Set((Array.isArray(req.body.supportAreas)?req.body.supportAreas:[]).map(x=>boundedText(x,80)).filter(x=>SUPPORT_AREAS.includes(x)))];if(!areas.length)return res.status(400).json({message:'Choose at least one support area.'});row.supportAreas=encryptField(JSON.stringify(areas));}
+    if(req.body?.supportNeeds!==undefined){const value=limitedText(req.body.supportNeeds,2400);if(!value)return res.status(400).json({message:'Support need cannot be blank.'});row.supportNeeds=encryptField(value);}
+    if(req.body?.staffNotes!==undefined)row.staffNotes=encryptField(limitedText(req.body.staffNotes,2400));
+    if(req.body?.parentSummary!==undefined)row.parentSummary=encryptField(limitedText(req.body.parentSummary,1600));
+    if(req.body?.reviewDate!==undefined){const review=safeDate(req.body.reviewDate);if(req.body.reviewDate&&!review)return res.status(400).json({message:'Choose a valid review date.'});row.reviewDate=review;}
+    if(req.body?.status!==undefined){if(!managementActor(req))return res.status(403).json({message:'Management approval is required to change support profile status.'});if(!['Active','Monitoring','Closed'].includes(req.body.status))return res.status(400).json({message:'Choose Active, Monitoring or Closed.'});row.status=req.body.status;}
+    row.updatedAt=nowIso();row.updatedBy=actor.username;pushSupportHistory(actor,row.id,row.learnerName,'profile_updated','Support profile updated');
+    res.json({success:true,profile:supportProfileView(row,actor)});
+  });
+  app.post('/api/learning-support/profiles/:id/accommodations',(req,res)=>{
+    const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management approval is required for accommodations.'});
+    const row=supportProfileFor(actor,req.params.id);if(!row)return res.status(404).json({message:'Support profile not found.'});
+    const type=boundedText(req.body?.type,120),details=limitedText(req.body?.details,900),startDate=safeDate(req.body?.startDate)||dateKeyInSouthAfrica(),endDate=safeDate(req.body?.endDate);
+    if(!ACCOMMODATION_TYPES.includes(type))return res.status(400).json({message:'Choose a supported accommodation type.'});
+    if(req.body?.endDate&&!endDate)return res.status(400).json({message:'Choose a valid accommodation end date.'});
+    const accommodations=decodeSupportJson(row.accommodations);const entry={id:crypto.randomUUID(),type,details,startDate,endDate,status:'Active',approvedBy:actor.username,approvedAt:nowIso()};
+    accommodations.unshift(entry);row.accommodations=encryptField(JSON.stringify(accommodations));row.updatedAt=nowIso();row.updatedBy=actor.username;pushSupportHistory(actor,row.id,row.learnerName,'accommodation_added',type);
+    res.status(201).json({success:true,accommodation:entry,profile:supportProfileView(row,actor)});
+  });
+  app.patch('/api/learning-support/profiles/:id/accommodations/:accommodationId',(req,res)=>{
+    const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management approval is required for accommodations.'});
+    const row=supportProfileFor(actor,req.params.id);if(!row)return res.status(404).json({message:'Support profile not found.'});
+    const accommodations=decodeSupportJson(row.accommodations),entry=accommodations.find(item=>item.id===req.params.accommodationId);if(!entry)return res.status(404).json({message:'Accommodation not found.'});
+    if(req.body?.status!==undefined){if(!['Active','Paused','Ended'].includes(req.body.status))return res.status(400).json({message:'Choose Active, Paused or Ended.'});entry.status=req.body.status;}
+    if(req.body?.details!==undefined)entry.details=limitedText(req.body.details,900);
+    if(req.body?.endDate!==undefined){const end=safeDate(req.body.endDate);if(req.body.endDate&&!end)return res.status(400).json({message:'Choose a valid end date.'});entry.endDate=end;}
+    entry.updatedAt=nowIso();entry.updatedBy=actor.username;row.accommodations=encryptField(JSON.stringify(accommodations));row.updatedAt=entry.updatedAt;row.updatedBy=actor.username;pushSupportHistory(actor,row.id,row.learnerName,'accommodation_updated',entry.type+' · '+entry.status);
+    res.json({success:true,accommodation:entry,profile:supportProfileView(row,actor)});
+  });
+  app.get('/api/learning-support/interventions',(req,res)=>{
+    const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view interventions.'});
+    let rows=schoolRecords('learnerSupportInterventions',actor);
+    if(actor.role==='parent')rows=rows.filter(row=>row.parentVisible&&parentCanSee(actor,findLearner(actor,row.learnerName)));
+    else if(!staffActor(req))return res.status(403).json({message:'School staff or linked parent access is required.'});
+    const learnerName=boundedText(req.query?.learnerName,160);if(learnerName)rows=rows.filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learnerName));
+    res.json(rows.map(row=>interventionView(row,actor)));
+  });
+  app.post('/api/learning-support/interventions',(req,res)=>{
+    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+    const profile=supportProfileFor(actor,req.body?.profileId);if(!profile)return res.status(404).json({message:'Support profile not found.'});
+    const title=limitedText(req.body?.title,180),strategy=limitedText(req.body?.strategy,2200),owner=limitedText(req.body?.owner,160)||actor.name||actor.username,startDate=safeDate(req.body?.startDate)||dateKeyInSouthAfrica(),reviewDate=safeDate(req.body?.reviewDate),outcomeMeasure=limitedText(req.body?.outcomeMeasure,1200),staffNotes=limitedText(req.body?.staffNotes,1600),parentSummary=limitedText(req.body?.parentSummary,1200);
+    if(!title||!strategy||!reviewDate)return res.status(400).json({message:'Enter an intervention title, strategy and review date.'});
+    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),profileId:profile.id,learnerName:profile.learnerName,title,owner,startDate,reviewDate,status:'Active',strategy:encryptField(strategy),outcomeMeasure:encryptField(outcomeMeasure),staffNotes:encryptField(staffNotes),parentSummary:encryptField(parentSummary),outcome:encryptField(''),parentVisible:Boolean(req.body?.parentVisible),createdAt:nowIso(),createdBy:actor.username});
+    db.learnerSupportInterventions.unshift(row);pushSupportHistory(actor,profile.id,profile.learnerName,'intervention_created',title);
+    res.status(201).json({success:true,intervention:interventionView(row,actor)});
+  });
+  app.patch('/api/learning-support/interventions/:id',(req,res)=>{
+    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+    const row=schoolRecords('learnerSupportInterventions',actor).find(item=>item.id===req.params.id);if(!row)return res.status(404).json({message:'Intervention not found.'});
+    if(req.body?.status!==undefined){if(!['Active','Review due','Completed','Stopped'].includes(req.body.status))return res.status(400).json({message:'Choose a valid intervention status.'});row.status=req.body.status;}
+    if(req.body?.reviewDate!==undefined){const review=safeDate(req.body.reviewDate);if(req.body.reviewDate&&!review)return res.status(400).json({message:'Choose a valid review date.'});row.reviewDate=review;}
+    if(req.body?.strategy!==undefined)row.strategy=encryptField(limitedText(req.body.strategy,2200));
+    if(req.body?.outcomeMeasure!==undefined)row.outcomeMeasure=encryptField(limitedText(req.body.outcomeMeasure,1200));
+    if(req.body?.staffNotes!==undefined)row.staffNotes=encryptField(limitedText(req.body.staffNotes,1600));
+    if(req.body?.parentSummary!==undefined)row.parentSummary=encryptField(limitedText(req.body.parentSummary,1200));
+    if(req.body?.outcome!==undefined)row.outcome=encryptField(limitedText(req.body.outcome,1600));
+    if(req.body?.parentVisible!==undefined)row.parentVisible=Boolean(req.body.parentVisible);
+    row.updatedAt=nowIso();row.updatedBy=actor.username;pushSupportHistory(actor,row.profileId,row.learnerName,'intervention_updated',row.title+' · '+row.status);
+    res.json({success:true,intervention:interventionView(row,actor)});
+  });
+  app.get('/api/learning-support/profiles/:id/history',(req,res)=>{
+    const actor=getSessionAccount(req);const profile=actor&&supportProfileFor(actor,req.params.id);if(!profile)return res.status(404).json({message:'Support profile not found.'});
+    if(actor.role==='parent'&&!parentCanSee(actor,findLearner(actor,profile.learnerName)))return res.status(403).json({message:'You cannot view this learner.'});
+    res.json(supportHistory(actor,profile.id));
+  });
+  app.get('/api/learning-support/summary/:learnerName',(req,res)=>{
+    const actor=getSessionAccount(req),learner=actor&&findLearner(actor,req.params.learnerName);if(!actor||!canSeeLearner(actor,learner))return res.status(403).json({message:'You cannot view this learner.'});
+    const profile=schoolRecords('learnerSupportProfiles',actor).find(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName)&&row.status!=='Closed');
+    if(!profile)return res.json({learnerName:learner.studentName,profile:null,interventions:[]});
+    let interventions=schoolRecords('learnerSupportInterventions',actor).filter(row=>row.profileId===profile.id);
+    if(actor.role==='parent')interventions=interventions.filter(row=>row.parentVisible);
+    res.json({learnerName:learner.studentName,profile:supportProfileView(profile,actor),interventions:interventions.map(row=>interventionView(row,actor))});
+  });
+
   // Cross-school owner dashboard is deliberately limited to platform-level users.
   app.get('/api/school-groups',(req,res)=>{const actor=getSessionAccount(req);if(!actor||!hasPlatformAccess(actor))return res.status(403).json({message:'Little Feet platform access is required.'});res.json(db.schoolGroups||[]);});
   app.post('/api/school-groups',(req,res)=>{const actor=getSessionAccount(req);if(!actor||!hasPlatformAccess(actor))return res.status(403).json({message:'Little Feet platform access is required.'});const name=limitedText(req.body?.name,160),schoolIds=[...new Set((Array.isArray(req.body?.schoolIds)?req.body.schoolIds:[]).map(String))];const known=new Set((db.schools||[]).map(s=>String(s.id)));if(!name||!schoolIds.length||schoolIds.some(id=>!known.has(id)))return res.status(400).json({message:'Enter a group name and valid school IDs.'});const row={id:crypto.randomUUID(),name,schoolIds,createdAt:nowIso(),createdBy:actor.username};db.schoolGroups.unshift(row);res.status(201).json({success:true,group:row});});
   app.get('/api/school-groups/:id/dashboard',(req,res)=>{const actor=getSessionAccount(req);if(!actor||!hasPlatformAccess(actor))return res.status(403).json({message:'Little Feet platform access is required.'});const group=(db.schoolGroups||[]).find(r=>r.id===req.params.id);if(!group)return res.status(404).json({message:'School group not found.'});const sites=group.schoolIds.map(id=>{const school=(db.schools||[]).find(s=>String(s.id)===String(id));const learners=(db.students||[]).filter(r=>String(r.schoolId)===String(id));const today=dateKeyInSouthAfrica();const present=(db.attendance||[]).filter(r=>String(r.schoolId)===String(id)&&r.date===today&&normalizeComparableText(r.status)==='present').length;const staff=(db.users||[]).filter(r=>String(r.schoolId)===String(id)&&['teacher','principal','admin','staff','school_accounts'].includes(r.role)).length;const bookings=(db.dayCareBookings||[]).filter(r=>String(r.schoolId)===String(id)&&r.date===today&&r.status==='confirmed').length;return {schoolId:id,schoolName:school?.name||id,learners:learners.length,presentToday:present,staff,dayCareBookingsToday:bookings};});res.json({group:{id:group.id,name:group.name},sites,totals:{learners:sites.reduce((a,b)=>a+b.learners,0),presentToday:sites.reduce((a,b)=>a+b.presentToday,0),staff:sites.reduce((a,b)=>a+b.staff,0)}});});
 
-  logStructured?.('info','advanced_school_operations.registered',{category:'startup',result:'ready',details:'ELDA, aftercare, ratios, day care, meals, groups, analytics, pickup passes and multi-site routes registered'});
+  logStructured?.('info','advanced_school_operations.registered',{category:'startup',result:'ready',details:'ELDA, aftercare, ratios, day care, meals, groups, analytics, learning support, pickup passes and multi-site routes registered'});
 }
 
 module.exports = { registerAdvancedSchoolOperations, ELDA_AREAS };
