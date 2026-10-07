@@ -10,7 +10,14 @@ const { Pool } = require('pg');
 const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
-const { registerSchoolCoreUpgrades } = require('./school-core-upgrades-server');
+let registerSchoolCoreUpgrades = null;
+try {
+  ({ registerSchoolCoreUpgrades } = require('./school-core-upgrades-server'));
+} catch (error) {
+  const missingOwnModule = error?.code === 'MODULE_NOT_FOUND'
+    && String(error.message || '').includes('school-core-upgrades-server');
+  if (!missingOwnModule) throw error;
+}
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
@@ -3436,13 +3443,15 @@ registerFinanceAutomation(app, {
   scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
 });
 
-registerSchoolCoreUpgrades(app, {
-  db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
-  tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
-  isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
-  validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
-  scheduleReplicaSnapshot, logStructured
-});
+if (typeof registerSchoolCoreUpgrades === 'function') {
+  registerSchoolCoreUpgrades(app, {
+    db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
+    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+    isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
+    validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
+    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured
+  });
+}
 
 app.get('/api/parent-payments/parents', (req, res) => {
   const actor = getSessionAccount(req);
