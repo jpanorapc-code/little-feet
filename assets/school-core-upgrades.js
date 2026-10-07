@@ -110,7 +110,41 @@
   async function refreshAssets(){
     const host=document.getElementById('lfAssetList');if(!host)return;
     const rows=await api('/api/assets');window.__littleFeetAssets=rows;
-    host.innerHTML=rows.length?rows.slice(0,100).map(row=>'<div class="item-row"><div><strong>'+esc(row.assetCode)+' · '+esc(row.name)+'</strong><p>'+esc(row.category||'Uncategorised')+' · '+esc(row.location||'No location')+' · '+esc(row.condition||'')+' · '+esc(row.status||'')+'</p><span class="meta">'+money(row.purchaseValue)+'</span></div></div>').join(''):'<p class="meta">No assets registered yet.</p>';
+    host.innerHTML=rows.length?rows.slice(0,100).map(row=>'<div class="item-row"><div><strong>'+esc(row.assetCode)+' · '+esc(row.name)+'</strong><p>'+esc(row.category||'Uncategorised')+' · '+esc(row.location||'No location')+' · '+esc(row.condition||'')+' · '+esc(row.status||'')+'</p><span class="meta">'+money(row.purchaseValue)+'</span></div>'+(management()?'<div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="editLittleFeetAsset(\''+esc(row.id)+'\')">Edit</button><button type="button" class="action-btn btn-red" onclick="deleteLittleFeetAsset(\''+esc(row.id)+'\')">Delete</button></div>':'')+'</div>').join(''):'<p class="meta">No assets registered yet.</p>';
+  }
+  window.editLittleFeetAsset=async id=>{
+    const row=(window.__littleFeetAssets||[]).find(item=>item.id===id);if(!row)return;
+    const name=prompt('Asset name',row.name||'');if(name===null)return;
+    const location=prompt('Room / location',row.location||'');if(location===null)return;
+    const condition=prompt('Condition',row.condition||'Good');if(condition===null)return;
+    const status=prompt('Status',row.status||'In service');if(status===null)return;
+    try{await api('/api/assets/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({name,location,condition,status})});await refreshAssets();}catch(err){alert(err.message);}
+  };
+  window.deleteLittleFeetAsset=async id=>{
+    if(!confirm('Delete this asset from the register?'))return;
+    try{await api('/api/assets/'+encodeURIComponent(id),{method:'DELETE'});await refreshAssets();}catch(err){alert(err.message);}
+  };
+  async function importLittleFeetAssets(file){
+    if(!file)return;
+    if(typeof XLSX==='undefined')throw new Error('Spreadsheet reader is still loading.');
+    const buffer=await file.arrayBuffer(),workbook=XLSX.read(buffer,{type:'array'}),sheet=workbook.Sheets[workbook.SheetNames[0]];
+    const raw=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    const rows=raw.map(row=>({
+      assetCode:row['Asset Code']||row['assetCode']||row['Code']||row['code'],
+      name:row['Asset Name']||row['name']||row['Name'],
+      category:row['Category']||row['category'],
+      location:row['Location']||row['location'],
+      supplier:row['Supplier']||row['supplier'],
+      serialNumber:row['Serial Number']||row['serialNumber'],
+      purchaseDate:row['Purchase Date']||row['purchaseDate'],
+      purchaseValue:row['Purchase Value']||row['purchaseValue']||0,
+      condition:row['Condition']||row['condition']||'Good',
+      status:row['Status']||row['status']||'In service',
+      notes:row['Notes']||row['notes']||''
+    })).filter(row=>String(row.assetCode||'').trim()&&String(row.name||'').trim());
+    if(!rows.length)throw new Error('No asset rows found. Use Asset Code and Asset Name columns.');
+    const result=await api('/api/assets/import',{method:'POST',body:JSON.stringify({rows})});
+    alert('Imported '+result.created+' asset(s). Skipped '+result.skipped+'.');await refreshAssets();
   }
   window.exportLittleFeetAssets=()=>{
     const rows=window.__littleFeetAssets||[];if(!rows.length)return alert('No assets to export.');
@@ -120,9 +154,10 @@
   };
   function setupAssets(){
     if(!staff())return;
-    const card=addCard('operationsTab','lfAssetRegisterCard','<div class="card-header-bar"><div><h2>Asset Register</h2><p class="meta">Keeps the existing asset checks and adds the full school asset list.</p></div><span class="badge-tag info">REGISTER</span></div>'+(management()?'<form id="lfAssetForm" class="workspace-grid"><input name="assetCode" placeholder="Asset code" required><input name="name" placeholder="Asset name" required><input name="category" placeholder="Category"><input name="location" placeholder="Room / location"><input name="supplier" placeholder="Supplier"><input name="serialNumber" placeholder="Serial number"><input name="purchaseDate" type="date"><input name="purchaseValue" type="number" min="0" step="0.01" placeholder="Purchase value"><input name="condition" placeholder="Condition" value="Good"><input name="status" placeholder="Status" value="In service"><textarea name="notes" placeholder="Notes"></textarea><button class="submit-btn">Add asset</button></form>':'')+'<button type="button" class="action-btn btn-blue" onclick="exportLittleFeetAssets()">Export CSV</button><div id="lfAssetList" class="record-list"></div>');
+    const card=addCard('operationsTab','lfAssetRegisterCard','<div class="card-header-bar"><div><h2>Asset Register</h2><p class="meta">Keeps the existing asset checks and adds the full school asset list.</p></div><span class="badge-tag info">REGISTER</span></div>'+(management()?'<form id="lfAssetForm" class="workspace-grid"><input name="assetCode" placeholder="Asset code" required><input name="name" placeholder="Asset name" required><input name="category" placeholder="Category"><input name="location" placeholder="Room / location"><input name="supplier" placeholder="Supplier"><input name="serialNumber" placeholder="Serial number"><input name="purchaseDate" type="date"><input name="purchaseValue" type="number" min="0" step="0.01" placeholder="Purchase value"><input name="condition" placeholder="Condition" value="Good"><input name="status" placeholder="Status" value="In service"><textarea name="notes" placeholder="Notes"></textarea><button class="submit-btn">Add asset</button></form><div class="flex-form-row"><input id="lfAssetImport" type="file" accept=".xlsx,.xls,.csv"><button id="lfAssetImportButton" type="button" class="action-btn btn-blue">Import Excel / CSV</button></div>':'')+'<button type="button" class="action-btn btn-blue" onclick="exportLittleFeetAssets()">Export CSV</button><div id="lfAssetList" class="record-list"></div>');
     if(!card)return;
     card.querySelector('#lfAssetForm')?.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.purchaseValue=Number(body.purchaseValue||0);await api('/api/assets',{method:'POST',body:JSON.stringify(body)});e.currentTarget.reset();e.currentTarget.elements.condition.value='Good';e.currentTarget.elements.status.value='In service';await refreshAssets();}catch(err){alert(err.message);}});
+    card.querySelector('#lfAssetImportButton')?.addEventListener('click',async()=>{try{await importLittleFeetAssets(document.getElementById('lfAssetImport')?.files?.[0]);}catch(err){alert(err.message);}});
     refreshAssets().catch(()=>{});
   }
 
@@ -152,7 +187,8 @@
   }
   function setupGradeR(){
     if(!staff() && user()?.role!=='parent')return;
-    const card=addCard('progressTab','lfGradeRSkillsCard','<div class="card-header-bar"><div><h2>Grade R Skills</h2><p class="meta">98 Little Feet observation skills mapped to CAPS Home Language, Mathematics and Life Skills.</p></div><span class="badge-tag info">98 SKILLS</span></div>'+(staff()?'<form id="lfGradeRForm" class="workspace-grid"><input id="lfGradeRLearner" name="learnerName" placeholder="Grade R learner" required><select id="lfGradeRSkill" name="skillId"></select><select name="rating"><option value="1">1 · Not yet</option><option value="2">2 · Developing</option><option value="3">3 · Achieved</option><option value="4">4 · Strong / consistent</option></select><input name="observedAt" type="date"><textarea name="evidence" placeholder="Observation / evidence"></textarea><button class="submit-btn">Save skill observation</button></form>':'<input id="lfGradeRLearner" placeholder="Learner name"><button id="lfGradeRRefresh" type="button" class="action-btn btn-blue">View progress</button><select id="lfGradeRSkill" class="hidden"></select>')+'<div id="lfGradeRSummary"></div>');
+    const gradeTarget=user()?.role==='parent'?'reportsTab':'progressTab';
+    const card=addCard(gradeTarget,'lfGradeRSkillsCard','<div class="card-header-bar"><div><h2>Grade R Skills</h2><p class="meta">98 Little Feet observation skills mapped to CAPS Home Language, Mathematics and Life Skills.</p></div><span class="badge-tag info">98 SKILLS</span></div>'+(staff()?'<form id="lfGradeRForm" class="workspace-grid"><input id="lfGradeRLearner" name="learnerName" placeholder="Grade R learner" required><select id="lfGradeRSkill" name="skillId"></select><select name="rating"><option value="1">1 · Not yet</option><option value="2">2 · Developing</option><option value="3">3 · Achieved</option><option value="4">4 · Strong / consistent</option></select><input name="observedAt" type="date"><textarea name="evidence" placeholder="Observation / evidence"></textarea><button class="submit-btn">Save skill observation</button></form>':'<input id="lfGradeRLearner" placeholder="Learner name"><button id="lfGradeRRefresh" type="button" class="action-btn btn-blue">View progress</button><select id="lfGradeRSkill" class="hidden"></select>')+'<div id="lfGradeRSummary"></div>');
     if(!card)return;
     const form=card.querySelector('#lfGradeRForm');if(form){form.elements.observedAt.value=new Date().toISOString().slice(0,10);form.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.rating=Number(body.rating);await api('/api/grade-r/assessments',{method:'POST',body:JSON.stringify(body)});await refreshGradeR();}catch(err){alert(err.message);}});}
     card.querySelector('#lfGradeRRefresh')?.addEventListener('click',()=>refreshGradeR());
@@ -189,15 +225,15 @@
   async function refreshAttendanceUpgrade(){
     const host=document.getElementById('lfAttendanceInsights'),form=document.getElementById('lfAttendanceSettings');if(!host)return;
     const data=await api('/api/attendance/insights?days=30');
-    if(form&&management()){form.elements.cutoffTime.value=data.settings.cutoffTime||'09:00';form.elements.autoAbsent.checked=Boolean(data.settings.autoAbsent);form.elements.notifyParents.checked=Boolean(data.settings.notifyParents);}
+    if(form&&management()){form.elements.cutoffTime.value=data.settings.cutoffTime||'09:00';form.elements.autoAbsent.checked=Boolean(data.settings.autoAbsent);form.elements.notifyParents.checked=Boolean(data.settings.notifyParents);form.elements.remindStaff.checked=Boolean(data.settings.remindStaff);}
     const dates=Object.entries(data.byDate||{}).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14);
-    host.innerHTML=dates.length?dates.map(([date,row])=>'<div class="item-row"><strong>'+esc(date)+'</strong><span>Present '+esc((row.Present||0)+(row['Checked In']||0))+' · Absent '+esc(row.Absent||0)+' · Late '+esc(row.Late||0)+'</span></div>').join(''):'<p class="meta">No attendance history yet.</p>';
+    host.innerHTML=dates.length?dates.map(([date,row])=>{const present=(row.Present||0)+(row['Checked In']||0),absent=row.Absent||0,late=row.Late||0,total=Math.max(1,present+absent+late+(row.Excused||0)),rate=Math.round((present/total)*100);return '<div class="item-row"><div style="width:100%;"><strong>'+esc(date)+'</strong><span style="float:right;">'+esc(rate)+'% present</span><progress max="100" value="'+esc(rate)+'" style="width:100%;"></progress><span class="meta">Present '+esc(present)+' · Absent '+esc(absent)+' · Late '+esc(late)+'</span></div></div>';}).join(''):'<p class="meta">No attendance history yet.</p>';
   }
   function setupAttendanceUpgrade(){
     if(!staff())return;
-    const card=addCard('attendanceTab','lfSmartAttendanceCard','<div class="card-header-bar"><div><h2>Smart Attendance</h2><p class="meta">Keeps the current register and adds a real cutoff, auto-absent run, parent email and 30-day view.</p></div><span class="badge-tag info">AUTOMATION</span></div>'+(management()?'<form id="lfAttendanceSettings" class="workspace-grid"><label>Attendance cutoff<input name="cutoffTime" type="time" value="09:00" required></label><label><input name="autoAbsent" type="checkbox"> Auto mark missing learners absent after cutoff</label><label><input name="notifyParents" type="checkbox"> Email linked parent when auto-absent is created</label><button class="submit-btn">Save attendance rules</button></form>':'')+'<button id="lfRunAttendanceNow" type="button" class="action-btn btn-blue">Run smart attendance now</button><div id="lfAttendanceInsights" class="record-list"></div>');
+    const card=addCard('attendanceTab','lfSmartAttendanceCard','<div class="card-header-bar"><div><h2>Smart Attendance</h2><p class="meta">Keeps the current register and adds a real cutoff, auto-absent run, parent email and 30-day view.</p></div><span class="badge-tag info">AUTOMATION</span></div>'+(management()?'<form id="lfAttendanceSettings" class="workspace-grid"><label>Attendance cutoff<input name="cutoffTime" type="time" value="09:00" required></label><label><input name="autoAbsent" type="checkbox"> Auto mark missing learners absent after cutoff</label><label><input name="notifyParents" type="checkbox"> Email linked parent when auto-absent is created</label><label><input name="remindStaff" type="checkbox"> Email school staff when learners are still missing after cutoff</label><button class="submit-btn">Save attendance rules</button></form>':'')+'<button id="lfRunAttendanceNow" type="button" class="action-btn btn-blue">Run smart attendance now</button><div id="lfAttendanceInsights" class="record-list"></div>');
     if(!card)return;
-    card.querySelector('#lfAttendanceSettings')?.addEventListener('submit',async e=>{e.preventDefault();try{const body={cutoffTime:e.currentTarget.elements.cutoffTime.value,autoAbsent:e.currentTarget.elements.autoAbsent.checked,notifyParents:e.currentTarget.elements.notifyParents.checked};await api('/api/attendance/automation/settings',{method:'PUT',body:JSON.stringify(body)});await refreshAttendanceUpgrade();}catch(err){alert(err.message);}});
+    card.querySelector('#lfAttendanceSettings')?.addEventListener('submit',async e=>{e.preventDefault();try{const body={cutoffTime:e.currentTarget.elements.cutoffTime.value,autoAbsent:e.currentTarget.elements.autoAbsent.checked,notifyParents:e.currentTarget.elements.notifyParents.checked,remindStaff:e.currentTarget.elements.remindStaff.checked};await api('/api/attendance/automation/settings',{method:'PUT',body:JSON.stringify(body)});await refreshAttendanceUpgrade();}catch(err){alert(err.message);}});
     card.querySelector('#lfRunAttendanceNow').addEventListener('click',async()=>{try{const result=await api('/api/attendance/automation/run',{method:'POST',body:'{}'});alert('Created '+result.created+' absence record(s).'+(result.skipped?' '+result.skipped:''));await refreshAttendanceUpgrade();window.loadAttendance?.();}catch(err){alert(err.message);}});
     refreshAttendanceUpgrade().catch(()=>{});
   }
