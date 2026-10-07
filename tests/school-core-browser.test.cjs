@@ -90,6 +90,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfAssetList').getByText('CORE-001').first().waitFor({state:'visible'});
 
     await page.locator('#lfGradeRForm input[name="learnerName"]').fill('Core Learner');
+    await page.locator('#lfGradeRForm input[name="term"]').fill('Term 4');
     await page.locator('#lfGradeRForm select[name="rating"]').selectOption('3');
     await page.locator('#lfGradeRForm textarea[name="evidence"]').fill('Observed in class');
     await page.locator('#lfGradeRForm button[type="submit"]').click();
