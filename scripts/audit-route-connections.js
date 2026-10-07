@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function auditRouteConnections(root = path.resolve(__dirname, '..')) {
-  const serverFiles = ['server.js', 'finance-automation-server.js', 'school-core-upgrades-server.js'];
+  const serverFiles = ['server.js', 'finance-automation-server.js', 'school-core-upgrades-server.js', 'advanced-school-operations-server.js'];
   const routePattern = /app\.(get|post|put|patch|delete)\(\s*(['"])(\/api\/[^'"]+)\2/g;
   const routes = [];
 
@@ -32,18 +32,23 @@ function auditRouteConnections(root = path.resolve(__dirname, '..')) {
   walk(assetsRoot);
 
   const calls = [];
-  const fetchPattern = /fetch\(\s*([`'"])(\/api\/[^`'"]+)\1\s*(?:,\s*\{([\s\S]{0,260}?)\})?/g;
+  const callPatterns = [
+    /fetch\(\s*([`'\"])(\/api\/[^`'\"]+)\1\s*(?:,\s*\{([\s\S]{0,260}?)\})?/g,
+    /\bapi\(\s*([`'\"])(\/api\/[^`'\"]+)\1\s*(?:,\s*\{([\s\S]{0,260}?)\})?/g
+  ];
   for (const relative of sourceFiles) {
     const full = path.join(root, relative);
     if (!fs.existsSync(full)) continue;
     const source = fs.readFileSync(full, 'utf8');
-    for (const match of source.matchAll(fetchPattern)) {
-      const tail = source.slice(match.index + match[0].length, match.index + match[0].length + 360);
-      const concatenated = tail.trimStart().startsWith('+');
-      const route = (match[2].replace(/\$\{[^}]*query[^}]*\}/ig, '').replace(/\$\{[^}]+\}/g, 'value') + (concatenated ? 'value' : '')).split('?')[0];
-      const method = /method\s*:\s*['"](GET|POST|PUT|PATCH|DELETE)['"]/i.exec((match[3] || '') + (concatenated ? tail : ''))?.[1]?.toUpperCase() || 'GET';
-      const line = source.slice(0, match.index).split('\n').length;
-      calls.push({ method, route, file: relative, line });
+    for (const callPattern of callPatterns) {
+      for (const match of source.matchAll(callPattern)) {
+        const tail = source.slice(match.index + match[0].length, match.index + match[0].length + 360);
+        const concatenated = tail.trimStart().startsWith('+');
+        const route = (match[2].replace(/\$\{[^}]*query[^}]*\}/ig, '').replace(/\$\{[^}]+\}/g, 'value') + (concatenated ? 'value' : '')).split('?')[0];
+        const method = /method\s*:\s*['\"](GET|POST|PUT|PATCH|DELETE)['\"]/i.exec((match[3] || '') + (concatenated ? tail : ''))?.[1]?.toUpperCase() || 'GET';
+        const line = source.slice(0, match.index).split('\n').length;
+        calls.push({ method, route, file: relative, line });
+      }
     }
   }
 
