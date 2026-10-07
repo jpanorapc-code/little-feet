@@ -34,6 +34,12 @@ const starGlowMask = fs.readFileSync(path.join(root, 'assets', '4k', 'little-fee
 assert.match(page, /<meta name="description" content="Little Feet by Little Feet Technologies \(Pty\) Ltd is a South African school operations platform/);
 assert.match(page, /<meta name="robots" content="index,follow,max-image-preview:large">/);
 assert.ok(page.includes('<link rel="canonical" href="https://littlefeet.co.za/">'));
+assert.match(server, /app\.all\(\/\^\\\/api\(\?:\\\/\|\$\)\//);
+assert.match(server, /message: 'API route not found\.'/);
+assert.match(server, /app\.get\('\/'\s*,/);
+assert.match(server, /app\.get\(\/\(\.\*\)\//);
+assert.doesNotMatch(server, /app\.get\(\/\(\.\*\)\/[\s\S]{0,300}sendFile\(path\.join\(__dirname, 'index\.html'\)\)/);
+assert.match(sitemap, /<lastmod>2026-10-07<\/lastmod>/);
 assert.ok(page.includes('<script type="application/ld+json">'));
 assert.equal((page.match(/<h1\b/gi) || []).length, 1, 'The public document should expose one primary H1.');
 assert.match(page, /<h1 role="button" tabindex="0"/);
