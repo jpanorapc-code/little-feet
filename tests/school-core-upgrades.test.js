@@ -16,6 +16,7 @@ const gatewayRequests = [];
 const gateway = http.createServer((req,res)=>{let raw='';req.setEncoding('utf8');req.on('data',chunk=>{raw+=chunk;});req.on('end',()=>{let body={};try{body=JSON.parse(raw||'{}');}catch{}gatewayRequests.push({url:req.url,body});res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({id:'accepted'}));});});
 gateway.listen(gatewayPort,'127.0.0.1');
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
+const signature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 for (const file of ['server.js','school-core-upgrades-server.js','finance-automation-server.js','failover-mode.js','auth-crypto.js','backup.js']) {
   fs.copyFileSync(path.join(root, file), path.join(tmp, file));
@@ -32,9 +33,9 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
     {id:'school-bravo',name:'Bravo School',status:'active'}
   ],
   users:[
-    {username:'alpha-admin',pinHash:hash('AdminPass1'),name:'Alpha Admin',role:'admin',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
-    {username:'alpha-teacher',pinHash:hash('TeacherPass1'),name:'Alpha Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
-    {username:'alpha-parent',email:'parent@alpha.test',phone:'+27110000001',pinHash:hash('ParentPass1'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
+    {username:'alpha-admin',pinHash:hash('AdminPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Admin',role:'admin',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
+    {username:'alpha-teacher',pinHash:hash('TeacherPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
+    {username:'alpha-parent',email:'parent@alpha.test',phone:'+27110000001',pinHash:hash('ParentPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
     {username:'bravo-admin',pinHash:hash('BravoPass1'),name:'Bravo Admin',role:'admin',schoolId:'school-bravo',schoolName:'Bravo School',verificationStatus:'Active'}
   ],
   students:[
@@ -141,6 +142,9 @@ async function login(username,pin){
     assert.equal(asset.response.status,201);
     const duplicateAsset=await request('/api/assets',{method:'POST',cookie:admin,body:{assetCode:'TAB-001',name:'Duplicate'}});
     assert.equal(duplicateAsset.response.status,409);
+    const assetImport=await request('/api/assets/import',{method:'POST',cookie:admin,body:{rows:[{assetCode:'CHAIR-001',name:'Class chair',category:'Furniture',location:'Grade R'}]}});
+    assert.equal(assetImport.response.status,201);
+    assert.equal(assetImport.data.created,1);
     const bravoAssets=await request('/api/assets',{cookie:bravo});
     assert.equal(bravoAssets.response.status,200);
     assert.equal(bravoAssets.data.length,0);
@@ -155,10 +159,18 @@ async function login(username,pin){
     const incident=await request('/api/dsd-incidents',{method:'POST',cookie:teacher,body:{
       learnerName:'Alpha Learner',incidentDate:'2026-10-07',incidentTime:'10:15',location:'Playground',incidentType:'Minor injury',
       description:'Learner tripped while running.',witnesses:'Teacher present',bodyRegions:['left-leg'],firstAid:'Cleaned area',
-      treatment:'Cold pack',parentNotification:'Parent called',correctiveAction:'Checked play area',staffStatement:'Observed fall directly'
+      treatment:'Cold pack',parentNotification:'Parent called',correctiveAction:'Checked play area',staffStatement:'Observed fall directly',
+      signingPin:'Sign1234',signatureData:signature
     }});
     assert.equal(incident.response.status,201,incident.text);
     assert.equal(incident.data.incident.bodyRegions[0],'left-leg');
+    assert.ok(incident.data.incident.staffSignedAt);
+    const principalSign=await request('/api/dsd-incidents/'+incident.data.incident.id+'/principal-sign',{method:'POST',cookie:admin,body:{principalReview:'Reviewed and action accepted',signingPin:'Sign1234',signatureData:signature}});
+    assert.equal(principalSign.response.status,200,principalSign.text);
+    assert.equal(principalSign.data.incident.status,'Awaiting parent acknowledgement');
+    const parentAck=await request('/api/dsd-incidents/'+incident.data.incident.id+'/parent-acknowledge',{method:'POST',cookie:parent,body:{acknowledgement:'Read and acknowledged',signingPin:'Sign1234',signatureData:signature}});
+    assert.equal(parentAck.response.status,200,parentAck.text);
+    assert.equal(parentAck.data.incident.status,'Complete');
     const parentIncidents=await request('/api/dsd-incidents',{cookie:parent});
     assert.equal(parentIncidents.response.status,200);
     assert.equal(parentIncidents.data.length,1);
