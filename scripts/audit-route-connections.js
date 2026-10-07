@@ -44,7 +44,8 @@ function auditRouteConnections(root = path.resolve(__dirname, '..')) {
       for (const match of source.matchAll(pattern)) {
         const tail = source.slice(match.index + match[0].length, match.index + match[0].length + 360);
         const concatenated = tail.trimStart().startsWith('+');
-        const route = (match[2].replace(/\$\{[^}]*query[^}]*\}/ig, '').replace(/\$\{[^}]+\}/g, 'value') + (concatenated ? 'value' : '')).split('?')[0];
+        const rawRoute = match[2].replace(/\$\{[^}]*query[^}]*\}/ig, '').replace(/\$\{[^}]+\}/g, 'value');
+        const route = rawRoute.split('?')[0] + (concatenated && !rawRoute.includes('?') ? 'value' : '');
         const method = /method\s*:\s*['"](GET|POST|PUT|PATCH|DELETE)['"]/i.exec((match[3] || '') + (concatenated ? tail : ''))?.[1]?.toUpperCase() || 'GET';
         const line = source.slice(0, match.index).split('\n').length;
         calls.push({ method, route, file: relative, line, via });
@@ -52,7 +53,15 @@ function auditRouteConnections(root = path.resolve(__dirname, '..')) {
     }
   }
 
-  const unmatched = calls.filter(call => !routes.some(route => route.method === call.method && route.expression.test(call.route)));
+  const callMatchesRoute = (call, route) => {
+    if (route.method !== call.method) return false;
+    if (route.expression.test(call.route)) return true;
+    const dynamicAt = call.route.indexOf('value');
+    if (dynamicAt < 0) return false;
+    const staticPrefix = call.route.slice(0, dynamicAt);
+    return Boolean(staticPrefix) && route.template.startsWith(staticPrefix);
+  };
+  const unmatched = calls.filter(call => !routes.some(route => callMatchesRoute(call, route)));
   return { routes, calls, unmatched };
 }
 
