@@ -128,6 +128,24 @@ const login = async (username, pin) => {
     assert.equal(enrolled.data.application.status, 'Enrolled');
     const learnerId = enrolled.data.application.convertedLearnerId;
 
+    const learnerUpload = await request('/api/files', { method: 'POST', cookie: parentCookie, body: { entityType: 'learner', recordId: learnerId, purpose: 'previous_report', originalFilename: 'report.png', dataUrl: pngA } });
+    assert.equal(learnerUpload.response.status, 201, learnerUpload.data?.message);
+    assert.equal((await fetch(origin + learnerUpload.data.file.contentUrl, { headers: { cookie: otherParentCookie } })).status, 404, 'Parents must not read another learner document.');
+
+    const expiry = await request('/api/learner-documents/' + learnerId + '/' + learnerUpload.data.file.id, { method: 'PATCH', cookie: alphaCookie, body: { expiryDate: '2027-12-31' } });
+    assert.equal(expiry.response.status, 200, expiry.data?.message);
+    const verifiedLearnerDoc = await request('/api/learner-documents/' + learnerId + '/' + learnerUpload.data.file.id + '/verify', { method: 'POST', cookie: alphaCookie, body: { status: 'Verified' } });
+    assert.equal(verifiedLearnerDoc.response.status, 200, verifiedLearnerDoc.data?.message);
+
+    const parentVault = await request('/api/learner-documents', { cookie: parentCookie });
+    assert.equal(parentVault.data.some(row => row.learner.id === learnerId && row.documents.some(file => file.id === learnerUpload.data.file.id && file.verificationStatus === 'Verified')), true);
+    assert.equal((await request('/api/learner-documents', { cookie: otherParentCookie })).data.some(row => row.learner.id === learnerId), false, 'Learner vault must remain parent-linked.');
+
+    const audit = await request('/api/learner-documents/' + learnerId + '/audit', { cookie: parentCookie });
+    assert.equal(audit.data.some(row => row.action === 'uploaded'), true);
+    assert.equal(audit.data.some(row => row.action === 'metadata_updated'), true);
+    assert.equal(audit.data.some(row => row.action === 'verified'), true);
+
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
     assert.equal(staffUpload.response.status, 201, staffUpload.data?.message);
     const staffFileUrl = staffUpload.data.file.contentUrl;
