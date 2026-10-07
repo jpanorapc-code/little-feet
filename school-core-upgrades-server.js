@@ -146,10 +146,16 @@ function registerSchoolCoreUpgrades(app, deps) {
     const maximum = req.body?.maximum === undefined ? mark.maximum : cleanNumber(req.body.maximum,0.01,100000);
     const weight = req.body?.weight === undefined ? mark.weight : cleanNumber(req.body.weight,0.01,100);
     if (score === null || maximum === null || weight === null || score > maximum) return res.status(400).json({message:'Score, total or weight is not valid.'});
-    for (const key of ['subject','assessmentName','term','comment']) if (req.body?.[key] !== undefined) mark[key] = boundedText(req.body[key], key === 'comment' ? 600 : 180);
+    for (const key of ['subject','assessmentName','term']) {
+      if (req.body?.[key] === undefined) continue;
+      const value=limitedText(req.body[key],key==='subject'?120:180);
+      if(!value)return res.status(400).json({message:key+' cannot be blank.'});
+      mark[key]=value;
+    }
+    if(req.body?.comment!==undefined)mark.comment=boundedText(req.body.comment,600);
     if (req.body?.year !== undefined) {
       const year = Math.trunc(Number(req.body.year));
-      if (year < 2000 || year > 2100) return res.status(400).json({message:'Year is not valid.'});
+      if (!Number.isInteger(year) || year < 2000 || year > 2100) return res.status(400).json({message:'Year is not valid.'});
       mark.year = year;
     }
     mark.score=score; mark.maximum=maximum; mark.weight=weight; mark.percentage=Math.round((score/maximum)*10000)/100;
