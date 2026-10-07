@@ -4224,7 +4224,7 @@ const publicFileMetadata = file => ({
 });
 const admissionApplicationVisibleTo = (application, actor) => Boolean(application && actor && (
   hasPlatformAccess(actor)
-  || (['principal','admin','staff','teacher'].includes(actor.role) && application.schoolId===accountSchoolId(actor))
+  || (['principal','admin','staff'].includes(actor.role) && application.schoolId===accountSchoolId(actor))
   || (actor.role==='parent' && normalizeUsername(application.createdBy)===normalizeUsername(actor.username))
 ));
 const admissionApplicationView = application => ({
@@ -4244,7 +4244,8 @@ const relatedRecordForFile = (file, actor) => {
   if (file.entityType === 'learner') {
     const learner=db.students.find(item=>item.id===file.recordId);
     if(!learner)return null;
-    if(hasPlatformAccess(actor) || (recordInSchool(learner,actor)&&['teacher','principal','admin','staff'].includes(actor.role)))return learner;
+    if(hasPlatformAccess(actor) || (recordInSchool(learner,actor)&&['principal','admin','staff'].includes(actor.role)))return learner;
+    if(actor.role==='teacher')return learnerRecordsVisibleTo(db.students,actor).some(item=>item.id===learner.id)?learner:null;
     return actor.role==='parent'&&isParentLinkedToLearner(actor,learner)?learner:null;
   }
   if (!recordInSchool(file, actor)) return null;
@@ -4583,7 +4584,8 @@ app.get('/api/learner-documents',(req,res)=>{
   const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view learner documents.'});
   let learners=[];
   if(actor.role==='parent')learners=(db.students||[]).filter(learner=>isParentLinkedToLearner(actor,learner));
-  else if(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor.role))learners=tenantRecords(db.students,actor);
+  else if(actor.role==='teacher')learners=learnerRecordsVisibleTo(db.students,actor);
+  else if(hasPlatformAccess(actor)||['principal','admin','staff'].includes(actor.role))learners=tenantRecords(db.students,actor);
   else return res.status(403).json({message:'You cannot view learner documents.'});
   const learnerIds=new Set(learners.map(item=>item.id));
   const files=(db.fileRecords||[]).filter(file=>file.entityType==='learner'&&file.accessState==='active'&&learnerIds.has(file.recordId)&&relatedRecordForFile(file,actor));
