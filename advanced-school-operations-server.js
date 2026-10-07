@@ -311,7 +311,8 @@ function registerAdvancedSchoolOperations(app, deps) {
   const ACCOMMODATION_TYPES=Object.freeze(['Extra time','Reader','Scribe','Separate venue','Preferential seating','Rest breaks','Enlarged print','Assistive technology','Oral instructions','Reduced-distraction workspace','Alternative response format','Other']);
   const decodeSupportJson=value=>{try{const parsed=JSON.parse(decryptStoredField(value)||'[]');return Array.isArray(parsed)?parsed:[];}catch{return [];}};
   const supportProfileView=(row,actor)=>{
-    const base={id:row.id,learnerName:row.learnerName,status:row.status||'Active',reviewDate:row.reviewDate||'',supportAreas:decodeSupportJson(row.supportAreas),accommodations:decodeSupportJson(row.accommodations),parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,createdBy:row.createdBy,updatedAt:row.updatedAt||row.createdAt,updatedBy:row.updatedBy||row.createdBy};
+    const accommodations=decodeSupportJson(row.accommodations);
+    const base={id:row.id,learnerName:row.learnerName,status:row.status||'Active',reviewDate:row.reviewDate||'',supportAreas:decodeSupportJson(row.supportAreas),accommodations:actor?.role==='parent'?accommodations.filter(item=>item.status==='Active'):accommodations,parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,createdBy:row.createdBy,updatedAt:row.updatedAt||row.createdAt,updatedBy:row.updatedBy||row.createdBy};
     if(actor?.role!=='parent'){base.supportNeeds=decryptStoredField(row.supportNeeds);base.staffNotes=decryptStoredField(row.staffNotes);}
     return base;
   };
@@ -412,8 +413,7 @@ function registerAdvancedSchoolOperations(app, deps) {
     res.json({success:true,intervention:interventionView(row,actor)});
   });
   app.get('/api/learning-support/profiles/:id/history',(req,res)=>{
-    const actor=getSessionAccount(req);const profile=actor&&supportProfileFor(actor,req.params.id);if(!profile)return res.status(404).json({message:'Support profile not found.'});
-    if(actor.role==='parent'&&!parentCanSee(actor,findLearner(actor,profile.learnerName)))return res.status(403).json({message:'You cannot view this learner.'});
+    const actor=staffActor(req);const profile=actor&&supportProfileFor(actor,req.params.id);if(!profile)return res.status(404).json({message:'Support profile not found.'});
     res.json(supportHistory(actor,profile.id));
   });
   app.get('/api/learning-support/summary/:learnerName',(req,res)=>{
