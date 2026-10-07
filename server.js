@@ -10,6 +10,7 @@ const { Pool } = require('pg');
 const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
+const { registerSchoolCoreUpgrades } = require('./school-core-upgrades-server');
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
@@ -1054,6 +1055,16 @@ const db = {
   financeReconciliationRuns: [],
   payrollProfiles: [],
   payrollRuns: [],
+  subjectMarks: [],
+  markHistory: [],
+  reportCards: [],
+  disciplineRecords: [],
+  disciplineSettings: [],
+  assetRegister: [],
+  gradeRSkillAssessments: [],
+  dsdIncidents: [],
+  communicationCampaigns: [],
+  attendanceAutomationSettings: [],
   systemErrors: [],
   schoolBilling: {},
   schoolTerms: {},
@@ -1434,7 +1445,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -3425,6 +3436,14 @@ registerFinanceAutomation(app, {
   scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
 });
 
+registerSchoolCoreUpgrades(app, {
+  db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
+  tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+  isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
+  validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
+  scheduleReplicaSnapshot, logStructured
+});
+
 app.get('/api/parent-payments/parents', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff', 'school_accounts'].includes(actor.role))) return res.status(403).json({ message: 'School finance access is required.' });
@@ -4171,7 +4190,7 @@ app.post('/api/term', (req, res) => {
   res.json({ term: db.schoolTerms[accountSchoolId(actor)] || db.term });
 });
 
-const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet']);
+const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet', 'dsd_incident']);
 const fileContentPath = file => `/api/files/${encodeURIComponent(file.id)}/content`;
 const publicFileMetadata = file => ({
   id: file.id, entityType: file.entityType, recordId: file.recordId, purpose: file.purpose,
@@ -4187,6 +4206,7 @@ const relatedRecordForFile = (file, actor) => {
   if (file.entityType === 'school') return db.schools.find(item => item.id === file.recordId && item.id === accountSchoolId(actor));
   if (file.entityType === 'post') return db.posts.find(item => item.id === file.recordId && recordInSchool(item, actor));
   if (file.entityType === 'worksheet') return learnerRecordsVisibleTo(db.worksheets, actor).find(item => item.id === file.recordId);
+  if (file.entityType === 'dsd_incident') return (db.dsdIncidents || []).find(item => item.id === file.recordId && recordInSchool(item, actor));
   return null;
 };
 const canManageFile = (file, actor) => Boolean(actor && recordInSchool(file, actor)
