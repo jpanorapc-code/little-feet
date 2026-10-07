@@ -19,7 +19,7 @@ function registerAdvancedSchoolOperations(app, deps) {
   const collections = [
     'eldaSkillCatalogue','eldaAssessments','aftercareSettings','aftercarePlans','aftercareSessions',
     'staffClockSessions','staffRatioSettings','dayCareBookings','dayCareCapacitySettings',
-    'mealPlans','dietaryProfiles','learnerGroups','pickupPasses','academicAnalyticsSettings','schoolGroups'
+    'mealPlans','dietaryProfiles','learnerGroups','pickupPasses','academicAnalyticsSettings','schoolGroups','communicationTemplates'
   ];
   collections.forEach(name => { if (!Array.isArray(db[name])) db[name] = []; });
 
@@ -240,6 +240,11 @@ function registerAdvancedSchoolOperations(app, deps) {
   app.post('/api/pickup-passes/redeem',(req,res)=>{
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const token=String(req.body?.token||'').trim();if(!token)return res.status(400).json({message:'Pickup token is required.'});const hash=crypto.createHash('sha256').update(token).digest('hex');const row=schoolRecords('pickupPasses',actor).find(r=>r.tokenHash===hash);if(!row)return res.status(404).json({message:'Pickup pass not found.'});if(row.status!=='active')return res.status(409).json({message:'Pickup pass has already been used or cancelled.'});if(Date.parse(row.expiresAt)<=Date.now()){row.status='expired';return res.status(410).json({message:'Pickup pass has expired.'});}row.status='used';row.usedAt=nowIso();row.usedBy=actor.username;res.json({success:true,pass:{id:row.id,learnerName:row.learnerName,collectorName:row.collectorName,status:row.status,usedAt:row.usedAt}});
   });
+
+  // Reusable communication templates. Delivery remains in the core communication engine.
+  app.get('/api/communications/templates',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});res.json(schoolRecords('communicationTemplates',actor));});
+  app.post('/api/communications/templates',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const name=limitedText(req.body?.name,160),title=limitedText(req.body?.title,180),message=limitedText(req.body?.message,3000);if(!name||!title||!message)return res.status(400).json({message:'Enter template name, title and message.'});const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),name,title,message,createdAt:nowIso(),createdBy:actor.username});db.communicationTemplates.unshift(row);res.status(201).json({success:true,template:row});});
+  app.delete('/api/communications/templates/:id',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const before=db.communicationTemplates.length;db.communicationTemplates=db.communicationTemplates.filter(r=>!(r.id===req.params.id&&recordInSchool(r,actor)));if(before===db.communicationTemplates.length)return res.status(404).json({message:'Template not found.'});res.json({success:true});});
 
   // Cross-school owner dashboard is deliberately limited to platform-level users.
   app.get('/api/school-groups',(req,res)=>{const actor=getSessionAccount(req);if(!actor||!hasPlatformAccess(actor))return res.status(403).json({message:'Little Feet platform access is required.'});res.json(db.schoolGroups||[]);});
