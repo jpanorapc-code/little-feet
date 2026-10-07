@@ -495,7 +495,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     return safeHttpsUrl(raw);
   };
   const sendGateway = async (kind,payload) => {
-    const prefix=kind==='sms'?'LF_SMS':'LF_PUSH';
+    const prefix=kind==='sms'?'LF_SMS':kind==='whatsapp'?'LF_WHATSAPP':'LF_PUSH';
     const endpoint=providerEndpoint(prefix+'_API_URL'),key=String(process.env[prefix+'_API_KEY']||'').trim();
     if(!endpoint||!key)return {ok:false,status:'not_configured'};
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify(payload)});
@@ -505,7 +505,8 @@ function registerSchoolCoreUpgrades(app, deps) {
   const communicationConfig = () => ({
     email:Boolean(smtpEmailConfigured?.() || apiEmailConfigured?.()),
     sms:Boolean(providerEndpoint('LF_SMS_API_URL')&&String(process.env.LF_SMS_API_KEY||'').trim()&&String(process.env.LF_SMS_FROM||'').trim()),
-    push:Boolean(providerEndpoint('LF_PUSH_API_URL')&&String(process.env.LF_PUSH_API_KEY||'').trim())
+    push:Boolean(providerEndpoint('LF_PUSH_API_URL')&&String(process.env.LF_PUSH_API_KEY||'').trim()),
+    whatsapp:Boolean(providerEndpoint('LF_WHATSAPP_API_URL')&&String(process.env.LF_WHATSAPP_API_KEY||'').trim()&&String(process.env.LF_WHATSAPP_FROM||'').trim())
   });
   const communicationPhone=(actor,recipient)=>{
     const direct=boundedText(recipient.phone||recipient.mobile||recipient.contactPhone,60);
@@ -542,40 +543,69 @@ function registerSchoolCoreUpgrades(app, deps) {
   app.get('/api/communications/campaigns',(req,res)=>{
     const actor=communicationActor(req);if(!actor)return res.status(403).json({message:'Communication access is required.'});res.json(schoolRecords('communicationCampaigns',actor));
   });
+  const executeCommunicationCampaign=async(campaign,actor)=>{
+    const recipients=communicationRecipients(actor,campaign.audience,campaign.className);
+    if(!recipients.length){campaign.status='failed';campaign.error='No matching recipients were found.';campaign.executedAt=nowIso();return campaign;}
+    campaign.deliveries=[];
+    for(const recipient of recipients){
+      for(const channel of campaign.channels){
+        const delivery={recipient:recipient.username,channel,status:'failed',at:nowIso()};
+        try{
+          if(channel==='email'){
+            const to=[recipient.email,recipient.username,...(recipient.loginAliases||[])].find(looksLikeEmailAddress);
+            if(!to) delivery.status='no_address';
+            else delivery.status=(await sendLittleFeetEmail({to,subject:campaign.title,text:campaign.message,html:'<p>'+String(campaign.message).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])).replace(/\n/g,'<br>')+'</p>'}))?'sent':'not_configured';
+          } else if(channel==='sms'){
+            const phone=communicationPhone(actor,recipient);
+            if(!phone) delivery.status='no_address';
+            else delivery.status=(await sendGateway('sms',{from:String(process.env.LF_SMS_FROM||''),to:phone,message:campaign.message,reference:campaign.id})).status;
+          } else if(channel==='whatsapp'){
+            const phone=communicationPhone(actor,recipient);
+            if(!phone) delivery.status='no_address';
+            else delivery.status=(await sendGateway('whatsapp',{from:String(process.env.LF_WHATSAPP_FROM||''),to:phone,message:campaign.message,reference:campaign.id})).status;
+          } else {
+            delivery.status=(await sendGateway('push',{recipient:recipient.username,title:campaign.title,message:campaign.message,reference:campaign.id,schoolId:accountSchoolId(actor)})).status;
+          }
+        }catch(error){delivery.status='failed';delivery.error=boundedText(error.message,240);}
+        campaign.deliveries.push(delivery);
+      }
+    }
+    campaign.status='completed';campaign.executedAt=nowIso();return campaign;
+  };
   app.post('/api/communications/campaigns',async(req,res,next)=>{
     const actor=communicationActor(req);if(!actor)return res.status(403).json({message:'Communication access is required.'});
     const title=limitedText(req.body?.title,180),message=limitedText(req.body?.message,3000),audience=['all','parents','teachers','staff','class'].includes(req.body?.audience)?req.body.audience:null;
-    const channels=[...new Set((Array.isArray(req.body?.channels)?req.body.channels:[]).filter(c=>['email','sms','push'].includes(c)))];
+    const channels=[...new Set((Array.isArray(req.body?.channels)?req.body.channels:[]).filter(c=>['email','sms','push','whatsapp'].includes(c)))];
     if(!title||!message||!audience||!channels.length)return res.status(400).json({message:'Add title, message, audience and at least one channel.'});
-    const config=communicationConfig(), unavailable=channels.filter(channel=>!config[channel]);
+    const config=communicationConfig(),unavailable=channels.filter(channel=>!config[channel]);
     if(unavailable.length)return res.status(409).json({message:'Not configured: '+unavailable.join(', ')+'. No fake delivery was recorded.'});
-    const recipients=communicationRecipients(actor,audience,boundedText(req.body?.className,120));
-    if(!recipients.length)return res.status(400).json({message:'No matching recipients were found.'});
-    const campaign=tagSchoolRecord(actor,{id:crypto.randomUUID(),title,message,audience,className:boundedText(req.body?.className,120),channels,createdBy:actor.username,createdAt:nowIso(),deliveries:[]});
+    const className=boundedText(req.body?.className,120);
+    if(audience==='class'&&!className)return res.status(400).json({message:'Enter the class name for a one-class campaign.'});
+    const scheduledAt=String(req.body?.scheduledAt||'').trim();
+    const scheduledMs=scheduledAt?Date.parse(scheduledAt):NaN;
+    if(scheduledAt&&(!Number.isFinite(scheduledMs)||scheduledMs<=Date.now()))return res.status(400).json({message:'Scheduled time must be a valid future date and time.'});
+    const recipients=communicationRecipients(actor,audience,className);if(!recipients.length)return res.status(400).json({message:'No matching recipients were found.'});
+    const campaign=tagSchoolRecord(actor,{id:crypto.randomUUID(),title,message,audience,className,channels,scheduledAt:scheduledAt||'',status:scheduledAt?'scheduled':'sending',createdBy:actor.username,createdAt:nowIso(),deliveries:[]});
     try{
-      for(const recipient of recipients){
-        for(const channel of channels){
-          const delivery={recipient:recipient.username,channel,status:'failed',at:nowIso()};
-          try{
-            if(channel==='email'){
-              const to=[recipient.email,recipient.username,...(recipient.loginAliases||[])].find(looksLikeEmailAddress);
-              if(!to) delivery.status='no_address';
-              else delivery.status=(await sendLittleFeetEmail({to,subject:title,text:message,html:'<p>'+String(message).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])).replace(/\n/g,'<br>')+'</p>'}))?'sent':'not_configured';
-            } else if(channel==='sms'){
-              const phone=communicationPhone(actor,recipient);
-              if(!phone) delivery.status='no_address';
-              else delivery.status=(await sendGateway('sms',{from:String(process.env.LF_SMS_FROM||''),to:phone,message,reference:campaign.id})).status;
-            } else {
-              delivery.status=(await sendGateway('push',{recipient:recipient.username,title,message,reference:campaign.id,schoolId:accountSchoolId(actor)})).status;
-            }
-          }catch(error){delivery.status='failed';delivery.error=boundedText(error.message,240);}
-          campaign.deliveries.push(delivery);
-        }
-      }
       db.communicationCampaigns.unshift(campaign);
+      if(!scheduledAt)await executeCommunicationCampaign(campaign,actor);
       res.status(201).json({success:true,campaign});
     }catch(error){next(error);}
   });
+  const runScheduledCommunicationCampaigns=async()=>{
+    const due=(db.communicationCampaigns||[]).filter(c=>c.status==='scheduled'&&c.scheduledAt&&Date.parse(c.scheduledAt)<=Date.now());
+    let changed=false;
+    for(const campaign of due){
+      const actor=(db.users||[]).find(account=>normalizeUsername(account.username)===normalizeUsername(campaign.createdBy)&&accountSchoolId(account)===campaign.schoolId);
+      if(!actor){campaign.status='failed';campaign.error='Campaign creator account is unavailable.';campaign.executedAt=nowIso();changed=true;continue;}
+      const config=communicationConfig(),unavailable=(campaign.channels||[]).filter(channel=>!config[channel]);
+      if(unavailable.length){campaign.status='blocked';campaign.error='Not configured at send time: '+unavailable.join(', ');campaign.executedAt=nowIso();changed=true;continue;}
+      await executeCommunicationCampaign(campaign,actor);changed=true;
+    }
+    if(changed){await saveDatabaseState();scheduleReplicaSnapshot?.();}
+  };
+  const scheduledCommunicationTimer=setInterval(()=>{runScheduledCommunicationCampaigns().catch(error=>logStructured?.('error','communications.schedule_failed',{category:'communications',message:error.message}));},60000);
+  scheduledCommunicationTimer.unref?.();
 
   const attendanceSettingFor=actor=>{
     let setting=schoolRecords('attendanceAutomationSettings',actor)[0];
