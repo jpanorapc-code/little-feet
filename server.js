@@ -4438,6 +4438,150 @@ app.delete('/api/files/:id', async (req, res, next) => {
   }
 });
 
+// Admissions 2.0 + central learner document repository.
+const admissionsManagementActor=req=>{
+  const actor=getSessionAccount(req);
+  return actor&&(hasPlatformAccess(actor)||['principal','admin','staff'].includes(actor.role))?actor:null;
+};
+const admissionForActor=(actor,id)=>(db.admissionsApplications||[]).find(item=>item.id===id&&admissionApplicationVisibleTo(item,actor));
+const admissionDocumentState=application=>{
+  const files=(db.fileRecords||[]).filter(file=>file.entityType==='admission_application'&&file.recordId===application.id&&file.accessState==='active');
+  const byPurpose=new Map();
+  files.forEach(file=>{const list=byPurpose.get(file.purpose)||[];list.push(file);byPurpose.set(file.purpose,list);});
+  const checklist=(application.checklist||[]).map(item=>{
+    const documents=byPurpose.get(item.key)||[];
+    const verified=documents.some(file=>file.verificationStatus==='Verified');
+    const rejected=documents.length>0&&!verified&&documents.every(file=>file.verificationStatus==='Rejected');
+    return {...item,status:verified?'verified':rejected?'rejected':documents.length?'pending':'missing',documentCount:documents.length};
+  });
+  const missingRequired=checklist.filter(item=>item.required&&item.status!=='verified').map(item=>item.key);
+  return {files:files.map(publicFileMetadata),checklist,missingRequired,complete:missingRequired.length===0};
+};
+const admissionApiView=application=>({...admissionApplicationView(application),documents:admissionDocumentState(application)});
+
+app.get('/api/admissions/applications',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view admissions.'});
+  let rows=(db.admissionsApplications||[]).filter(item=>admissionApplicationVisibleTo(item,actor));
+  rows=rows.sort((a,b)=>Date.parse(b.updatedAt||b.createdAt)-Date.parse(a.updatedAt||a.createdAt));
+  res.json(rows.map(admissionApiView));
+});
+app.get('/api/admissions/applications/:id',(req,res)=>{
+  const actor=getSessionAccount(req),application=actor&&admissionForActor(actor,req.params.id);
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  res.json(admissionApiView(application));
+});
+app.get('/api/admissions/applications/:id/history',(req,res)=>{
+  const actor=getSessionAccount(req),application=actor&&admissionForActor(actor,req.params.id);
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  res.json((db.admissionsStatusHistory||[]).filter(row=>row.applicationId===application.id).sort((a,b)=>Date.parse(b.changedAt)-Date.parse(a.changedAt)));
+});
+app.patch('/api/admissions/applications/:id/status',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  const nextStatus=boundedText(req.body?.status,40),note=boundedText(req.body?.note,1200);
+  if(!ADMISSION_STATUSES.has(nextStatus)||nextStatus==='Enrolled')return res.status(400).json({message:'Choose a valid admissions status. Use Enrol to create the learner record.'});
+  if(application.status==='Enrolled')return res.status(409).json({message:'An enrolled application cannot be moved back into the admissions queue.'});
+  const previous=application.status;
+  application.status=nextStatus;application.reviewNote=note;application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:nextStatus,changedBy:actor.username,changedAt:application.updatedAt,note});
+  const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&recordInSchool(item,actor));
+  if(ticket){ticket.status=['Approved','Rejected','Withdrawn'].includes(nextStatus)?'Completed':'Open';ticket.updatedAt=application.updatedAt;}
+  res.json({success:true,application:admissionApiView(application)});
+});
+app.post('/api/admissions/applications/:id/withdraw',(req,res)=>{
+  const actor=getSessionAccount(req),application=actor&&admissionForActor(actor,req.params.id);
+  if(!application||actor.role!=='parent'||normalizeUsername(application.createdBy)!==normalizeUsername(actor.username))return res.status(404).json({message:'Application not found.'});
+  if(['Enrolled','Rejected','Withdrawn'].includes(application.status))return res.status(409).json({message:'This application can no longer be withdrawn.'});
+  const previous=application.status;application.status='Withdrawn';application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:'Withdrawn',changedBy:actor.username,changedAt:application.updatedAt,note:'Withdrawn by parent'});
+  res.json({success:true,application:admissionApiView(application)});
+});
+app.put('/api/admissions/applications/:id/checklist',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  const incoming=Array.isArray(req.body?.items)?req.body.items:[];
+  if(!incoming.length)return res.status(400).json({message:'Add at least one checklist item.'});
+  const existing=new Map((application.checklist||[]).map(item=>[item.key,item]));
+  application.checklist=incoming.slice(0,30).map(raw=>{
+    const key=boundedText(raw?.key,80).replace(/[^a-z0-9_-]/gi,'_').toLowerCase(),label=limitedText(raw?.label,160);
+    const old=existing.get(key)||{};
+    return {key,label:label||old.label||key,required:Boolean(raw?.required),status:old.status||'missing',verifiedAt:old.verifiedAt||'',verifiedBy:old.verifiedBy||''};
+  }).filter(item=>item.key&&item.label);
+  if(!application.checklist.length)return res.status(400).json({message:'Checklist items must have valid names.'});
+  application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  res.json({success:true,application:admissionApiView(application)});
+});
+app.post('/api/admissions/applications/:id/documents/:fileId/verify',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  const file=(db.fileRecords||[]).find(item=>item.id===req.params.fileId&&item.entityType==='admission_application'&&item.recordId===application.id&&item.accessState==='active');
+  if(!file)return res.status(404).json({message:'Application document not found.'});
+  const status=boundedText(req.body?.status,30),reason=boundedText(req.body?.reason,500);
+  if(!['Verified','Rejected'].includes(status))return res.status(400).json({message:'Choose Verified or Rejected.'});
+  if(status==='Rejected'&&!reason)return res.status(400).json({message:'Add a reason when rejecting a document.'});
+  file.verificationStatus=status;file.verifiedAt=status==='Verified'?new Date().toISOString():'';file.verifiedBy=status==='Verified'?actor.username:'';file.rejectionReason=status==='Rejected'?reason:'';
+  const item=(application.checklist||[]).find(row=>row.key===file.purpose);
+  if(item){item.status=status==='Verified'?'verified':'rejected';item.verifiedAt=file.verifiedAt;item.verifiedBy=file.verifiedBy;}
+  application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  res.json({success:true,file:publicFileMetadata(file),application:admissionApiView(application)});
+});
+app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  if(application.status==='Enrolled')return res.status(409).json({message:'This application is already enrolled.',learnerId:application.convertedLearnerId});
+  if(!['Approved','Under review','Documents required','Waitlisted','Submitted'].includes(application.status))return res.status(409).json({message:'This application cannot be enrolled from its current status.'});
+  const documentState=admissionDocumentState(application);
+  if(!documentState.complete)return res.status(409).json({message:'Verify all required admission documents before enrolment.',missingRequired:documentState.missingRequired});
+  const className=limitedText(req.body?.className||application.gradeOrAgeGroup,120),address=limitedText(req.body?.address||decryptStoredField(application.homeArea),500);
+  const emergencyContact=limitedText(req.body?.emergencyContact,500),medicalNotes=limitedText(req.body?.medicalNotes,2000),consent=limitedText(req.body?.consent||'Pending verification',120);
+  if(!className||!address)return res.status(400).json({message:'Enter the learner class/grade and home address before enrolment.'});
+  const guardianName=application.guardianName,guardianPhone=decryptStoredField(application.contactPhone),guardianEmail=decryptStoredField(application.contactEmail),dateOfBirth=decryptStoredField(application.dateOfBirth);
+  let learner=tenantRecords(db.students,actor).find(student=>normalizeComparableText(student.studentName)===normalizeComparableText(application.learnerName)&&normalizeComparableText(student.className)===normalizeComparableText(className));
+  if(!learner){
+    const learnerLimit=schoolLearnerLimitState(actor);if(!learnerLimit.allowed)return res.status(409).json({message:`The ${learnerLimit.planCode||'current'} school package has reached its learner limit.`});
+    learner=tagSchoolRecord(actor,{id:crypto.randomUUID(),studentName:application.learnerName,className,parentName:guardianName,contactEmail:guardianEmail||'',dateOfBirth:encryptField(dateOfBirth),medicalNotes:encryptField(medicalNotes||''),emergencyContact:encryptField(emergencyContact||''),authorisedPickups:encryptField(''),registeredAt:new Date().toISOString(),registeredBy:actor.username,admissionApplicationId:application.id});
+    db.students.push(learner);ensureLearnerAccessCode(actor,learner);
+  }
+  let registry=tenantRecords(db.registry,actor).find(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(application.learnerName)&&normalizeComparableText(row.className)===normalizeComparableText(className));
+  if(!registry){
+    registry=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:application.learnerName,className,dateOfBirth:encryptField(dateOfBirth),guardianName,guardianPhone:encryptField(guardianPhone),guardianEmail:encryptField(guardianEmail||''),address:encryptField(address),emergencyContact:encryptField(emergencyContact||''),medicalNotes:encryptField(medicalNotes||''),consent,createdAt:new Date().toISOString(),createdBy:actor.username,admissionApplicationId:application.id});
+    db.registry.unshift(registry);
+  }
+  const parent=(db.users||[]).find(account=>account.role==='parent'&&normalizeUsername(account.username)===normalizeUsername(application.createdBy));
+  if(parent){
+    const links=new Set(Array.isArray(parent.linkedLearners)?parent.linkedLearners:[]);
+    links.add(application.learnerName);parent.linkedLearners=[...links];
+    if(!parent.schoolId){parent.schoolId=application.schoolId;parent.schoolName=application.schoolName;}
+  }
+  const priorStatus=application.status;application.status='Enrolled';application.convertedLearnerId=learner.id;application.convertedRegistryId=registry.id;application.enrolledAt=new Date().toISOString();application.enrolledBy=actor.username;application.updatedAt=application.enrolledAt;
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:priorStatus,toStatus:'Enrolled',changedBy:actor.username,changedAt:application.enrolledAt,note:'Converted to learner register'});
+  const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&recordInSchool(item,actor));if(ticket){ticket.status='Completed';ticket.updatedAt=application.enrolledAt;}
+  res.status(201).json({success:true,application:admissionApiView(application),learnerKey:learnerRecordKey(learner),registryId:registry.id});
+});
+app.get('/api/learner-documents',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view learner documents.'});
+  let learners=[];
+  if(actor.role==='parent')learners=(db.students||[]).filter(learner=>isParentLinkedToLearner(actor,learner));
+  else if(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor.role))learners=tenantRecords(db.students,actor);
+  else return res.status(403).json({message:'You cannot view learner documents.'});
+  const learnerIds=new Set(learners.map(item=>item.id));
+  const files=(db.fileRecords||[]).filter(file=>file.entityType==='learner'&&file.accessState==='active'&&learnerIds.has(file.recordId)&&relatedRecordForFile(file,actor));
+  res.json(learners.map(learner=>({learner:{id:learner.id,studentName:learner.studentName,className:learner.className},documents:files.filter(file=>file.recordId===learner.id).map(publicFileMetadata)})));
+});
+app.post('/api/learner-documents/:learnerId/:fileId/verify',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'School management access is required.'});
+  const learner=tenantRecords(db.students,actor).find(item=>item.id===req.params.learnerId);if(!learner)return res.status(404).json({message:'Learner not found.'});
+  const file=(db.fileRecords||[]).find(item=>item.id===req.params.fileId&&item.entityType==='learner'&&item.recordId===learner.id&&item.accessState==='active');
+  if(!file)return res.status(404).json({message:'Learner document not found.'});
+  const status=boundedText(req.body?.status,30),reason=boundedText(req.body?.reason,500);if(!['Verified','Rejected'].includes(status))return res.status(400).json({message:'Choose Verified or Rejected.'});if(status==='Rejected'&&!reason)return res.status(400).json({message:'Add a rejection reason.'});
+  file.verificationStatus=status;file.verifiedAt=status==='Verified'?new Date().toISOString():'';file.verifiedBy=status==='Verified'?actor.username:'';file.rejectionReason=status==='Rejected'?reason:'';
+  res.json({success:true,file:publicFileMetadata(file)});
+});
+
 // Posts
 app.get('/api/posts', (req, res) => {
   const actor = getSessionAccount(req);
