@@ -56,7 +56,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({state:'visible'});
 
-    for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard','#lfAdvancedEldaCard','#lfAftercareCard','#lfStaffRatioCard','#lfStaffClockCard','#lfDayCareCard','#lfMealsCard','#lfLearnerGroupsCard','#lfAdvancedAcademicAnalytics','#lfPickupQrCard']){
+    for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard','#lfAdvancedEldaCard','#lfAftercareCard','#lfStaffRatioCard','#lfStaffClockCard','#lfDayCareCard','#lfMealsCard','#lfLearnerGroupsCard','#lfAdvancedAcademicAnalytics','#lfPickupQrCard','#lfCommunicationInboxCard']){
       await page.locator(selector).waitFor({state:'attached'});
     }
 
@@ -93,6 +93,9 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfDisciplineForm input[name="points"]').fill('2');
     await page.locator('#lfDisciplineForm button[type="submit"]').click();
     await page.locator('#lfDisciplineList').getByText('Core Learner').first().waitFor({state:'visible'});
+
+    await openTab('progressTab');
+    assert.equal(await page.locator('#lfEldaAiAssist').isDisabled(),true,'AI assist must stay disabled when no approved provider is configured');
 
     await openTab('operationsTab');
     await page.locator('#lfAssetForm input[name="assetCode"]').fill('CORE-001');
