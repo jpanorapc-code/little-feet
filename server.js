@@ -4206,7 +4206,14 @@ const relatedRecordForFile = (file, actor) => {
   if (file.entityType === 'school') return db.schools.find(item => item.id === file.recordId && item.id === accountSchoolId(actor));
   if (file.entityType === 'post') return db.posts.find(item => item.id === file.recordId && recordInSchool(item, actor));
   if (file.entityType === 'worksheet') return learnerRecordsVisibleTo(db.worksheets, actor).find(item => item.id === file.recordId);
-  if (file.entityType === 'dsd_incident') return (db.dsdIncidents || []).find(item => item.id === file.recordId && recordInSchool(item, actor));
+  if (file.entityType === 'dsd_incident') {
+    const incident = (db.dsdIncidents || []).find(item => item.id === file.recordId && recordInSchool(item, actor));
+    if (!incident) return null;
+    if (hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role)) return incident;
+    if (actor.role !== 'parent') return null;
+    const learner = tenantRecords(db.students, actor).find(item => normalizeComparableText(item.studentName) === normalizeComparableText(incident.learnerName));
+    return learner && isParentLinkedToLearner(actor, learner) ? incident : null;
+  }
   return null;
 };
 const canManageFile = (file, actor) => Boolean(actor && recordInSchool(file, actor)
@@ -7410,7 +7417,7 @@ if (typeof registerSchoolCoreUpgrades === 'function') {
 }
 
 app.use((req, res, next) => {
-  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
+  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|school-core-upgrades-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
   const blockedDirectory = /^\/(?:\.git|\.github|node_modules|output|tests|tmp|uploads|scripts|lib)(?:\/|$)/i.test(req.path);
   const blockedSourceMap = /\.map$/i.test(req.path);
   if (blockedFile || blockedDirectory || blockedSourceMap) {
