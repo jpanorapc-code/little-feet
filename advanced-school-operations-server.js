@@ -13,7 +13,8 @@ function registerAdvancedSchoolOperations(app, deps) {
   const {
     db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
     tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
-    isParentLinkedToLearner, validDateKey, createParentPaymentRecord, encryptField, decryptStoredField, logStructured
+    isParentLinkedToLearner, validDateKey, createParentPaymentRecord, encryptField, decryptStoredField,
+    saveDatabaseState, scheduleReplicaSnapshot, logStructured
   } = deps;
 
   const collections = [
@@ -175,17 +176,32 @@ function registerAdvancedSchoolOperations(app, deps) {
     else{if(!open)return res.status(409).json({message:'Staff member is not clocked in.'});if(action==='clock_out'){open.clockOutAt=nowIso();open.status='complete';}else if(action==='step_out'){if(open.status==='stepped_out')return res.status(409).json({message:'Staff member is already stepped out.'});open.breaks.push({outAt:nowIso(),returnAt:''});open.status='stepped_out';}else{const br=[...open.breaks].reverse().find(x=>!x.returnAt);if(!br)return res.status(409).json({message:'No open step-out was found.'});br.returnAt=nowIso();open.status='working';}}
     open.updatedBy=actor.username;open.updatedAt=nowIso();res.json({success:true,session:open});
   });
-  const ratioSetting=actor=>{let row=schoolRecords('staffRatioSettings',actor)[0];if(!row){row=tagSchoolRecord(actor,{id:crypto.randomUUID(),maxChildrenPerStaff:10,updatedAt:nowIso()});db.staffRatioSettings.unshift(row);}return row;};
-  app.get('/api/staff-ratio/settings',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});res.json(ratioSetting(actor));});
-  app.put('/api/staff-ratio/settings',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const value=Number(req.body?.maxChildrenPerStaff);if(!Number.isInteger(value)||value<1||value>50)return res.status(400).json({message:'Ratio must be between 1 and 50 children per staff member.'});const row=ratioSetting(actor);row.maxChildrenPerStaff=value;row.updatedAt=nowIso();row.updatedBy=actor.username;res.json({success:true,settings:row});});
-  app.get('/api/staff-ratio/live',(req,res)=>{
-    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+  const ratioSetting=actor=>{let row=schoolRecords('staffRatioSettings',actor)[0];if(!row){row=tagSchoolRecord(actor,{id:crypto.randomUUID(),maxChildrenPerStaff:10,updatedAt:nowIso(),lastBreachAlertAt:''});db.staffRatioSettings.unshift(row);}return row;};
+  const liveRatioFor=actor=>{
     const today=dateKeyInSouthAfrica(),present=new Set(schoolRecords('attendance',actor).filter(r=>r.date===today&&normalizeComparableText(r.status)==='present').map(r=>normalizeComparableText(r.studentName)));
     const aftercare=new Set(schoolRecords('aftercareSessions',actor).filter(r=>r.date===today&&!r.checkOutAt).map(r=>normalizeComparableText(r.learnerName)));
-    const children=new Set([...present,...aftercare]);const activeStaff=schoolRecords('staffClockSessions',actor).filter(r=>r.date===today&&!r.clockOutAt&&r.status==='working');
-    const max=ratioSetting(actor).maxChildrenPerStaff,required=children.size?Math.ceil(children.size/max):0;
-    res.json({date:today,children:children.size,activeStaff:activeStaff.length,maxChildrenPerStaff:max,requiredStaff:required,withinRatio:activeStaff.length>=required,shortfall:Math.max(0,required-activeStaff.length)});
-  });
+    const children=new Set([...present,...aftercare]),activeStaff=schoolRecords('staffClockSessions',actor).filter(r=>r.date===today&&!r.clockOutAt&&r.status==='working');
+    const setting=ratioSetting(actor),max=setting.maxChildrenPerStaff,required=children.size?Math.ceil(children.size/max):0;
+    return {date:today,children:children.size,activeStaff:activeStaff.length,maxChildrenPerStaff:max,requiredStaff:required,withinRatio:activeStaff.length>=required,shortfall:Math.max(0,required-activeStaff.length)};
+  };
+  app.get('/api/staff-ratio/settings',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});res.json(ratioSetting(actor));});
+  app.put('/api/staff-ratio/settings',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const value=Number(req.body?.maxChildrenPerStaff);if(!Number.isInteger(value)||value<1||value>50)return res.status(400).json({message:'Ratio must be between 1 and 50 children per staff member.'});const row=ratioSetting(actor);row.maxChildrenPerStaff=value;row.updatedAt=nowIso();row.updatedBy=actor.username;res.json({success:true,settings:row});});
+  app.get('/api/staff-ratio/live',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});res.json(liveRatioFor(actor));});
+  const runRatioBreachWatch=async()=>{
+    let changed=false;
+    for(const setting of db.staffRatioSettings||[]){
+      const actor=(db.users||[]).find(account=>accountSchoolId(account)===setting.schoolId&&['principal','admin','staff'].includes(account.role));
+      if(!actor)continue;
+      const live=liveRatioFor(actor);
+      if(live.withinRatio){if(setting.breachActive){setting.breachActive=false;setting.recoveredAt=nowIso();changed=true;}continue;}
+      const last=Date.parse(setting.lastBreachAlertAt||'');if(Number.isFinite(last)&&Date.now()-last<30*60*1000)continue;
+      db.staffNotices.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),title:'Staff-to-child ratio breach',message:'Live ratio check found '+live.children+' children with '+live.activeStaff+' active staff. '+live.requiredStaff+' active staff are required by the school configured ratio. Shortfall: '+live.shortfall+'.',audience:'All staff',required:true,dueDate:'',createdBy:'ratio-monitor',createdByName:'Little Feet ratio monitor',acknowledgedBy:[],createdAt:nowIso()}));
+      setting.lastBreachAlertAt=nowIso();setting.breachActive=true;setting.lastShortfall=live.shortfall;changed=true;
+    }
+    if(changed){await saveDatabaseState();scheduleReplicaSnapshot?.();}
+  };
+  const ratioWatchTimer=setInterval(()=>{runRatioBreachWatch().catch(error=>logStructured?.('error','staff_ratio.watch_failed',{category:'staff-ratio',message:error.message}));},30*60*1000);
+  ratioWatchTimer.unref?.();
 
   // Temporary/day-care bookings with capacity and waiting list.
   const capacityFor=(actor,className,date)=>{const row=schoolRecords('dayCareCapacitySettings',actor).find(x=>normalizeComparableText(x.className)===normalizeComparableText(className)&&(!x.date||x.date===date));return row?.capacity||20;};
