@@ -137,6 +137,10 @@ async function login(username,pin){
     const parentConduct=await request('/api/discipline',{cookie:parent});
     assert.equal(parentConduct.response.status,200);
     assert.equal(parentConduct.data.length,1);
+    assert.equal(conduct.data.record.requiredAction,'Normal');
+    const conductPrint=await request('/api/discipline/'+conduct.data.record.id+'/print',{cookie:parent});
+    assert.equal(conductPrint.response.status,200);
+    assert.match(conductPrint.text,/Learner Conduct Record/);
 
     const asset=await request('/api/assets',{method:'POST',cookie:admin,body:{assetCode:'TAB-001',name:'Class tablet',category:'IT',location:'Grade R',purchaseValue:2500,condition:'Good',status:'In service'}});
     assert.equal(asset.response.status,201);
@@ -158,13 +162,23 @@ async function login(username,pin){
 
     const incident=await request('/api/dsd-incidents',{method:'POST',cookie:teacher,body:{
       learnerName:'Alpha Learner',incidentDate:'2026-10-07',incidentTime:'10:15',location:'Playground',incidentType:'Minor injury',
-      description:'Learner tripped while running.',witnesses:'Teacher present',bodyRegions:['left-leg'],firstAid:'Cleaned area',
-      treatment:'Cold pack',parentNotification:'Parent called',correctiveAction:'Checked play area',staffStatement:'Observed fall directly',
-      signingPin:'Sign1234',signatureData:signature
+      description:'Learner tripped while running.',witnesses:'Teacher present',injuriesOrSymptoms:'Scrape on left knee',bodyRegions:['left-leg'],
+      bloodPresent:true,bloodAmount:'Small amount',bloodLocation:'Left knee',firstAid:'Cleaned area',treatment:'Cold pack',
+      medicalReferral:'Not required',parentNotification:'Parent called',parentNotifiedAt:'10:30',parentCollectedAt:'12:00',
+      parentAdvice:'Keep area clean and watch for swelling',personInCharge:'Alpha Teacher',preventiveMeasures:'Inspect running surface',
+      correctiveAction:'Checked play area',staffStatement:'Observed fall directly',signingPin:'Sign1234',signatureData:signature
     }});
     assert.equal(incident.response.status,201,incident.text);
     assert.equal(incident.data.incident.bodyRegions[0],'left-leg');
+    assert.equal(incident.data.incident.bloodPresent,true);
+    assert.equal(incident.data.incident.bloodAmount,'Small amount');
+    assert.equal(incident.data.incident.personInCharge,'Alpha Teacher');
+    assert.equal(incident.data.incident.preventiveMeasures,'Inspect running surface');
     assert.ok(incident.data.incident.staffSignedAt);
+    const incidentPrint=await request('/api/dsd-incidents/'+incident.data.incident.id+'/print',{cookie:teacher});
+    assert.equal(incidentPrint.response.status,200);
+    assert.match(incidentPrint.text,/Amount of blood/);
+    assert.match(incidentPrint.text,/Measures to prevent repeat/);
     const principalSign=await request('/api/dsd-incidents/'+incident.data.incident.id+'/principal-sign',{method:'POST',cookie:admin,body:{principalReview:'Reviewed and action accepted',signingPin:'Sign1234',signatureData:signature}});
     assert.equal(principalSign.response.status,200,principalSign.text);
     assert.equal(principalSign.data.incident.status,'Awaiting parent acknowledgement');
