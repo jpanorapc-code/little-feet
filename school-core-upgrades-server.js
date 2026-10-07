@@ -520,8 +520,13 @@ function registerSchoolCoreUpgrades(app, deps) {
     else if(audience==='teachers') selected=users.filter(a=>a.role==='teacher');
     else if(audience==='staff') selected=users.filter(a=>['teacher','principal','admin','school_accounts'].includes(a.role));
     if(audience==='class'&&className){
-      const names=new Set(schoolLearners(actor).filter(l=>normalizeComparableText(l.className)===normalizeComparableText(className)).map(l=>normalizeComparableText(l.studentName)));
-      selected=users.filter(account=>account.role!=='parent'||(account.linkedLearners||[]).some(name=>names.has(normalizeComparableText(name))));
+      const classKey=normalizeComparableText(className);
+      const names=new Set(schoolLearners(actor).filter(l=>normalizeComparableText(l.className)===classKey).map(l=>normalizeComparableText(l.studentName)));
+      selected=users.filter(account=>{
+        if(account.role==='parent')return (account.linkedLearners||[]).some(name=>names.has(normalizeComparableText(name)));
+        if(account.role==='teacher')return (account.assignedClasses||[]).some(name=>normalizeComparableText(name)===classKey);
+        return false;
+      });
     }
     return selected;
   };
