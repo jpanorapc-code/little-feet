@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const http = require('node:http');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
@@ -10,6 +11,10 @@ fs.mkdirSync(tmpRoot, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(tmpRoot, 'school-core-upgrades-'));
 const port = 7900 + Math.floor(Math.random() * 80);
 const base = 'http://127.0.0.1:' + port;
+const gatewayPort = port + 1000;
+const gatewayRequests = [];
+const gateway = http.createServer((req,res)=>{let raw='';req.setEncoding('utf8');req.on('data',chunk=>{raw+=chunk;});req.on('end',()=>{let body={};try{body=JSON.parse(raw||'{}');}catch{}gatewayRequests.push({url:req.url,body});res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({id:'accepted'}));});});
+gateway.listen(gatewayPort,'127.0.0.1');
 const hash = pin => crypto.scryptSync(String(pin), 'little-feet-pin-salt', 64).toString('hex');
 
 for (const file of ['server.js','school-core-upgrades-server.js','finance-automation-server.js','failover-mode.js','auth-crypto.js','backup.js']) {
@@ -29,7 +34,7 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
   users:[
     {username:'alpha-admin',pinHash:hash('AdminPass1'),name:'Alpha Admin',role:'admin',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
     {username:'alpha-teacher',pinHash:hash('TeacherPass1'),name:'Alpha Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
-    {username:'alpha-parent',pinHash:hash('ParentPass1'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
+    {username:'alpha-parent',email:'parent@alpha.test',phone:'+27110000001',pinHash:hash('ParentPass1'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
     {username:'bravo-admin',pinHash:hash('BravoPass1'),name:'Bravo Admin',role:'admin',schoolId:'school-bravo',schoolName:'Bravo School',verificationStatus:'Active'}
   ],
   students:[
@@ -41,12 +46,13 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
 
 const child=spawn(process.execPath,['server.js'],{
   cwd:tmp,
-  env:{...process.env,PORT:String(port),NODE_ENV:'test',LF_REPLICA_MODE:'1',LF_TEST_ALLOW_REPLICA_WRITES:'1',LF_SMS_API_URL:'',LF_SMS_API_KEY:'',LF_PUSH_API_URL:'',LF_PUSH_API_KEY:''},
+  env:{...process.env,PORT:String(port),NODE_ENV:'test',LF_REPLICA_MODE:'1',LF_TEST_ALLOW_REPLICA_WRITES:'1',LF_EMAIL_FROM:'noreply@littlefeet.test',LF_EMAIL_API_KEY:'email-test',LF_EMAIL_API_URL:'http://127.0.0.1:'+gatewayPort+'/email',LF_SMS_FROM:'LittleFeet',LF_SMS_API_KEY:'sms-test',LF_SMS_API_URL:'http://127.0.0.1:'+gatewayPort+'/sms',LF_PUSH_API_KEY:'push-test',LF_PUSH_API_URL:'http://127.0.0.1:'+gatewayPort+'/push'},
   stdio:['ignore','ignore','pipe']
 });
 let stderr=''; child.stderr.on('data',chunk=>{stderr+=chunk.toString();});
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const stop=()=>new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);child.kill();});
+const stopGateway=()=>new Promise(resolve=>gateway.close(()=>resolve()));
 
 async function request(route,{method='GET',body,cookie}={}){
   const headers={};
@@ -114,6 +120,9 @@ async function login(username,pin){
     const parentReports=await request('/api/academics/report-cards',{cookie:parent});
     assert.equal(parentReports.response.status,200);
     assert.equal(parentReports.data.length,1);
+    const emailed=await request('/api/academics/report-cards/'+report.data.reportCard.id+'/email',{method:'POST',cookie:teacher,body:{}});
+    assert.equal(emailed.response.status,200,emailed.text);
+    assert.equal(gatewayRequests.some(row=>row.url==='/email'&&row.body.subject.includes('report card')),true);
     const printable=await request('/api/academics/report-cards/'+report.data.reportCard.id+'/print',{cookie:parent});
     assert.equal(printable.response.status,200);
     assert.match(printable.text,/Little Feet Report Card/);
@@ -123,6 +132,7 @@ async function login(username,pin){
     }});
     assert.equal(conduct.response.status,201);
     assert.equal(conduct.data.totalPoints,3);
+    assert.equal(conduct.data.record.parentNotificationStatus,'sent');
     const parentConduct=await request('/api/discipline',{cookie:parent});
     assert.equal(parentConduct.response.status,200);
     assert.equal(parentConduct.data.length,1);
@@ -162,15 +172,18 @@ async function login(username,pin){
 
     const config=await request('/api/communications/config',{cookie:teacher});
     assert.equal(config.response.status,200);
-    assert.equal(config.data.sms,false);
-    assert.equal(config.data.push,false);
-    const fakeSend=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'Test',message:'No fake sends',audience:'parents',channels:['push']}});
-    assert.equal(fakeSend.response.status,409);
-    assert.match(fakeSend.data.message,/No fake delivery/i);
+    assert.deepEqual(config,{email:true,sms:true,push:true});
+    const campaign=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'School update',message:'Real provider test',audience:'parents',channels:['email','sms','push']}});
+    assert.equal(campaign.response.status,201,campaign.text);
+    assert.equal(campaign.data.campaign.deliveries.length,3);
+    assert.equal(campaign.data.campaign.deliveries.every(row=>row.status==='sent'),true);
+    assert.equal(gatewayRequests.some(row=>row.url==='/sms'),true);
+    assert.equal(gatewayRequests.some(row=>row.url==='/push'),true);
 
     console.log('School core upgrades test passed');
   } finally {
     await stop();
+    await stopGateway();
     fs.rmSync(tmp,{recursive:true,force:true});
   }
-})().catch(async error=>{console.error(error);await stop();process.exitCode=1;});
+})().catch(async error=>{console.error(error);await stop();await stopGateway().catch(()=>{});process.exitCode=1;});
