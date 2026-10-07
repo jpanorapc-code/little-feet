@@ -164,6 +164,14 @@ function registerSchoolCoreUpgrades(app, deps) {
     if (!mark) return res.status(404).json({message:'Mark record not found.'});
     res.json(schoolRecords('markHistory',actor).filter(row=>row.markId===mark.id));
   });
+  app.delete('/api/academics/marks/:id', (req,res) => {
+    const actor=staffActor(req);
+    const index=actor?(db.subjectMarks||[]).findIndex(row=>row.id===req.params.id&&recordInSchool(row,actor)):-1;
+    if(index<0)return res.status(404).json({message:'Mark record not found.'});
+    const [mark]=db.subjectMarks.splice(index,1);
+    db.markHistory.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),markId:mark.id,action:'deleted',changedBy:actor.username,changedAt:nowIso(),before:{...mark},after:null}));
+    res.json({success:true,mark});
+  });
 
   const reportViewAllowed = (actor, report) => {
     if (!actor || !report || !recordInSchool(report,actor)) return false;
@@ -357,6 +365,7 @@ function registerSchoolCoreUpgrades(app, deps) {
       rows=rows.filter(row=>allowed.has(normalizeComparableText(row.learnerName)));
     }
     if(req.query?.learnerName) rows=rows.filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(req.query.learnerName));
+    if(req.query?.term) rows=rows.filter(row=>String(row.term||'')===String(req.query.term));
     res.json(rows);
   });
   app.post('/api/grade-r/assessments',(req,res)=>{
@@ -365,20 +374,23 @@ function registerSchoolCoreUpgrades(app, deps) {
     if(!learner)return res.status(404).json({message:'Choose a learner in your school.'});
     const skill=GRADE_R_SKILLS.find(item=>item.id===req.body?.skillId), rating=Math.trunc(Number(req.body?.rating));
     if(!skill||![1,2,3,4].includes(rating))return res.status(400).json({message:'Choose a Grade R skill and a rating from 1 to 4.'});
-    const record=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',skillId:skill.id,subject:skill.subject,skill:skill.label,rating,evidence:boundedText(req.body?.evidence,1200),observedAt:validDateKey(req.body?.observedAt)||dateKeyInSouthAfrica(),recordedBy:actor.username,createdAt:nowIso()});
+    const term=boundedText(req.body?.term,60);
+    if(!term)return res.status(400).json({message:'Choose a term for this Grade R skill observation.'});
+    const record=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',skillId:skill.id,subject:skill.subject,skill:skill.label,rating,term,evidence:boundedText(req.body?.evidence,1200),observedAt:validDateKey(req.body?.observedAt)||dateKeyInSouthAfrica(),recordedBy:actor.username,createdAt:nowIso()});
     db.gradeRSkillAssessments.unshift(record); res.status(201).json({success:true,assessment:record});
   });
   app.get('/api/grade-r/summary/:learnerName',(req,res)=>{
     const actor=getSessionAccount(req), learner=actor&&findLearner(actor,req.params.learnerName);
     if(!canSeeLearner(actor,learner))return res.status(403).json({message:'You cannot view that learner.'});
-    const rows=schoolRecords('gradeRSkillAssessments',actor).filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName));
+    const requestedTerm=boundedText(req.query?.term,60);
+    const rows=schoolRecords('gradeRSkillAssessments',actor).filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName) && (!requestedTerm || String(row.term||'')===requestedTerm));
     const latest=new Map(); rows.forEach(row=>{if(!latest.has(row.skillId))latest.set(row.skillId,row);});
     const assessed=[...latest.values()], subjectSummary={};
     for(const subject of ['Home Language','Mathematics','Life Skills']){
       const group=assessed.filter(row=>row.subject===subject);
       subjectSummary[subject]={assessed:group.length,total:GRADE_R_SKILLS.filter(skill=>skill.subject===subject).length,average:group.length?Math.round((group.reduce((sum,row)=>sum+row.rating,0)/group.length)*100)/100:0};
     }
-    res.json({learnerName:learner.studentName,totalSkills:GRADE_R_SKILLS.length,assessedSkills:assessed.length,subjectSummary,latest:assessed});
+    res.json({learnerName:learner.studentName,term:requestedTerm||'all',totalSkills:GRADE_R_SKILLS.length,assessedSkills:assessed.length,subjectSummary,latest:assessed});
   });
 
   const incidentView = row => ({
