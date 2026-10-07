@@ -84,8 +84,15 @@ async function login(username){const r=await request('/api/login',{method:'POST'
   assert.equal(aiAttempt.response.status,409,'AI must not fabricate output without a configured provider');
 
   const group=await request('/api/learner-groups',{method:'POST',cookie:teacher,body:{name:'Team A',type:'Sport'}});
+  assert.equal(group.response.status,201,group.text);
+  const groupsAfterCreate=await request('/api/learner-groups',{cookie:teacher});
+  assert.equal(groupsAfterCreate.response.status,200,groupsAfterCreate.text);
+  assert.equal(groupsAfterCreate.data.some(row=>row.id===group.data.group.id&&row.name==='Team A'),true,'A successful group create must be visible to the immediate refresh request.');
   const members=await request('/api/learner-groups/'+group.data.group.id+'/members',{method:'POST',cookie:teacher,body:{learnerNames:['Learner A']}});
+  assert.equal(members.response.status,200,members.text);
   assert.deepEqual(members.data.group.members,['Learner A']);
+  const groupsAfterMembers=await request('/api/learner-groups',{cookie:teacher});
+  assert.equal(groupsAfterMembers.data.find(row=>row.id===group.data.group.id)?.members?.includes('Learner A'),true,'Saved group members must be visible to the immediate refresh request.');
 
   await request('/api/academics/subject-assignments',{method:'POST',cookie:teacher,body:{learnerName:'Learner A',subject:'Mathematics',action:'add',effectiveDate:'2026-10-07'}});
   const analytics=await request('/api/academics/analytics?term=Term%204&subject=Mathematics',{cookie:teacher});
