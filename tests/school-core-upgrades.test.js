@@ -181,10 +181,13 @@ async function login(username,pin){
     assert.equal(incident.data.incident.personInCharge,'Alpha Teacher');
     assert.equal(incident.data.incident.preventiveMeasures,'Inspect running surface');
     assert.ok(incident.data.incident.staffSignedAt);
+    assert.equal(incident.data.incident.staffSigned,true);
+    assert.equal(Object.prototype.hasOwnProperty.call(incident.data.incident,'staffSignature'),false,'Normal incident JSON must not expose decrypted signature image data');
     const incidentPrint=await request('/api/dsd-incidents/'+incident.data.incident.id+'/print',{cookie:teacher});
     assert.equal(incidentPrint.response.status,200);
     assert.match(incidentPrint.text,/Amount of blood/);
     assert.match(incidentPrint.text,/Measures to prevent repeat/);
+    assert.match(incidentPrint.text,/class="signature-image"/,'Printable DSD form must render stored signatures');
     const principalSign=await request('/api/dsd-incidents/'+incident.data.incident.id+'/principal-sign',{method:'POST',cookie:admin,body:{principalReview:'Reviewed and action accepted',signingPin:'Sign1234',signatureData:signature}});
     assert.equal(principalSign.response.status,200,principalSign.text);
     assert.equal(principalSign.data.incident.status,'Awaiting parent acknowledgement');
