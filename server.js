@@ -1093,6 +1093,7 @@ const db = {
   communicationTemplates: [],
   admissionsApplications: [],
   admissionsStatusHistory: [],
+  documentAudit: [],
   systemErrors: [],
   schoolBilling: {},
   schoolTerms: {},
@@ -1473,7 +1474,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'eldaSkillCatalogue', 'eldaAssessments', 'aftercareSettings', 'aftercarePlans', 'aftercareSessions', 'staffClockSessions', 'staffRatioSettings', 'dayCareBookings', 'dayCareCapacitySettings', 'mealPlans', 'dietaryProfiles', 'learnerGroups', 'learnerSubjectAssignments', 'pickupPasses', 'academicAnalyticsSettings', 'communicationTemplates', 'admissionsApplications', 'admissionsStatusHistory', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'eldaSkillCatalogue', 'eldaAssessments', 'aftercareSettings', 'aftercarePlans', 'aftercareSessions', 'staffClockSessions', 'staffRatioSettings', 'dayCareBookings', 'dayCareCapacitySettings', 'mealPlans', 'dietaryProfiles', 'learnerGroups', 'learnerSubjectAssignments', 'pickupPasses', 'academicAnalyticsSettings', 'communicationTemplates', 'admissionsApplications', 'admissionsStatusHistory', 'documentAudit', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -4219,7 +4220,7 @@ const publicFileMetadata = file => ({
   sha256: file.sha256, uploadedBy: file.uploadedBy, createdAt: file.createdAt,
   updatedAt: file.updatedAt || file.createdAt, accessState: file.accessState,
   verificationStatus:file.verificationStatus||'Pending review', verifiedAt:file.verifiedAt||'', verifiedBy:file.verifiedBy||'',
-  rejectionReason:file.rejectionReason||'', contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
+  rejectionReason:file.rejectionReason||'', expiryDate:file.expiryDate||'', contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
 });
 const admissionApplicationVisibleTo = (application, actor) => Boolean(application && actor && (
   hasPlatformAccess(actor)
@@ -4328,6 +4329,7 @@ app.post('/api/files', async (req, res, next) => {
   try {
     file = await createStoredFile(actor, { entityType, recordId, purpose: req.body?.purpose, originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl,
       schoolIdOverride:related.schoolId||accountSchoolId(actor),schoolNameOverride:related.schoolName||actor.schoolName||'' });
+    if(['learner','admission_application'].includes(entityType))db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:file.schoolId,entityType,recordId,fileId:file.id,action:'uploaded',by:actor.username,at:new Date().toISOString(),details:file.originalFilename});
     await saveDatabaseState();
     req.persistenceCommitted = true;
     res.status(201).json({ success: true, file: publicFileMetadata(file) });
@@ -4523,6 +4525,7 @@ app.post('/api/admissions/applications/:id/documents/:fileId/verify',(req,res)=>
   if(!['Verified','Rejected'].includes(status))return res.status(400).json({message:'Choose Verified or Rejected.'});
   if(status==='Rejected'&&!reason)return res.status(400).json({message:'Add a reason when rejecting a document.'});
   file.verificationStatus=status;file.verifiedAt=status==='Verified'?new Date().toISOString():'';file.verifiedBy=status==='Verified'?actor.username:'';file.rejectionReason=status==='Rejected'?reason:'';
+  db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:application.schoolId,entityType:'admission_application',recordId:application.id,fileId:file.id,action:status==='Verified'?'verified':'rejected',by:actor.username,at:new Date().toISOString(),details:reason||''});
   const item=(application.checklist||[]).find(row=>row.key===file.purpose);
   if(item){item.status=status==='Verified'?'verified':'rejected';item.verifiedAt=file.verifiedAt;item.verifiedBy=file.verifiedBy;}
   application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
@@ -4572,6 +4575,25 @@ app.get('/api/learner-documents',(req,res)=>{
   const files=(db.fileRecords||[]).filter(file=>file.entityType==='learner'&&file.accessState==='active'&&learnerIds.has(file.recordId)&&relatedRecordForFile(file,actor));
   res.json(learners.map(learner=>({learner:{id:learner.id,studentName:learner.studentName,className:learner.className},documents:files.filter(file=>file.recordId===learner.id).map(publicFileMetadata)})));
 });
+app.patch('/api/learner-documents/:learnerId/:fileId',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'School management access is required.'});
+  const learner=tenantRecords(db.students,actor).find(item=>item.id===req.params.learnerId);if(!learner)return res.status(404).json({message:'Learner not found.'});
+  const file=(db.fileRecords||[]).find(item=>item.id===req.params.fileId&&item.entityType==='learner'&&item.recordId===learner.id&&item.accessState==='active');
+  if(!file)return res.status(404).json({message:'Learner document not found.'});
+  const expiryDate=boundedText(req.body?.expiryDate,10);
+  if(expiryDate&&!validDateKey(expiryDate))return res.status(400).json({message:'Choose a valid expiry date.'});
+  const purpose=boundedText(req.body?.purpose||file.purpose,80);if(!purpose)return res.status(400).json({message:'Document type is required.'});
+  file.expiryDate=expiryDate;file.purpose=purpose;file.updatedAt=new Date().toISOString();
+  db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:learner.schoolId,entityType:'learner',recordId:learner.id,fileId:file.id,action:'metadata_updated',by:actor.username,at:file.updatedAt,details:expiryDate?('Expiry '+expiryDate):'Expiry cleared'});
+  res.json({success:true,file:publicFileMetadata(file)});
+});
+app.get('/api/learner-documents/:learnerId/audit',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view document history.'});
+  const learner=(db.students||[]).find(item=>item.id===req.params.learnerId);
+  if(!learner||!relatedRecordForFile({entityType:'learner',recordId:learner.id,schoolId:learner.schoolId},actor))return res.status(404).json({message:'Learner not found.'});
+  res.json((db.documentAudit||[]).filter(row=>row.entityType==='learner'&&row.recordId===learner.id).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)));
+});
+
 app.post('/api/learner-documents/:learnerId/:fileId/verify',(req,res)=>{
   const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'School management access is required.'});
   const learner=tenantRecords(db.students,actor).find(item=>item.id===req.params.learnerId);if(!learner)return res.status(404).json({message:'Learner not found.'});
@@ -4579,6 +4601,7 @@ app.post('/api/learner-documents/:learnerId/:fileId/verify',(req,res)=>{
   if(!file)return res.status(404).json({message:'Learner document not found.'});
   const status=boundedText(req.body?.status,30),reason=boundedText(req.body?.reason,500);if(!['Verified','Rejected'].includes(status))return res.status(400).json({message:'Choose Verified or Rejected.'});if(status==='Rejected'&&!reason)return res.status(400).json({message:'Add a rejection reason.'});
   file.verificationStatus=status;file.verifiedAt=status==='Verified'?new Date().toISOString():'';file.verifiedBy=status==='Verified'?actor.username:'';file.rejectionReason=status==='Rejected'?reason:'';
+  db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:learner.schoolId,entityType:'learner',recordId:learner.id,fileId:file.id,action:status==='Verified'?'verified':'rejected',by:actor.username,at:new Date().toISOString(),details:reason||''});
   res.json({success:true,file:publicFileMetadata(file)});
 });
 
