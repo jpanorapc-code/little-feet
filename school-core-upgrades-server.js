@@ -572,6 +572,23 @@ function registerSchoolCoreUpgrades(app, deps) {
     }
     campaign.status='completed';campaign.executedAt=nowIso();return campaign;
   };
+  app.get('/api/communications/inbox',(req,res)=>{
+    const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view messages.'});
+    const username=normalizeUsername(actor.username);
+    const rows=schoolRecords('communicationCampaigns',actor).filter(campaign=>(campaign.deliveries||[]).some(d=>normalizeUsername(d.recipient)===username&&d.status==='sent')).map(campaign=>{
+      const deliveries=(campaign.deliveries||[]).filter(d=>normalizeUsername(d.recipient)===username&&d.status==='sent');
+      return {id:campaign.id,title:campaign.title,message:campaign.message,channels:deliveries.map(d=>d.channel),createdAt:campaign.executedAt||campaign.createdAt,readAt:deliveries.find(d=>d.openedAt)?.openedAt||''};
+    });
+    res.json(rows);
+  });
+  app.post('/api/communications/campaigns/:id/read',(req,res)=>{
+    const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to acknowledge this message.'});
+    const campaign=schoolRecords('communicationCampaigns',actor).find(row=>row.id===req.params.id);if(!campaign)return res.status(404).json({message:'Campaign not found.'});
+    const username=normalizeUsername(actor.username),deliveries=(campaign.deliveries||[]).filter(d=>normalizeUsername(d.recipient)===username&&d.status==='sent');
+    if(!deliveries.length)return res.status(403).json({message:'This campaign was not delivered to your account.'});
+    const openedAt=nowIso();deliveries.forEach(d=>{if(!d.openedAt)d.openedAt=openedAt;});res.json({success:true,readAt:openedAt});
+  });
+
   app.post('/api/communications/campaigns',async(req,res,next)=>{
     const actor=communicationActor(req);if(!actor)return res.status(403).json({message:'Communication access is required.'});
     const title=limitedText(req.body?.title,180),message=limitedText(req.body?.message,3000),audience=['all','parents','teachers','staff','class'].includes(req.body?.audience)?req.body.audience:null;
