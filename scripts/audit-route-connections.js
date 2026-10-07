@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function auditRouteConnections(root = path.resolve(__dirname, '..')) {
-  const serverFiles = ['server.js', 'finance-automation-server.js'];
+  const serverFiles = ['server.js', 'finance-automation-server.js', 'school-core-upgrades-server.js'];
   const routePattern = /app\.(get|post|put|patch|delete)\(\s*(['"])(\/api\/[^'"]+)\2/g;
   const routes = [];
 

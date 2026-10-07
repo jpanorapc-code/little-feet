@@ -123,15 +123,10 @@ async function main() {
         return audio ? {
           paused:audio.paused,
           muted:audio.muted,
-          readyState:audio.readyState,
-          networkState:audio.networkState,
           currentTime:audio.currentTime,
           duration:audio.duration,
           errorCode:audio.error?.code || null,
-          errorMessage:audio.error?.message || '',
-          currentSrc:audio.currentSrc || audio.src,
-          userActivationActive:navigator.userActivation?.isActive ?? null,
-          userActivationSeen:navigator.userActivation?.hasBeenActive ?? null
+          currentSrc:audio.currentSrc || audio.src
         } : null;
       });
       assert.ok(antarcticState && !antarcticState.paused && !antarcticState.muted, `Antarctic audio did not enter playback: ${JSON.stringify(antarcticState)}`);
@@ -162,8 +157,6 @@ async function main() {
       await page.locator('#settingsTab').waitFor({ state: 'visible' });
       assert.equal(await page.locator('.profile-icon-choice').count(), 8, 'Settings should expose eight penguin profile avatars');
       // Initial dashboard loaders can still be settling when Settings first opens.
-      // Wait for a short quiet window so this assertion measures the avatar click
-      // itself rather than unrelated startup API traffic.
       let requestsBeforeAvatar = 0;
       for (let attempt = 0; attempt < 6; attempt += 1) {
         const before = [...apiRequestCounts.values()].reduce((sum, value) => sum + value, 0);

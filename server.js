@@ -4,11 +4,20 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 const tls = require('tls');
+const dns = require('node:dns').promises;
 const Database = require('better-sqlite3');
 const { Pool } = require('pg');
 const session = require('express-session');
 const { hashPin, matchesPin, pinHashNeedsUpgrade } = require('./auth-crypto');
 const { registerFinanceAutomation } = require('./finance-automation-server');
+let registerSchoolCoreUpgrades = null;
+try {
+  ({ registerSchoolCoreUpgrades } = require('./school-core-upgrades-server'));
+} catch (error) {
+  const missingOwnModule = error?.code === 'MODULE_NOT_FOUND'
+    && String(error.message || '').includes('school-core-upgrades-server');
+  if (!missingOwnModule || process.env.NODE_ENV !== 'test') throw error;
+}
 const { createObjectStorage, objectKeyFor } = require('./lib/storage/object-storage');
 const { stripHtml, verifyResendWebhook, fetchResendReceivedEmail } = require('./lib/mailbox-integration');
 const { oauthCallbackUrl, resolveOAuthAccount, publicOrigin } = require('./lib/oauth-identity');
@@ -315,7 +324,11 @@ const ensureSchool = (schoolName) => {
   if (!Array.isArray(db.schools)) db.schools = [];
   let school = db.schools.find(entry => schoolKey(entry.name) === schoolKey(cleanName));
   if (!school) {
-    school = { id: createSchoolId(), name: cleanName, status: 'active', createdAt: new Date().toISOString() };
+    const createdAt = new Date().toISOString();
+    school = {
+      id: createSchoolId(), name: cleanName, status: 'active', createdAt,
+      subscriptionStatus: 'trial_pending', trialStartedAt: '', trialEndsAt: ''
+    };
     db.schools.push(school);
   }
   return school;
@@ -327,6 +340,16 @@ const accountSchoolId = (account) => {
   if (!schoolName) return '';
   account.schoolId = ensureSchool(schoolName).id;
   return account.schoolId;
+};
+const ensureSchoolTrialStarted = account => {
+  if (!account || hasPlatformAccess(account) || !['principal', 'admin', 'school_accounts'].includes(account.role)) return null;
+  const school = db.schools.find(entry => entry.id === accountSchoolId(account));
+  if (!school || school.subscriptionStatus !== 'trial_pending') return school || null;
+  const startedAt = new Date().toISOString();
+  school.subscriptionStatus = 'trial';
+  school.trialStartedAt = startedAt;
+  school.trialEndsAt = new Date(Date.now() + (14 * 24 * 60 * 60 * 1000)).toISOString();
+  return school;
 };
 const isSameSchool = (first, second) => {
   if (!first || !second) return false;
@@ -521,6 +544,70 @@ const sendLoginLockoutEmail = async account => {
   });
 };
 
+const loginSecurityRequestSummary = req => ({
+  network: boundedText(req.ip || 'Unavailable', 96) || 'Unavailable',
+  device: boundedText(req.get('user-agent') || 'Unknown browser or device', 300) || 'Unknown browser or device'
+});
+
+const sendSuccessfulLoginEmail = async (req, account, authMethod = 'password') => {
+  const to = accountSecurityEmail(account);
+  if (!to) return false;
+  const requestSummary = loginSecurityRequestSummary(req);
+  const signedInAt = new Date().toISOString();
+  const accountName = String(account?.name || 'Little Feet user').trim();
+  const imageUrl = 'https://littlefeet.co.za/assets/security/login-security-alert.jpg';
+  const text = [
+    `Hello ${accountName},`,
+    '',
+    'A successful sign-in to your Little Feet account was detected.',
+    `Time: ${signedInAt}`,
+    `Sign-in method: ${authMethod}`,
+    `Network address: ${requestSummary.network}`,
+    `Browser/device: ${requestSummary.device}`,
+    '',
+    'If this was you, no action is needed.',
+    'If this was not you, change your password or PIN and contact your school administrator immediately.',
+    '',
+    'Little Feet security'
+  ].join('\n');
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#071426;font-family:Arial,Helvetica,sans-serif;color:#eef7ff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#071426;padding:24px 12px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#0d2038;border:1px solid #1f4d70;border-radius:16px;overflow:hidden;">
+          <tr><td style="padding:0;">
+            <img src="${imageUrl}" width="620" alt="Little Feet login security alert" style="display:block;width:100%;max-width:620px;height:auto;border:0;">
+          </td></tr>
+          <tr><td style="padding:24px 28px 28px;">
+            <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:14px;">New sign-in detected</div>
+            <p style="margin:0 0 16px;line-height:1.6;color:#d8e9f7;">Hello ${emailHtmlText(accountName)},</p>
+            <p style="margin:0 0 18px;line-height:1.6;color:#d8e9f7;">A successful sign-in to your Little Feet account was detected.</p>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#09192c;border-radius:10px;margin:0 0 18px;">
+              <tr><td style="padding:14px 16px;color:#b9d5e9;line-height:1.7;">
+                <strong style="color:#ffffff;">Time:</strong> ${emailHtmlText(signedInAt)}<br>
+                <strong style="color:#ffffff;">Sign-in method:</strong> ${emailHtmlText(authMethod)}<br>
+                <strong style="color:#ffffff;">Network address:</strong> ${emailHtmlText(requestSummary.network)}<br>
+                <strong style="color:#ffffff;">Browser/device:</strong> ${emailHtmlText(requestSummary.device)}
+              </td></tr>
+            </table>
+            <p style="margin:0 0 8px;line-height:1.6;color:#d8e9f7;">If this was you, no action is needed.</p>
+            <p style="margin:0;line-height:1.6;color:#ffd4d4;"><strong>If this was not you:</strong> change your password or PIN and contact your school administrator immediately.</p>
+            <p style="margin:22px 0 0;color:#7fb4d7;font-size:13px;">Little Feet security</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+  return sendLittleFeetEmail({
+    to,
+    subject: 'Little Feet security: new sign-in',
+    text,
+    html
+  });
+};
+
 const pruneLoginAttempts = (now = Date.now()) => {
   for (const [key, entry] of loginAttempts) {
     if (!entry || now >= loginAttemptExpiry(entry)) loginAttempts.delete(key);
@@ -633,7 +720,7 @@ app.use((req, res, next) => {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "frame-src 'none'",
-    "form-action 'self'",
+    "form-action 'self' https://www.payfast.co.za https://sandbox.payfast.co.za",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://unpkg.com",
     "img-src 'self' data: blob: https:",
@@ -655,7 +742,11 @@ app.use(express.json({
   limit: `${MAX_API_BODY_MB}mb`,
   verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
-app.use(express.urlencoded({ extended: true, limit: `${MAX_API_BODY_MB}mb` }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: `${MAX_API_BODY_MB}mb`,
+  verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
+}));
 const STANDARD_IMPORT_API_PATHS = new Set([
   '/api/schedules/import',
   '/api/attendance/import',
@@ -675,7 +766,7 @@ app.use('/api', (req, res, next) => {
 });
 app.use('/api', (req, res, next) => {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
-  if (String(req.originalUrl || '').split('?')[0] === '/api/email/inbound/resend') return next();
+  if (['/api/email/inbound/resend', '/api/payments/payfast/itn'].includes(String(req.originalUrl || '').split('?')[0])) return next();
   if (requestPayloadTooComplex(req.body)) return res.status(400).json({ message: 'Request structure is too deeply nested or complex.' });
   if (!requestContainsBlockedLanguage(req.body)) return next();
   return res.status(422).json({ message: 'Please remove prohibited language before submitting this form.' });
@@ -971,6 +1062,16 @@ const db = {
   financeReconciliationRuns: [],
   payrollProfiles: [],
   payrollRuns: [],
+  subjectMarks: [],
+  markHistory: [],
+  reportCards: [],
+  disciplineRecords: [],
+  disciplineSettings: [],
+  assetRegister: [],
+  gradeRSkillAssessments: [],
+  dsdIncidents: [],
+  communicationCampaigns: [],
+  attendanceAutomationSettings: [],
   systemErrors: [],
   schoolBilling: {},
   schoolTerms: {},
@@ -1053,6 +1154,92 @@ class PostgresSessionStore extends session.Store {
   }
 }
 
+const LOGIN_HUMAN_CHECK_TTL_MS = 5 * 60 * 1000;
+const LOGIN_HUMAN_CHECK_USED_MAX = 10000;
+const usedLoginHumanChecks = new Map();
+const loginHumanCheckRequired = () => process.env.NODE_ENV !== 'test' || process.env.LF_TEST_REQUIRE_HUMAN_CHECK === '1';
+const loginHumanCheckKey = crypto.createHash('sha256')
+  .update(`${process.env.SESSION_SECRET || 'little-feet-session-secret'}\nlogin-human-check-v2`)
+  .digest();
+const loginHumanCheckClientHash = req => crypto.createHash('sha256')
+  .update(String(req.get('user-agent') || '').slice(0, 500))
+  .digest('hex');
+const loginHumanCheckSignature = ({ nonce, expiresAt, clientHash, answer }) => crypto
+  .createHmac('sha256', loginHumanCheckKey)
+  .update(`${nonce}\n${expiresAt}\n${clientHash}\n${String(answer ?? '').trim()}`)
+  .digest('hex');
+
+const pruneUsedLoginHumanChecks = (now = Date.now()) => {
+  for (const [key, expiresAt] of usedLoginHumanChecks) {
+    if (Number(expiresAt) < now) usedLoginHumanChecks.delete(key);
+  }
+  while (usedLoginHumanChecks.size > LOGIN_HUMAN_CHECK_USED_MAX) {
+    usedLoginHumanChecks.delete(usedLoginHumanChecks.keys().next().value);
+  }
+};
+
+const issueLoginHumanCheck = req => {
+  const first = crypto.randomInt(2, 10);
+  const second = crypto.randomInt(1, 9);
+  const subtract = crypto.randomInt(0, 2) === 1;
+  const left = subtract ? Math.max(first, second) : first;
+  const right = subtract ? Math.min(first, second) : second;
+  const answer = subtract ? left - right : left + right;
+  const nonce = crypto.randomBytes(18).toString('hex');
+  const expiresAt = Date.now() + LOGIN_HUMAN_CHECK_TTL_MS;
+  const clientHash = loginHumanCheckClientHash(req);
+  const signature = loginHumanCheckSignature({ nonce, expiresAt, clientHash, answer });
+  return {
+    challengeId: `${nonce}.${expiresAt}.${signature}`,
+    prompt: `What is ${left} ${subtract ? '−' : '+'} ${right}?`,
+    left,
+    right,
+    operator: subtract ? '−' : '+',
+    expiresInSeconds: Math.floor(LOGIN_HUMAN_CHECK_TTL_MS / 1000)
+  };
+};
+
+const verifyLoginHumanCheck = (req, body) => {
+  if (!loginHumanCheckRequired()) return true;
+  const challengeId = limitedText(body?.humanCheckId, 180);
+  const answer = limitedText(body?.humanCheckAnswer, 20);
+  const honeypot = limitedText(body?.companyWebsite, 200);
+  if (honeypot || !challengeId || !answer) return false;
+
+  const parts = challengeId.split('.');
+  if (parts.length !== 3) return false;
+  const [nonce, expiresText, suppliedSignature] = parts;
+  if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{13}$/.test(expiresText) || !/^[a-f0-9]{64}$/.test(suppliedSignature)) return false;
+
+  const expiresAt = Number(expiresText);
+  const now = Date.now();
+  if (!Number.isSafeInteger(expiresAt) || expiresAt < now || expiresAt > now + LOGIN_HUMAN_CHECK_TTL_MS + 30000) return false;
+
+  pruneUsedLoginHumanChecks(now);
+  const fingerprint = crypto.createHash('sha256').update(challengeId).digest('hex');
+  if (usedLoginHumanChecks.has(fingerprint)) return false;
+  usedLoginHumanChecks.set(fingerprint, expiresAt);
+
+  const expectedSignature = loginHumanCheckSignature({
+    nonce,
+    expiresAt,
+    clientHash: loginHumanCheckClientHash(req),
+    answer
+  });
+  const expected = Buffer.from(expectedSignature, 'hex');
+  const actual = Buffer.from(suppliedSignature, 'hex');
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+};
+
+// Serve this before express-session so the login page does not wait for the
+// database-backed session store just to display the human-verification prompt.
+app.get('/api/auth/human-check', (req, res) => {
+  if (!enforcePublicRateLimit(req, res, 'login-human-check', 60, 10 * 60 * 1000)) return;
+  res.set('Cache-Control', 'no-store');
+  if (!loginHumanCheckRequired()) return res.json({ required: false });
+  res.json({ required: true, ...issueLoginHumanCheck(req) });
+});
+
 app.use(session({
   store: process.env.DATABASE_URL ? new PostgresSessionStore() : undefined,
   secret: process.env.SESSION_SECRET || 'little-feet-session-secret',
@@ -1094,6 +1281,7 @@ const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/email/inbound/resend',
   '/api/email/mailbox/sync',
   '/api/payments/webhook',
+  '/api/payments/payfast/itn',
   '/api/payments/reconcile',
   '/api/finance/recurring-runs',
   '/api/finance/reconciliation/apply',
@@ -1237,6 +1425,7 @@ function applySavedState(saved) {
   syncCurrentReleaseNotes();
   removeLegacyDemoRecords();
   migrateSchoolTenancy();
+  migrateSchoolSubscriptionTrials();
   migrateSensitiveStoredFields();
   return true;
 }
@@ -1263,7 +1452,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -1278,6 +1467,22 @@ function migrateSchoolTenancy() {
   if (!db.schoolTerms[defaultSchoolId]) db.schoolTerms[defaultSchoolId] = db.term;
   if (!db.schoolBilling || typeof db.schoolBilling !== 'object') db.schoolBilling = {};
   if (!db.schoolBilling[defaultSchoolId] && db.subscriptionBilling) db.schoolBilling[defaultSchoolId] = db.subscriptionBilling;
+}
+
+function migrateSchoolSubscriptionTrials() {
+  if (!Array.isArray(db.schools)) db.schools = [];
+  const now = Date.now();
+  const trialMs = 14 * 24 * 60 * 60 * 1000;
+  db.schools.forEach(school => {
+    if (!school || typeof school !== 'object') return;
+    if (school.subscriptionStatus === 'trial_pending') return;
+    if (!school.subscriptionStatus) school.subscriptionStatus = 'trial';
+    if (school.trialStartedAt && Number.isFinite(Date.parse(school.trialEndsAt || ''))) return;
+    const createdAtMs = Date.parse(school.createdAt || '');
+    const startMs = Number.isFinite(createdAtMs) && createdAtMs >= now - trialMs ? createdAtMs : now;
+    school.trialStartedAt = new Date(startMs).toISOString();
+    school.trialEndsAt = new Date(startMs + trialMs).toISOString();
+  });
 }
 
 function migrateSensitiveStoredFields() {
@@ -1683,6 +1888,7 @@ async function initialisePersistence() {
   ensureBootstrapAdministrator();
   syncConfiguredPlatformOwnerAccess();
   migrateSchoolTenancy();
+  migrateSchoolSubscriptionTrials();
   migrateSensitiveStoredFields();
   removeLegacyMailboxConnections();
   ensureAllLearnersHaveAccessCodes();
@@ -1704,17 +1910,72 @@ persistenceReady = initialisePersistence();
 
 // API Endpoints
 // Auth
-const establishAuthenticatedSession = (req, account, callback) => {
+const establishAuthenticatedSession = (req, account, callback, authMethod = 'password') => {
+  ensureSchoolTrialStarted(account);
   const safeUser = safeAccount(account);
   req.session.regenerate(regenerateError => {
     if (regenerateError) return callback(regenerateError);
     req.session.littleFeetUser = safeUser;
-    req.session.save(saveError => callback(saveError, safeUser));
+    req.session.save(saveError => {
+      if (!saveError) {
+        logStructured('info', 'auth.login_succeeded', {
+          category: 'authentication',
+          requestId: req.requestId,
+          user: account?.username || '',
+          role: account?.role || '',
+          schoolId: account ? accountSchoolId(account) : '',
+          schoolName: account?.schoolName || '',
+          method: req.method,
+          route: req.path,
+          result: 'success',
+          details: `Sign-in method: ${authMethod}`
+        });
+        void sendSuccessfulLoginEmail(req, account, authMethod).then(sent => {
+          if (sent) logStructured('info', 'auth.login_notification_sent', {
+            category: 'authentication',
+            requestId: req.requestId,
+            user: account?.username || '',
+            role: account?.role || '',
+            schoolId: account ? accountSchoolId(account) : '',
+            schoolName: account?.schoolName || '',
+            method: req.method,
+            route: req.path,
+            result: 'sent'
+          });
+        }).catch(error => {
+          logStructured('error', 'auth.login_notification_failed', {
+            category: 'authentication',
+            requestId: req.requestId,
+            user: account?.username || '',
+            role: account?.role || '',
+            schoolId: account ? accountSchoolId(account) : '',
+            schoolName: account?.schoolName || '',
+            method: req.method,
+            route: req.path,
+            message: error.message
+          });
+        });
+      }
+      callback(saveError, safeUser);
+    });
   });
 };
 
 app.post('/api/login', (req, res) => {
   const { username, pin } = req.body;
+  if (!verifyLoginHumanCheck(req, req.body)) {
+    logStructured('warn', 'auth.human_check_failed', {
+      category: 'authentication',
+      requestId: req.requestId,
+      method: req.method,
+      route: req.path,
+      result: 'rejected'
+    });
+    return res.status(400).json({
+      message: 'Please complete the security check and try again.',
+      humanCheckRequired: true
+    });
+  }
   const loginUsername = limitedText(username, 160);
   const normalizedUsername = loginUsername ? normalizeUsername(loginUsername) : '';
 
@@ -1912,8 +2173,10 @@ app.get('/api/production-readiness', (req, res) => {
   const integrations = {
     paymentDestination: billingPaymentConfigured(billing.payment),
     signedPaymentWebhook: Boolean(process.env.LF_PAYMENT_WEBHOOK_SECRET),
-    emailDelivery: Boolean(process.env.LF_EMAIL_FROM && process.env.LF_EMAIL_API_KEY),
-    smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY),
+    payfastAutomaticConfirmation: payFastConfigured(),
+    emailDelivery: Boolean(smtpEmailConfigured() || apiEmailConfigured()),
+    smsDelivery: Boolean(process.env.LF_SMS_FROM && process.env.LF_SMS_API_KEY && safeHttpsUrl(process.env.LF_SMS_API_URL)),
+    pushDelivery: Boolean(process.env.LF_PUSH_API_KEY && safeHttpsUrl(process.env.LF_PUSH_API_URL)),
     monitoring: Boolean(process.env.LF_MONITORING_DSN || process.env.LF_MONITORING_PROVIDER),
     monitoringProvider: boundedText(process.env.LF_MONITORING_PROVIDER || (process.env.LF_MONITORING_DSN ? 'external-dsn' : ''), 80),
     privateObjectStorage: objectStorage.configured,
@@ -1928,7 +2191,8 @@ app.get('/api/production-readiness', (req, res) => {
   if (!readiness.checks.sessionSecret) missingActions.push('Set a strong SESSION_SECRET.');
   if (!readiness.checks.privateObjectStorage) missingActions.push('Configure the private Cloudflare R2 bucket and server-side credentials.');
   if (!readiness.checks.storageCleanupHealthy) missingActions.push('Resolve pending private-object cleanup jobs.');
-  if (!integrations.paymentDestination) missingActions.push('Configure a bank-transfer destination or HTTPS payment link.');
+  if (!integrations.paymentDestination) missingActions.push('Configure a bank-transfer destination, HTTPS payment link, or PayFast automatic confirmation.');
+  if (payFastMode === 'sandbox' && isProduction) missingActions.push('Production cannot use PayFast sandbox mode. Set LF_PAYFAST_MODE=live.');
   if (!integrations.monitoring) missingActions.push('Configure error and uptime monitoring.');
   if (!integrations.offsiteBackup) missingActions.push('Configure an offsite backup target and test a restore.');
   res.json({
@@ -1976,7 +2240,8 @@ app.post('/api/signup', (req, res) => {
 
 const safeAccount = ({ pin, pinHash, reportSigningPinHash, mailboxConnection, emailForwarding, ...account }) => ({
   ...account,
-  ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {})
+  ...(account.role === 'parent' ? { subscription: parentSubscriptionActive(account) ? 'plus' : 'basic', parentSubscriptionActive: parentSubscriptionActive(account) } : {}),
+  ...(!PLATFORM_INTERNAL_ROLES.has(account.role) ? { schoolSubscriptionAccess: schoolSubscriptionAccessState(account) } : {})
 });
 const getSessionAccount = (req) => {
   const username = req.session?.littleFeetUser?.username;
@@ -1994,6 +2259,27 @@ const requireCompanyStaff = (req) => {
   const account = getSessionAccount(req);
   return isCompanyStaffRole(account) ? account : null;
 };
+const SCHOOL_SUBSCRIPTION_EXEMPT_API_PREFIXES = Object.freeze([
+  '/api/auth/', '/api/subscription-billing', '/api/payments/', '/api/release-notes',
+  '/api/account-deletion-request', '/api/system/client-log'
+]);
+app.use('/api', (req, res, next) => {
+  const pathOnly = String(req.originalUrl || '').split('?')[0];
+  if (SCHOOL_SUBSCRIPTION_EXEMPT_API_PREFIXES.some(prefix => pathOnly.startsWith(prefix))) return next();
+  const actor = getSessionAccount(req);
+  if (!actor || hasPlatformAccess(actor) || PLATFORM_INTERNAL_ROLES.has(actor.role)) return next();
+  const access = schoolSubscriptionAccessState(actor);
+  if (access.allowed) return next();
+  return res.status(402).json({
+    code: 'SCHOOL_SUBSCRIPTION_REQUIRED',
+    message: access.status === 'trial_expired'
+      ? 'The school\'s 14-day Little Feet trial has ended. A principal or administrator must activate a school subscription to continue.'
+      : access.status === 'trial_pending'
+        ? 'The school\'s 14-day Little Feet trial has not started yet. A principal or administrator must sign in to activate it.'
+        : 'The school subscription has expired or is inactive. A principal or administrator must renew it to continue.',
+    subscription: access
+  });
+});
 const learnerRecordsVisibleTo = (records, actor) => {
   const schoolRecords = tenantRecords(records, actor);
   if (actor?.role === 'parent') {
@@ -2499,18 +2785,110 @@ app.patch('/api/system-errors/:id', (req, res) => {
 
 const billingBundleSizes = [5, 20, 100];
 const schoolSubscriptionPlans = Object.freeze([
-  Object.freeze({ code: 'micro', name: 'Micro / ECD', maxLearners: 30, monthlyPrice: 350 }),
-  Object.freeze({ code: 'standard', name: 'Standard Primary', maxLearners: 250, monthlyPrice: 1500 }),
-  Object.freeze({ code: 'enterprise', name: 'Enterprise Campus', maxLearners: 1000, monthlyPrice: 7500 })
+  Object.freeze({ code: 'micro', name: 'Micro / ECD', maxLearners: 30, hardMaxLearners: 250, monthlyPrice: 350, overagePerLearner: 10 }),
+  Object.freeze({ code: 'standard', name: 'Standard Primary', maxLearners: 250, hardMaxLearners: 1000, monthlyPrice: 1500, overagePerLearner: 6 }),
+  Object.freeze({ code: 'enterprise', name: 'Enterprise Campus', maxLearners: 1000, hardMaxLearners: 1000, monthlyPrice: 7500, overagePerLearner: 0 })
 ]);
+const schoolLearnerCount = schoolId => (db.students || []).filter(student => student.schoolId === schoolId).length;
+const schoolPlanForCode = code => schoolSubscriptionPlans.find(plan => plan.code === String(code || '').trim().toLowerCase()) || null;
+const planPriceForLearners = (plan, learnerCount) => {
+  const count = Math.max(0, Number(learnerCount) || 0);
+  const overageLearners = Math.max(0, count - plan.maxLearners);
+  return {
+    learnerCount: count,
+    overageLearners,
+    overageRate: plan.overagePerLearner,
+    monthlyTotal: Math.round((plan.monthlyPrice + (overageLearners * plan.overagePerLearner)) * 100) / 100
+  };
+};
+const schoolLearnerLimitState = actor => {
+  const schoolId = accountSchoolId(actor);
+  const school = db.schools.find(entry => entry.id === schoolId);
+  const count = schoolLearnerCount(schoolId);
+  const access = schoolSubscriptionAccessState(actor);
+  if (!school || hasPlatformAccess(actor)) return { allowed: true, learnerCount: count, hardMaxLearners: 1000, planCode: '' };
+  if (access.status === 'trial') return { allowed: count < 1000, learnerCount: count, hardMaxLearners: 1000, planCode: 'trial' };
+  const plan = schoolPlanForCode(school.subscriptionPlanCode);
+  const hardMaxLearners = plan?.hardMaxLearners || 1000;
+  return { allowed: count < hardMaxLearners, learnerCount: count, hardMaxLearners, planCode: plan?.code || '' };
+};
+
+const payFastMode = String(process.env.LF_PAYFAST_MODE || 'live').trim().toLowerCase() === 'sandbox' ? 'sandbox' : 'live';
+const payFastConfigured = () => Boolean(
+  process.env.LF_PAYFAST_MERCHANT_ID && process.env.LF_PAYFAST_MERCHANT_KEY && process.env.LF_PAYFAST_PASSPHRASE
+  && (!isProduction || payFastMode === 'live')
+);
+const payFastHost = () => payFastMode === 'sandbox' ? 'sandbox.payfast.co.za' : 'www.payfast.co.za';
+const payFastProcessUrl = () => `https://${payFastHost()}/eng/process`;
+const payFastValidationUrl = () => process.env.NODE_ENV === 'test' && process.env.LF_PAYFAST_TEST_VALIDATION_URL
+  ? String(process.env.LF_PAYFAST_TEST_VALIDATION_URL)
+  : `https://${payFastHost()}/eng/query/validate`;
+const payFastUrlEncode = value => encodeURIComponent(String(value ?? '').trim())
+  .replace(/%20/g, '+')
+  .replace(/[!'()*~]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+  .replace(/%[0-9a-f]{2}/gi, token => token.toUpperCase());
+const payFastParamString = (entries, passphrase = '') => {
+  const pairs = [];
+  for (const [key, value] of entries) {
+    if (key === 'signature' || value === '' || value == null) continue;
+    pairs.push(`${key}=${payFastUrlEncode(value)}`);
+  }
+  if (passphrase) pairs.push(`passphrase=${payFastUrlEncode(passphrase)}`);
+  return pairs.join('&');
+};
+const payFastSignature = entries => crypto.createHash('md5')
+  .update(payFastParamString(entries, String(process.env.LF_PAYFAST_PASSPHRASE || '')))
+  .digest('hex');
+const payFastRawEntries = req => {
+  if (Buffer.isBuffer(req.rawBody) && req.rawBody.length) return [...new URLSearchParams(req.rawBody.toString('utf8')).entries()];
+  return Object.entries(req.body || {}).map(([key, value]) => [key, String(value ?? '')]);
+};
+const ipv4ToInt = ip => {
+  const parts = String(ip || '').replace(/^::ffff:/, '').split('.').map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return null;
+  return (((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3]) >>> 0;
+};
+const ipv4InCidr = (ip, cidr) => {
+  const [network, bitsText] = cidr.split('/');
+  const bits = Number(bitsText);
+  const address = ipv4ToInt(ip), networkAddress = ipv4ToInt(network);
+  if (address === null || networkAddress === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+  return (address & mask) === (networkAddress & mask);
+};
+const PAYFAST_PUBLISHED_CIDRS = Object.freeze([
+  '197.97.145.144/28', '41.74.179.192/27', '102.216.36.0/28', '102.216.36.128/28', '144.126.193.139/32'
+]);
+let payFastResolvedIps = { expiresAt: 0, values: new Set() };
+const payFastSourceIsValid = async req => {
+  if (process.env.NODE_ENV === 'test' && process.env.LF_PAYFAST_TEST_ALLOW_LOCAL_ITN === '1') return true;
+  const sourceIp = String(req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+  if (PAYFAST_PUBLISHED_CIDRS.some(cidr => ipv4InCidr(sourceIp, cidr))) return true;
+  if (payFastResolvedIps.expiresAt <= Date.now()) {
+    const hosts = ['www.payfast.co.za', 'w1w.payfast.co.za', 'w2w.payfast.co.za', ...(payFastMode === 'sandbox' ? ['sandbox.payfast.co.za'] : [])];
+    const resolved = (await Promise.all(hosts.map(host => dns.resolve4(host).catch(() => [])))).flat();
+    payFastResolvedIps = { expiresAt: Date.now() + (10 * 60 * 1000), values: new Set(resolved) };
+  }
+  return payFastResolvedIps.values.has(sourceIp);
+};
+const payFastServerValidates = async paramString => {
+  const response = await fetch(payFastValidationUrl(), {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: paramString,
+    signal: AbortSignal.timeout(10000)
+  });
+  return response.ok && String(await response.text()).trim() === 'VALID';
+};
+const htmlAttributeEscape = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
 const billingDefaults = () => ({
   pricing: { baseMonthly: 0, bundles: { 5: { costPrice: 0, sellingPrice: 0 }, 20: { costPrice: 0, sellingPrice: 0 }, 100: { costPrice: 0, sellingPrice: 0 } }, lateFeeEnabled: false, lateFee: 0 },
   payment: { method: 'payment_link', paymentLink: '', accountName: '', bankName: '', accountNumberEncrypted: '', payMePayloadEncrypted: '', branchCode: '', referencePrefix: 'LF' },
   orders: []
 });
-const billingPaymentConfigured = (payment) => payment?.method === 'payment_link'
-  ? Boolean(payment.paymentLink)
-  : Boolean(payment?.accountName && payment?.bankName && payment?.accountNumberEncrypted);
+const billingPaymentConfigured = (payment) => payment?.method === 'payfast'
+  ? payFastConfigured()
+  : payment?.method === 'payment_link'
+    ? Boolean(payment.paymentLink)
+    : Boolean(payment?.accountName && payment?.bankName && payment?.accountNumberEncrypted);
 const subscriptionBillingState = (actor = null) => {
   const defaults = billingDefaults();
   const schoolId = actor ? accountSchoolId(actor) : null;
@@ -2562,6 +2940,7 @@ const donationBillingState = () => {
 };
 const paymentInstructions = (billing, reference) => {
   const payment = billing.payment;
+  if (payment.method === 'payfast') return { method: 'PayFast', provider: 'payfast', automaticConfirmation: true, paymentLink: `/api/payments/payfast/checkout?reference=${encodeURIComponent(reference)}`, reference };
   if (payment.method === 'payment_link') return { method: 'Online payment', paymentLink: payment.paymentLink, reference };
   return {
     method: 'Bank transfer', accountName: payment.accountName, bankName: payment.bankName,
@@ -2572,6 +2951,26 @@ const paymentInstructions = (billing, reference) => {
 const dateKeyInSouthAfrica = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit'
 }).format(new Date());
+const schoolSubscriptionAccessState = account => {
+  if (!account || hasPlatformAccess(account) || PLATFORM_INTERNAL_ROLES.has(account.role)) return { allowed: true, active: true, status: 'platform', trialEndsAt: '', activeUntil: '' };
+  const schoolId = accountSchoolId(account);
+  const school = db.schools.find(entry => entry.id === schoolId);
+  if (!school) return { allowed: false, active: false, status: 'unverified', trialEndsAt: '', activeUntil: '' };
+  const activeUntil = /^\d{4}-\d{2}-\d{2}$/.test(String(school.subscriptionActiveUntil || '')) ? String(school.subscriptionActiveUntil) : '';
+  if (school.subscriptionStatus === 'active') {
+    const allowed = !activeUntil || activeUntil >= dateKeyInSouthAfrica();
+    return { allowed, active: allowed, status: allowed ? 'active' : 'expired', planCode: school.subscriptionPlanCode || '', activeUntil, trialEndsAt: school.trialEndsAt || '' };
+  }
+  if (['refunded', 'expired', 'cancelled', 'canceled'].includes(String(school.subscriptionStatus || '').toLowerCase())) {
+    return { allowed: false, active: false, status: String(school.subscriptionStatus).toLowerCase(), planCode: school.subscriptionPlanCode || '', activeUntil, trialEndsAt: school.trialEndsAt || '' };
+  }
+  if (school.subscriptionStatus === 'trial_pending') {
+    return { allowed: false, active: false, status: 'trial_pending', planCode: '', activeUntil, trialStartedAt: '', trialEndsAt: '' };
+  }
+  const trialEndMs = Date.parse(school.trialEndsAt || '');
+  const allowed = Number.isFinite(trialEndMs) && trialEndMs >= Date.now();
+  return { allowed, active: false, status: allowed ? 'trial' : 'trial_expired', planCode: '', activeUntil, trialStartedAt: school.trialStartedAt || '', trialEndsAt: school.trialEndsAt || '' };
+};
 const parentSubscriptionActive = account => {
   if (!account || account.role !== 'parent') return true;
   const grantedUntil = validDateKey(account.parentSubscriptionGrantedUntil);
@@ -2676,6 +3075,134 @@ const findPaymentTarget = (reference, actor = null) => {
   return null;
 };
 const expectedPaymentAmount = target => Number(target.type === 'subscription' ? target.record.monthlyTotal : target.type === 'parent_payment' ? parentPaymentAmount(target.record) : target.record.amount);
+
+const STORE_RESERVATION_TTL_MS = 30 * 60 * 1000;
+const storeProductForOrder = order => (db.storeProducts || []).find(product =>
+  product.id === order?.productId && (!order?.schoolId || product.schoolId === order.schoolId)
+) || null;
+const storeAvailableQuantity = product => Math.max(0, (Number(product?.stockQuantity) || 0) - (Number(product?.reservedQuantity) || 0));
+const updateStoreRoomRecord = (order, status, details) => {
+  const records = Array.isArray(db.moduleRecords?.stock) ? db.moduleRecords.stock : [];
+  const reference = String(order?.reference || '').toUpperCase();
+  const record = records.find(entry =>
+    entry.orderId === order?.id
+    || String(entry.reference || '').toUpperCase() === reference
+    || (reference && String(entry.details || '').toUpperCase().includes(`REF ${reference}`))
+  );
+  if (!record) return;
+  record.status = status;
+  if (details) record.details = details;
+  record.updatedAt = new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' });
+};
+const releaseStoreReservation = (order, timestamp, reason = 'failed') => {
+  const quantity = Math.max(0, Number.parseInt(order?.quantity, 10) || 0);
+  const product = storeProductForOrder(order);
+  if (order?.stockAccountingVersion === 2) {
+    if (order.stockReservationStatus === 'reserved') {
+      if (product) product.reservedQuantity = Math.max(0, (Number(product.reservedQuantity) || 0) - quantity);
+      order.stockReservationStatus = reason === 'expired' ? 'expired' : 'released';
+      order.stockReleasedAt = timestamp;
+    }
+  } else if (!order?.legacyStockRestoredAt) {
+    // Legacy store orders reduced stock at checkout. Restore it once when a payment fails or is refunded.
+    if (product) product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) + quantity);
+    order.legacyStockRestoredAt = timestamp;
+    order.stockReservationStatus = 'returned_legacy';
+  }
+  if (reason === 'expired') {
+    order.status = 'payment expired - stock released';
+    order.fulfilmentStatus = 'payment_expired';
+    updateStoreRoomRecord(order, 'Payment expired · stock released', `Store payment expired · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  } else if (reason === 'cancelled') {
+    order.status = 'cancelled - stock released';
+    order.fulfilmentStatus = 'cancelled';
+    order.cancelledAt = timestamp;
+    updateStoreRoomRecord(order, 'Cancelled · stock released', `Store order cancelled · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  } else if (reason === 'refunded') {
+    order.status = 'refunded - stock returned';
+    order.fulfilmentStatus = 'refunded';
+    updateStoreRoomRecord(order, 'Refunded · stock returned', `Store refund confirmed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  } else {
+    order.status = 'payment failed - stock released';
+    order.fulfilmentStatus = 'payment_failed';
+    updateStoreRoomRecord(order, 'Payment failed · stock released', `Store payment failed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+  }
+};
+const releaseExpiredStoreReservations = (schoolId = '') => {
+  const now = Date.now();
+  (db.storeOrders || []).forEach(order => {
+    if (order.stockAccountingVersion !== 2 || order.stockReservationStatus !== 'reserved') return;
+    if (schoolId && order.schoolId !== schoolId) return;
+    const reservedAt = Date.parse(order.stockReservedAt || order.createdAt || '');
+    if (!Number.isFinite(reservedAt) || now - reservedAt < STORE_RESERVATION_TTL_MS) return;
+    const hasPaidEvent = (db.paymentEvents || []).some(event =>
+      event.status === 'paid' && event.targetType === 'store' && event.schoolId === order.schoolId
+      && String(event.reference || '').toUpperCase() === String(order.reference || '').toUpperCase()
+    );
+    if (!hasPaidEvent) releaseStoreReservation(order, new Date().toISOString(), 'expired');
+  });
+};
+const applyStorePaymentState = (target, normalStatus, timestamp) => {
+  const order = target.record;
+  const quantity = Math.max(0, Number.parseInt(order?.quantity, 10) || 0);
+  const product = storeProductForOrder(order);
+
+  if (normalStatus === 'paid') {
+    if (order.stockAccountingVersion === 2) {
+      if (order.stockReservationStatus === 'reserved') {
+        if (product) {
+          product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) - quantity);
+          product.reservedQuantity = Math.max(0, (Number(product.reservedQuantity) || 0) - quantity);
+        }
+        order.stockReservationStatus = 'consumed';
+        order.stockConsumedAt = timestamp;
+      } else if (['released', 'expired'].includes(order.stockReservationStatus)) {
+        if (product && storeAvailableQuantity(product) >= quantity) {
+          product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) - quantity);
+          order.stockReservationStatus = 'consumed_after_release';
+          order.stockConsumedAt = timestamp;
+        } else {
+          order.stockReservationStatus = 'paid_stock_review';
+        }
+      }
+    } else {
+      order.stockReservationStatus = order.stockReservationStatus || 'consumed_legacy';
+    }
+    const needsReview = order.stockReservationStatus === 'paid_stock_review';
+    order.status = needsReview ? 'paid - stock review required' : 'paid - ready to prepare';
+    order.fulfilmentStatus = needsReview ? 'stock_review_required' : 'ready_to_prepare';
+    updateStoreRoomRecord(
+      order,
+      needsReview ? 'PAID · STOCK REVIEW REQUIRED' : 'PAID · READY TO PREPARE',
+      `Paid store order · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`
+    );
+    return;
+  }
+
+  if (normalStatus === 'failed') {
+    releaseStoreReservation(order, timestamp, 'failed');
+    return;
+  }
+
+  if (normalStatus === 'refunded') {
+    if (order.stockAccountingVersion === 2 && ['consumed', 'consumed_after_release'].includes(order.stockReservationStatus)) {
+      if (product) product.stockQuantity = Math.max(0, (Number(product.stockQuantity) || 0) + quantity);
+      order.stockReservationStatus = 'returned';
+      order.stockReturnedAt = timestamp;
+      order.status = 'refunded - stock returned';
+      order.fulfilmentStatus = 'refunded';
+      updateStoreRoomRecord(order, 'Refunded · stock returned', `Store refund confirmed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+    } else if (order.stockReservationStatus === 'paid_stock_review') {
+      order.status = 'refunded - no stock adjustment required';
+      order.fulfilmentStatus = 'refunded';
+      order.stockReservationStatus = 'refunded_without_stock';
+      order.stockReturnedAt = timestamp;
+      updateStoreRoomRecord(order, 'Refunded · no stock adjustment', `Store refund confirmed · ${order.productName} × ${quantity} · ${order.parentName} · Ref ${order.reference}`);
+    } else {
+      releaseStoreReservation(order, timestamp, 'refunded');
+    }
+  }
+};
 const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransactionId, source, receivedAt }, actor = null) => {
   if (!Array.isArray(db.paymentEvents)) db.paymentEvents = [];
   if (!Array.isArray(db.paymentLedger)) db.paymentLedger = [];
@@ -2690,7 +3217,13 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
   const settledEvent = db.paymentEvents.find(event => event.status === 'paid'
     && event.targetType === target.type && event.schoolId === target.schoolId
     && String(event.reference || '').toUpperCase() === String(target.record.reference || '').toUpperCase());
+  const refundedEvent = db.paymentEvents.find(event => event.status === 'refunded'
+    && event.targetType === target.type && event.schoolId === target.schoolId
+    && String(event.reference || '').toUpperCase() === String(target.record.reference || '').toUpperCase());
   if (normalStatus === 'paid' && settledEvent) return { duplicate: true, event: settledEvent, target: target.record };
+  if (normalStatus === 'refunded' && target.type !== 'parent_payment' && refundedEvent) return { duplicate: true, event: refundedEvent, target: target.record };
+  if (normalStatus === 'refunded' && target.type !== 'parent_payment' && !settledEvent) return { error: 'A payment can be refunded only after it has been confirmed as paid.' };
+  if (target.type === 'store' && normalStatus === 'failed' && settledEvent) return { error: 'A paid store order cannot be changed back to failed.' };
   if (numericAmount === null || numericAmount <= 0) return { error: 'Payment amount must be greater than zero.' };
   if (target.type === 'parent_payment') {
     const current = parentPaymentFinancials(target.record);
@@ -2724,6 +3257,8 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
     if (school && normalStatus === 'paid') {
       school.subscriptionStatus = 'active';
       school.subscriptionPlanCode = target.record.planCode || '';
+      school.subscriptionLearnerCapacity = target.record.learnerCapacity || 0;
+      school.subscriptionHardMaxLearners = target.record.hardMaxLearners || 0;
       school.subscriptionActivatedAt = timestamp;
       school.subscriptionActiveUntil = extendSubscriptionDate(school.subscriptionActiveUntil, timestamp);
       target.record.activeUntil = school.subscriptionActiveUntil;
@@ -2731,6 +3266,8 @@ const applyPaymentEvent = ({ eventId, reference, status, amount, providerTransac
       school.subscriptionStatus = 'refunded';
       school.subscriptionActiveUntil = '';
     }
+  } else if (target.type === 'store') {
+    applyStorePaymentState(target, normalStatus, timestamp);
   }
   db.paymentEvents.unshift(event);
   db.paymentLedger.unshift({
@@ -2753,12 +3290,13 @@ app.get('/api/subscription-billing', (req, res) => {
     pricing: publicBillingPricing(billing, isAdmin),
     plans: schoolSubscriptionPlans.map(plan => ({ ...plan })),
     paymentConfigured: billingPaymentConfigured(billing.payment),
+    payfastAvailable: payFastConfigured(),
     subscription: school ? {
-      active: school.subscriptionStatus === 'active' && (!validDateKey(school.subscriptionActiveUntil) || school.subscriptionActiveUntil >= dateKeyInSouthAfrica()),
-      status: school.subscriptionStatus || 'trial',
-      planCode: school.subscriptionPlanCode || '',
-      activeUntil: validDateKey(school.subscriptionActiveUntil)
-    } : { active: false, status: 'unverified', planCode: '', activeUntil: '' },
+      ...schoolSubscriptionAccessState(actor),
+      learnerCount: schoolLearnerCount(accountSchoolId(actor)),
+      learnerCapacity: Number(school.subscriptionLearnerCapacity || 0),
+      hardMaxLearners: Number(school.subscriptionHardMaxLearners || 0)
+    } : { allowed: false, active: false, status: 'unverified', planCode: '', activeUntil: '', trialEndsAt: '' },
     payment: isAdmin ? { ...adminPayment, accountNumber: decryptField(accountNumberEncrypted), capitecPayMeConfigured: Boolean(decryptField(payMePayloadEncrypted)) } : undefined,
     orders: billing.orders.filter(order => !order.schoolId || order.schoolId === accountSchoolId(actor)).map(order => ({ ...order, profitMargin: isAdmin ? order.profitMargin : undefined }))
   });
@@ -2777,7 +3315,8 @@ app.put('/api/subscription-billing', async (req, res) => {
     bundles[capacity] = { costPrice, sellingPrice };
   }
   if (baseMonthly === null || lateFee === null) return res.status(400).json({ message: 'Enter valid non-negative pricing amounts.' });
-  const paymentMethod = req.body?.payment?.method === 'bank_transfer' ? 'bank_transfer' : 'payment_link';
+  const requestedPaymentMethod = String(req.body?.payment?.method || 'payment_link').trim().toLowerCase();
+  const paymentMethod = ['bank_transfer', 'payfast'].includes(requestedPaymentMethod) ? requestedPaymentMethod : 'payment_link';
   const rawPaymentLink = limitedText(req.body?.payment?.paymentLink || '', 2048);
   const accountName = limitedText(req.body?.payment?.accountName || '', 160);
   const bankName = limitedText(req.body?.payment?.bankName || '', 160);
@@ -2790,6 +3329,8 @@ app.put('/api/subscription-billing', async (req, res) => {
   const paymentLink = rawPaymentLink ? safeHttpsUrl(rawPaymentLink) : '';
   if (paymentMethod === 'payment_link') {
     if (!paymentLink) return res.status(400).json({ message: 'Enter a valid HTTPS payment link without embedded credentials.' });
+  } else if (paymentMethod === 'payfast') {
+    if (!payFastConfigured()) return res.status(409).json({ message: 'PayFast automatic confirmation is not configured on the server yet.' });
   } else if (!accountName || !bankName || !accountNumber) {
     return res.status(400).json({ message: 'Account name, bank name, and account number are required for bank transfers.' });
   }
@@ -2804,7 +3345,7 @@ app.put('/api/subscription-billing', async (req, res) => {
     ? (capitecPayMePayload ? encryptField(capitecPayMePayload) : '')
     : String(billing.payment.payMePayloadEncrypted || '');
   billing.pricing = { baseMonthly, bundles, lateFeeEnabled: Boolean(req.body?.lateFeeEnabled), lateFee };
-  billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', payMePayloadEncrypted, branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
+  billing.payment = { method: paymentMethod, paymentLink: paymentMethod === 'payment_link' ? paymentLink : '', accountName: paymentMethod === 'bank_transfer' ? accountName : '', bankName: paymentMethod === 'bank_transfer' ? bankName : '', accountNumberEncrypted: paymentMethod === 'bank_transfer' ? encryptField(accountNumber) : '', payMePayloadEncrypted: paymentMethod === 'bank_transfer' ? payMePayloadEncrypted : '', branchCode: paymentMethod === 'bank_transfer' ? branchCode : '', referencePrefix };
   billing.updatedAt = new Date().toISOString();
   db.subscriptionBilling = {
     ...billing,
@@ -2844,10 +3385,17 @@ app.post('/api/subscription-billing/orders', (req, res) => {
   if (!requestedPlan && billing.pricing.baseMonthly <= 0) return res.status(409).json({ message: 'Choose one of the published school plans.' });
   if (!requestedPlan && requestedBundle && bundle.sellingPrice <= 0) return res.status(409).json({ message: 'That learner bundle is not available yet. Ask an administrator to set its selling price.' });
   const reference = `${billing.payment.referencePrefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const monthlyTotal = requestedPlan ? requestedPlan.monthlyPrice : Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
+  const currentLearners = schoolLearnerCount(accountSchoolId(actor));
+  if (requestedPlan && currentLearners > requestedPlan.hardMaxLearners) {
+    return res.status(409).json({ message: `${requestedPlan.name} supports up to ${requestedPlan.hardMaxLearners.toLocaleString('en-ZA')} learners including paid overage. Choose a larger package.` });
+  }
+  const planCharge = requestedPlan ? planPriceForLearners(requestedPlan, currentLearners) : null;
+  const monthlyTotal = requestedPlan ? planCharge.monthlyTotal : Math.round((billing.pricing.baseMonthly + bundle.sellingPrice) * 100) / 100;
   const order = {
     id: crypto.randomUUID(), reference, schoolId: accountSchoolId(actor), schoolName: actor.schoolName, requestedBy: actor.username,
     planCode: requestedPlan?.code || '', planName: requestedPlan?.name || '', learnerCapacity: requestedPlan?.maxLearners || 0,
+    hardMaxLearners: requestedPlan?.hardMaxLearners || 0, learnerCount: requestedPlan ? currentLearners : 0,
+    overageLearners: requestedPlan ? planCharge.overageLearners : 0, overageRate: requestedPlan ? planCharge.overageRate : 0,
     baseMonthly: requestedPlan ? requestedPlan.monthlyPrice : billing.pricing.baseMonthly, bundleCapacity: requestedPlan ? 0 : requestedBundle, bundlePrice: requestedPlan ? 0 : bundle.sellingPrice,
     monthlyTotal, lateFeeAccepted: Boolean(req.body?.lateFeeAccepted), lateFee: Boolean(req.body?.lateFeeAccepted) && billing.pricing.lateFeeEnabled ? billing.pricing.lateFee : 0,
     profitMargin: requestedPlan ? 0 : Math.round((bundle.sellingPrice - bundle.costPrice) * 100) / 100,
@@ -3110,6 +3658,81 @@ app.post('/api/payments/reconcile', (req, res) => {
   }, actor);
   if (result.error) return res.status(400).json({ message: result.error });
   res.status(result.duplicate ? 200 : 201).json({ success: true, duplicate: result.duplicate, event: result.event });
+});
+
+app.get('/api/payments/payfast/checkout', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).send('Sign in to continue to payment.');
+  if (!payFastConfigured()) return res.status(503).send('PayFast automatic payment confirmation is not configured.');
+  const reference = String(req.query?.reference || '').trim().toUpperCase();
+  const target = findPaymentTarget(reference, actor);
+  if (!target) return res.status(404).send('Payment request not found.');
+  const billing = subscriptionBillingState(actor);
+  if (billing.payment.method !== 'payfast') return res.status(409).send('This payment request is not configured for PayFast.');
+  const amount = expectedPaymentAmount(target);
+  if (!Number.isFinite(amount) || amount <= 0) return res.status(400).send('Payment amount is invalid.');
+  const origin = publicOrigin();
+  const nameParts = String(actor.name || actor.username || 'Little Feet customer').trim().split(/\s+/);
+  const fields = [
+    ['merchant_id', String(process.env.LF_PAYFAST_MERCHANT_ID || '')],
+    ['merchant_key', String(process.env.LF_PAYFAST_MERCHANT_KEY || '')],
+    ['return_url', `${origin}/?payment=complete&reference=${encodeURIComponent(reference)}`],
+    ['cancel_url', `${origin}/?payment=cancelled&reference=${encodeURIComponent(reference)}`],
+    ['notify_url', `${origin}/api/payments/payfast/itn`],
+    ['name_first', nameParts[0] || 'Customer'],
+    ['name_last', nameParts.slice(1).join(' ') || ''],
+    ['email_address', /^\S+@\S+\.\S+$/.test(String(actor.username || '')) ? actor.username : ''],
+    ['m_payment_id', reference],
+    ['amount', amount.toFixed(2)],
+    ['item_name', String(target.record.planName || target.record.description || target.record.productName || 'Little Feet payment').slice(0, 100)],
+    ['item_description', `Little Feet ${target.type.replaceAll('_', ' ')} · ${reference}`.slice(0, 255)]
+  ];
+  const signature = payFastSignature(fields);
+  const hiddenFields = [...fields, ['signature', signature]].filter(([, value]) => value !== '').map(([name, value]) => `<input type="hidden" name="${htmlAttributeEscape(name)}" value="${htmlAttributeEscape(value)}">`).join('');
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Continue to PayFast</title></head><body><form id="payfast" method="post" action="${htmlAttributeEscape(payFastProcessUrl())}">${hiddenFields}<noscript><button type="submit">Continue to PayFast</button></noscript></form><script>document.getElementById('payfast').submit();</script></body></html>`);
+});
+
+app.post('/api/payments/payfast/itn', async (req, res) => {
+  if (!payFastConfigured()) return res.status(503).send('PayFast is not configured.');
+  const entries = payFastRawEntries(req);
+  const data = Object.fromEntries(entries);
+  const suppliedSignature = String(data.signature || '').trim().toLowerCase();
+  const merchantId = String(data.merchant_id || '').trim();
+  const reference = String(data.m_payment_id || '').trim().toUpperCase();
+  const providerPaymentId = String(data.pf_payment_id || '').trim();
+  const amount = Number(data.amount_gross);
+  if (merchantId !== String(process.env.LF_PAYFAST_MERCHANT_ID || '').trim()) return res.status(401).send('Invalid merchant.');
+  if (!/^[0-9a-f]{32}$/.test(suppliedSignature)) return res.status(401).send('Invalid signature.');
+  const unsignedEntries = entries.filter(([key]) => key !== 'signature');
+  const paramString = payFastParamString(unsignedEntries);
+  const expectedSignature = crypto.createHash('md5').update(`${paramString}&passphrase=${payFastUrlEncode(String(process.env.LF_PAYFAST_PASSPHRASE || ''))}`).digest('hex');
+  const suppliedBuffer = Buffer.from(suppliedSignature, 'hex'), expectedBuffer = Buffer.from(expectedSignature, 'hex');
+  if (suppliedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(suppliedBuffer, expectedBuffer)) return res.status(401).send('Invalid signature.');
+  if (!await payFastSourceIsValid(req)) return res.status(401).send('Invalid PayFast source.');
+  const target = findPaymentTarget(reference);
+  if (!target) return res.status(404).send('Unknown payment reference.');
+  const expectedAmount = expectedPaymentAmount(target);
+  if (!Number.isFinite(amount) || Math.abs(amount - expectedAmount) > 0.01) return res.status(400).send('Payment amount mismatch.');
+  let confirmed = false;
+  try { confirmed = await payFastServerValidates(paramString); } catch (error) {
+    logStructured('error', 'payments.payfast_validation_failed', { category: 'payments', message: error.message, result: 'failed' });
+    return res.status(503).send('Unable to validate payment with PayFast.');
+  }
+  if (!confirmed) return res.status(401).send('PayFast did not validate this notification.');
+  const paymentStatus = String(data.payment_status || '').trim().toUpperCase();
+  if (paymentStatus !== 'COMPLETE' && paymentStatus !== 'CANCELLED') return res.status(200).send('IGNORED');
+  const result = applyPaymentEvent({
+    eventId: `payfast:${providerPaymentId || crypto.createHash('sha256').update(paramString).digest('hex').slice(0, 32)}`,
+    reference,
+    status: paymentStatus === 'COMPLETE' ? 'paid' : 'failed',
+    amount,
+    providerTransactionId: providerPaymentId,
+    source: 'payfast-itn',
+    receivedAt: new Date().toISOString()
+  });
+  if (result.error) return res.status(400).send(result.error);
+  res.status(200).json({ success: true, duplicate: result.duplicate });
 });
 
 app.post('/api/payments/webhook', (req, res) => {
@@ -3567,7 +4190,7 @@ app.post('/api/term', (req, res) => {
   res.json({ term: db.schoolTerms[accountSchoolId(actor)] || db.term });
 });
 
-const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet']);
+const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet', 'dsd_incident']);
 const fileContentPath = file => `/api/files/${encodeURIComponent(file.id)}/content`;
 const publicFileMetadata = file => ({
   id: file.id, entityType: file.entityType, recordId: file.recordId, purpose: file.purpose,
@@ -3583,6 +4206,14 @@ const relatedRecordForFile = (file, actor) => {
   if (file.entityType === 'school') return db.schools.find(item => item.id === file.recordId && item.id === accountSchoolId(actor));
   if (file.entityType === 'post') return db.posts.find(item => item.id === file.recordId && recordInSchool(item, actor));
   if (file.entityType === 'worksheet') return learnerRecordsVisibleTo(db.worksheets, actor).find(item => item.id === file.recordId);
+  if (file.entityType === 'dsd_incident') {
+    const incident = (db.dsdIncidents || []).find(item => item.id === file.recordId && recordInSchool(item, actor));
+    if (!incident) return null;
+    if (hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role)) return incident;
+    if (actor.role !== 'parent') return null;
+    const learner = tenantRecords(db.students, actor).find(item => normalizeComparableText(item.studentName) === normalizeComparableText(incident.learnerName));
+    return learner && isParentLinkedToLearner(actor, learner) ? incident : null;
+  }
   return null;
 };
 const canManageFile = (file, actor) => Boolean(actor && recordInSchool(file, actor)
@@ -4207,7 +4838,14 @@ const emailDeliveryProvider = () => {
   return 'Not configured';
 };
 
-const smtpSend = async ({to,subject,text}) => {
+const emailHtmlText = value => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const smtpSend = async ({to,subject,text,html}) => {
   const config = smtpConfig();
   if (!smtpEmailConfigured()) return false;
   if (config.port !== 465) throw new Error('Little Feet SMTP currently requires implicit TLS on port 465.');
@@ -4289,19 +4927,38 @@ const smtpSend = async ({to,subject,text}) => {
     await command('DATA', [354], 'data');
 
     const cleanSubject = emailHeaderText(subject || 'Little Feet');
-    const cleanText = String(text || '').replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+    const cleanText = String(text || '').replace(/\r?\n/g, '\r\n');
+    const cleanHtml = String(html || '').replace(/\r?\n/g, '\r\n');
     const fromHeader = config.fromName ? `${config.fromName} <${config.from}>` : config.from;
-    const message = [
+    const messageHeaders = [
       `From: ${fromHeader}`,
       `To: ${to}`,
       `Subject: ${cleanSubject}`,
       'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=utf-8',
-      'Content-Transfer-Encoding: 8bit',
-      `Date: ${new Date().toUTCString()}`,
-      '',
-      cleanText
-    ].join('\r\n');
+      `Date: ${new Date().toUTCString()}`
+    ];
+    let messageBody;
+    if (cleanHtml) {
+      const boundary = `lf-alt-${crypto.randomBytes(12).toString('hex')}`;
+      messageHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+      messageBody = [
+        `--${boundary}`,
+        'Content-Type: text/plain; charset=utf-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        cleanText,
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        cleanHtml,
+        `--${boundary}--`
+      ].join('\r\n');
+    } else {
+      messageHeaders.push('Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit');
+      messageBody = cleanText;
+    }
+    const message = `${messageHeaders.join('\r\n')}\r\n\r\n${messageBody}`.replace(/^\./gm, '..');
     socket.write(`${message}\r\n.\r\n`);
     await expect([250], 'message delivery');
     socket.write('QUIT\r\n');
@@ -4314,15 +4971,21 @@ const smtpSend = async ({to,subject,text}) => {
   }
 };
 
-const sendLittleFeetEmail = async ({to,subject,text}) => {
+const sendLittleFeetEmail = async ({to,subject,text,html}) => {
   if (!looksLikeEmailAddress(to)) return false;
-  if (smtpEmailConfigured()) return smtpSend({to,subject,text});
+  if (smtpEmailConfigured()) return smtpSend({to,subject,text,html});
 
   const from=String(process.env.LF_EMAIL_FROM||'').trim(),apiKey=String(process.env.LF_EMAIL_API_KEY||'').trim();
   if(!looksLikeEmailAddress(from)||!apiKey)return false;
-  const endpoint=safeHttpsUrl(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails');
+  const rawEndpoint=String(process.env.LF_EMAIL_API_URL||'https://api.resend.com/emails').trim();
+  const testLoopbackEndpoint=process.env.NODE_ENV==='test' && /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/i.test(rawEndpoint)
+    ? rawEndpoint
+    : '';
+  const endpoint=safeHttpsUrl(rawEndpoint)||testLoopbackEndpoint;
   if(!endpoint)throw new Error('Invalid LF_EMAIL_API_URL');
-  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({from,to:[to],subject:emailHeaderText(subject),text:String(text||'')})});
+  const payload={from,to:[to],subject:emailHeaderText(subject),text:String(text||'')};
+  if(String(html||'').trim())payload.html=String(html);
+  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify(payload)});
   if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
   return true;
 };
@@ -5791,8 +6454,19 @@ app.get('/api/store', (req, res) => {
   const user = getSessionAccount(req);
   if (!user) return res.status(401).json({ message: 'Sign in to view the school store.' });
   const schoolName = user.schoolName || 'Your school';
-  const products = tenantRecords(db.storeProducts || [], user).filter(product => product.active !== false).map(({ schoolName: _schoolName, schoolId: _schoolId, ...product }) => product);
-  res.json({ schoolName, products, canManage: isAdminLike(user), webStoreUrl: user.schoolStoreUrl || null });
+  const schoolId = accountSchoolId(user);
+  releaseExpiredStoreReservations(schoolId);
+  const canManage = isAdminLike(user);
+  const products = tenantRecords(db.storeProducts || [], user).filter(product => product.active !== false).map(({ schoolName: _schoolName, schoolId: _schoolId, ...product }) => {
+    const physicalStockQuantity = Math.max(0, Number(product.stockQuantity) || 0);
+    const reservedQuantity = Math.max(0, Number(product.reservedQuantity) || 0);
+    return {
+      ...product,
+      stockQuantity: Math.max(0, physicalStockQuantity - reservedQuantity),
+      ...(canManage ? { physicalStockQuantity, reservedQuantity } : {})
+    };
+  });
+  res.json({ schoolName, products, canManage, webStoreUrl: user.schoolStoreUrl || null });
 });
 app.post('/api/store/products', (req, res) => {
   const actor = requireAdmin(req);
@@ -5802,7 +6476,7 @@ app.post('/api/store/products', (req, res) => {
   const stockQuantity = Number.parseInt(req.body?.stockQuantity, 10);
   if (!name || price === null || price <= 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) return res.status(400).json({ message: 'Enter an item name, a price greater than zero, and a valid stock quantity.' });
   if (!Array.isArray(db.storeProducts)) db.storeProducts = [];
-  const product = tagSchoolRecord(actor, { id: crypto.randomUUID(), name, price, stockQuantity, active: true, createdAt: new Date().toISOString(), createdBy: actor.username });
+  const product = tagSchoolRecord(actor, { id: crypto.randomUUID(), name, price, stockQuantity, reservedQuantity: 0, active: true, createdAt: new Date().toISOString(), createdBy: actor.username });
   db.storeProducts.unshift(product);
   res.status(201).json({ success: true, product });
 });
@@ -5820,21 +6494,82 @@ app.post('/api/store/orders', (req, res) => {
   const product = (db.storeProducts || []).find(entry => entry.id === req.body?.productId && entry.active !== false && recordInSchool(entry, actor));
   const quantity = Number.parseInt(req.body?.quantity, 10);
   if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) return res.status(400).json({ message: 'Choose an available store item and quantity.' });
-  if (product.stockQuantity < quantity) return res.status(409).json({ message: 'The requested quantity is not currently available.' });
+  const schoolId = accountSchoolId(actor);
+  releaseExpiredStoreReservations(schoolId);
+  if (storeAvailableQuantity(product) < quantity) return res.status(409).json({ message: 'The requested quantity is not currently available.' });
   const billing = subscriptionBillingState(actor);
   if (!billingPaymentConfigured(billing.payment)) return res.status(409).json({ message: 'The school payment destination is not configured yet.' });
-  product.stockQuantity -= quantity;
+  product.reservedQuantity = Math.max(0, Number(product.reservedQuantity) || 0) + quantity;
   const reference = `${billing.payment.referencePrefix}-STORE-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  const order = tagSchoolRecord(actor, { id: crypto.randomUUID(), reference, productId: product.id, productName: product.name, quantity, amount: Math.round(product.price * quantity * 100) / 100, parentUsername: actor.username, parentName: actor.name || actor.username, status: 'awaiting payment and preparation', createdAt: new Date().toISOString() });
+  const timestamp = new Date().toISOString();
+  const order = tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), reference, productId: product.id, productName: product.name, quantity,
+    amount: Math.round(product.price * quantity * 100) / 100,
+    parentUsername: actor.username, parentName: actor.name || actor.username,
+    status: 'awaiting payment', paymentStatus: 'awaiting_payment', fulfilmentStatus: 'awaiting_payment',
+    stockAccountingVersion: 2, stockReservationStatus: 'reserved', stockReservedAt: timestamp,
+    createdAt: timestamp
+  });
   if (!Array.isArray(db.storeOrders)) db.storeOrders = [];
   db.storeOrders.unshift(order);
-  db.moduleRecords.stock.unshift(tagSchoolRecord(actor, { id: crypto.randomUUID(), details: `Store order to prepare · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`, source: 'school-store', status: 'Awaiting payment and preparation', createdAt: new Date().toLocaleString() }));
-  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference) });
+  db.moduleRecords.stock.unshift(tagSchoolRecord(actor, {
+    id: crypto.randomUUID(), orderId: order.id, reference,
+    details: `Store order awaiting payment · ${product.name} × ${quantity} · ${order.parentName} · Ref ${reference}`,
+    source: 'school-store', status: 'Awaiting payment', createdAt: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })
+  }));
+  res.status(201).json({ success: true, order, payment: paymentInstructions(billing, reference), reservationExpiresAt: new Date(Date.parse(timestamp) + STORE_RESERVATION_TTL_MS).toISOString() });
 });
 app.get('/api/store/orders', (req, res) => {
   const actor = getSessionAccount(req);
-  if (!actor || !(hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Stock-room access is required.' });
-  res.json(tenantRecords(db.storeOrders || [], actor));
+  if (!actor || !(hasPlatformAccess(actor) || ['parent', 'teacher', 'principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'School-store order access is required.' });
+  releaseExpiredStoreReservations(accountSchoolId(actor));
+  let orders = tenantRecords(db.storeOrders || [], actor);
+  if (actor.role === 'parent') orders = orders.filter(order => normalizeUsername(order.parentUsername) === normalizeUsername(actor.username));
+  res.json(orders.map(order => ({
+    id: order.id, reference: order.reference, productId: order.productId, productName: order.productName,
+    quantity: order.quantity, amount: order.amount, parentName: order.parentName,
+    status: order.status, paymentStatus: order.paymentStatus || 'awaiting_payment',
+    fulfilmentStatus: order.fulfilmentStatus || '', stockReservationStatus: order.stockReservationStatus || '',
+    createdAt: order.createdAt, paidAt: order.paidAt || '', refundedAt: order.refundedAt || '',
+    stockReservedAt: order.stockReservedAt || '', stockReleasedAt: order.stockReleasedAt || '',
+    fulfilmentUpdatedAt: order.fulfilmentUpdatedAt || ''
+  })));
+});
+
+app.post('/api/store/orders/:id/cancel', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in to cancel a store order.' });
+  const order = (db.storeOrders || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!order) return res.status(404).json({ message: 'Store order not found.' });
+  const ownsOrder = actor.role === 'parent' && normalizeUsername(order.parentUsername) === normalizeUsername(actor.username);
+  const canManage = hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role);
+  if (!ownsOrder && !canManage) return res.status(403).json({ message: 'You cannot cancel this store order.' });
+  if (order.paymentStatus === 'paid') return res.status(409).json({ message: 'A paid order cannot be cancelled. Confirm the actual refund first, then record that refund in Little Feet.' });
+  if (['cancelled', 'refunded', 'collected'].includes(String(order.fulfilmentStatus || '').toLowerCase())) return res.json({ success: true, order });
+  releaseStoreReservation(order, new Date().toISOString(), 'cancelled');
+  res.json({ success: true, order });
+});
+
+app.patch('/api/store/orders/:id/fulfilment', (req, res) => {
+  const actor = getSessionAccount(req);
+  if (!actor || !(hasPlatformAccess(actor) || ['principal', 'admin', 'staff'].includes(actor.role))) return res.status(403).json({ message: 'Only authorised store staff can update order fulfilment.' });
+  const order = (db.storeOrders || []).find(entry => entry.id === req.params.id && recordInSchool(entry, actor));
+  if (!order) return res.status(404).json({ message: 'Store order not found.' });
+  if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'The order must have a confirmed payment before fulfilment can change.' });
+  if (order.fulfilmentStatus === 'refunded') return res.status(409).json({ message: 'A refunded order cannot be fulfilled.' });
+  const next = String(req.body?.status || '').trim().toLowerCase();
+  const labels = {
+    preparing: ['preparing', 'PAID · PREPARING'],
+    ready_for_collection: ['ready for collection', 'PAID · READY FOR COLLECTION'],
+    collected: ['collected', 'PAID · COLLECTED']
+  };
+  if (!labels[next]) return res.status(400).json({ message: 'Choose preparing, ready for collection, or collected.' });
+  order.fulfilmentStatus = next;
+  order.status = labels[next][0];
+  order.fulfilmentUpdatedAt = new Date().toISOString();
+  order.fulfilmentUpdatedBy = actor.username;
+  updateStoreRoomRecord(order, labels[next][1], `Store order ${labels[next][0]} · ${order.productName} × ${order.quantity} · ${order.parentName} · Ref ${order.reference}`);
+  res.json({ success: true, order });
 });
 
 // Internal operational records for the advanced workspaces. External providers are configured separately.
@@ -6043,6 +6778,8 @@ app.post('/api/registry', (req, res) => {
     && normalizeComparableText(student.className) === normalizeComparableText(className)
   );
   if (!learner) {
+    const learnerLimit = schoolLearnerLimitState(actor);
+    if (!learnerLimit.allowed) return res.status(409).json({ message: `The ${learnerLimit.planCode || 'current'} school package has reached its ${learnerLimit.hardMaxLearners.toLocaleString('en-ZA')}-learner limit. Renew or move to a larger package before adding another learner.` });
     learner = tagSchoolRecord(actor, {
       id: crypto.randomUUID(),
       studentName: learnerName,
@@ -6440,6 +7177,8 @@ app.post('/api/students/import', (req, res) => {
   const seenInFile = new Set();
   const rejected = [];
   let imported = 0;
+  const learnerLimit = schoolLearnerLimitState(actor);
+  let remainingCapacity = Math.max(0, learnerLimit.hardMaxLearners - learnerLimit.learnerCount);
 
   incoming.forEach((row, index) => {
     const studentName = boundedText(row?.studentName, 160);
@@ -6454,6 +7193,10 @@ app.post('/api/students/import', (req, res) => {
     const key = recordKey(candidate);
     if (knownRecords.has(key) || seenInFile.has(key)) {
       rejected.push({ row: batchNumber * 500 + index + 2, reason: 'Duplicate learner record already exists.' });
+      return;
+    }
+    if (remainingCapacity <= 0) {
+      rejected.push({ row: batchNumber * 500 + index + 2, reason: `School package learner limit reached (${learnerLimit.hardMaxLearners}). Renew or move to a larger package before importing more learners.` });
       return;
     }
     seenInFile.add(key);
@@ -6473,6 +7216,7 @@ app.post('/api/students/import', (req, res) => {
     db.students.push(learner);
     ensureLearnerAccessCode(actor, learner);
     imported += 1;
+    remainingCapacity -= 1;
   });
 
   job.processedBatches.push({ batchNumber, imported, rejected: rejected.length, rejectedRows: rejected.slice(0, 100), rejectedRowsTruncated: rejected.length > 100, processedAt: new Date().toISOString() });
@@ -6555,7 +7299,7 @@ app.get('/auth/google/callback',
   (req, res) => {
     const { account, error } = resolveOAuthAccount('google', req.user, db.users);
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
-    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=google'));
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=google'), 'google');
   }
 );
 
@@ -6597,7 +7341,7 @@ app.get('/auth/yahoo/callback', async (req, res) => {
     if (!profileResponse.ok) throw new Error('Yahoo profile request failed');
     const { account, error } = resolveOAuthAccount('yahoo', profile, db.users);
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
-    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'));
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=yahoo'), 'yahoo');
   } catch (error) {
     logStructured('error', 'oauth.yahoo_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=yahoo-sign-in-failed');
@@ -6655,15 +7399,25 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     if (!profileResponse.ok) throw new Error('Microsoft profile request failed');
     const { account, error } = resolveOAuthAccount('microsoft', profile, db.users);
     if (error) return res.redirect(`/?oauthError=${encodeURIComponent(error)}`);
-    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'));
+    establishAuthenticatedSession(req, account, error => res.redirect(error ? '/?oauthError=session-failed' : '/?oauth=microsoft'), 'microsoft');
   } catch (error) {
     logStructured('error', 'oauth.microsoft_signin_failed', { category: 'authentication', requestId: req.requestId, method: req.method, route: req.path, message: error.message });
     res.redirect('/?oauthError=microsoft-sign-in-failed');
   }
 });
 
+if (typeof registerSchoolCoreUpgrades === 'function') {
+  registerSchoolCoreUpgrades(app, {
+    db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
+    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+    isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
+    validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
+    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured
+  });
+}
+
 app.use((req, res, next) => {
-  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
+  const blockedFile = /^\/(?:\.env(?:\.[^/]+)?|server\.js|backup-server\.js|auth-crypto\.js|finance-automation-server\.js|school-core-upgrades-server\.js|littlefeet-replica\.json|(?:littlefeet|littlesteps)\.(?:db|sqlite|sqlite3)(?:-(?:shm|wal))?|package(?:-lock)?\.json|\.render-deploy-release\.json|create_portal_documents\.py|npm-debug\.log)$/i.test(req.path);
   const blockedDirectory = /^\/(?:\.git|\.github|node_modules|output|tests|tmp|uploads|scripts|lib)(?:\/|$)/i.test(req.path);
   const blockedSourceMap = /\.map$/i.test(req.path);
   if (blockedFile || blockedDirectory || blockedSourceMap) {

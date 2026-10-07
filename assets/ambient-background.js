@@ -19,14 +19,22 @@
     return document.body.classList.contains('portal-active') ? (portalVideo || loginVideo) : (loginVideo || portalVideo);
   }
 
+  function translated(key, fallback) {
+    return window.translateLittleFeetText?.(key) || fallback;
+  }
+
   function render() {
     const active = activeVideo();
     const unavailable = active?.dataset.playbackState === 'error';
     const paused = !active || active.paused;
-    button.textContent = unavailable ? 'Background unavailable' : (paused ? 'Play background' : 'Pause background');
+    button.textContent = unavailable
+      ? translated('backgroundUnavailable', 'Background unavailable')
+      : (paused ? translated('playBackground', 'Play background') : translated('pauseBackground', 'Pause background'));
     button.setAttribute('aria-pressed', String(!paused && !unavailable));
     button.disabled = reducedMotion.matches || unavailable;
-    button.title = reducedMotion.matches ? 'Background motion follows your reduced-motion setting' : button.textContent;
+    button.title = reducedMotion.matches
+      ? translated('reducedMotionBackground', 'Background motion follows your reduced-motion setting')
+      : button.textContent;
   }
 
   async function sync() {
@@ -70,6 +78,7 @@
     });
   });
 
+  window.addEventListener('littlefeet:languagechange', render);
   document.addEventListener('visibilitychange', sync);
   document.addEventListener('littlefeet:session-ready', sync);
   document.addEventListener('littlefeet:session-ended', sync);

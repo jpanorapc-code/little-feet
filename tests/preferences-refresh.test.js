@@ -52,10 +52,10 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v48-antarctic-audio-clean/);
-assert.match(serviceWorker, /backup\.js\?v=20261004-antarctic-audio-clean-v1/);
-assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261001-api-refresh-flood-v1/);
-assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261002-avatar-svg-v2/);
+assert.match(serviceWorker, /little-feet-shell-v54-school-core-audio/);
+assert.match(serviceWorker, /backup\.js\?v=20261007-school-core-audio-v1/);
+assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
+assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 
 assert.match(page, /id="loginLanguagePreference"/);
 assert.match(preferences, /function setLoginLanguage\(language\)/);

@@ -618,8 +618,8 @@ function portalAudioPreferenceKey() {
 
 function updatePortalAudioControls() {
   document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
-    const muteLabel = button.dataset.muteLabel || 'Mute Little Feet';
-    const unmuteLabel = button.dataset.unmuteLabel || 'Unmute Little Feet';
+    const muteLabel = window.translateLittleFeetText?.('soundOn') || button.dataset.muteLabel || 'Sound On';
+    const unmuteLabel = window.translateLittleFeetText?.('muted') || button.dataset.unmuteLabel || 'Muted';
     const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
     button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
     button.classList.toggle('is-muted', portalAudioMuted);
@@ -628,6 +628,8 @@ function updatePortalAudioControls() {
     button.title = portalAudioMuted ? 'Sound muted — click to turn sound on' : 'Sound on — click to mute';
   });
 }
+
+window.addEventListener('littlefeet:languagechange', updatePortalAudioControls);
 
 function stopAllPortalAudio() {
   pauseLittleFeetAntarcticAudio();
@@ -917,12 +919,27 @@ function toggleLoginPinVisibility() {
   if (!input || !button) return;
   const shouldShow = input.type === 'password';
   input.type = shouldShow ? 'text' : 'password';
-  const label = shouldShow ? 'Hide password' : 'Show password';
+  const label = shouldShow
+    ? (window.translateLittleFeetText?.('hidePassword') || 'Hide password')
+    : (window.translateLittleFeetText?.('showPassword') || 'Show password');
   button.setAttribute('aria-pressed', String(shouldShow));
   button.setAttribute('aria-label', label);
   button.setAttribute('title', label);
   input.focus({ preventScroll: true });
 }
+
+function refreshLoginPasswordLanguage() {
+  const input = document.getElementById('loginPin');
+  const button = document.getElementById('loginPinToggle');
+  if (!input || !button) return;
+  const key = input.type === 'text' ? 'hidePassword' : 'showPassword';
+  const fallback = input.type === 'text' ? 'Hide password' : 'Show password';
+  const label = window.translateLittleFeetText?.(key) || fallback;
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+}
+
+window.addEventListener('littlefeet:languagechange', refreshLoginPasswordLanguage);
 
 function clearRememberedLogin() {
   try { localStorage.removeItem(SAVED_LOGIN_USERNAME_KEY); } catch {}
@@ -951,6 +968,101 @@ async function saveRememberedLogin(username, pin) {
   } catch { /* The browser may choose its own password-save prompt instead. */ }
 }
 
+let loginHumanCheckEnabled = true;
+let loginHumanCheckLoadVersion = 0;
+let loginHumanCheckAbortController = null;
+
+async function loadLoginHumanCheck() {
+  const prompt = document.getElementById('loginHumanCheckPrompt');
+  const answer = document.getElementById('loginHumanCheckAnswer');
+  const challengeId = document.getElementById('loginHumanCheckId');
+  const submit = document.querySelector('#loginForm button[type="submit"]');
+  const refresh = document.querySelector('#loginHumanCheckPanel .action-btn');
+  if (!prompt || !answer || !challengeId) return false;
+
+  const loadVersion = ++loginHumanCheckLoadVersion;
+  loginHumanCheckAbortController?.abort();
+  prompt.dataset.lfI18n = 'loadingSecurityCheck';
+  prompt.textContent = window.translateLittleFeetText?.('loadingSecurityCheck') || 'Loading security check…';
+  delete prompt.dataset.humanLeft;
+  delete prompt.dataset.humanRight;
+  delete prompt.dataset.humanOperator;
+  answer.value = '';
+  answer.required = true;
+  answer.disabled = true;
+  challengeId.value = '';
+  if (submit) submit.disabled = true;
+  if (refresh) refresh.disabled = true;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    loginHumanCheckAbortController = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 2500);
+
+    try {
+      const response = await fetch('/api/auth/human-check', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      if (loadVersion !== loginHumanCheckLoadVersion) return false;
+      if (!response.ok) throw new Error('Security check unavailable.');
+
+      if (data.required === false) {
+        loginHumanCheckEnabled = false;
+        document.getElementById('loginHumanCheckPanel')?.classList.add('hidden');
+        answer.required = false;
+        answer.disabled = true;
+        if (submit) submit.disabled = false;
+        if (refresh) refresh.disabled = false;
+        return true;
+      }
+
+      if (!data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
+      loginHumanCheckEnabled = true;
+      document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
+      answer.required = true;
+      if (Number.isFinite(Number(data.left)) && Number.isFinite(Number(data.right)) && ['+', '−'].includes(data.operator)) {
+        prompt.dataset.lfI18n = 'humanCheckQuestion';
+        prompt.dataset.humanLeft = String(data.left);
+        prompt.dataset.humanRight = String(data.right);
+        prompt.dataset.humanOperator = data.operator;
+        prompt.textContent = window.translateLittleFeetText?.('humanCheckQuestion', {
+          left: data.left,
+          operator: data.operator,
+          right: data.right
+        }) || data.prompt;
+      } else {
+        prompt.textContent = data.prompt;
+      }
+      challengeId.value = data.challengeId;
+      answer.disabled = false;
+      if (submit) submit.disabled = false;
+      if (refresh) refresh.disabled = false;
+      answer.focus({ preventScroll: true });
+      return true;
+    } catch (error) {
+      if (loadVersion !== loginHumanCheckLoadVersion) return false;
+      if (attempt === 0) {
+        prompt.dataset.lfI18n = 'retryingSecurityCheck';
+        prompt.textContent = window.translateLittleFeetText?.('retryingSecurityCheck') || 'Retrying security check…';
+        await new Promise(resolve => window.setTimeout(resolve, 150));
+        continue;
+      }
+      prompt.dataset.lfI18n = 'securityUnavailable';
+      prompt.textContent = window.translateLittleFeetText?.('securityUnavailable') || 'Security check unavailable. Select New check to retry.';
+      if (submit) submit.disabled = true;
+      if (refresh) refresh.disabled = false;
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+      if (loginHumanCheckAbortController === controller) loginHumanCheckAbortController = null;
+    }
+  }
+  return false;
+}
+
 function showSignupForm() {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('signupForm').classList.remove('hidden');
@@ -960,6 +1072,7 @@ function hideSignupForm() {
   document.getElementById('signupForm').classList.add('hidden');
   document.getElementById('loginForm').classList.remove('hidden');
   document.getElementById('signupForm').reset();
+  void loadLoginHumanCheck();
 }
 
 // Authentication
@@ -968,29 +1081,51 @@ if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     unlockPortalAudio();
-    const username = document.getElementById('loginUsername').value;
-    const pin = document.getElementById('loginPin').value;
+
+    const usernameInput = document.getElementById('loginUsername');
+    const pinInput = document.getElementById('loginPin');
+    const username = usernameInput?.value.trim() || '';
+    const pin = pinInput?.value || '';
+    const humanCheckId = document.getElementById('loginHumanCheckId')?.value || '';
+    const humanCheckAnswer = document.getElementById('loginHumanCheckAnswer')?.value.trim() || '';
+    const companyWebsite = document.getElementById('loginCompanyWebsite')?.value || '';
     const rememberLogin = document.getElementById('rememberLogin')?.checked === true;
+
+    if (!username || !pin || (loginHumanCheckEnabled && (!humanCheckId || !humanCheckAnswer))) {
+      loginForm.reportValidity();
+      return;
+    }
+    if (usernameInput && usernameInput.value !== username) usernameInput.value = username;
     if (!rememberLogin) clearRememberedLogin();
 
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, pin })
+        body: JSON.stringify({ username, pin, humanCheckId, humanCheckAnswer, companyWebsite })
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.user) {
         currentUser = data.user;
-        if (rememberLogin) await saveRememberedLogin(username, pin);
+
+        // Enter the portal immediately after the server accepts the login.
+        // Mobile credential managers can keep navigator.credentials.store()
+        // pending while their native save-password UI is open, so saving the
+        // optional remembered credential must never block session startup.
         setupSession();
+        if (rememberLogin) void saveRememberedLogin(username, pin);
       } else {
         alert(data.message || 'Login failed.');
+        void loadLoginHumanCheck();
       }
     } catch {
       alert('Unable to connect to login server.');
+      void loadLoginHumanCheck();
     }
   });
+  void loadLoginHumanCheck();
 }
 
 const signupForm = document.getElementById('signupForm');
@@ -1550,7 +1685,7 @@ function normalizeProfileIcon(icon) {
 
 function profileIconMarkup(icon) {
   const selectedIcon = normalizeProfileIcon(icon);
-  return `<svg class="profile-avatar-image profile-avatar-${selectedIcon}" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-${selectedIcon}"></use></svg>`;
+  return `<svg class="profile-avatar-image profile-avatar-${selectedIcon}" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-${selectedIcon}"></use></svg>`;
 }
 
 function getProfileIconStorageKey() {
@@ -1638,6 +1773,29 @@ function openSelectedWorkspace() {
   button.click();
 }
 
+function enforceSchoolSubscriptionUi() {
+  const access = currentUser?.schoolSubscriptionAccess;
+  if (!access || access.allowed || isFullAccessUser(currentUser)) return false;
+  const canRenew = ['admin', 'principal', 'school_accounts'].includes(currentUser?.role);
+  window.setTimeout(async () => {
+    const statusLabel = String(access.status || 'expired').replaceAll('_', ' ');
+    const detail = access.status === 'trial_expired'
+      ? `The 14-day Little Feet trial for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> has ended.`
+      : access.status === 'trial_pending'
+        ? `The 14-day Little Feet trial for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> has not been activated yet.`
+        : `The Little Feet subscription for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> is ${escapeWorkspaceText(statusLabel)}.`;
+    if (canRenew) {
+      const financeButton = [...document.querySelectorAll('.nav-btn')].find(button => String(button.getAttribute('onclick') || '').includes("'financeTab'"));
+      if (financeButton) switchTab('financeTab', financeButton);
+      await loadSubscriptionBillingOverview();
+      openModal('School subscription required', `<p style="line-height:1.6;">${detail}</p><p class="meta">School data remains protected. Renew or activate a plan to restore normal portal access.</p><button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionCheckout();">Choose plan & create payment request</button>`);
+    } else {
+      openModal('School subscription inactive', `<p style="line-height:1.6;">${detail}</p><p class="meta">Please contact the school principal or administrator to renew Little Feet access.</p>`);
+    }
+  }, 0);
+  return true;
+}
+
 function setupSession() {
   markServerSessionValidated();
   loadPortalAudioPreference();
@@ -1669,7 +1827,8 @@ function setupSession() {
   applyUserPreferences();
   if (isParent) switchChatMode('direct');
   requestAnimationFrame(syncMobileHeaderOffset);
-  loadAllData();
+  const subscriptionBlocked = enforceSchoolSubscriptionUi();
+  if (!subscriptionBlocked) loadAllData();
   window.setTimeout(() => window.restoreDashboardDrafts?.(), 120);
   document.dispatchEvent(new CustomEvent('littlefeet:session-ready'));
   if (alertMonitorId) clearInterval(alertMonitorId);
@@ -4249,8 +4408,9 @@ function setupFormListeners() {
 }
 
 function paymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
+  const effectiveLabel = payment?.provider === 'payfast' ? 'Pay securely with PayFast' : linkLabel;
   const primary = payment.paymentLink
-    ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">${escapeWorkspaceText(linkLabel)}</a>`
+    ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">${escapeWorkspaceText(effectiveLabel)}</a>${payment?.automaticConfirmation ? '<p class="meta" style="margin:8px 0 0;">Payment is confirmed automatically by PayFast. Little Feet activates the subscription only after the verified payment notification is received.</p>' : ''}`
     : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
   const capitec = payment.capitecPayMePayload
     ? `<div style="margin-top:12px;padding:12px;border:1px solid #2dd4bf;border-radius:8px;text-align:center;background:rgba(45,212,191,.08);"><strong>Pay with the Capitec app</strong><div id="capitecPayMeQr" style="width:190px;min-height:190px;margin:10px auto;background:#fff;padding:5px;"></div><span class="meta">Capitec customers can scan this Pay Me code. Other banks can use the EFT details above.</span></div>`
@@ -4320,7 +4480,9 @@ async function loadSubscriptionBillingOverview() {
         : '';
       return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(paymentStatus)}${reconcile}</li>`;
     }).join('') || '<li>No payment requests yet.</li>';
-    const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : escapeWorkspaceText(String(data.subscription?.status || 'trial').toUpperCase());
+    const accessState = String(data.subscription?.status || 'trial');
+    const trialEndLabel = accessState === 'trial' && data.subscription?.trialEndsAt ? ` UNTIL ${escapeWorkspaceText(new Date(data.subscription.trialEndsAt).toLocaleDateString('en-ZA'))}` : '';
+    const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : `${escapeWorkspaceText(accessState.replaceAll('_', ' ').toUpperCase())}${trialEndLabel}`;
     container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
   } catch (error) {
     container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load subscription information.'))}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
@@ -4349,7 +4511,7 @@ async function openSubscriptionBillingAdmin() {
       <div class="workspace-grid"><label>Base monthly school price<input name="baseMonthly" type="number" min="0" step="0.01" value="${data.pricing.baseMonthly}"></label><label>Late-payment fee<input name="lateFee" type="number" min="0" step="0.01" value="${data.pricing.lateFee}"></label></div>
       <label style="display:flex;align-items:center;gap:8px;"><input name="lateFeeEnabled" type="checkbox" ${data.pricing.lateFeeEnabled ? 'checked' : ''}> Apply the late-payment fee only when the school accepts this term.</label>
       <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:540px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px;">Extra learners</th><th style="padding:9px;">Your cost</th><th style="padding:9px;">School price</th><th style="padding:9px;">Your margin</th></tr></thead><tbody>${[5,20,100].map(capacity => `<tr><td style="padding:9px;"><strong>+${capacity} children</strong></td><td style="padding:9px;"><input name="cost${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'costPrice')}"></td><td style="padding:9px;"><input name="price${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'sellingPrice')}"></td><td style="padding:9px;color:#2dd4bf;">Calculated after saving</td></tr>`).join('')}</tbody></table></div>
-      <fieldset style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><legend style="padding:0 5px;font-weight:700;">Where schools pay</legend><label>Payment method<select name="paymentMethod" onchange="toggleSubscriptionPaymentFields(this.value)"><option value="payment_link" ${payment.method === 'payment_link' ? 'selected' : ''}>Secure payment link</option><option value="bank_transfer" ${payment.method === 'bank_transfer' ? 'selected' : ''}>Bank transfer</option></select></label><div id="subscriptionPaymentLinkFields" style="margin-top:10px;"><label>HTTPS payment link<input name="paymentLink" type="url" placeholder="https://..." value="${escapeWorkspaceText(payment.paymentLink || '')}"></label></div><div id="subscriptionBankFields" style="display:none;margin-top:10px;" class="workspace-grid"><label>Account name<input name="accountName" value="${escapeWorkspaceText(payment.accountName || '')}"></label><label>Bank name<input name="bankName" value="${escapeWorkspaceText(payment.bankName || '')}"></label><label>Account number<input name="accountNumber" inputmode="numeric" value="${escapeWorkspaceText(payment.accountNumber || '')}"></label><label>Branch code<input name="branchCode" inputmode="numeric" value="${escapeWorkspaceText(payment.branchCode || '')}"></label></div><label style="margin-top:10px;display:block;">Capitec Pay Me QR text <span class="meta">(optional)</span><input name="capitecPayMePayload" maxlength="512" placeholder="${payment.capitecPayMeConfigured ? 'Pay Me code is saved — leave blank to keep it' : 'Paste the decoded Capitec Pay Me QR text'}"></label><label style="margin-top:10px;display:block;">Payment reference prefix<input name="referencePrefix" maxlength="16" value="${escapeWorkspaceText(payment.referencePrefix || 'LF')}"></label></fieldset>
+      <fieldset style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><legend style="padding:0 5px;font-weight:700;">Where schools pay</legend><label>Payment method<select name="paymentMethod" onchange="toggleSubscriptionPaymentFields(this.value)">${data.payfastAvailable ? `<option value="payfast" ${payment.method === 'payfast' ? 'selected' : ''}>PayFast · automatic confirmation</option>` : ''}<option value="payment_link" ${payment.method === 'payment_link' ? 'selected' : ''}>Secure payment link</option><option value="bank_transfer" ${payment.method === 'bank_transfer' ? 'selected' : ''}>Bank transfer</option></select></label>${data.payfastAvailable ? '<p class="meta" style="margin:8px 0 0;">PayFast uses the live server credentials and verified ITN notifications. Merchant secrets never enter the browser.</p>' : '<p class="meta" style="margin:8px 0 0;">PayFast automatic confirmation becomes available after the live merchant credentials are configured on the server.</p>'}<div id="subscriptionPaymentLinkFields" style="margin-top:10px;"><label>HTTPS payment link<input name="paymentLink" type="url" placeholder="https://..." value="${escapeWorkspaceText(payment.paymentLink || '')}"></label></div><div id="subscriptionBankFields" style="display:none;margin-top:10px;" class="workspace-grid"><label>Account name<input name="accountName" value="${escapeWorkspaceText(payment.accountName || '')}"></label><label>Bank name<input name="bankName" value="${escapeWorkspaceText(payment.bankName || '')}"></label><label>Account number<input name="accountNumber" inputmode="numeric" value="${escapeWorkspaceText(payment.accountNumber || '')}"></label><label>Branch code<input name="branchCode" inputmode="numeric" value="${escapeWorkspaceText(payment.branchCode || '')}"></label></div><label style="margin-top:10px;display:block;">Capitec Pay Me QR text <span class="meta">(optional)</span><input name="capitecPayMePayload" maxlength="512" placeholder="${payment.capitecPayMeConfigured ? 'Pay Me code is saved — leave blank to keep it' : 'Paste the decoded Capitec Pay Me QR text'}"></label><label style="margin-top:10px;display:block;">Payment reference prefix<input name="referencePrefix" maxlength="16" value="${escapeWorkspaceText(payment.referencePrefix || 'LF')}"></label></fieldset>
       <button class="submit-btn">Save subscription billing</button>
     </form>
     <section style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:12px;"><h3 style="margin:0 0 8px;">Recent payment requests</h3><ul style="margin:0;padding-left:20px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></section>`);
@@ -4391,7 +4553,11 @@ async function openSubscriptionCheckout() {
   if (!data.paymentConfigured) return alert('An administrator still needs to configure the payment destination.');
   const plans = Array.isArray(data.plans) ? data.plans : [];
   if (!plans.length) return alert('The published school plans are temporarily unavailable.');
-  const options = plans.map(plan => `<option value="${escapeWorkspaceText(plan.code)}">${escapeWorkspaceText(plan.name)} — up to ${Number(plan.maxLearners).toLocaleString('en-ZA')} learners — ${formatSubscriptionMoney(plan.monthlyPrice)}/month</option>`).join('');
+  const options = plans.map(plan => {
+    const overage = Number(plan.overagePerLearner || 0) > 0 ? ` · +${formatSubscriptionMoney(plan.overagePerLearner)} per learner above ${Number(plan.maxLearners).toLocaleString('en-ZA')}` : '';
+    const hardMax = Number(plan.hardMaxLearners || plan.maxLearners);
+    return `<option value="${escapeWorkspaceText(plan.code)}">${escapeWorkspaceText(plan.name)} — ${Number(plan.maxLearners).toLocaleString('en-ZA')} included · max ${hardMax.toLocaleString('en-ZA')} — ${formatSubscriptionMoney(plan.monthlyPrice)}/month${overage}</option>`;
+  }).join('');
   openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Choose the published plan that matches your school size. Little Feet will create a unique Capitec payment reference.</p><label>School plan<select name="planCode">${options}</select></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
 }
 
@@ -4404,7 +4570,8 @@ async function createSubscriptionOrder(event) {
     if (!response.ok) throw new Error(result.message || 'Unable to create payment request.');
     const payment = result.payment;
     const destination = paymentDestinationMarkup(payment);
-    openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
+    const overageLine = Number(result.order.overageLearners || 0) > 0 ? `<br><span style="color:var(--text-muted);">${Number(result.order.learnerCount).toLocaleString('en-ZA')} learners · ${Number(result.order.overageLearners).toLocaleString('en-ZA')} over included capacity × ${formatSubscriptionMoney(result.order.overageRate)}</span>` : '';
+    openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong>${overageLine}<br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
     renderCapitecPayMeQr(payment);
   } catch (error) { alert(safeUserFacingError(error, 'Unable to create payment request.')); }
 }
@@ -5630,20 +5797,62 @@ async function markBroadcastRead(id) {
   loadBroadcasts();
 }
 
+function storeOrderStatusClass(order) {
+  const payment = String(order?.paymentStatus || '').toLowerCase();
+  const fulfilment = String(order?.fulfilmentStatus || '').toLowerCase();
+  if (payment === 'paid' && ['ready_to_prepare','preparing','ready_for_collection','collected'].includes(fulfilment)) return 'info';
+  if (['refunded','cancelled'].includes(fulfilment) || payment === 'refunded') return 'urgent';
+  if (['payment_failed','payment_expired','stock_review_required'].includes(fulfilment) || payment === 'failed') return 'urgent';
+  return '';
+}
+
+function storeOrderStatusLabel(order) {
+  const fulfilment = String(order?.fulfilmentStatus || '').trim();
+  const payment = String(order?.paymentStatus || 'awaiting_payment').trim();
+  return (fulfilment || payment).replaceAll('_', ' ').toUpperCase();
+}
+
+function storeOrderActions(order, canManage) {
+  const payment = String(order?.paymentStatus || '').toLowerCase();
+  const fulfilment = String(order?.fulfilmentStatus || '').toLowerCase();
+  const actions = [];
+  if (payment !== 'paid' && !['refunded','cancelled','payment_failed','payment_expired'].includes(fulfilment)) {
+    if (currentUser?.role === 'parent' || canManage) actions.push(`<button type="button" class="action-btn btn-red" onclick="cancelStoreOrder('${escapeWorkspaceText(order.id)}')">Cancel order</button>`);
+    if (canManage) actions.push(`<button type="button" class="action-btn btn-green" onclick="recordStorePayment('${escapeWorkspaceText(order.id)}','${escapeWorkspaceText(order.reference)}',${Number(order.amount || 0)})">Record cleared payment</button>`);
+  }
+  if (canManage && payment === 'paid' && fulfilment !== 'refunded') {
+    if (!['preparing','ready_for_collection','collected'].includes(fulfilment)) actions.push(`<button type="button" class="action-btn btn-blue" onclick="updateStoreFulfilment('${escapeWorkspaceText(order.id)}','preparing')">Start preparing</button>`);
+    if (!['ready_for_collection','collected'].includes(fulfilment)) actions.push(`<button type="button" class="action-btn btn-green" onclick="updateStoreFulfilment('${escapeWorkspaceText(order.id)}','ready_for_collection')">Ready for collection</button>`);
+    if (fulfilment !== 'collected') actions.push(`<button type="button" class="action-btn btn-green" onclick="updateStoreFulfilment('${escapeWorkspaceText(order.id)}','collected')">Collected</button>`);
+    actions.push(`<button type="button" class="action-btn btn-red" onclick="recordStoreRefund('${escapeWorkspaceText(order.id)}','${escapeWorkspaceText(order.reference)}',${Number(order.amount || 0)})">Record confirmed refund</button>`);
+  }
+  return actions.length ? `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;">${actions.join('')}</div>` : '';
+}
+
 async function loadStoreItems() {
   const box = document.getElementById('storeItems');
   if (!box || !currentUser) return;
   try {
-    const response = await fetch('/api/store');
-    const store = await response.json();
-    if (!response.ok) throw new Error(store.message);
+    const [storeResponse, ordersResponse] = await Promise.all([fetch('/api/store'), fetch('/api/store/orders')]);
+    const store = await storeResponse.json();
+    const orders = ordersResponse.ok ? await ordersResponse.json() : [];
+    if (!storeResponse.ok) throw new Error(store.message);
     document.getElementById('storeWelcome').textContent = `${store.schoolName} store`;
     window.schoolStoreProducts = store.products || [];
-    const productCards = store.products?.length ? store.products.map(product => `<article class="store-item"><span class="badge-tag info">IN STOCK: ${product.stockQuantity}</span><h3 style="margin:10px 0 6px;">${escapeWorkspaceText(product.name)}</h3><strong style="font-size:1.2rem;color:#2dd4bf;">${formatSubscriptionMoney(product.price)}</strong><p style="margin:8px 0 12px;color:var(--text-muted);font-size:.82rem;">Payment reference and confirmed total are shown before you continue to payment.</p>${currentUser.role === 'parent' ? `<button type="button" class="submit-btn" onclick="openStoreCheckout('${product.id}')" ${product.stockQuantity < 1 ? 'disabled' : ''}>${product.stockQuantity < 1 ? 'Out of stock' : 'Buy item'}</button>` : ''}${store.canManage ? `<button type="button" class="action-btn btn-red" style="margin-top:8px;" onclick="removeStoreProduct('${product.id}')">Remove item</button>` : ''}</article>`).join('') : `<article class="store-item" style="grid-column:1/-1;text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🛍️</div><h3 style="margin-bottom:8px;">No store items yet</h3><p style="color:var(--text-muted);margin:0;">An administrator can add uniforms, stationery, activity packs or other school items here.</p></article>`;
+    window.schoolStoreOrders = Array.isArray(orders) ? orders : [];
+    const productCards = store.products?.length ? store.products.map(product => {
+      const reserved = store.canManage && Number(product.reservedQuantity || 0) > 0 ? `<p class="meta" style="margin:5px 0 0;">Physical stock: ${Number(product.physicalStockQuantity || 0)} · Reserved awaiting payment: ${Number(product.reservedQuantity || 0)}</p>` : '';
+      return `<article class="store-item"><span class="badge-tag info">AVAILABLE: ${product.stockQuantity}</span><h3 style="margin:10px 0 6px;">${escapeWorkspaceText(product.name)}</h3><strong style="font-size:1.2rem;color:#2dd4bf;">${formatSubscriptionMoney(product.price)}</strong>${reserved}<p style="margin:8px 0 12px;color:var(--text-muted);font-size:.82rem;">Payment reference and confirmed total are shown before you continue to payment.</p>${currentUser.role === 'parent' ? `<button type="button" class="submit-btn" onclick="openStoreCheckout('${product.id}')" ${product.stockQuantity < 1 ? 'disabled' : ''}>${product.stockQuantity < 1 ? 'Out of stock' : 'Buy item'}</button>` : ''}${store.canManage ? `<button type="button" class="action-btn btn-red" style="margin-top:8px;" onclick="removeStoreProduct('${product.id}')">Remove item</button>` : ''}</article>`;
+    }).join('') : `<article class="store-item" style="grid-column:1/-1;text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🛍️</div><h3 style="margin-bottom:8px;">No store items yet</h3><p style="color:var(--text-muted);margin:0;">An administrator can add uniforms, stationery, activity packs or other school items here.</p></article>`;
     const safeStoreUrl = typeof store.webStoreUrl === 'string' && /^https:\/\//i.test(store.webStoreUrl) ? store.webStoreUrl : '';
     const externalStore = safeStoreUrl ? `<article class="store-item" style="grid-column:1/-1;"><span class="badge-tag info">OFFICIAL EXTERNAL SCHOOL STORE</span><h3 style="margin:10px 0 5px;">${escapeWorkspaceText(store.schoolName)} web store</h3><p style="margin:0 0 12px;color:var(--text-muted);">Browse items managed by the school’s linked web-store provider.</p><a class="action-btn btn-blue" style="display:inline-block;text-decoration:none;" href="${safeStoreUrl}" target="_blank" rel="noopener noreferrer">Visit official web store</a></article>` : '';
     const manager = store.canManage ? `<article class="store-item" style="grid-column:1/-1;"><h3 style="margin-bottom:7px;">Add school-store item</h3><form onsubmit="addStoreProduct(event)" style="display:grid;grid-template-columns:minmax(180px,1fr) 130px 130px auto;gap:8px;align-items:end;"><label>Item name<input name="name" required placeholder="e.g. School jersey"></label><label>Price (R)<input name="price" type="number" min="0.01" step="0.01" required></label><label>Stock quantity<input name="stockQuantity" type="number" min="0" step="1" required></label><button class="submit-btn">Add item</button></form></article>` : '';
-    box.innerHTML = productCards + externalStore + manager;
+    const orderTitle = currentUser.role === 'parent' ? 'Your recent orders' : 'Store orders';
+    const orderList = window.schoolStoreOrders.length
+      ? window.schoolStoreOrders.slice(0, 30).map(order => `<div class="item-row" style="align-items:flex-start;"><div><strong>${escapeWorkspaceText(order.productName)} × ${Number(order.quantity || 0)}</strong> <span class="badge-tag ${storeOrderStatusClass(order)}">${escapeWorkspaceText(storeOrderStatusLabel(order))}</span><p style="margin:5px 0;">${formatSubscriptionMoney(order.amount)} · Ref <strong>${escapeWorkspaceText(order.reference)}</strong></p><p class="meta">Created ${escapeWorkspaceText(new Date(order.createdAt).toLocaleString())}${order.paidAt ? ` · Paid ${escapeWorkspaceText(new Date(order.paidAt).toLocaleString())}` : ''}</p>${storeOrderActions(order, store.canManage)}</div></div>`).join('')
+      : '<p class="meta">No store orders yet.</p>';
+    const orderPanel = `<article class="store-item" style="grid-column:1/-1;"><h3 style="margin-bottom:10px;">${orderTitle}</h3>${orderList}</article>`;
+    box.innerHTML = productCards + externalStore + manager + orderPanel;
   } catch { box.textContent = 'Unable to load school store items.'; }
 }
 
@@ -5673,10 +5882,73 @@ async function confirmStoreCheckout() {
     if (!response.ok) throw new Error(result.message || 'Unable to create the order.');
     const payment = result.payment;
     const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
-    openModal('Order ready for payment', `<p style="margin:0 0 10px;">Your order is in the stock-room queue for preparation.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>${escapeWorkspaceText(result.order.productName)} × ${result.order.quantity}: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the order and payment can be matched.</p>`);
+    openModal('Order ready for payment', `<p style="margin:0 0 10px;">Your items are reserved while you complete payment. The stock room starts preparation only after payment is confirmed.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>${escapeWorkspaceText(result.order.productName)} × ${result.order.quantity}: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.reservationExpiresAt ? `<br><span class="meta">Reservation holds until ${escapeWorkspaceText(new Date(result.reservationExpiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the order and payment can be matched.</p>`);
     renderCapitecPayMeQr(payment);
     loadStoreItems();
   } catch (error) { alert(safeUserFacingError(error, 'Unable to create the order.')); }
+}
+
+async function cancelStoreOrder(orderId) {
+  if (!confirm('Cancel this unpaid store order and release the reserved stock?')) return;
+  try {
+    const response = await fetch(`/api/store/orders/${encodeURIComponent(orderId)}/cancel`, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to cancel the store order.');
+    await loadStoreItems();
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to cancel the store order.')); }
+}
+
+function recordStorePayment(orderId, reference, amount) {
+  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can record a cleared store payment.');
+  openModal('Record cleared store payment', `<form onsubmit="submitStorePayment(event,'${encodeURIComponent(orderId)}','${encodeURIComponent(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Use this only after the money has actually cleared.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
+}
+
+async function submitStorePayment(event, encodedOrderId, encodedReference, expectedAmount) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/payments/reconcile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      eventId: `store-paid-${decodeURIComponent(encodedOrderId)}-${Date.now()}`,
+      reference: decodeURIComponent(encodedReference), status:'paid', amount: form.elements.amount.value,
+      bankReference: form.elements.bankReference.value
+    }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to record the store payment.');
+    closeModal();
+    await loadStoreItems();
+    alert('Payment confirmed. The order is ready for the stock room.');
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to record the store payment.')); }
+}
+
+async function updateStoreFulfilment(orderId, status) {
+  try {
+    const response = await fetch(`/api/store/orders/${encodeURIComponent(orderId)}/fulfilment`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to update the store order.');
+    await loadStoreItems();
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to update the store order.')); }
+}
+
+function recordStoreRefund(orderId, reference, amount) {
+  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can record a confirmed refund.');
+  openModal('Record confirmed store refund', `<form onsubmit="submitStoreRefund(event,'${encodeURIComponent(orderId)}','${encodeURIComponent(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">This does not send money. Use it only after PayFast or the bank has actually confirmed the refund. Little Feet will then return the item quantity to stock.</p><label>Refunded amount (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Refund/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Record confirmed refund</button></form>`);
+}
+
+async function submitStoreRefund(event, encodedOrderId, encodedReference, expectedAmount) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    const response = await fetch('/api/payments/reconcile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      eventId: `store-refund-${decodeURIComponent(encodedOrderId)}-${Date.now()}`,
+      reference: decodeURIComponent(encodedReference), status:'refunded', amount: form.elements.amount.value,
+      bankReference: form.elements.bankReference.value
+    }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to record the store refund.');
+    closeModal();
+    await loadStoreItems();
+    alert('Refund recorded and the item quantity was returned to stock.');
+  } catch (error) { alert(safeUserFacingError(error, 'Unable to record the store refund.')); }
 }
 
 async function addStoreProduct(event) {

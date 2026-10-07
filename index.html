@@ -475,6 +475,11 @@
     .login-section-label { width:min(100%,360px); margin:0 auto 9px; color:#94a3b8; font-size:.65rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; text-align:left; }
     .field-help { display:block; margin:-6px 0 10px; color:var(--text-muted); font-size:.68rem; line-height:1.35; }
     .login-device-note { width:100%; margin:-7px 0 12px; color:var(--text-muted); font-size:.68rem; line-height:1.35; }
+    .login-human-check { margin:2px 0 10px; padding:10px 11px; border:1px solid rgba(94,234,212,.20); border-radius:10px; background:rgba(7,25,43,.36); }
+    .login-human-check-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+    .login-human-check-prompt { display:block; margin:0 0 6px; color:var(--text-muted); font-size:.72rem; line-height:1.35; }
+    .login-human-check .action-btn { min-height:40px; margin:0 0 10px; }
+    .login-human-trap { position:absolute !important; left:-10000px !important; width:1px !important; height:1px !important; overflow:hidden !important; opacity:0 !important; pointer-events:none !important; }
     .login-help-panel { width:min(100%,360px); margin:12px auto 0; padding:10px 11px; border:1px solid rgba(125,211,252,.18); border-radius:10px; background:rgba(2,15,28,.28); color:var(--text-muted); text-align:left; }
     .login-help-panel strong { display:block; margin-bottom:3px; color:var(--text-dark); font-size:.75rem; }
     .login-help-panel span { display:block; font-size:.70rem; line-height:1.4; }
@@ -4365,7 +4370,7 @@
       align-items:center;
       padding:8px 0 max(8px, env(safe-area-inset-bottom));
       border-top:1px solid rgba(94,234,212,.24);
-      background:linear-gradient(180deg, rgba(7,24,42,.68), rgba(4,16,30,.84));
+      background:linear-gradient(155deg,#08287f,#061d5b);
       box-shadow:0 -10px 26px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05);
       backdrop-filter:blur(18px) saturate(118%);
       -webkit-backdrop-filter:blur(18px) saturate(118%);
@@ -4477,7 +4482,7 @@
       .login-info-runner-dot { padding:0 5px; }
     }
     body.light-mode .login-info-runner {
-      background:linear-gradient(180deg, rgba(63,106,120,.72), rgba(42,82,96,.86));
+      background:linear-gradient(155deg,#08287f,#061d5b);
       border-top-color:rgba(88,214,205,.30);
       color:#f1fbfc;
     }
@@ -4520,37 +4525,37 @@
     #loginForm #loginPin:-webkit-autofill:hover,
     #loginForm #loginPin:-webkit-autofill:focus,
     #loginForm #loginPin:-webkit-autofill:active {
-      -webkit-text-fill-color:#f7fbff !important;
-      caret-color:#f7fbff !important;
+      -webkit-text-fill-color:#08287f !important;
+      caret-color:#08287f !important;
       -webkit-box-shadow:
-        0 0 0 1000px #0f304e inset,
+        0 0 0 1000px #b8e5ef inset,
         inset 0 1px 0 rgba(255,255,255,.055),
         inset 0 0 0 1px rgba(0,8,18,.16) !important;
       box-shadow:
-        0 0 0 1000px #0f304e inset,
+        0 0 0 1000px #b8e5ef inset,
         inset 0 1px 0 rgba(255,255,255,.055),
         inset 0 0 0 1px rgba(0,8,18,.16) !important;
       border-color:rgba(111,196,215,.28) !important;
-      background-color:#0f304e !important;
+      background-color:#b8e5ef !important;
       transition:background-color 99999s ease-out 0s;
     }
     #loginForm #loginUsername:-webkit-autofill:focus,
     #loginForm #loginPin:-webkit-autofill:focus {
-      border-color:rgba(110,238,220,.76) !important;
+      border-color:rgba(97,195,226,.95) !important;
       -webkit-box-shadow:
-        0 0 0 1000px #0f304e inset,
-        0 0 0 3px rgba(34,190,173,.14),
-        0 0 20px rgba(46,194,187,.10) !important;
+        0 0 0 1000px #b8e5ef inset,
+        0 0 0 3px rgba(97,195,226,.24),
+        0 0 20px rgba(97,195,226,.10) !important;
       box-shadow:
-        0 0 0 1000px #0f304e inset,
-        0 0 0 3px rgba(34,190,173,.14),
-        0 0 20px rgba(46,194,187,.10) !important;
+        0 0 0 1000px #b8e5ef inset,
+        0 0 0 3px rgba(97,195,226,.24),
+        0 0 20px rgba(97,195,226,.10) !important;
     }
     #loginForm #loginUsername:autofill,
     #loginForm #loginPin:autofill {
-      color:#f7fbff !important;
-      caret-color:#f7fbff !important;
-      background:#0f304e !important;
+      color:#08287f !important;
+      caret-color:#08287f !important;
+      background:#b8e5ef !important;
       border-color:rgba(111,196,215,.28) !important;
     }
 
@@ -4562,22 +4567,22 @@
     body.light-mode #loginForm #loginPin:-webkit-autofill:hover,
     body.light-mode #loginForm #loginPin:-webkit-autofill:focus,
     body.light-mode #loginForm #loginPin:-webkit-autofill:active {
-      -webkit-text-fill-color:#092a3a !important;
-      caret-color:#092a3a !important;
+      -webkit-text-fill-color:#08287f !important;
+      caret-color:#08287f !important;
       -webkit-box-shadow:
-        0 0 0 1000px #abc5cd inset,
+        0 0 0 1000px #b8e5ef inset,
         inset 0 1px 0 rgba(255,255,255,.24) !important;
       box-shadow:
-        0 0 0 1000px #abc5cd inset,
+        0 0 0 1000px #b8e5ef inset,
         inset 0 1px 0 rgba(255,255,255,.24) !important;
-      background-color:#abc5cd !important;
+      background-color:#b8e5ef !important;
       border-color:rgba(42,103,125,.36) !important;
     }
     body.light-mode #loginForm #loginUsername:autofill,
     body.light-mode #loginForm #loginPin:autofill {
-      color:#092a3a !important;
-      caret-color:#092a3a !important;
-      background:#abc5cd !important;
+      color:#08287f !important;
+      caret-color:#08287f !important;
+      background:#b8e5ef !important;
       border-color:rgba(42,103,125,.36) !important;
     }
 
@@ -5930,7 +5935,7 @@
       box-shadow:none !important;
     }
 
-    /* Company name: same clean typography language as the slogan, no border. */
+    /* Navy wordmark: restrained icy rim and a short dimensional shadow. */
     #authSection .brand-header h1 {
       order:2 !important;
       position:relative !important;
@@ -5941,7 +5946,7 @@
       margin:0 auto 8px !important;
       padding:0 6px !important;
 
-      font-family:Georgia,"Times New Roman",serif !important;
+      font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
       font-size:clamp(1.65rem,3.25vw,2.35rem) !important;
       font-weight:800 !important;
       font-style:normal !important;
@@ -5951,8 +5956,8 @@
       text-align:center !important;
       text-transform:none !important;
 
-      color:var(--dark-navy) !important;
-      -webkit-text-fill-color:var(--dark-navy) !important;
+      color:#08287f !important;
+      -webkit-text-fill-color:#08287f !important;
       background:none !important;
       background-image:none !important;
       background-clip:border-box !important;
@@ -5964,8 +5969,7 @@
       box-shadow:none !important;
 
       text-shadow:
-        0 1px 0 rgba(255,255,255,.48),
-        0 3px 10px rgba(2,12,28,.22) !important;
+        0 -1px 0 #fff, 0 1px 0 #7fbacf, 0 2px 0 #47758f, 0 3px 0 #244762, 0 5px 8px #020c1cc0 !important;
       animation:none !important;
       cursor:pointer !important;
     }
@@ -5986,7 +5990,7 @@
       text-underline-offset:4px !important;
     }
 
-    /* Slogan: solid Little Feet navy text, no pill, border, or glass shell. */
+    /* Raised ice lettering without a surrounding panel. */
     #authSection .brand-header p.slogan {
       order:3 !important;
       position:relative !important;
@@ -6009,8 +6013,8 @@
     }
 
     #authSection .brand-header p.slogan span {
-      color:var(--dark-navy) !important;
-      -webkit-text-fill-color:var(--dark-navy) !important;
+      color:#08287f !important;
+      -webkit-text-fill-color:#08287f !important;
       background:none !important;
       background-image:none !important;
       background-clip:border-box !important;
@@ -6026,8 +6030,7 @@
       text-transform:uppercase !important;
 
       text-shadow:
-        0 1px 0 rgba(255,255,255,.42),
-        0 2px 7px rgba(2,12,28,.20) !important;
+        0 -1px 0 #fff, 0 1px 0 #568aa5, 0 2px 0 #193c60, 0 3px 6px #020c1ce6 !important;
       animation:none !important;
     }
 
@@ -6040,8 +6043,8 @@
           rgba(8,40,127,.97),
           rgba(6,29,91,.965)
         ) !important;
-      backdrop-filter:blur(10px) saturate(108%) !important;
-      -webkit-backdrop-filter:blur(10px) saturate(108%) !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
     }
 
     body.light-mode #authSection > .auth-card {
@@ -6084,7 +6087,7 @@
         overflow-x:hidden !important;
       }
 
-      #authSection {
+      #authSection:not(.hidden) {
         display:flex !important;
         flex-direction:column !important;
         align-items:center !important;
@@ -6204,17 +6207,105 @@
         padding:4px 9px !important;
       }
     }
+  
+    /* Mobile login interaction guard.
+       Keep decorative branding from covering real form hit targets. */
+    #authSection > .auth-card {
+      position:relative !important;
+      z-index:10 !important;
+      isolation:isolate !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection .brand-header {
+      z-index:4 !important;
+      pointer-events:none !important;
+    }
+
+    #authSection .brand-header .login-emblem-button,
+    #authSection .brand-header h1 {
+      pointer-events:auto !important;
+    }
+
+    #authSection .login-card-tools,
+    #authSection .login-access-note,
+    #authSection #loginForm,
+    #authSection .login-new-account,
+    #authSection .login-legal,
+    #authSection #signupForm {
+      position:relative !important;
+      z-index:8 !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection #loginForm {
+      width:100% !important;
+      min-width:0 !important;
+    }
+
+    #authSection #loginForm input,
+    #authSection #loginForm select,
+    #authSection #loginForm button,
+    #authSection #loginForm label,
+    #authSection #loginForm .password-field,
+    #authSection #loginForm .login-utility-row {
+      pointer-events:auto !important;
+    }
+
+    #authSection #loginForm button,
+    #authSection #loginForm input,
+    #authSection #loginForm select {
+      touch-action:manipulation;
+    }
+
+    #authSection #loginForm > .submit-btn {
+      position:relative !important;
+      z-index:9 !important;
+      pointer-events:auto !important;
+    }
+
+    #authSection .login-info-runner {
+      pointer-events:none !important;
+    }
+
+    @media (max-width:640px) {
+      #authSection > .auth-card {
+        width:min(calc(100vw - 24px),520px) !important;
+        max-width:520px !important;
+        min-width:0 !important;
+        overflow:visible !important;
+      }
+
+      #authSection #loginForm > .submit-btn {
+        width:100% !important;
+        max-width:none !important;
+        min-height:48px !important;
+      }
+
+      #authSection #loginForm input:not([type="checkbox"]):not([type="radio"]),
+      #authSection #loginForm select {
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+      }
+
+      #authSection .password-field {
+        width:100% !important;
+        min-width:0 !important;
+      }
+    }
+
   </style>
-  <link rel="stylesheet" href="/assets/ambient-background.css?v=20261003-login-wallpaper-v2">
-  <script defer src="/assets/ambient-background.js?v=20261003-login-wallpaper-v1"></script>
+  <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
+  <script defer src="/assets/ambient-background.js?v=20261006-login-cache-v2"></script>
 </head>
 <body>
   <div class="ambient-background" aria-hidden="true">
-    <video id="loginBackgroundVideo" class="login-background-video" muted loop playsinline preload="auto" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
-      <source src="/assets/video/little-feet-login-wallpaper.mp4?v=20261003-hq-v3" type="video/mp4">
+    <video id="loginBackgroundVideo" class="login-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-login-clean.jpg" tabindex="-1">
+      <source src="/assets/video/little-feet-login-clean.mp4" type="video/mp4">
     </video>
-    <video id="ambientBackgroundVideo" class="portal-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-ambient-poster.jpg" tabindex="-1">
-      <source src="/assets/video/little-feet-ambient-silent.mp4" type="video/mp4">
+    <video id="ambientBackgroundVideo" class="portal-background-video" muted loop playsinline preload="metadata" poster="/assets/video/little-feet-login-clean.jpg" tabindex="-1">
+      <source src="/assets/video/little-feet-login-clean.mp4" type="video/mp4">
     </video>
   </div>
   <audio id="littleFeetAntarcticAudio" preload="auto" loop hidden>
@@ -6301,14 +6392,14 @@
 <g class="penguin-wave"><image href="assets/brand/iceberg-blue-eyes.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
 </svg></button></div>
 <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
-        <p class="slogan"><span>Every Little Step Matters</span></p>
+        <p class="slogan"><span data-lf-i18n="tagline">Every Little Step Matters</span></p>
       </div>
       <div class="login-card-tools">
         <span class="login-secure-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="securePortal">Secure school portal</span></span>
         <div class="login-card-actions">
-          <label class="login-language-pill" for="loginLanguagePreference" title="Display language">
+          <label class="login-language-pill" for="loginLanguagePreference" title="Display language" data-lf-i18n-title="displayLanguage">
             <svg class="ui-icon" aria-hidden="true"><use href="#icon-globe"></use></svg>
-            <select id="loginLanguagePreference" data-no-draft aria-label="Display language">
+            <select id="loginLanguagePreference" data-no-draft aria-label="Display language" data-lf-i18n-aria-label="displayLanguage">
               <option value="en">English</option>
               <option value="af">Afrikaans</option>
               <option value="zu">isiZulu</option>
@@ -6322,8 +6413,8 @@
               <option value="nr">isiNdebele</option>
             </select>
           </label>
-          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Sound On</span></button>
-          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="loginBackgroundVideo ambientBackgroundVideo" aria-pressed="false">Play background</button>
+          <button type="button" class="action-btn btn-blue login-audio-compact" data-portal-audio-mute data-mute-label="Sound On" data-unmute-label="Muted" onclick="togglePortalAudioMute()" aria-label="Sound on. Mute Little Feet sound" title="Sound on — click to mute"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span data-lf-i18n="soundOn">Sound On</span></button>
+          <button id="backgroundMotionToggle" class="action-btn btn-blue login-background-compact" type="button" aria-controls="loginBackgroundVideo ambientBackgroundVideo" aria-pressed="false" data-lf-i18n="playBackground">Play background</button>
         </div>
       </div>
       <p class="login-access-note" data-lf-i18n="accessNote">School-managed, role-based access for approved Little Feet accounts.</p>
@@ -6331,16 +6422,29 @@
       <form id="loginForm">
         <div>
           <label for="loginUsername"><span data-lf-i18n="usernameLabel">Staff ID or Parent Email</span> <span class="req">*</span></label>
-          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" autocomplete="username" required>
+          <input type="text" id="loginUsername" placeholder="e.g. teacher@school.com or Parent@school.com" data-lf-i18n-placeholder="usernamePlaceholder" autocomplete="username" required>
         </div>
         <div>
           <label for="loginPin"><span data-lf-i18n="passwordLabel">Security PIN / Password</span> <span class="req">*</span></label>
           <div class="password-field">
             <input type="password" id="loginPin" placeholder="••••••••" autocomplete="current-password" required>
-            <button type="button" class="password-toggle" id="loginPinToggle" aria-label="Show password" aria-controls="loginPin" aria-pressed="false" title="Show password" onclick="toggleLoginPinVisibility()">
+            <button type="button" class="password-toggle" id="loginPinToggle" aria-label="Show password" data-lf-i18n-aria-label="showPassword" aria-controls="loginPin" aria-pressed="false" title="Show password" data-lf-i18n-title="showPassword" onclick="toggleLoginPinVisibility()">
               <svg class="ui-icon icon-eye" aria-hidden="true"><use href="#icon-eye"></use></svg>
               <svg class="ui-icon icon-eye-off" aria-hidden="true"><use href="#icon-eye-off"></use></svg>
             </button>
+          </div>
+        </div>
+        <div id="loginHumanCheckPanel" class="login-human-check" aria-live="polite">
+          <label for="loginHumanCheckAnswer"><span data-lf-i18n="securityCheck">Security check</span> <span class="req">*</span></label>
+          <span id="loginHumanCheckPrompt" class="login-human-check-prompt" data-lf-i18n="loadingSecurityCheck">Loading security check…</span>
+          <div class="login-human-check-row">
+            <input type="text" id="loginHumanCheckAnswer" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="Answer" data-lf-i18n-placeholder="answerPlaceholder" required disabled>
+            <button type="button" class="action-btn btn-blue" onclick="loadLoginHumanCheck()" data-lf-i18n="newCheck">New check</button>
+          </div>
+          <input type="hidden" id="loginHumanCheckId">
+          <div class="login-human-trap" aria-hidden="true">
+            <label for="loginCompanyWebsite">Leave this field empty</label>
+            <input type="text" id="loginCompanyWebsite" tabindex="-1" autocomplete="off">
           </div>
         </div>
         <div class="login-utility-row">
@@ -6353,10 +6457,10 @@
         <button type="submit" class="submit-btn"><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg><span data-lf-i18n="signIn">Secure Account Login</span></button>
 
         <div class="login-divider"><span data-lf-i18n="otherSignIn">Other sign-in options</span></div>
-        <div class="social-signin" aria-label="Sign in with a connected provider">
-          <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')">Continue with Google</button>
-          <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')">Continue with Yahoo</button>
-          <button type="button" data-provider-signin="microsoft" onclick="startProviderSignIn('microsoft')">Continue with Microsoft</button>
+        <div class="social-signin" aria-label="Sign in with a connected provider" data-lf-i18n-aria-label="providerLabel">
+          <button type="button" data-provider-signin="google" onclick="startProviderSignIn('google')" data-lf-i18n="continueGoogle">Continue with Google</button>
+          <button type="button" data-provider-signin="yahoo" onclick="startProviderSignIn('yahoo')" data-lf-i18n="continueYahoo">Continue with Yahoo</button>
+          <button type="button" data-provider-signin="microsoft" onclick="startProviderSignIn('microsoft')" data-lf-i18n="continueMicrosoft">Continue with Microsoft</button>
         </div>
       </form>
 
@@ -6371,58 +6475,58 @@
           <span aria-hidden="true">•</span>
           <button type="button" class="legal-inline-link" onclick="openTermsOfService()" data-lf-i18n="termsLink">Terms</button>
           <span aria-hidden="true">•</span>
-          <button type="button" class="legal-inline-link" onclick="openAboutLittleFeet()">About Little Feet</button>
+          <button type="button" class="legal-inline-link" onclick="openAboutLittleFeet()" data-lf-i18n="aboutLittleFeet">About Little Feet</button>
         </div>
       </div>
 
       <form id="signupForm" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-color);">
-        <h3 style="margin-bottom:10px;color:var(--text-dark);">Create your account</h3>
-        <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px;">Teachers and principals are marked for school verification after creating an account.</p>
-        <div><label for="signupName">Full name *</label><input id="signupName" required autocomplete="name"></div>
-        <div><label for="signupUsername">Email or username *</label><input id="signupUsername" required autocomplete="username"></div>
-        <div><label for="signupPin">Password / PIN *</label><input id="signupPin" type="password" minlength="4" required autocomplete="new-password"></div>
-        <div><label for="signupRole">I am a *</label><select id="signupRole" required><option value="parent">Parent / Guardian</option><option value="teacher">Teacher / Educator</option><option value="principal">Principal</option></select></div>
-        <div><label for="signupSchool">Linked school name *</label><input id="signupSchool" required autocomplete="organization" placeholder="Enter your school name"></div>
-        <div><label for="signupLinkedLearners">Learner name(s) for your request <span style="font-weight:normal;">(parents only)</span></label><input id="signupLinkedLearners" name="requestedLearnerLinks" placeholder="Optional — your school must approve every learner link"><small style="display:block;margin-top:-6px;margin-bottom:10px;color:var(--text-muted);">For privacy, typing a learner name does not create access. An administrator must confirm the parent–learner relationship.</small></div>
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:.78rem;"><input id="signupTermsAccepted" type="checkbox" required style="width:auto;margin-top:3px;"> <span>I confirm I am authorised to create this account and have read and accept the <button type="button" class="legal-inline-link" onclick="openPopiaPrivacyNotice()">Privacy &amp; POPIA Notice</button> and <button type="button" class="legal-inline-link" onclick="openTermsOfService()">Terms of Service</button>. I understand that child data may only be used for authorised school purposes.</span></label>
-        <div style="display:flex;gap:9px;flex-wrap:wrap;"><button class="submit-btn" style="margin:0;">Create account</button><button type="button" class="action-btn btn-blue" onclick="hideSignupForm()">Cancel</button></div>
+        <h3 style="margin-bottom:10px;color:var(--text-dark);" data-lf-i18n="signupTitle">Create your account</h3>
+        <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px;" data-lf-i18n="signupIntro">Teachers and principals are marked for school verification after creating an account.</p>
+        <div><label for="signupName"><span data-lf-i18n="fullName">Full name</span> *</label><input id="signupName" required autocomplete="name"></div>
+        <div><label for="signupUsername"><span data-lf-i18n="emailUsername">Email or username</span> *</label><input id="signupUsername" required autocomplete="username"></div>
+        <div><label for="signupPin"><span data-lf-i18n="signupPassword">Password / PIN</span> *</label><input id="signupPin" type="password" minlength="4" required autocomplete="new-password"></div>
+        <div><label for="signupRole"><span data-lf-i18n="iAmA">I am a</span> *</label><select id="signupRole" required><option value="parent" data-lf-i18n="roleParent">Parent / Guardian</option><option value="teacher" data-lf-i18n="roleTeacher">Teacher / Educator</option><option value="principal" data-lf-i18n="rolePrincipal">Principal</option></select></div>
+        <div><label for="signupSchool"><span data-lf-i18n="linkedSchoolName">Linked school name</span> *</label><input id="signupSchool" required autocomplete="organization" placeholder="Enter your school name" data-lf-i18n-placeholder="schoolNamePlaceholder"></div>
+        <div><label for="signupLinkedLearners"><span data-lf-i18n="learnerNames">Learner name(s) for your request</span> <span style="font-weight:normal;" data-lf-i18n="parentsOnly">(parents only)</span></label><input id="signupLinkedLearners" name="requestedLearnerLinks" placeholder="Optional — your school must approve every learner link" data-lf-i18n-placeholder="learnerPlaceholder"><small style="display:block;margin-top:-6px;margin-bottom:10px;color:var(--text-muted);" data-lf-i18n="learnerPrivacy">For privacy, typing a learner name does not create access. An administrator must confirm the parent–learner relationship.</small></div>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:.78rem;"><input id="signupTermsAccepted" type="checkbox" required style="width:auto;margin-top:3px;"> <span><span data-lf-i18n="signupAgreementIntro">I confirm I am authorised to create this account and have read and accept the</span> <button type="button" class="legal-inline-link" data-lf-i18n="privacyNotice" onclick="openPopiaPrivacyNotice()">Privacy &amp; POPIA Notice</button> <span data-lf-i18n="agreementAnd">and</span> <button type="button" class="legal-inline-link" data-lf-i18n="termsService" onclick="openTermsOfService()">Terms of Service</button><span data-lf-i18n="signupAgreementEnd">. I understand that child data may only be used for authorised school purposes.</span></span></label>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;"><button class="submit-btn" style="margin:0;" data-lf-i18n="createAccount">Create account</button><button type="button" class="action-btn btn-blue" onclick="hideSignupForm()" data-lf-i18n="cancel">Cancel</button></div>
       </form>
 
     </div>
-    <div class="login-info-runner" role="region" aria-label="About Little Feet">
+    <div class="login-info-runner" role="region" aria-label="About Little Feet" data-lf-i18n-aria-label="aboutLittleFeet">
       <div class="login-info-runner-track">
         <div class="login-info-runner-group">
           <strong>Little Feet</strong>
-          <span>is a secure ECD, primary and secondary school operations platform</span>
+          <span data-lf-i18n="tickerPlatform">is a secure ECD, primary and secondary school operations platform</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Learning &amp; development</span>
+          <span data-lf-i18n="tickerLearning">Learning &amp; development</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Attendance &amp; daily care</span>
+          <span data-lf-i18n="tickerAttendance">Attendance &amp; daily care</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Family communication</span>
+          <span data-lf-i18n="tickerFamily">Family communication</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Finance &amp; school operations</span>
+          <span data-lf-i18n="tickerFinance">Finance &amp; school operations</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>Safeguarding, privacy &amp; support</span>
+          <span data-lf-i18n="tickerSafeguarding">Safeguarding, privacy &amp; support</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
-          <span>One connected place for everyday school life</span>
+          <span data-lf-i18n="tickerConnected">One connected place for everyday school life</span>
           <span class="login-info-runner-dot" aria-hidden="true">●</span>
         </div>
         <div class="login-info-runner-group" aria-hidden="true">
           <strong>Little Feet</strong>
-          <span>is a secure ECD, primary and secondary school operations platform</span>
+          <span data-lf-i18n="tickerPlatform">is a secure ECD, primary and secondary school operations platform</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Learning &amp; development</span>
+          <span data-lf-i18n="tickerLearning">Learning &amp; development</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Attendance &amp; daily care</span>
+          <span data-lf-i18n="tickerAttendance">Attendance &amp; daily care</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Family communication</span>
+          <span data-lf-i18n="tickerFamily">Family communication</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Finance &amp; school operations</span>
+          <span data-lf-i18n="tickerFinance">Finance &amp; school operations</span>
           <span class="login-info-runner-dot">●</span>
-          <span>Safeguarding, privacy &amp; support</span>
+          <span data-lf-i18n="tickerSafeguarding">Safeguarding, privacy &amp; support</span>
           <span class="login-info-runner-dot">●</span>
-          <span>One connected place for everyday school life</span>
+          <span data-lf-i18n="tickerConnected">One connected place for everyday school life</span>
           <span class="login-info-runner-dot">●</span>
         </div>
       </div>
@@ -6640,7 +6744,7 @@
                 alt="" decoding="async" fetchpriority="high">
             </picture>
             <picture class="cinematic-paused-picture" aria-hidden="true">
-              <img src="/assets/images/little-feet-cinematic-paused-school.avif?v=20261001-paused-v3"
+              <img src="/assets/images/little-feet-underwater-cover.webp"
                 alt="" loading="lazy" decoding="async">
             </picture>
             <div class="cinematic-surface-air" aria-hidden="true"></div>
@@ -7533,11 +7637,11 @@
             <p style="color:var(--text-muted);margin:0 0 12px;">Use this as the public learner-capacity guide. Tier names show a common fit, not an age restriction: a school should choose by learner capacity and the grades it actually offers.</p>
             <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;">
               <table style="width:100%;min-width:700px;border-collapse:collapse;text-align:left;">
-                <thead><tr><th style="padding:10px;">Package tier</th><th style="padding:10px;">Common fit</th><th style="padding:10px;">School size</th><th style="padding:10px;">Monthly price</th><th style="padding:10px;">Extra learner rate</th></tr></thead>
+                <thead><tr><th style="padding:10px;">Package tier</th><th style="padding:10px;">Common fit</th><th style="padding:10px;">Included / ceiling</th><th style="padding:10px;">Monthly price</th><th style="padding:10px;">Extra learner rate</th></tr></thead>
                 <tbody>
-                  <tr><td style="padding:10px;"><strong>Micro / ECD</strong></td><td style="padding:10px;">Day care / ECD · Birth–4/5 · small Grade R or micro school</td><td style="padding:10px;">Up to 30 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 per learner / month</td></tr>
-                  <tr style="background:rgba(45,212,191,.08);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Primary · typically Grades R–7 · approx. 5–13 years</td><td style="padding:10px;">Up to 250 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 per learner / month</td></tr>
-                  <tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Large primary, secondary/high Grades 8–12, or combined school</td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package — no overage</td></tr>
+                  <tr><td style="padding:10px;"><strong>Micro / ECD</strong></td><td style="padding:10px;">Day care / ECD · Birth–4/5 · small Grade R or micro school</td><td style="padding:10px;">30 included · paid overage up to 250 learners</td><td style="padding:10px;"><strong>R350 / month</strong></td><td style="padding:10px;">R10 per learner / month above 30</td></tr>
+                  <tr style="background:rgba(45,212,191,.08);"><td style="padding:10px;"><strong>Standard Primary</strong></td><td style="padding:10px;">Primary · typically Grades R–7 · approx. 5–13 years</td><td style="padding:10px;">250 included · paid overage up to 1,000 learners</td><td style="padding:10px;"><strong>R1,500 / month</strong></td><td style="padding:10px;">R6 per learner / month above 250</td></tr>
+                  <tr><td style="padding:10px;"><strong>Enterprise Campus</strong></td><td style="padding:10px;">Large primary, secondary/high Grades 8–12, or combined school</td><td style="padding:10px;">Up to 1,000 learners</td><td style="padding:10px;"><strong>R7,500 / month</strong></td><td style="padding:10px;">Flat package · no overage</td></tr>
                 </tbody>
               </table>
             </div>
@@ -7550,7 +7654,7 @@
             <p style="color:var(--text-muted);margin:0 0 12px;">A clear launch path for each school before its subscription begins.</p>
             <div class="workspace-grid">
               <div><h4 style="margin:0 0 5px;">Week 1: Integration</h4><p style="margin:0;color:var(--text-muted);font-size:.84rem;line-height:1.5;">Import learner, family, class and approved school data; then review roles and consent records.</p></div>
-              <div><h4 style="margin:0 0 5px;">Two-week trial</h4><p style="margin:0;color:var(--text-muted);font-size:.84rem;line-height:1.5;">Use the agreed plan with real school workflows before the subscription contract starts.</p></div>
+              <div><h4 style="margin:0 0 5px;">Two-week trial</h4><p style="margin:0;color:var(--text-muted);font-size:.84rem;line-height:1.5;">Use Little Feet with real school workflows for 14 days. When the trial ends, normal school access pauses until a school subscription is activated.</p></div>
               <div><h4 style="margin:0 0 5px;">Launch support</h4><p style="margin:0;color:var(--text-muted);font-size:.84rem;line-height:1.5;">Confirm staff training, parent access and go-live checks together before inviting the full school community.</p></div>
             </div>
             <p style="margin:14px 0 0;color:var(--text-muted);font-size:.78rem;">Commercial terms: 30-day money-back guarantee, 36-month agreement, cancellation and post-contract customisation fees are set in the signed school quotation. No fee or agreement is created by viewing this page.</p>
@@ -7690,7 +7794,7 @@
         <div class="card"><div class="card-header-bar"><h2 class="icon-label"><span class="professional-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-operations"></use></svg></span><span>Personal settings</span></h2><span class="badge-tag info">YOUR PREFERENCES</span></div>
           <p style="color:var(--text-muted);margin-bottom:16px;">These settings are saved on this device for the signed-in account.</p>
           <div class="workspace-grid">
-            <div class="workspace-card"><h3>Profile icon</h3><p>Choose your Little Feet penguin shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your penguin profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="classic" aria-label="Classic penguin" title="Classic penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-classic" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-classic"></use></svg><span class="profile-icon-label">Classic</span></button><button type="button" class="profile-icon-choice" data-profile-icon="lady" aria-label="Lady penguin" title="Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-lady" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-lady"></use></svg><span class="profile-icon-label">Lady</span></button><button type="button" class="profile-icon-choice" data-profile-icon="tough" aria-label="Tough penguin" title="Tough penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-tough" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-tough"></use></svg><span class="profile-icon-label">Tough</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cute" aria-label="Cute penguin" title="Cute penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-cute" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-cute"></use></svg><span class="profile-icon-label">Cute</span></button><button type="button" class="profile-icon-choice" data-profile-icon="happy" aria-label="Happy penguin" title="Happy penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-happy" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-happy"></use></svg><span class="profile-icon-label">Happy</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cool" aria-label="Cool penguin" title="Cool penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-cool" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-cool"></use></svg><span class="profile-icon-label">Cool</span></button><button type="button" class="profile-icon-choice" data-profile-icon="boss" aria-label="Boss penguin" title="Boss penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-boss" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-boss"></use></svg><span class="profile-icon-label">Boss</span></button><button type="button" class="profile-icon-choice" data-profile-icon="smart-lady" aria-label="Smart Lady penguin" title="Smart Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-smart-lady" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261002-avatar-svg-v2#avatar-smart-lady"></use></svg><span class="profile-icon-label">Smart Lady</span></button></div></div>
+            <div class="workspace-card"><h3>Profile icon</h3><p>Choose your Little Feet penguin shown beside your name in the top bar.</p><div class="profile-icon-picker" role="group" aria-label="Choose your penguin profile icon"><button type="button" class="profile-icon-choice" data-profile-icon="classic" aria-label="Classic penguin" title="Classic penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-classic" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-classic"></use></svg><span class="profile-icon-label">Classic</span></button><button type="button" class="profile-icon-choice" data-profile-icon="lady" aria-label="Lady penguin" title="Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-lady" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-lady"></use></svg><span class="profile-icon-label">Lady</span></button><button type="button" class="profile-icon-choice" data-profile-icon="tough" aria-label="Tough penguin" title="Tough penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-tough" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-tough"></use></svg><span class="profile-icon-label">Tough</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cute" aria-label="Cute penguin" title="Cute penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-cute" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-cute"></use></svg><span class="profile-icon-label">Cute</span></button><button type="button" class="profile-icon-choice" data-profile-icon="happy" aria-label="Happy penguin" title="Happy penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-happy" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-happy"></use></svg><span class="profile-icon-label">Happy</span></button><button type="button" class="profile-icon-choice" data-profile-icon="cool" aria-label="Cool penguin" title="Cool penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-cool" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-cool"></use></svg><span class="profile-icon-label">Cool</span></button><button type="button" class="profile-icon-choice" data-profile-icon="boss" aria-label="Boss penguin" title="Boss penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-boss" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-boss"></use></svg><span class="profile-icon-label">Boss</span></button><button type="button" class="profile-icon-choice" data-profile-icon="smart-lady" aria-label="Smart Lady penguin" title="Smart Lady penguin" aria-pressed="false" onclick="selectProfileIcon(this.dataset.profileIcon)"><svg class="profile-avatar-image profile-avatar-smart-lady" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-smart-lady"></use></svg><span class="profile-icon-label">Smart Lady</span></button></div></div>
             <div class="workspace-card"><h3>Language</h3><p>Choose your preferred display language. Core navigation and settings are translated; untranslated workspace text safely falls back to English.</p><select id="languagePreference" data-no-draft onchange="saveUserPreferences()"><option value="en">English</option><option value="af">Afrikaans</option><option value="zu">isiZulu</option><option value="xh">isiXhosa</option><option value="nso">Sepedi</option><option value="st">Sesotho</option><option value="tn">Setswana</option><option value="ss">siSwati</option><option value="ve">Tshivenda</option><option value="ts">itsonga</option><option value="nr">isiNdebele</option></select><p class="meta" style="margin-top:8px;">South African Sign Language (SASL) is an official language. Text translation is not a substitute for signed content, so SASL accessibility content is tracked separately rather than shown as a fake text translation.</p></div>
             <div class="workspace-card"><h3>Dashboard refresh</h3><p>Keep the dashboard current without hammering the API. Smart refresh updates only the active workspace and pauses while this tab is hidden.</p><select id="refreshPreference" data-no-draft onchange="saveUserPreferences()"><option value="0">Manual refresh only</option><option value="auto">Auto (smart · 2–5 minutes)</option><option value="300000">Every 5 minutes</option><option value="900000">Every 15 minutes</option><option value="1800000">Every 30 minutes</option><option value="3600000">Every hour</option><option value="7200000">Every 2 hours</option><option value="86400000">Every day</option></select><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="action-btn btn-blue" onclick="refreshDashboardSafely()">Refresh now safely</button></div><p class="meta" style="margin-top:8px;">Draft protection uses this browser tab only. Passwords, PINs, one-time codes, signatures and files are never stored in the draft checkpoint.</p></div>
             <div class="workspace-card"><h3>Little Feet sound</h3><p>Mute penguin calls, alerts, wallpaper audio and other optional Little Feet sounds. This choice is remembered for your account on this device.</p><button type="button" class="action-btn btn-blue" data-portal-audio-mute onclick="togglePortalAudioMute()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg><span>Mute Little Feet</span></button></div>
@@ -7824,9 +7928,9 @@
   </section>
 
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261004-antarctic-audio-clean-v1" defer></script>
+  <script src="backup.js?v=20261007-school-core-audio-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
-  <script src="/assets/my-day.js?v=20261001-startup-dedupe-v1" defer></script>
+  <script src="/assets/my-day.js?v=20261004-navy-v1" defer></script>
   <script src="/assets/staff-work.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/approvals.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/staff-notices.js?v=20261001-startup-dedupe-v1" defer></script>
@@ -7835,10 +7939,11 @@
   <script src="/assets/resource-booking.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/purchase-requests.js?v=20261001-startup-dedupe-v1" defer></script>
   <script src="/assets/workplace-extended.js?v=20261002-responsive-header-v1" defer></script>
-  <script src="/assets/preferences-enhancements.js?v=20261001-api-refresh-flood-v1" defer></script>
+  <script src="/assets/preferences-enhancements.js?v=20261006-login-i18n-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20261002-about-v1" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20260925-finance-v1" defer></script>
+  <script src="/assets/school-core-upgrades.js?v=20261007-school-core-v3" defer></script>
   <script src="/assets/mobile-pwa.js?v=20260925-pwa-v1" defer></script>
   <script>
     window.addEventListener('load', () => {

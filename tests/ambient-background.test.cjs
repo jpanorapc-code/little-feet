@@ -95,6 +95,34 @@ async function main() {
         return audio.right <= card.right + 1 && audio.left >= language.right - 1;
       });
       assert.ok(desktopToolsFit, 'Desktop login language and sound controls must not overlap or escape the card');
+
+      await page.locator('#loginLanguagePreference').selectOption('af');
+      await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.includes('Veilige'));
+      assert.equal((await page.locator('.slogan').textContent()).trim(), 'Elke klein tree maak saak');
+      assert.equal((await page.locator('[data-lf-i18n="securePortal"]').textContent()).trim(), 'Veilige skoolportaal');
+      assert.equal((await page.locator('[data-lf-i18n="securityCheck"]').textContent()).trim(), 'Sekuriteitskontrole');
+      assert.equal(await page.locator('#loginHumanCheckAnswer').getAttribute('placeholder'), 'Antwoord');
+      assert.equal((await page.locator('[data-lf-i18n="newCheck"]').textContent()).trim(), 'Nuwe kontrole');
+      assert.equal((await page.locator('[data-lf-i18n="continueGoogle"]').textContent()).trim(), 'Gaan voort met Google');
+      assert.equal((await page.locator('[data-lf-i18n="aboutLittleFeet"]').textContent()).trim(), 'Oor Little Feet');
+      assert.equal((await page.locator('[data-lf-i18n="tickerLearning"]').first().textContent()).trim(), 'Leer & ontwikkeling');
+      assert.equal((await page.locator('#backgroundMotionToggle').textContent()).trim(), 'Pouseer agtergrond');
+      await page.locator('.login-new-account button').click();
+      assert.equal((await page.locator('[data-lf-i18n="signupTitle"]').textContent()).trim(), 'Skep jou rekening');
+      assert.equal((await page.locator('[data-lf-i18n="fullName"]').textContent()).trim(), 'Volle naam');
+      assert.equal(await page.locator('#signupSchool').getAttribute('placeholder'), 'Voer jou skoolnaam in');
+      assert.equal((await page.locator('[data-lf-i18n="cancel"]').textContent()).trim(), 'Kanselleer');
+      await page.locator('[data-lf-i18n="cancel"]').click();
+
+      await page.locator('#loginLanguagePreference').selectOption('zu');
+      await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.includes('Iphothali'));
+      assert.equal((await page.locator('.slogan').textContent()).trim(), 'Zonke izinyathelo ezincane zibalulekile');
+      assert.equal((await page.locator('[data-lf-i18n="securityCheck"]').textContent()).trim(), 'Ukuhlola ukuphepha');
+      assert.equal(await page.locator('#loginHumanCheckAnswer').getAttribute('placeholder'), 'Impendulo');
+      assert.equal((await page.locator('[data-lf-i18n="tickerFamily"]').first().textContent()).trim(), 'Ukuxhumana nomndeni');
+
+      await page.locator('#loginLanguagePreference').selectOption('en');
+      await page.waitForFunction(() => document.querySelector('[data-lf-i18n="securePortal"]')?.textContent.trim() === 'Secure school portal');
       assert.equal(await page.locator('.login-audio-compact span').textContent(), 'Sound On');
       assert.equal(await page.locator('.login-audio-compact use').getAttribute('href'), '#icon-volume');
       assert.equal(await page.locator('.login-audio-compact').getAttribute('aria-pressed'), 'false');
@@ -105,15 +133,38 @@ async function main() {
       assert.ok(await page.locator('.login-audio-compact').evaluate(el => el.classList.contains('is-muted')), 'Muted button should expose a muted visual state');
       await page.locator('.login-audio-compact').click();
       await page.setViewportSize({width:390,height:844});
-      const mobileToolsFit = await page.evaluate(() => {
+      const mobileLoginState = await page.evaluate(() => {
         const card = document.querySelector('.auth-card').getBoundingClientRect();
         const language = document.querySelector('.login-language-pill').getBoundingClientRect();
         const audio = document.querySelector('.login-audio-compact').getBoundingClientRect();
-        return audio.right <= card.right + 1 && audio.left >= language.right - 1;
+        const username = document.getElementById('loginUsername');
+        const pinInput = document.getElementById('loginPin');
+        const submit = document.querySelector('#loginForm button[type="submit"]');
+        const hit = element => {
+          const rect = element.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          const top = document.elementFromPoint(x, y);
+          return top === element || element.contains(top);
+        };
+        return {
+          toolsFit: audio.right <= card.right + 1 && audio.left >= language.right - 1,
+          usernameHit: hit(username),
+          pinHit: hit(pinInput),
+          submitHit: hit(submit),
+          brandPointerEvents: getComputedStyle(document.querySelector('.brand-header')).pointerEvents,
+          cardPointerEvents: getComputedStyle(document.querySelector('.auth-card')).pointerEvents
+        };
       });
-      assert.ok(mobileToolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      const rememberWidth = await page.locator('#rememberLogin').evaluate(el => el.getBoundingClientRect().width);
+      assert.ok(rememberWidth <= 24, 'Remember-email checkbox must not stretch across the mobile form');
+      assert.ok(mobileLoginState.toolsFit, 'Mobile login language and sound controls must not overlap or escape the card');
+      assert.ok(mobileLoginState.usernameHit, 'Mobile username field must receive taps');
+      assert.ok(mobileLoginState.pinHit, 'Mobile PIN field must receive taps');
+      assert.ok(mobileLoginState.submitHit, 'Mobile login submit button must receive taps');
+      assert.equal(mobileLoginState.brandPointerEvents, 'none', 'Decorative mobile brand layer must not steal form taps');
+      assert.equal(mobileLoginState.cardPointerEvents, 'auto', 'Mobile login card must remain interactive');
       await page.screenshot({ path:path.join(root,'tmp','mobile-login-video.png') });
-      await page.setViewportSize({width:1440,height:1000});
     }
     await page.locator('#loginPinToggle').click();
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'text');
@@ -121,15 +172,29 @@ async function main() {
     assert.equal(await page.locator('#loginPin').getAttribute('type'), 'password');
     await page.locator('#loginUsername').fill(`browser-${role}`);
     await page.locator('#loginPin').fill(pin);
+    if (role === 'admin') await page.locator('#rememberLogin').check();
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({ state: 'visible' });
+    await page.locator('#authSection').waitFor({ state: 'hidden' });
     await page.waitForLoadState('domcontentloaded');
     if (role === 'admin') {
+      // Admin signs in while the viewport is still phone-sized. Restore desktop
+      // only after the mobile login has successfully transitioned into the portal.
+      await page.setViewportSize({width:1440,height:1000});
       await page.waitForFunction(() => {
         const login = document.getElementById('loginBackgroundVideo');
         const portal = document.getElementById('ambientBackgroundVideo');
         return login?.paused && portal?.readyState >= 2 && !portal.paused && portal.currentTime > 0;
       });
+    }
+    if (role === 'admin') {
+      const mediaSources = await page.evaluate(() => ['loginBackgroundVideo','ambientBackgroundVideo'].map(id => document.getElementById(id).currentSrc));
+      assert.equal(mediaSources[0], mediaSources[1], 'Login and portal must use the same clean video');
+      for (const icon of ['classic','lady','tough','cute','happy','cool','boss','smart-lady']) {
+        await page.evaluate(icon => selectProfileIcon(icon), icon);
+        const selected = await page.locator('.user-avatar use').first().getAttribute('href');
+        assert.ok(selected.endsWith('#avatar-' + icon), 'Selected portrait must appear in the header');
+      }
     }
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();
