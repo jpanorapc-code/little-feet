@@ -312,13 +312,15 @@ function registerAdvancedSchoolOperations(app, deps) {
   const decodeSupportJson=value=>{try{const parsed=JSON.parse(decryptStoredField(value)||'[]');return Array.isArray(parsed)?parsed:[];}catch{return [];}};
   const supportProfileView=(row,actor)=>{
     const accommodations=decodeSupportJson(row.accommodations);
-    const base={id:row.id,learnerName:row.learnerName,status:row.status||'Active',reviewDate:row.reviewDate||'',supportAreas:decodeSupportJson(row.supportAreas),accommodations:actor?.role==='parent'?accommodations.filter(item=>item.status==='Active'):accommodations,parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,createdBy:row.createdBy,updatedAt:row.updatedAt||row.createdAt,updatedBy:row.updatedBy||row.createdBy};
-    if(actor?.role!=='parent'){base.supportNeeds=decryptStoredField(row.supportNeeds);base.staffNotes=decryptStoredField(row.staffNotes);}
+    const reviewDate=row.reviewDate||'',reviewDue=Boolean(reviewDate&&reviewDate<=dateKeyInSouthAfrica()&&row.status!=='Closed');
+    const base={id:row.id,learnerName:row.learnerName,status:row.status||'Active',reviewDate,reviewDue,supportAreas:decodeSupportJson(row.supportAreas),accommodations:actor?.role==='parent'?accommodations.filter(item=>item.status==='Active'):accommodations,parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,updatedAt:row.updatedAt||row.createdAt};
+    if(actor?.role!=='parent'){base.supportNeeds=decryptStoredField(row.supportNeeds);base.staffNotes=decryptStoredField(row.staffNotes);base.createdBy=row.createdBy;base.updatedBy=row.updatedBy||row.createdBy;}
     return base;
   };
   const interventionView=(row,actor)=>{
-    const base={id:row.id,profileId:row.profileId,learnerName:row.learnerName,title:row.title,owner:row.owner,startDate:row.startDate,reviewDate:row.reviewDate,status:row.status,parentVisible:Boolean(row.parentVisible),parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,createdBy:row.createdBy,updatedAt:row.updatedAt||row.createdAt};
-    if(actor?.role!=='parent'){base.strategy=decryptStoredField(row.strategy);base.outcomeMeasure=decryptStoredField(row.outcomeMeasure);base.staffNotes=decryptStoredField(row.staffNotes);base.outcome=decryptStoredField(row.outcome);}
+    const reviewDate=row.reviewDate||'',reviewDue=Boolean(reviewDate&&reviewDate<=dateKeyInSouthAfrica()&&!['Completed','Stopped'].includes(row.status));
+    const base={id:row.id,profileId:row.profileId,learnerName:row.learnerName,title:row.title,owner:row.owner,startDate:row.startDate,reviewDate,reviewDue,status:row.status,parentVisible:Boolean(row.parentVisible),parentSummary:decryptStoredField(row.parentSummary),createdAt:row.createdAt,updatedAt:row.updatedAt||row.createdAt};
+    if(actor?.role!=='parent'){base.strategy=decryptStoredField(row.strategy);base.outcomeMeasure=decryptStoredField(row.outcomeMeasure);base.staffNotes=decryptStoredField(row.staffNotes);base.outcome=decryptStoredField(row.outcome);base.createdBy=row.createdBy;}
     return base;
   };
   const supportProfileFor=(actor,id)=>schoolRecords('learnerSupportProfiles',actor).find(row=>row.id===id);
