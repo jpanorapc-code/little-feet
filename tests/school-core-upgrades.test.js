@@ -225,6 +225,13 @@ async function login(username,pin){
     assert.equal(gatewayRequests.some(row=>row.url==='/sms'&&row.body.to==='+27110000001'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/push'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/whatsapp'),true);
+    const parentInbox=await request('/api/communications/inbox',{cookie:parent});
+    assert.equal(parentInbox.response.status,200,parentInbox.text);
+    assert.equal(parentInbox.data.some(row=>row.id===campaign.data.campaign.id),true);
+    const readReceipt=await request('/api/communications/campaigns/'+campaign.data.campaign.id+'/read',{method:'POST',cookie:parent,body:{}});
+    assert.equal(readReceipt.response.status,200,readReceipt.text);
+    const parentInboxAfterRead=await request('/api/communications/inbox',{cookie:parent});
+    assert.ok(parentInboxAfterRead.data.find(row=>row.id===campaign.data.campaign.id).readAt);
     const scheduledAt=new Date(Date.now()+10*60*1000).toISOString();
     const scheduled=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'Later update',message:'Scheduled provider test',audience:'parents',channels:['email'],scheduledAt}});
     assert.equal(scheduled.response.status,201,scheduled.text);
