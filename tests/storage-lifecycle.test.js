@@ -30,7 +30,8 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-parent-one', pinHash: pinHash('ParentPass1'), name: 'Parent One', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: [] },
     { username: 'alpha-parent-two', pinHash: pinHash('ParentPass2'), name: 'Parent Two', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: ['Other Learner'] },
-    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
+    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
+    { username: 'bravo-parent', pinHash: pinHash('BravoParent1'), name: 'Bravo Parent', role: 'parent', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active', linkedLearners: [] }
   ],
   students: [{ id: 'other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-alpha', schoolName: 'Alpha School' }], registry: [], tickets: [],
   posts: [], worksheets: [], fileRecords: [], storageCleanupJobs: [], admissionsApplications: [], admissionsStatusHistory: [], documentAudit: [],
