@@ -117,6 +117,17 @@ const login = async (username, pin) => {
       assert.equal(verified.response.status, 200, verified.data?.message);
     }
 
+    const approved = await request('/api/admissions/applications/' + applicationId + '/status', { method: 'PATCH', cookie: principalCookie, body: { status: 'Approved', note: 'Place offered' } });
+    assert.equal(approved.response.status, 200, approved.data?.message);
+    assert.equal(approved.data.application.documents.complete, true);
+
+    const enrolled = await request('/api/admissions/applications/' + applicationId + '/enrol', { method: 'POST', cookie: alphaCookie, body: {
+      className: 'Grade 1', address: '1 Test Street', emergencyContact: 'Emergency contact', medicalNotes: '', consent: 'Parent consent received'
+    } });
+    assert.equal(enrolled.response.status, 201, enrolled.data?.message);
+    assert.equal(enrolled.data.application.status, 'Enrolled');
+    const learnerId = enrolled.data.application.convertedLearnerId;
+
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
     assert.equal(staffUpload.response.status, 201, staffUpload.data?.message);
     const staffFileUrl = staffUpload.data.file.contentUrl;
