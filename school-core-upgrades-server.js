@@ -407,12 +407,15 @@ function registerSchoolCoreUpgrades(app, deps) {
     res.json({learnerName:learner.studentName,term:requestedTerm||'all',totalSkills:GRADE_R_SKILLS.length,assessedSkills:assessed.length,subjectSummary,latest:assessed});
   });
 
-  const incidentView = row => ({
-    ...row,
-    staffSignature: row.staffSignature ? decryptStoredField(row.staffSignature) : null,
-    principalSignature: row.principalSignature ? decryptStoredField(row.principalSignature) : null,
-    parentSignature: row.parentSignature ? decryptStoredField(row.parentSignature) : null
-  });
+  const incidentView = row => {
+    const {staffSignature,principalSignature,parentSignature,...safeRow}=row;
+    return {
+      ...safeRow,
+      staffSigned:Boolean(staffSignature&&row.staffSignedAt),
+      principalSigned:Boolean(principalSignature&&row.principalSignedAt),
+      parentSigned:Boolean(parentSignature&&row.parentSignedAt)
+    };
+  };
   app.get('/api/dsd-incidents',(req,res)=>{
     const actor=getSessionAccount(req); if(!actor)return res.status(401).json({message:'Sign in to view incidents.'});
     let rows=schoolRecords('dsdIncidents',actor);
@@ -456,8 +459,12 @@ function registerSchoolCoreUpgrades(app, deps) {
     if(!row||!(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor?.role)||parentCanSeeLearner(actor,learner)))return res.status(404).send('Incident not found.');
     const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
     const line=(label,value)=>'<div class="line"><strong>'+esc(label)+':</strong> '+esc(value||'Not recorded')+'</div>';
+    const signatureHtml=(stored,signedAt)=>{
+      const data=stored?decryptStoredField(stored):'';
+      return validSignatureData(data)?'<img class="signature-image" alt="Stored signature" src="'+esc(data)+'"><p>'+esc('Signed '+signedAt)+'</p>':'<p>Not signed</p>';
+    };
     res.setHeader('Cache-Control','private, no-store');
-    res.type('html').send('<!doctype html><html><head><meta charset="utf-8"><title>Little Feet incident report</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#102a43}.line{padding:7px 0;border-bottom:1px solid #d9e2ec}.sig{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.box{border:1px solid #b8c8d8;padding:12px;margin:12px 0}@media print{button{display:none}}</style></head><body><h1>Incident / Injury Report</h1><p>'+esc(row.schoolName||'')+' · '+esc(row.incidentNumber)+'</p>'+line('Child',row.learnerName)+line('Date',row.incidentDate)+line('Time',row.incidentTime)+line('Where did it occur',row.location)+line('Description',row.description)+line('Witnesses',row.witnesses)+line('Injuries or symptoms',row.injuriesOrSymptoms)+line('Body areas',(row.bodyRegions||[]).join(', '))+line('Blood present',row.bloodPresent?'Yes':'No')+line('Amount of blood',row.bloodAmount)+line('Where was the blood',row.bloodLocation)+line('First aid / what was done',row.firstAid)+line('Further medical attention',row.medicalReferral)+line('Parent notified',row.parentNotification)+line('When parent was notified',row.parentNotifiedAt)+line('When parent collected child',row.parentCollectedAt)+line('Advice given to parent',row.parentAdvice)+line('Person in charge',row.personInCharge)+line('Measures to prevent repeat',row.preventiveMeasures||row.correctiveAction)+'<div class="sig"><div class="box"><strong>Staff</strong><p>'+esc(row.staffSignedAt?'Signed '+row.staffSignedAt:'Not signed')+'</p></div><div class="box"><strong>Principal</strong><p>'+esc(row.principalSignedAt?'Signed '+row.principalSignedAt:'Not signed')+'</p></div><div class="box"><strong>Parent</strong><p>'+esc(row.parentSignedAt?'Signed '+row.parentSignedAt:'Not signed')+'</p></div></div><button onclick="window.print()">Print / Save PDF copy</button></body></html>');
+    res.type('html').send('<!doctype html><html><head><meta charset="utf-8"><title>Little Feet incident report</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#102a43}.line{padding:7px 0;border-bottom:1px solid #d9e2ec}.sig{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:24px}.box{border:1px solid #b8c8d8;padding:12px;margin:12px 0}.signature-image{display:block;width:100%;max-width:260px;height:90px;object-fit:contain;border-bottom:1px solid #b8c8d8;margin:10px 0}@media(max-width:760px){.sig{grid-template-columns:1fr}}@media print{button{display:none}}</style></head><body><h1>Incident / Injury Report</h1><p>'+esc(row.schoolName||'')+' · '+esc(row.incidentNumber)+'</p>'+line('Child',row.learnerName)+line('Date',row.incidentDate)+line('Time',row.incidentTime)+line('Where did it occur',row.location)+line('Description',row.description)+line('Witnesses',row.witnesses)+line('Injuries or symptoms',row.injuriesOrSymptoms)+line('Body areas',(row.bodyRegions||[]).join(', '))+line('Blood present',row.bloodPresent?'Yes':'No')+line('Amount of blood',row.bloodAmount)+line('Where was the blood',row.bloodLocation)+line('First aid / what was done',row.firstAid)+line('Further medical attention',row.medicalReferral)+line('Parent notified',row.parentNotification)+line('When parent was notified',row.parentNotifiedAt)+line('When parent collected child',row.parentCollectedAt)+line('Advice given to parent',row.parentAdvice)+line('Person in charge',row.personInCharge)+line('Measures to prevent repeat',row.preventiveMeasures||row.correctiveAction)+'<div class="sig"><div class="box"><strong>Staff</strong>'+signatureHtml(row.staffSignature,row.staffSignedAt)+'</div><div class="box"><strong>Principal</strong>'+signatureHtml(row.principalSignature,row.principalSignedAt)+'</div><div class="box"><strong>Parent</strong>'+signatureHtml(row.parentSignature,row.parentSignedAt)+'</div></div><button onclick="window.print()">Print / Save PDF copy</button></body></html>');
   });
 
   app.post('/api/dsd-incidents/:id/principal-sign',(req,res)=>{
