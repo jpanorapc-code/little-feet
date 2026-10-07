@@ -97,8 +97,9 @@ const login = async (username, pin) => {
     const principalCookie = await login('alpha-principal', 'Principal1');
     const parentCookie = await login('alpha-parent-one', 'ParentPass1');
     const otherParentCookie = await login('alpha-parent-two', 'ParentPass2');
+    const bravoCookieAfterRestart = await login('bravo-admin', 'BravoPass1');
 
-    const bravoDuplicateUpload = await request('/api/files', { method: 'POST', cookie: bravoCookie, body: { entityType: 'learner', recordId: 'bravo-other-learner', purpose: 'cross-school-probe', originalFilename: 'bravo-report.png', dataUrl: pngA } });
+    const bravoDuplicateUpload = await request('/api/files', { method: 'POST', cookie: bravoCookieAfterRestart, body: { entityType: 'learner', recordId: 'bravo-other-learner', purpose: 'cross-school-probe', originalFilename: 'bravo-report.png', dataUrl: pngA } });
     assert.equal(bravoDuplicateUpload.response.status, 201, bravoDuplicateUpload.data?.message);
     const crossSchoolList = await request('/api/files?entityType=learner&recordId=bravo-other-learner', { cookie: otherParentCookie });
     assert.equal(crossSchoolList.response.status, 200);
