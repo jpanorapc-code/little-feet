@@ -149,9 +149,9 @@ async function login(username,pin){
     assert.equal(bravoAssets.response.status,200);
     assert.equal(bravoAssets.data.length,0);
 
-    const gradeR=await request('/api/grade-r/assessments',{method:'POST',cookie:teacher,body:{learnerName:'Alpha Learner',skillId:'MATH-01',rating:3,evidence:'Counts during morning activity'}});
+    const gradeR=await request('/api/grade-r/assessments',{method:'POST',cookie:teacher,body:{learnerName:'Alpha Learner',term:'Term 4',skillId:'MATH-01',rating:3,evidence:'Counts during morning activity'}});
     assert.equal(gradeR.response.status,201);
-    const gradeSummary=await request('/api/grade-r/summary/Alpha%20Learner',{cookie:parent});
+    const gradeSummary=await request('/api/grade-r/summary/Alpha%20Learner?term=Term%204',{cookie:parent});
     assert.equal(gradeSummary.response.status,200);
     assert.equal(gradeSummary.data.totalSkills,98);
     assert.equal(gradeSummary.data.assessedSkills,1);
