@@ -2948,7 +2948,7 @@ async function submitSchoolApplication(event, index) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Unable to send the school application.');
     closeModal();
-    alert(`Application sent to ${result.ticket.assignedTo}. Your application reference is ${result.ticket.id}.`);
+    alert(`Application sent to ${result.application.assignedTo}. Your admissions reference is ${result.application.applicationNumber}.`);
     loadTickets();
   } catch (error) { alert(safeUserFacingError(error, 'Unable to send the school application.')); }
 }
