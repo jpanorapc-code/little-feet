@@ -51,11 +51,22 @@ assert.match(page, /ambient-background\.js\?v=20261006-login-cache-v2/);
 assert.match(page, /backup\.js\?v=20261007-learning-support-v1/);
 assert.match(page, /input\[type="checkbox"\],[\s\S]*input\[type="radio"\][\s\S]*width:18px;[\s\S]*max-width:18px;[\s\S]*box-shadow:none;/);
 assert.match(page, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
-assert.match(serviceWorker, /little-feet-shell-v57-learning-support/);
+assert.match(serviceWorker, /little-feet-shell-v58-repo-audit/);
 assert.match(serviceWorker, /\/assets\/ambient-background\.js\?v=20261006-login-cache-v2/);
 assert.match(serviceWorker, /\/backup\.js\?v=20261007-learning-support-v1/);
 assert.match(serviceWorker, /\/assets\/preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /\/assets\/advanced-school-operations\.js\?v=20261007-learning-support-v1/);
+
+const startupScriptSources = [...page.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+  .map(match => match[1])
+  .filter(src => !src.startsWith('/vendor/') && src !== '/runtime-config.js')
+  .map(src => src.startsWith('/') ? src : '/' + src);
+const shellAssetsBlock = serviceWorker.match(/const\s+SHELL_ASSETS\s*=\s*\[([\s\S]*?)\];/);
+assert.ok(shellAssetsBlock, 'Service worker must define a startup shell.');
+const shellAssets = new Set([...shellAssetsBlock[1].matchAll(/["']([^"']+)["']/g)].map(match => match[1]));
+for (const src of startupScriptSources) {
+  assert.ok(shellAssets.has(src), 'Startup script missing from service-worker shell: ' + src);
+}
 assert.match(serviceWorker, /if \(\/\\\.\(\?:js\|css\)\$\/i\.test\(url\.pathname\)\)[\s\S]*fetch\(event\.request\)[\s\S]*catch\(\(\) => caches\.match\(event\.request\)\)/);
 assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
 assert.match(page, /name="theme-color" content="#0d9488"/);
@@ -96,7 +107,7 @@ assert.match(client, /const legacyProfileIconMap = Object\.freeze\(/);
 assert.match(client, /function normalizeProfileIcon\(icon\)/);
 assert.match(client, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3#avatar-\$\{selectedIcon\}/);
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
-assert.match(serviceWorker, /little-feet-shell-v57-learning-support/);
+assert.match(serviceWorker, /little-feet-shell-v58-repo-audit/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 assert.match(serviceWorker, /backup\.js\?v=20261007-learning-support-v1/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
@@ -555,7 +566,7 @@ assert.match(page, /id="ambientBackgroundVideo"[\s\S]*little-feet-login-clean\.m
 assert.match(ambientBackground, /littlefeet:session-ready/);
 assert.match(ambientBackground, /littlefeet:session-ended/);
 assert.match(ambientBackground, /document\.body\.classList\.contains\('portal-active'\)/);
-assert.match(serviceWorker, /little-feet-shell-v57-learning-support/);
+assert.match(serviceWorker, /little-feet-shell-v58-repo-audit/);
 assert.match(serviceWorker, /little-feet-login-clean\.jpg/);
 assert.match(page, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);
