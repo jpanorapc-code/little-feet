@@ -316,6 +316,7 @@ const validateLearnerLinks = (value) => {
 const isParentLinkedToLearner = (parent, learner) => {
   if (!parent || !learner) return false;
   if (parent.role !== 'parent' || parent.parentRelationshipStatus !== 'Administrator approved') return false;
+  if (!isSameSchool(parent, learner)) return false;
   return normaliseLearnerLinks(parent.linkedLearners).includes(normalizeComparableText(learner.studentName));
 };
 const normaliseAssignedClasses = (value) => [...new Set((Array.isArray(value) ? value : String(value || '').split(',')).map(normalizeComparableText).filter(Boolean))];
@@ -4586,7 +4587,7 @@ app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
 app.get('/api/learner-documents',(req,res)=>{
   const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view learner documents.'});
   let learners=[];
-  if(actor.role==='parent')learners=(db.students||[]).filter(learner=>isParentLinkedToLearner(actor,learner));
+  if(actor.role==='parent')learners=tenantRecords(db.students,actor).filter(learner=>isParentLinkedToLearner(actor,learner));
   else if(actor.role==='teacher')learners=learnerRecordsVisibleTo(db.students,actor);
   else if(hasPlatformAccess(actor)||['principal','admin','staff'].includes(actor.role))learners=tenantRecords(db.students,actor);
   else return res.status(403).json({message:'You cannot view learner documents.'});
