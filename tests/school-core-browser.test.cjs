@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
 const root=path.resolve(__dirname,'..');
 const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'little-feet-school-core-browser-'));
 fs.symlinkSync(path.join(root,'node_modules'),path.join(fixture,'node_modules'),'junction');
-for(const file of ['server.js','school-core-upgrades-server.js','finance-automation-server.js','failover-mode.js','auth-crypto.js','backup.js','index.html','logo.png','logo-transparent.png','little-feet-mascot.jfif']){
+for(const file of ['server.js','school-core-upgrades-server.js','advanced-school-operations-server.js','finance-automation-server.js','failover-mode.js','auth-crypto.js','backup.js','index.html','logo.png','logo-transparent.png','little-feet-mascot.jfif']){
   fs.copyFileSync(path.join(root,file),path.join(fixture,file));
 }
 fs.cpSync(path.join(root,'lib'),path.join(fixture,'lib'),{recursive:true});
@@ -56,7 +56,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#loginForm button[type="submit"]').click();
     await page.locator('#dashboardSection').waitFor({state:'visible'});
 
-    for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard']){
+    for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard','#lfAdvancedEldaCard','#lfAftercareCard','#lfStaffRatioCard','#lfStaffClockCard','#lfDayCareCard','#lfMealsCard','#lfLearnerGroupsCard','#lfAdvancedAcademicAnalytics','#lfPickupQrCard']){
       await page.locator(selector).waitFor({state:'attached'});
     }
 
@@ -142,6 +142,29 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.equal(await classField.isHidden(),true,'Class name must hide again when class audience is not selected');
     assert.equal(await page.locator('#lfCampaignForm input[value="sms"]').isDisabled(),true,'SMS must not pretend to be ready without provider config');
     assert.equal(await page.locator('#lfCampaignForm input[value="push"]').isDisabled(),true,'Push must not pretend to be ready without provider config');
+    assert.equal(await page.locator('#lfCampaignForm input[value="whatsapp"]').isDisabled(),true,'WhatsApp must not pretend to be ready without provider config');
+    assert.equal(await page.locator('#lfCampaignForm input[name="scheduledAt"]').count(),1,'Campaigns must expose real schedule-for-later input');
+    assert.equal(await page.locator('#lfCommunicationTemplateForm').count(),1,'Communication templates must be available');
+
+    await openTab('operationsTab');
+    await page.locator('#lfLearnerGroupForm input[name="name"]').fill('Browser Team');
+    await page.locator('#lfLearnerGroupForm input[name="type"]').fill('Sport');
+    await page.locator('#lfLearnerGroupForm button[type="submit"]').click();
+    await page.locator('#lfLearnerGroupList').getByText('Browser Team').waitFor({state:'visible'});
+    await page.locator('#lfDayCareForm input[name="childName"]').fill('Holiday Child');
+    await page.locator('#lfDayCareForm input[name="className"]').fill('Holiday Group');
+    await page.locator('#lfDayCareForm input[name="date"]').fill('2026-12-15');
+    await page.locator('#lfDayCareForm input[name="rate"]').fill('0');
+    await page.locator('#lfDayCareForm button[type="submit"]').click();
+    await page.locator('#lfDayCareList').getByText('Holiday Child').waitFor({state:'visible'});
+
+    await openTab('staffWorkTab');
+    await page.locator('#lfStaffClockCard button[data-clock="clock_in"]').click();
+    await page.waitForTimeout(150);
+
+    await openTab('attendanceTab');
+    await page.locator('#lfRefreshRatio').click();
+    await page.locator('#lfRatioLive').waitFor({state:'visible'});
 
     assert.deepEqual(errors,[],'New school core UI must not throw browser errors: '+errors.join(' | '));
     assert.deepEqual(failedApi,[],'New school core UI must not produce server errors: '+failedApi.join(' | '));
