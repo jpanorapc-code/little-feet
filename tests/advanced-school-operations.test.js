@@ -69,6 +69,20 @@ async function login(username){const r=await request('/api/login',{method:'POST'
   const b2=await request('/api/day-care/bookings',{method:'POST',cookie:admin,body:{childName:'Visitor 2',className:'Holiday',date:'2026-12-15',rate:0}});
   assert.equal(b1.data.booking.status,'confirmed');assert.equal(b2.data.booking.status,'waitlisted');
 
+  const dietary=await request('/api/meals/dietary',{method:'POST',cookie:teacher,body:{learnerName:'Learner A',allergies:'Synthetic restriction',requirements:'Synthetic requirement',notes:'Synthetic note'}});
+  assert.equal(dietary.response.status,201,dietary.text);
+  const dietaryView=await request('/api/meals/dietary',{cookie:parent});
+  assert.equal(dietaryView.data[0].allergies,'Synthetic restriction');
+  await wait(120);
+  const persisted=fs.readFileSync(path.join(tmp,'littlefeet-replica.json'),'utf8');
+  assert.equal(persisted.includes('Synthetic restriction'),false,'Dietary details must be encrypted at rest');
+
+  const aiConfig=await request('/api/ai/observation/config',{cookie:teacher});
+  assert.equal(aiConfig.response.status,200);
+  assert.equal(aiConfig.data.ready,false);
+  const aiAttempt=await request('/api/ai/observation-assist',{method:'POST',cookie:teacher,body:{observation:'Synthetic classroom observation'}});
+  assert.equal(aiAttempt.response.status,409,'AI must not fabricate output without a configured provider');
+
   const group=await request('/api/learner-groups',{method:'POST',cookie:teacher,body:{name:'Team A',type:'Sport'}});
   const members=await request('/api/learner-groups/'+group.data.group.id+'/members',{method:'POST',cookie:teacher,body:{learnerNames:['Learner A']}});
   assert.deepEqual(members.data.group.members,['Learner A']);
