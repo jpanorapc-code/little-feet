@@ -65,13 +65,13 @@ function normaliseApiArgument(expression) {
       let text = part.slice(1, -1);
       if (first === '`') {
         text = text.replace(/\$\{([\s\S]*?)\}/g, (_match, expression) =>
-          /\b(?:query|search|params|qs)\b/i.test(expression) ? '' : 'value'
+          /(?:query|search|params|\bqs\b)/i.test(expression) ? '' : 'value'
         );
       } else {
         text = text.replace(/\\(['"\\])/g, '$1');
       }
       route += text;
-    } else if (/\b(?:query|search|params|qs)\b/i.test(part) || /['"`]\?/.test(part)) {
+    } else if (/(?:query|search|params|\bqs\b)/i.test(part) || /['"`]\?/.test(part)) {
       continue;
     } else {
       route += 'value';
