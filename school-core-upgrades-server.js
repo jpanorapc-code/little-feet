@@ -201,6 +201,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     const record=tagSchoolRecord(actor,{
       id:crypto.randomUUID(), learnerName, learnerKey:learner.id||'', className:boundedText(learner.className,120),
       ...built, teacherComment:boundedText(req.body?.teacherComment,2000), promotionOutcome:boundedText(req.body?.promotionOutcome,120),
+      parentUsername:parentForLearner(actor,learner)?.username || '',
       createdBy:actor.username, createdAt:nowIso(), updatedAt:nowIso(), status:'Generated'
     });
     db.reportCards.unshift(record);
@@ -215,6 +216,24 @@ function registerSchoolCoreUpgrades(app, deps) {
     const subjects=(report.subjects||[]).map(row=>'<tr><td>'+esc(row.subject)+'</td><td>'+esc(row.assessments)+'</td><td>'+esc(row.percentage)+'%</td></tr>').join('');
     res.setHeader('Cache-Control','private, no-store');
     res.type('html').send('<!doctype html><html><head><meta charset="utf-8"><title>Little Feet report card</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#102a43}h1{margin-bottom:4px}table{border-collapse:collapse;width:100%;margin:18px 0}td,th{border:1px solid #b8c8d8;padding:8px;text-align:left}.meta{color:#52677a}.box{border:1px solid #b8c8d8;padding:12px;margin-top:14px}@media print{button{display:none}}</style></head><body><h1>Little Feet Report Card</h1><div class="meta">'+esc(report.schoolName||'')+'</div><h2>'+esc(report.learnerName)+'</h2><p>'+esc(report.className||'')+' · '+esc(report.term)+' '+esc(report.year)+'</p><table><thead><tr><th>Subject</th><th>Assessments</th><th>Result</th></tr></thead><tbody>'+subjects+'</tbody></table><p><strong>Overall:</strong> '+esc(report.average)+'%</p><div class="box"><strong>Teacher comment</strong><p>'+esc(report.teacherComment||'')+'</p></div><div class="box"><strong>Promotion / progression</strong><p>'+esc(report.promotionOutcome||'Not recorded')+'</p></div><div class="box"><strong>Attendance</strong><pre>'+esc(JSON.stringify(report.attendanceSummary||{},null,2))+'</pre></div><button onclick="window.print()">Print / Save PDF</button></body></html>');
+  });
+  app.post('/api/academics/report-cards/:id/email', async (req,res,next) => {
+    const actor=staffActor(req);
+    const report=actor&&(db.reportCards||[]).find(row=>row.id===req.params.id&&recordInSchool(row,actor));
+    if(!report)return res.status(404).json({message:'Report card not found.'});
+    const learner=findLearner(actor,report.learnerName);
+    const parent=learner&&parentForLearner(actor,learner);
+    const to=parent&&[parent.email,parent.username,...(parent.loginAliases||[])].find(looksLikeEmailAddress);
+    if(!to)return res.status(409).json({message:'No linked parent email is available for this learner.'});
+    if(!(smtpEmailConfigured?.()||apiEmailConfigured?.()))return res.status(409).json({message:'Email delivery is not configured. Nothing was marked as sent.'});
+    try{
+      const subject='Little Feet report card · '+report.learnerName+' · '+report.term+' '+report.year;
+      const lines=(report.subjects||[]).map(row=>row.subject+': '+row.percentage+'%').join('\n');
+      const sent=await sendLittleFeetEmail({to,subject,text:[subject,'',lines,'','Overall: '+report.average+'%','Teacher comment: '+(report.teacherComment||''),'Promotion / progression: '+(report.promotionOutcome||'Not recorded'),'','Sign in to Little Feet to review the full record.'].join('\n')});
+      if(!sent)return res.status(502).json({message:'The email provider did not accept the report card. Nothing was marked as sent.'});
+      report.lastEmailedAt=nowIso();report.lastEmailedTo=to;report.updatedAt=nowIso();
+      res.json({success:true,sentTo:to,sentAt:report.lastEmailedAt});
+    }catch(error){next(error);}
   });
 
   const disciplineSettingsFor = actor => {
@@ -247,7 +266,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     if(req.query?.learnerName) rows=rows.filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(req.query.learnerName));
     res.json(rows);
   });
-  app.post('/api/discipline',(req,res)=>{
+  app.post('/api/discipline',async(req,res,next)=>{
     const actor=staffActor(req); if(!actor)return res.status(403).json({message:'Teacher or management access is required.'});
     const learnerName=limitedText(req.body?.learnerName,160), learner=learnerName&&findLearner(actor,learnerName);
     if(!learner)return res.status(404).json({message:'Choose a learner in your school.'});
@@ -255,11 +274,28 @@ function registerSchoolCoreUpgrades(app, deps) {
     const points=cleanNumber(req.body?.points,1,100);
     const category=limitedText(req.body?.category,120), details=limitedText(req.body?.details,1600);
     if(!kind||points===null||!category||!details)return res.status(400).json({message:'Add type, points, category and details.'});
-    const record=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',className:boundedText(learner.className,120),kind,points,pointDelta:kind==='demerit'?points:-points,category,details,actionTaken:boundedText(req.body?.actionTaken,1000),parentNotified:Boolean(req.body?.parentNotified),parentVisible:req.body?.parentVisible!==false,recordedBy:actor.username,createdAt:nowIso(),status:'Open'});
+    const record=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',className:boundedText(learner.className,120),kind,points,pointDelta:kind==='demerit'?points:-points,category,details,actionTaken:boundedText(req.body?.actionTaken,1000),parentNotified:Boolean(req.body?.parentNotified),parentVisible:req.body?.parentVisible!==false,parentNotificationStatus:'not_requested',recordedBy:actor.username,createdAt:nowIso(),status:'Open'});
     db.disciplineRecords.unshift(record);
     const all=schoolRecords('disciplineRecords',actor).filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learnerName));
     const total=all.reduce((sum,row)=>sum+Number(row.pointDelta||0),0), settings=disciplineSettingsFor(actor);
     const action=total>=settings.principalReview?'Principal review':total>=settings.parentMeeting?'Parent meeting':total>=settings.warning?'Warning':'Normal';
+    if(record.parentNotified){
+      const parent=parentForLearner(actor,learner),to=parent&&[parent.email,parent.username,...(parent.loginAliases||[])].find(looksLikeEmailAddress);
+      if(!to) record.parentNotificationStatus='no_parent_email';
+      else if(!(smtpEmailConfigured?.()||apiEmailConfigured?.())) record.parentNotificationStatus='email_not_configured';
+      else {
+        try{
+          record.parentNotificationStatus=(await sendLittleFeetEmail({
+            to,subject:'Little Feet conduct update · '+learnerName,
+            text:[learnerName+' has a new school conduct record.','Type: '+kind,'Category: '+category,'Points: '+points,'Action: '+(record.actionTaken||'No action recorded'),'','Sign in to Little Feet to view the record.'].join('\n')
+          }))?'sent':'provider_rejected';
+          if(record.parentNotificationStatus==='sent')record.parentNotifiedAt=nowIso();
+        }catch(error){
+          record.parentNotificationStatus='failed';
+          logStructured?.('warn','discipline.parent_notification_failed',{category:'discipline',schoolId:accountSchoolId(actor),message:error.message});
+        }
+      }
+    }
     res.status(201).json({success:true,record,totalPoints:total,action});
   });
   app.patch('/api/discipline/:id',(req,res)=>{
@@ -474,7 +510,7 @@ function registerSchoolCoreUpgrades(app, deps) {
 
   const attendanceSettingFor=actor=>{
     let setting=schoolRecords('attendanceAutomationSettings',actor)[0];
-    if(!setting){setting=tagSchoolRecord(actor,{id:crypto.randomUUID(),cutoffTime:'09:00',autoAbsent:false,notifyParents:false,updatedAt:nowIso()});db.attendanceAutomationSettings.unshift(setting);}
+    if(!setting){setting=tagSchoolRecord(actor,{id:crypto.randomUUID(),cutoffTime:'09:00',autoAbsent:false,notifyParents:false,remindStaff:false,lastReminderDate:'',updatedAt:nowIso()});db.attendanceAutomationSettings.unshift(setting);}
     return setting;
   };
   app.get('/api/attendance/automation/settings',(req,res)=>{
@@ -483,7 +519,7 @@ function registerSchoolCoreUpgrades(app, deps) {
   app.put('/api/attendance/automation/settings',(req,res)=>{
     const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});
     const cutoff=String(req.body?.cutoffTime||'');if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoff))return res.status(400).json({message:'Use a valid cutoff time.'});
-    const setting=attendanceSettingFor(actor);setting.cutoffTime=cutoff;setting.autoAbsent=Boolean(req.body?.autoAbsent);setting.notifyParents=Boolean(req.body?.notifyParents);setting.updatedAt=nowIso();setting.updatedBy=actor.username;res.json({success:true,settings:setting});
+    const setting=attendanceSettingFor(actor);setting.cutoffTime=cutoff;setting.autoAbsent=Boolean(req.body?.autoAbsent);setting.notifyParents=Boolean(req.body?.notifyParents);setting.remindStaff=Boolean(req.body?.remindStaff);setting.updatedAt=nowIso();setting.updatedBy=actor.username;res.json({success:true,settings:setting});
   });
   const isSchoolDate=dateKey=>{
     const d=new Date(dateKey+'T12:00:00+02:00'),day=d.getDay();if(day===0||day===6)return false;
@@ -492,22 +528,36 @@ function registerSchoolCoreUpgrades(app, deps) {
   };
   const runAttendanceAutomation=async actor=>{
     const setting=attendanceSettingFor(actor),date=dateKeyInSouthAfrica();
-    if(!setting.autoAbsent||!isSchoolDate(date))return {date,created:0,skipped:'disabled_or_closed'};
+    if(!isSchoolDate(date))return {date,created:0,notified:0,staffReminded:0,skipped:'school_closed'};
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Johannesburg',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()).split(':').map(Number);
     const nowMinutes=parts[0]*60+parts[1],cut=setting.cutoffTime.split(':').map(Number),cutMinutes=cut[0]*60+cut[1];
-    if(nowMinutes<cutMinutes)return {date,created:0,skipped:'before_cutoff'};
+    if(nowMinutes<cutMinutes)return {date,created:0,notified:0,staffReminded:0,skipped:'before_cutoff'};
     const existing=new Set(schoolRecords('attendance',actor).filter(row=>String(row.date||'')===date).map(row=>normalizeComparableText(row.studentName)));
+    const missing=schoolLearners(actor).filter(learner=>!existing.has(normalizeComparableText(learner.studentName)));
+    let staffReminded=0;
+    if(setting.remindStaff && missing.length && setting.lastReminderDate!==date && (smtpEmailConfigured?.()||apiEmailConfigured?.())){
+      const recipients=(db.users||[]).filter(account=>isSameSchool(actor,account)&&account.verificationStatus==='Active'&&['teacher','principal','admin'].includes(account.role));
+      for(const account of recipients){
+        const to=[account.email,account.username,...(account.loginAliases||[])].find(looksLikeEmailAddress);
+        if(!to)continue;
+        try{
+          const sent=await sendLittleFeetEmail({to,subject:'Little Feet attendance reminder · '+date,text:missing.length+' learner(s) still have no attendance record after the '+setting.cutoffTime+' cutoff. Open Daily Attendance to review the register.'});
+          if(sent)staffReminded++;
+        }catch(error){logStructured?.('warn','attendance.staff_reminder_failed',{category:'attendance',schoolId:accountSchoolId(actor),message:error.message});}
+      }
+      setting.lastReminderDate=date;setting.lastReminderAt=nowIso();
+    }
+    if(!setting.autoAbsent)return {date,created:0,notified:0,staffReminded,missing:missing.length,skipped:'auto_absent_disabled'};
     let created=0,notified=0;
-    for(const learner of schoolLearners(actor)){
-      if(existing.has(normalizeComparableText(learner.studentName)))continue;
+    for(const learner of missing){
       db.attendance.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),studentName:learner.studentName,status:'Absent',date,time:setting.cutoffTime,recordedBy:'attendance-automation',createdAt:nowIso(),automation:true}));
       existing.add(normalizeComparableText(learner.studentName));created++;
       if(setting.notifyParents){
         const parent=parentForLearner(actor,learner),to=parent&&[parent.email,parent.username,...(parent.loginAliases||[])].find(looksLikeEmailAddress);
-        if(to){try{if(await sendLittleFeetEmail({to,subject:'Little Feet attendance: '+learner.studentName+' marked absent',text:learner.studentName+' was marked absent after the school attendance cutoff. Contact the school if this is incorrect.'}))notified++;}catch(error){logStructured?.('warn','attendance.parent_notification_failed',{category:'attendance',schoolId:accountSchoolId(actor),message:error.message});}}
+        if(to&&(smtpEmailConfigured?.()||apiEmailConfigured?.())){try{if(await sendLittleFeetEmail({to,subject:'Little Feet attendance: '+learner.studentName+' marked absent',text:learner.studentName+' was marked absent after the school attendance cutoff. Contact the school if this is incorrect.'}))notified++;}catch(error){logStructured?.('warn','attendance.parent_notification_failed',{category:'attendance',schoolId:accountSchoolId(actor),message:error.message});}}
       }
     }
-    setting.lastRunDate=date;setting.lastRunAt=nowIso();return {date,created,notified};
+    setting.lastRunDate=date;setting.lastRunAt=nowIso();return {date,created,notified,staffReminded,missing:missing.length};
   };
   app.post('/api/attendance/automation/run',async(req,res,next)=>{
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
