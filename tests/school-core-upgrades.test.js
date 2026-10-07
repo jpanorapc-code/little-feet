@@ -118,6 +118,14 @@ async function login(username,pin){
     assert.equal(history.response.status,200);
     assert.equal(history.data.length,2);
 
+    const invalidYearEdit=await request('/api/academics/marks/'+mark.data.mark.id,{method:'PATCH',cookie:teacher,body:{year:'banana'}});
+    assert.equal(invalidYearEdit.response.status,400);
+    const blankSubjectEdit=await request('/api/academics/marks/'+mark.data.mark.id,{method:'PATCH',cookie:teacher,body:{subject:'   '}});
+    assert.equal(blankSubjectEdit.response.status,400);
+    const markAfterRejectedEdits=await request('/api/academics/marks?learnerName=Alpha%20Learner',{cookie:teacher});
+    assert.equal(markAfterRejectedEdits.data.marks[0].year,2026);
+    assert.equal(markAfterRejectedEdits.data.marks[0].subject,'Mathematics');
+
     const report=await request('/api/academics/report-cards',{method:'POST',cookie:teacher,body:{
       learnerName:'Alpha Learner',term:'Term 4',year:2026,periodStart:'2026-10-01',periodEnd:'2026-10-31',teacherComment:'Steady progress',promotionOutcome:'Progress to next phase'
     }});
