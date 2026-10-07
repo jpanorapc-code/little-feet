@@ -4211,18 +4211,42 @@ app.post('/api/term', (req, res) => {
   res.json({ term: db.schoolTerms[accountSchoolId(actor)] || db.term });
 });
 
-const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet', 'dsd_incident']);
+const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet', 'dsd_incident', 'admission_application']);
 const fileContentPath = file => `/api/files/${encodeURIComponent(file.id)}/content`;
 const publicFileMetadata = file => ({
   id: file.id, entityType: file.entityType, recordId: file.recordId, purpose: file.purpose,
   originalFilename: file.originalFilename, contentType: file.contentType, size: file.size,
   sha256: file.sha256, uploadedBy: file.uploadedBy, createdAt: file.createdAt,
   updatedAt: file.updatedAt || file.createdAt, accessState: file.accessState,
-  contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
+  verificationStatus:file.verificationStatus||'Pending review', verifiedAt:file.verifiedAt||'', verifiedBy:file.verifiedBy||'',
+  rejectionReason:file.rejectionReason||'', contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
+});
+const admissionApplicationVisibleTo = (application, actor) => Boolean(application && actor && (
+  hasPlatformAccess(actor)
+  || (['principal','admin','staff','teacher'].includes(actor.role) && application.schoolId===accountSchoolId(actor))
+  || (actor.role==='parent' && normalizeUsername(application.createdBy)===normalizeUsername(actor.username))
+));
+const admissionApplicationView = application => ({
+  ...application,
+  contactPhone:decryptStoredField(application.contactPhone),
+  contactEmail:decryptStoredField(application.contactEmail),
+  dateOfBirth:decryptStoredField(application.dateOfBirth),
+  homeArea:decryptStoredField(application.homeArea),
+  notes:decryptStoredField(application.notes)
 });
 const relatedRecordForFile = (file, actor) => {
+  if (!file || !actor) return null;
+  if (file.entityType === 'admission_application') {
+    const application=(db.admissionsApplications||[]).find(item=>item.id===file.recordId);
+    return admissionApplicationVisibleTo(application,actor)?application:null;
+  }
+  if (file.entityType === 'learner') {
+    const learner=db.students.find(item=>item.id===file.recordId);
+    if(!learner)return null;
+    if(hasPlatformAccess(actor) || (recordInSchool(learner,actor)&&['teacher','principal','admin','staff'].includes(actor.role)))return learner;
+    return actor.role==='parent'&&isParentLinkedToLearner(actor,learner)?learner:null;
+  }
   if (!recordInSchool(file, actor)) return null;
-  if (file.entityType === 'learner') return db.students.find(item => item.id === file.recordId && recordInSchool(item, actor));
   if (file.entityType === 'staff') return db.users.find(item => normalizeUsername(item.username) === normalizeUsername(file.recordId) && isSameSchool(item, actor));
   if (file.entityType === 'school') return db.schools.find(item => item.id === file.recordId && item.id === accountSchoolId(actor));
   if (file.entityType === 'post') return db.posts.find(item => item.id === file.recordId && recordInSchool(item, actor));
@@ -4232,14 +4256,14 @@ const relatedRecordForFile = (file, actor) => {
     if (!incident) return null;
     if (hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role)) return incident;
     if (actor.role !== 'parent') return null;
-    const learner = tenantRecords(db.students, actor).find(item => normalizeComparableText(item.studentName) === normalizeComparableText(incident.learnerName));
+    const learner = db.students.find(item => normalizeComparableText(item.studentName) === normalizeComparableText(incident.learnerName) && recordInSchool(item,actor));
     return learner && isParentLinkedToLearner(actor, learner) ? incident : null;
   }
   return null;
 };
-const canManageFile = (file, actor) => Boolean(actor && recordInSchool(file, actor)
+const canManageFile = (file, actor) => Boolean(actor && relatedRecordForFile(file,actor)
   && ((hasPlatformAccess(actor) || ['admin', 'principal', 'staff'].includes(actor.role)) || normalizeUsername(file.uploadedBy) === normalizeUsername(actor.username)));
-const createStoredFile = async (actor, { entityType, recordId, purpose, originalFilename, dataUrl }) => {
+const createStoredFile = async (actor, { entityType, recordId, purpose, originalFilename, dataUrl, schoolIdOverride, schoolNameOverride }) => {
   if (!objectStorage.configured) {
     const error = new Error('Private file storage is not configured. Ask an administrator to configure Cloudflare R2.');
     error.status = 503;
@@ -4255,18 +4279,21 @@ const createStoredFile = async (actor, { entityType, recordId, purpose, original
     throw error;
   }
   const id = crypto.randomUUID();
-  const key = objectKeyFor({ schoolId: accountSchoolId(actor), entityType, recordId, extension: decoded.extension });
+  const storageSchoolId=schoolIdOverride||accountSchoolId(actor),storageSchoolName=schoolNameOverride||actor.schoolName||'';
+  const key = objectKeyFor({ schoolId: storageSchoolId, entityType, recordId, extension: decoded.extension });
   const sha256 = crypto.createHash('sha256').update(decoded.bytes).digest('hex');
   const result = await objectStorage.put({
     key, body: decoded.bytes, contentType: decoded.mimeType,
-    metadata: { fileid: id, tenant: crypto.createHash('sha256').update(accountSchoolId(actor)).digest('hex') }
+    metadata: { fileid: id, tenant: crypto.createHash('sha256').update(storageSchoolId).digest('hex') }
   });
-  const record = tagSchoolRecord(actor, {
+  const record = {
     id, entityType, recordId: boundedText(recordId, 180), purpose: boundedText(purpose || 'attachment', 80),
     storageProvider: objectStorage.kind, objectKey: key, originalFilename: decoded.filename,
     contentType: decoded.mimeType, size: decoded.bytes.length, sha256, etag: boundedText(result.etag, 180),
-    uploadedBy: actor.username, createdAt: new Date().toISOString(), accessState: 'active'
-  });
+    uploadedBy: actor.username, createdAt: new Date().toISOString(), accessState: 'active',
+    verificationStatus:'Pending review', verifiedAt:'', verifiedBy:'', rejectionReason:'',
+    schoolId:storageSchoolId, schoolName:storageSchoolName
+  };
   db.fileRecords.unshift(record);
   return record;
 };
@@ -4280,22 +4307,27 @@ app.get('/api/files', (req, res) => {
   if (!actor) return res.status(401).json({ message: 'Sign in to view files.' });
   const entityType = boundedText(req.query.entityType, 40);
   const recordId = boundedText(req.query.recordId, 180);
-  const files = tenantRecords(db.fileRecords, actor).filter(file => file.accessState === 'active'
+  const files = (db.fileRecords||[]).filter(file => file.accessState === 'active'
     && (!entityType || file.entityType === entityType) && (!recordId || file.recordId === recordId)
     && relatedRecordForFile(file, actor));
   res.json(files.map(publicFileMetadata));
 });
 
 app.post('/api/files', async (req, res, next) => {
-  const actor = requireSchoolStaff(req);
-  if (!actor) return res.status(403).json({ message: 'Authorised school staff can upload files.' });
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in before uploading files.' });
   const entityType = boundedText(req.body?.entityType, 40);
   const recordId = boundedText(req.body?.recordId, 180);
-  const probe = tagSchoolRecord(actor, { entityType, recordId });
-  if (!recordId || !relatedRecordForFile(probe, actor)) return res.status(404).json({ message: 'The related school record was not found.' });
+  const probe = {entityType,recordId,schoolId:accountSchoolId(actor)};
+  const related=recordId&&relatedRecordForFile(probe, actor);
+  const staffAllowed=hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor.role);
+  const parentAllowed=actor.role==='parent'&&['learner','admission_application'].includes(entityType);
+  if(!staffAllowed&&!parentAllowed)return res.status(403).json({message:'You cannot upload files for this record.'});
+  if (!related) return res.status(404).json({ message: 'The related school record was not found.' });
   let file;
   try {
-    file = await createStoredFile(actor, { entityType, recordId, purpose: req.body?.purpose, originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl });
+    file = await createStoredFile(actor, { entityType, recordId, purpose: req.body?.purpose, originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl,
+      schoolIdOverride:related.schoolId||accountSchoolId(actor),schoolNameOverride:related.schoolName||actor.schoolName||'' });
     await saveDatabaseState();
     req.persistenceCommitted = true;
     res.status(201).json({ success: true, file: publicFileMetadata(file) });
@@ -4327,7 +4359,7 @@ app.get('/api/files/integrity', async (req, res, next) => {
 
 app.put('/api/files/:id', async (req, res, next) => {
   const actor = getSessionAccount(req);
-  const previous = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  const previous = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && relatedRecordForFile(item,actor));
   if (!previous || !canManageFile(previous, actor)) return res.status(404).json({ message: 'File not found.' });
   let replacement;
   let previousObjectDeleted = false;
@@ -4360,7 +4392,7 @@ app.put('/api/files/:id', async (req, res, next) => {
 app.get('/api/files/:id/content', async (req, res, next) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to download files.' });
-  const file = db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  const file = db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active');
   if (!file || !relatedRecordForFile(file, actor)) return res.status(404).json({ message: 'File not found.' });
   try {
     const object = await objectStorage.get({ key: file.objectKey });
@@ -4383,7 +4415,7 @@ app.get('/api/files/:id/content', async (req, res, next) => {
 
 app.delete('/api/files/:id', async (req, res, next) => {
   const actor = getSessionAccount(req);
-  const file = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  const file = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && relatedRecordForFile(item,actor));
   if (!file || !canManageFile(file, actor)) return res.status(404).json({ message: 'File not found.' });
   try {
     const related = relatedRecordForFile(file, actor);
