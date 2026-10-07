@@ -60,6 +60,15 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       await page.locator(selector).waitFor({state:'attached'});
     }
 
+    const openTab=async tabId=>{
+      await page.evaluate(id=>{
+        const button=[...document.querySelectorAll('.nav-btn')].find(node=>String(node.getAttribute('onclick')||'').includes("switchTab('"+id+"'"));
+        window.switchTab(id,button||null);
+      },tabId);
+      await page.locator('#'+tabId).waitFor({state:'visible'});
+    };
+
+    await openTab('worksheetsTab');
     await page.locator('#lfSubjectMarkForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfSubjectMarkForm input[name="subject"]').fill('Mathematics');
     await page.locator('#lfSubjectMarkForm input[name="assessmentName"]').fill('Number work');
@@ -69,6 +78,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfSubjectMarkForm button[type="submit"]').click();
     await assert.doesNotReject(async()=>page.locator('#lfSubjectMarksList').getByText('90%').first().waitFor({state:'visible'}));
 
+    await openTab('reportsTab');
     await page.locator('#lfReportCardForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfReportCardForm input[name="term"]').fill('Term 4');
     await page.locator('#lfReportCardForm textarea[name="teacherComment"]').fill('Good progress');
@@ -76,6 +86,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfReportCardForm button[type="submit"]').click();
     await page.locator('#lfReportCardList').getByText('Core Learner').first().waitFor({state:'visible'});
 
+    await openTab('safeguardingTab');
     await page.locator('#lfDisciplineForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfDisciplineForm input[name="category"]').fill('Class conduct');
     await page.locator('#lfDisciplineForm textarea[name="details"]').fill('Needs a conduct note');
@@ -83,12 +94,14 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfDisciplineForm button[type="submit"]').click();
     await page.locator('#lfDisciplineList').getByText('Core Learner').first().waitFor({state:'visible'});
 
+    await openTab('operationsTab');
     await page.locator('#lfAssetForm input[name="assetCode"]').fill('CORE-001');
     await page.locator('#lfAssetForm input[name="name"]').fill('Class tablet');
     await page.locator('#lfAssetForm input[name="location"]').fill('Grade R');
     await page.locator('#lfAssetForm button[type="submit"]').click();
     await page.locator('#lfAssetList').getByText('CORE-001').first().waitFor({state:'visible'});
 
+    await openTab('progressTab');
     await page.locator('#lfGradeRForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfGradeRForm input[name="term"]').fill('Term 4');
     await page.locator('#lfGradeRForm select[name="rating"]').selectOption('3');
@@ -96,6 +109,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfGradeRForm button[type="submit"]').click();
     await page.locator('#lfGradeRSummary').getByText('1 /').first().waitFor({state:'visible'});
 
+    await openTab('careTab');
     await page.locator('#lfDsdIncidentForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfDsdIncidentForm input[name="incidentDate"]').fill('2026-10-07');
     await page.locator('#lfDsdIncidentForm input[name="incidentTime"]').fill('10:15');
@@ -106,6 +120,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfDsdIncidentForm button[type="submit"]').click();
     await page.locator('#lfDsdIncidentList').getByText('Core Learner').first().waitFor({state:'visible'});
 
+    await openTab('attendanceTab');
     await page.locator('#lfAttendanceSettings input[name="cutoffTime"]').fill('09:00');
     await page.locator('#lfAttendanceSettings input[name="autoAbsent"]').check();
     await page.locator('#lfAttendanceSettings input[name="remindStaff"]').check();
@@ -114,6 +129,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.equal(await page.locator('#lfAttendanceSettings input[name="autoAbsent"]').isChecked(),true);
     assert.equal(await page.locator('#lfAttendanceSettings input[name="remindStaff"]').isChecked(),true);
 
+    await openTab('engagementTab');
     assert.equal(await page.locator('#lfCampaignForm input[value="sms"]').isDisabled(),true,'SMS must not pretend to be ready without provider config');
     assert.equal(await page.locator('#lfCampaignForm input[value="push"]').isDisabled(),true,'Push must not pretend to be ready without provider config');
 
