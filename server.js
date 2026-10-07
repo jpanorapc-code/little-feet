@@ -4372,7 +4372,9 @@ app.put('/api/files/:id', async (req, res, next) => {
   try {
     replacement = await createStoredFile(actor, {
       entityType: previous.entityType, recordId: previous.recordId, purpose: previous.purpose,
-      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl
+      originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl,
+      schoolIdOverride: previous.schoolId || accountSchoolId(actor),
+      schoolNameOverride: previous.schoolName || actor.schoolName || ''
     });
     replacement.replacesFileId = previous.id;
     previous.accessState = 'replaced'; previous.replacedByFileId = replacement.id; previous.updatedAt = new Date().toISOString();
