@@ -103,6 +103,9 @@ const login = async (username, pin) => {
     const crossSchoolList = await request('/api/files?entityType=learner&recordId=bravo-other-learner', { cookie: otherParentCookie });
     assert.equal(crossSchoolList.response.status, 200);
     assert.equal(crossSchoolList.data.length, 0, 'A same-name learner link must never cross the school boundary.');
+    const crossSchoolVault = await request('/api/learner-documents', { cookie: otherParentCookie });
+    assert.equal(crossSchoolVault.response.status, 200);
+    assert.equal(crossSchoolVault.data.some(row => row.learner.id === 'bravo-other-learner'), false, 'A same-name learner in another school must not appear in the parent learner vault.');
     assert.equal((await fetch(origin + bravoDuplicateUpload.data.file.contentUrl, { headers: { cookie: otherParentCookie } })).status, 404, 'A parent must not download a same-name learner document from another school.');
     const crossSchoolUpload = await request('/api/files', { method: 'POST', cookie: otherParentCookie, body: { entityType: 'learner', recordId: 'bravo-other-learner', purpose: 'cross-school-probe', originalFilename: 'blocked.png', dataUrl: pngA } });
     assert.equal(crossSchoolUpload.response.status, 404, 'A parent must not upload to a same-name learner record in another school.');
