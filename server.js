@@ -7700,7 +7700,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Wildcard Catch-All (Serves Frontend)
+// Error handler and public frontend entry point.
 app.use((error, req, res, _next) => {
   const report = recordSystemError(error, req);
   if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
@@ -7711,10 +7711,20 @@ app.use((error, req, res, _next) => {
   });
 });
 
-app.get(/(.*)/, (req, res) => {
-  if (path.extname(req.path)) return res.status(404).end();
+// Little Feet is a single-page shell at the canonical root. Unknown API routes
+// must never fall through to HTML, and unknown public paths must not become
+// crawlable soft-404 pages.
+app.all(/^\/api(?:\/|$)/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(404).json({ message: 'API route not found.' });
+});
+app.get('/', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+app.get(/(.*)/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(404).end();
 });
 
 // Start Server
