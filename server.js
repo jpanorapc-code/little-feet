@@ -4510,6 +4510,8 @@ app.post('/api/admissions/applications/:id/withdraw',(req,res)=>{
   if(['Enrolled','Rejected','Withdrawn'].includes(application.status))return res.status(409).json({message:'This application can no longer be withdrawn.'});
   const previous=application.status;application.status='Withdrawn';application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
   db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:'Withdrawn',changedBy:actor.username,changedAt:application.updatedAt,note:'Withdrawn by parent'});
+  const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&item.schoolId===application.schoolId);
+  if(ticket){ticket.status='Completed';ticket.updatedAt=application.updatedAt;ticket.feedback='Application withdrawn by parent.';}
   res.json({success:true,application:admissionApiView(application)});
 });
 app.put('/api/admissions/applications/:id/checklist',(req,res)=>{
@@ -4550,7 +4552,7 @@ app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
   const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
   if(!application)return res.status(404).json({message:'Application not found.'});
   if(application.status==='Enrolled')return res.status(409).json({message:'This application is already enrolled.',learnerId:application.convertedLearnerId});
-  if(!['Approved','Under review','Documents required','Waitlisted','Submitted'].includes(application.status))return res.status(409).json({message:'This application cannot be enrolled from its current status.'});
+  if(application.status!=='Approved')return res.status(409).json({message:'Approve this application before enrolling the learner.'});
   const documentState=admissionDocumentState(application);
   if(!documentState.complete)return res.status(409).json({message:'Verify all required admission documents before enrolment.',missingRequired:documentState.missingRequired});
   const className=limitedText(req.body?.className||application.gradeOrAgeGroup,120),address=limitedText(req.body?.address||decryptStoredField(application.homeArea),500);
@@ -7700,7 +7702,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Wildcard Catch-All (Serves Frontend)
+// Error handler and public frontend entry point.
 app.use((error, req, res, _next) => {
   const report = recordSystemError(error, req);
   if (!replicaMode && (!req.method || req.method === 'GET')) void saveDatabaseState();
@@ -7711,10 +7713,20 @@ app.use((error, req, res, _next) => {
   });
 });
 
-app.get(/(.*)/, (req, res) => {
-  if (path.extname(req.path)) return res.status(404).end();
+// Little Feet is a single-page shell at the canonical root. Unknown API routes
+// must never fall through to HTML, and unknown public paths must not become
+// crawlable soft-404 pages.
+app.all(/^\/api(?:\/|$)/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(404).json({ message: 'API route not found.' });
+});
+app.get('/', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+app.get(/(.*)/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(404).end();
 });
 
 // Start Server
