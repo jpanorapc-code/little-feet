@@ -117,6 +117,9 @@ const login = async (username, pin) => {
       assert.equal(verified.response.status, 200, verified.data?.message);
     }
 
+    const notApprovedEnrolment = await request('/api/admissions/applications/' + applicationId + '/enrol', { method: 'POST', cookie: alphaCookie, body: { className: 'Grade 1', address: '1 Test Street' } });
+    assert.equal(notApprovedEnrolment.response.status, 409, 'Verified documents must not bypass the admissions approval gate.');
+
     const approved = await request('/api/admissions/applications/' + applicationId + '/status', { method: 'PATCH', cookie: principalCookie, body: { status: 'Approved', note: 'Place offered' } });
     assert.equal(approved.response.status, 200, approved.data?.message);
     assert.equal(approved.data.application.documents.complete, true);
