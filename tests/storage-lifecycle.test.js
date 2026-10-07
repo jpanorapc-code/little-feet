@@ -150,6 +150,24 @@ const login = async (username, pin) => {
     assert.equal(audit.data.some(row => row.action === 'metadata_updated'), true);
     assert.equal(audit.data.some(row => row.action === 'verified'), true);
 
+    const bravoParentCookie = await login('bravo-parent', 'BravoParent1');
+    const crossSubmitted = await request('/api/school-applications', { method: 'POST', cookie: bravoParentCookie, body: {
+      schoolName: 'Alpha School', guardianName: 'Bravo Parent', contactPhone: '0830000000', contactEmail: 'bravo-parent@example.test',
+      learnerName: 'Cross School Learner', dateOfBirth: '2020-05-20', intendedStart: '2027-01-15', gradeOrAgeGroup: 'Grade 1',
+      homeArea: 'Other Area', notes: 'Cross-school application tenant test'
+    } });
+    assert.equal(crossSubmitted.response.status, 201, crossSubmitted.data?.message);
+    const crossUpload = await request('/api/files', { method: 'POST', cookie: bravoParentCookie, body: {
+      entityType: 'admission_application', recordId: crossSubmitted.data.application.id, purpose: 'birth_certificate', originalFilename: 'cross.png', dataUrl: pngA
+    } });
+    assert.equal(crossUpload.response.status, 201, crossUpload.data?.message);
+    const crossReplacement = await request('/api/files/' + crossUpload.data.file.id, { method: 'PUT', cookie: bravoParentCookie, body: { originalFilename: 'cross-replacement.png', dataUrl: pngB } });
+    assert.equal(crossReplacement.response.status, 200, crossReplacement.data?.message);
+    await new Promise(resolve => setTimeout(resolve, 120));
+    const persistedState = JSON.parse(fs.readFileSync(path.join(temp, 'littlefeet-replica.json'), 'utf8'));
+    const persistedReplacement = persistedState.fileRecords.find(file => file.id === crossReplacement.data.file.id);
+    assert.equal(persistedReplacement.schoolId, 'school-alpha', 'Replacing an admission document must preserve the target school tenant.');
+
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
     assert.equal(staffUpload.response.status, 201, staffUpload.data?.message);
     const staffFileUrl = staffUpload.data.file.contentUrl;
