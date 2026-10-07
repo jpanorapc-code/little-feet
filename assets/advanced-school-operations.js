@@ -195,7 +195,7 @@
     const u=user();if(!u)return;
     if(u.role==='parent'){
       const card=mountCard('homeTab','lfParentAdmissionsCard','<div class="card-header-bar"><div><h2>My School Applications & Documents</h2><p class="meta">Track applications, see missing requirements and upload supporting documents to private Little Feet storage.</p></div><span class="badge-tag info">ADMISSIONS</span></div><div id="lfParentAdmissionsList" class="record-list"></div>');if(card)refreshAdmissions().catch(()=>{});
-    }else if(staff()){
+    }else if(management()){
       const card=mountCard('registryTab','lfStaffAdmissionsCard','<div class="card-header-bar"><div><h2>Admissions Queue</h2><p class="meta">Review applications, verify supporting documents, waitlist/approve/reject and enrol accepted learners into the live register.</p></div><span class="badge-tag info">ADMISSIONS 2.0</span></div><div id="lfStaffAdmissionsList" class="record-list"></div>');if(card)refreshAdmissions().catch(()=>{});
     }
   }
