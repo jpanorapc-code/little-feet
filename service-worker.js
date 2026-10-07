@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v56-admissions';
+const CACHE_NAME = 'little-feet-shell-v57-learning-support';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -14,7 +14,7 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
   '/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3',
-  '/backup.js?v=20261007-admissions-v2',
+  '/backup.js?v=20261007-learning-support-v1',
   '/assets/mobile-pwa.js?v=20260925-pwa-v1',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
@@ -22,7 +22,7 @@ const SHELL_ASSETS = [
   '/assets/legal-notices.js?v=20261002-about-v1',
   '/assets/finance-automation.js?v=20260925-finance-v1',
   '/assets/school-core-upgrades.js?v=20261007-school-core-v3',
-  '/assets/advanced-school-operations.js?v=20261007-admissions-v2'
+  '/assets/advanced-school-operations.js?v=20261007-learning-support-v1'
 ];
 
 self.addEventListener('install', event => {
