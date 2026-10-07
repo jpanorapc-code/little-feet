@@ -1091,6 +1091,9 @@ const db = {
   academicAnalyticsSettings: [],
   schoolGroups: [],
   communicationTemplates: [],
+  admissionsApplications: [],
+  admissionsStatusHistory: [],
+  documentAudit: [],
   systemErrors: [],
   schoolBilling: {},
   schoolTerms: {},
@@ -1471,7 +1474,7 @@ function migrateSchoolTenancy() {
     account.schoolName = school.name;
   });
   const defaultSchoolId = db.users.find(account => account.role === 'admin')?.schoolId || db.users[0]?.schoolId || ensureSchool('Your School').id;
-  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'eldaSkillCatalogue', 'eldaAssessments', 'aftercareSettings', 'aftercarePlans', 'aftercareSessions', 'staffClockSessions', 'staffRatioSettings', 'dayCareBookings', 'dayCareCapacitySettings', 'mealPlans', 'dietaryProfiles', 'learnerGroups', 'learnerSubjectAssignments', 'pickupPasses', 'academicAnalyticsSettings', 'communicationTemplates', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
+  const collections = ['posts', 'schedules', 'worksheets', 'badges', 'tickets', 'attendance', 'staffTasks', 'staffLeave', 'teacherCover', 'performanceReviews', 'staffQualifications', 'staffDevelopmentPlans', 'emailInbox', 'emailDismissals', 'staffNotices', 'meetingMinutes', 'maintenanceOrders', 'resourceBookings', 'purchaseRequests', 'broadcasts', 'campusVisitors', 'visitorMeetings', 'registry', 'consentRecords', 'pickupLogs', 'reportReviews', 'learnerAccessCodes', 'storeProducts', 'storeOrders', 'parentPayments', 'parentSubscriptions', 'bookRegister', 'paymentEvents', 'paymentLedger', 'financeRecurringRules', 'financeAdjustments', 'financeReconciliationRuns', 'payrollProfiles', 'payrollRuns', 'subjectMarks', 'markHistory', 'reportCards', 'disciplineRecords', 'disciplineSettings', 'assetRegister', 'gradeRSkillAssessments', 'dsdIncidents', 'communicationCampaigns', 'attendanceAutomationSettings', 'eldaSkillCatalogue', 'eldaAssessments', 'aftercareSettings', 'aftercarePlans', 'aftercareSessions', 'staffClockSessions', 'staffRatioSettings', 'dayCareBookings', 'dayCareCapacitySettings', 'mealPlans', 'dietaryProfiles', 'learnerGroups', 'learnerSubjectAssignments', 'pickupPasses', 'academicAnalyticsSettings', 'communicationTemplates', 'admissionsApplications', 'admissionsStatusHistory', 'documentAudit', 'systemErrors', 'importAudit', 'importJobs', 'fileRecords', 'storageCleanupJobs', 'chatGroups', 'directMessages'];
   collections.forEach(collection => {
     if (!Array.isArray(db[collection])) db[collection] = [];
     db[collection].forEach(record => {
@@ -4209,18 +4212,43 @@ app.post('/api/term', (req, res) => {
   res.json({ term: db.schoolTerms[accountSchoolId(actor)] || db.term });
 });
 
-const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet', 'dsd_incident']);
+const FILE_ENTITY_TYPES = new Set(['learner', 'staff', 'school', 'post', 'worksheet', 'dsd_incident', 'admission_application']);
 const fileContentPath = file => `/api/files/${encodeURIComponent(file.id)}/content`;
 const publicFileMetadata = file => ({
   id: file.id, entityType: file.entityType, recordId: file.recordId, purpose: file.purpose,
   originalFilename: file.originalFilename, contentType: file.contentType, size: file.size,
   sha256: file.sha256, uploadedBy: file.uploadedBy, createdAt: file.createdAt,
   updatedAt: file.updatedAt || file.createdAt, accessState: file.accessState,
-  contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
+  verificationStatus:file.verificationStatus||'Pending review', verifiedAt:file.verifiedAt||'', verifiedBy:file.verifiedBy||'',
+  rejectionReason:file.rejectionReason||'', expiryDate:file.expiryDate||'', contentUrl: file.accessState === 'active' ? fileContentPath(file) : null
+});
+const admissionApplicationVisibleTo = (application, actor) => Boolean(application && actor && (
+  hasPlatformAccess(actor)
+  || (['principal','admin','staff'].includes(actor.role) && application.schoolId===accountSchoolId(actor))
+  || (actor.role==='parent' && normalizeUsername(application.createdBy)===normalizeUsername(actor.username))
+));
+const admissionApplicationView = application => ({
+  ...application,
+  contactPhone:decryptStoredField(application.contactPhone),
+  contactEmail:decryptStoredField(application.contactEmail),
+  dateOfBirth:decryptStoredField(application.dateOfBirth),
+  homeArea:decryptStoredField(application.homeArea),
+  notes:decryptStoredField(application.notes)
 });
 const relatedRecordForFile = (file, actor) => {
+  if (!file || !actor) return null;
+  if (file.entityType === 'admission_application') {
+    const application=(db.admissionsApplications||[]).find(item=>item.id===file.recordId);
+    return admissionApplicationVisibleTo(application,actor)?application:null;
+  }
+  if (file.entityType === 'learner') {
+    const learner=db.students.find(item=>item.id===file.recordId);
+    if(!learner)return null;
+    if(hasPlatformAccess(actor) || (recordInSchool(learner,actor)&&['principal','admin','staff'].includes(actor.role)))return learner;
+    if(actor.role==='teacher')return learnerRecordsVisibleTo(db.students,actor).some(item=>item.id===learner.id)?learner:null;
+    return actor.role==='parent'&&isParentLinkedToLearner(actor,learner)?learner:null;
+  }
   if (!recordInSchool(file, actor)) return null;
-  if (file.entityType === 'learner') return db.students.find(item => item.id === file.recordId && recordInSchool(item, actor));
   if (file.entityType === 'staff') return db.users.find(item => normalizeUsername(item.username) === normalizeUsername(file.recordId) && isSameSchool(item, actor));
   if (file.entityType === 'school') return db.schools.find(item => item.id === file.recordId && item.id === accountSchoolId(actor));
   if (file.entityType === 'post') return db.posts.find(item => item.id === file.recordId && recordInSchool(item, actor));
@@ -4230,14 +4258,14 @@ const relatedRecordForFile = (file, actor) => {
     if (!incident) return null;
     if (hasPlatformAccess(actor) || ['teacher', 'principal', 'admin', 'staff'].includes(actor.role)) return incident;
     if (actor.role !== 'parent') return null;
-    const learner = tenantRecords(db.students, actor).find(item => normalizeComparableText(item.studentName) === normalizeComparableText(incident.learnerName));
+    const learner = db.students.find(item => normalizeComparableText(item.studentName) === normalizeComparableText(incident.learnerName) && recordInSchool(item,actor));
     return learner && isParentLinkedToLearner(actor, learner) ? incident : null;
   }
   return null;
 };
-const canManageFile = (file, actor) => Boolean(actor && recordInSchool(file, actor)
+const canManageFile = (file, actor) => Boolean(actor && relatedRecordForFile(file,actor)
   && ((hasPlatformAccess(actor) || ['admin', 'principal', 'staff'].includes(actor.role)) || normalizeUsername(file.uploadedBy) === normalizeUsername(actor.username)));
-const createStoredFile = async (actor, { entityType, recordId, purpose, originalFilename, dataUrl }) => {
+const createStoredFile = async (actor, { entityType, recordId, purpose, originalFilename, dataUrl, schoolIdOverride, schoolNameOverride }) => {
   if (!objectStorage.configured) {
     const error = new Error('Private file storage is not configured. Ask an administrator to configure Cloudflare R2.');
     error.status = 503;
@@ -4253,18 +4281,21 @@ const createStoredFile = async (actor, { entityType, recordId, purpose, original
     throw error;
   }
   const id = crypto.randomUUID();
-  const key = objectKeyFor({ schoolId: accountSchoolId(actor), entityType, recordId, extension: decoded.extension });
+  const storageSchoolId=schoolIdOverride||accountSchoolId(actor),storageSchoolName=schoolNameOverride||actor.schoolName||'';
+  const key = objectKeyFor({ schoolId: storageSchoolId, entityType, recordId, extension: decoded.extension });
   const sha256 = crypto.createHash('sha256').update(decoded.bytes).digest('hex');
   const result = await objectStorage.put({
     key, body: decoded.bytes, contentType: decoded.mimeType,
-    metadata: { fileid: id, tenant: crypto.createHash('sha256').update(accountSchoolId(actor)).digest('hex') }
+    metadata: { fileid: id, tenant: crypto.createHash('sha256').update(storageSchoolId).digest('hex') }
   });
-  const record = tagSchoolRecord(actor, {
+  const record = {
     id, entityType, recordId: boundedText(recordId, 180), purpose: boundedText(purpose || 'attachment', 80),
     storageProvider: objectStorage.kind, objectKey: key, originalFilename: decoded.filename,
     contentType: decoded.mimeType, size: decoded.bytes.length, sha256, etag: boundedText(result.etag, 180),
-    uploadedBy: actor.username, createdAt: new Date().toISOString(), accessState: 'active'
-  });
+    uploadedBy: actor.username, createdAt: new Date().toISOString(), accessState: 'active',
+    verificationStatus:'Pending review', verifiedAt:'', verifiedBy:'', rejectionReason:'',
+    schoolId:storageSchoolId, schoolName:storageSchoolName
+  };
   db.fileRecords.unshift(record);
   return record;
 };
@@ -4278,22 +4309,28 @@ app.get('/api/files', (req, res) => {
   if (!actor) return res.status(401).json({ message: 'Sign in to view files.' });
   const entityType = boundedText(req.query.entityType, 40);
   const recordId = boundedText(req.query.recordId, 180);
-  const files = tenantRecords(db.fileRecords, actor).filter(file => file.accessState === 'active'
+  const files = (db.fileRecords||[]).filter(file => file.accessState === 'active'
     && (!entityType || file.entityType === entityType) && (!recordId || file.recordId === recordId)
     && relatedRecordForFile(file, actor));
   res.json(files.map(publicFileMetadata));
 });
 
 app.post('/api/files', async (req, res, next) => {
-  const actor = requireSchoolStaff(req);
-  if (!actor) return res.status(403).json({ message: 'Authorised school staff can upload files.' });
+  const actor = getSessionAccount(req);
+  if (!actor) return res.status(401).json({ message: 'Sign in before uploading files.' });
   const entityType = boundedText(req.body?.entityType, 40);
   const recordId = boundedText(req.body?.recordId, 180);
-  const probe = tagSchoolRecord(actor, { entityType, recordId });
-  if (!recordId || !relatedRecordForFile(probe, actor)) return res.status(404).json({ message: 'The related school record was not found.' });
+  const probe = {entityType,recordId,schoolId:accountSchoolId(actor)};
+  const related=recordId&&relatedRecordForFile(probe, actor);
+  const staffAllowed=hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor.role);
+  const parentAllowed=actor.role==='parent'&&['learner','admission_application'].includes(entityType);
+  if(!staffAllowed&&!parentAllowed)return res.status(403).json({message:'You cannot upload files for this record.'});
+  if (!related) return res.status(404).json({ message: 'The related school record was not found.' });
   let file;
   try {
-    file = await createStoredFile(actor, { entityType, recordId, purpose: req.body?.purpose, originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl });
+    file = await createStoredFile(actor, { entityType, recordId, purpose: req.body?.purpose, originalFilename: req.body?.originalFilename, dataUrl: req.body?.dataUrl,
+      schoolIdOverride:related.schoolId||accountSchoolId(actor),schoolNameOverride:related.schoolName||actor.schoolName||'' });
+    if(['learner','admission_application'].includes(entityType))db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:file.schoolId,entityType,recordId,fileId:file.id,action:'uploaded',by:actor.username,at:new Date().toISOString(),details:file.originalFilename});
     await saveDatabaseState();
     req.persistenceCommitted = true;
     res.status(201).json({ success: true, file: publicFileMetadata(file) });
@@ -4325,7 +4362,7 @@ app.get('/api/files/integrity', async (req, res, next) => {
 
 app.put('/api/files/:id', async (req, res, next) => {
   const actor = getSessionAccount(req);
-  const previous = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  const previous = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && relatedRecordForFile(item,actor));
   if (!previous || !canManageFile(previous, actor)) return res.status(404).json({ message: 'File not found.' });
   let replacement;
   let previousObjectDeleted = false;
@@ -4358,7 +4395,7 @@ app.put('/api/files/:id', async (req, res, next) => {
 app.get('/api/files/:id/content', async (req, res, next) => {
   const actor = getSessionAccount(req);
   if (!actor) return res.status(401).json({ message: 'Sign in to download files.' });
-  const file = db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  const file = db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active');
   if (!file || !relatedRecordForFile(file, actor)) return res.status(404).json({ message: 'File not found.' });
   try {
     const object = await objectStorage.get({ key: file.objectKey });
@@ -4381,7 +4418,7 @@ app.get('/api/files/:id/content', async (req, res, next) => {
 
 app.delete('/api/files/:id', async (req, res, next) => {
   const actor = getSessionAccount(req);
-  const file = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && recordInSchool(item, actor));
+  const file = actor && db.fileRecords.find(item => item.id === req.params.id && item.accessState === 'active' && relatedRecordForFile(item,actor));
   if (!file || !canManageFile(file, actor)) return res.status(404).json({ message: 'File not found.' });
   try {
     const related = relatedRecordForFile(file, actor);
@@ -4402,6 +4439,189 @@ app.delete('/api/files/:id', async (req, res, next) => {
     await saveDatabaseState().catch(() => {});
     next(error);
   }
+});
+
+// Admissions 2.0 + central learner document repository.
+const admissionsManagementActor=req=>{
+  const actor=getSessionAccount(req);
+  return actor&&(hasPlatformAccess(actor)||['principal','admin','staff'].includes(actor.role))?actor:null;
+};
+const admissionForActor=(actor,id)=>(db.admissionsApplications||[]).find(item=>item.id===id&&admissionApplicationVisibleTo(item,actor));
+const admissionDocumentState=application=>{
+  const files=(db.fileRecords||[]).filter(file=>file.entityType==='admission_application'&&file.recordId===application.id&&file.accessState==='active');
+  const byPurpose=new Map();
+  files.forEach(file=>{const list=byPurpose.get(file.purpose)||[];list.push(file);byPurpose.set(file.purpose,list);});
+  const checklist=(application.checklist||[]).map(item=>{
+    const documents=byPurpose.get(item.key)||[];
+    const verified=documents.some(file=>file.verificationStatus==='Verified');
+    const rejected=documents.length>0&&!verified&&documents.every(file=>file.verificationStatus==='Rejected');
+    return {...item,status:verified?'verified':rejected?'rejected':documents.length?'pending':'missing',documentCount:documents.length};
+  });
+  const missingRequired=checklist.filter(item=>item.required&&item.status!=='verified').map(item=>item.key);
+  return {files:files.map(publicFileMetadata),checklist,missingRequired,complete:missingRequired.length===0};
+};
+const admissionApiView=application=>({...admissionApplicationView(application),documents:admissionDocumentState(application)});
+const notifyAdmissionParent=async(application,title,message)=>{
+  const parent=(db.users||[]).find(account=>account.role==='parent'&&normalizeUsername(account.username)===normalizeUsername(application.createdBy));
+  if(parent&&typeof addEmailInboxItem==='function')addEmailInboxItem(parent,{type:'Notification',title,message,sourceId:application.id,sourceTab:'homeTab',sender:application.schoolName||'Admissions'});
+  const email=decryptStoredField(application.contactEmail);
+  if(looksLikeEmailAddress(email)&&(smtpEmailConfigured()||apiEmailConfigured()))await sendLittleFeetEmail({to:email,subject:title,text:message,html:'<p>'+String(message).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])).replace(/\n/g,'<br>')+'</p>'}).catch(()=>false);
+};
+
+app.get('/api/admissions/applications',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view admissions.'});
+  let rows=(db.admissionsApplications||[]).filter(item=>admissionApplicationVisibleTo(item,actor));
+  rows=rows.sort((a,b)=>Date.parse(b.updatedAt||b.createdAt)-Date.parse(a.updatedAt||a.createdAt));
+  res.json(rows.map(admissionApiView));
+});
+app.get('/api/admissions/applications/:id',(req,res)=>{
+  const actor=getSessionAccount(req),application=actor&&admissionForActor(actor,req.params.id);
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  res.json(admissionApiView(application));
+});
+app.get('/api/admissions/applications/:id/history',(req,res)=>{
+  const actor=getSessionAccount(req),application=actor&&admissionForActor(actor,req.params.id);
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  res.json((db.admissionsStatusHistory||[]).filter(row=>row.applicationId===application.id).sort((a,b)=>Date.parse(b.changedAt)-Date.parse(a.changedAt)));
+});
+app.patch('/api/admissions/applications/:id/status',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  const nextStatus=boundedText(req.body?.status,40),note=boundedText(req.body?.note,1200);
+  if(!ADMISSION_STATUSES.has(nextStatus)||nextStatus==='Enrolled')return res.status(400).json({message:'Choose a valid admissions status. Use Enrol to create the learner record.'});
+  if(application.status==='Enrolled')return res.status(409).json({message:'An enrolled application cannot be moved back into the admissions queue.'});
+  const previous=application.status;
+  application.status=nextStatus;application.reviewNote=note;application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:nextStatus,changedBy:actor.username,changedAt:application.updatedAt,note});
+  const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&recordInSchool(item,actor));
+  if(ticket){ticket.status=['Approved','Rejected','Withdrawn'].includes(nextStatus)?'Completed':'Open';ticket.updatedAt=application.updatedAt;}
+  if(nextStatus==='Documents required'){
+    const missing=admissionDocumentState(application).checklist.filter(item=>item.required&&item.status!=='verified').map(item=>item.label);
+    void notifyAdmissionParent(application,'Admission documents required',missing.length?('Please upload or replace these required documents: '+missing.join(', ')+'.'):'The school requested additional admission documents.').catch(()=>{});
+  }else if(['Waitlisted','Approved','Rejected'].includes(nextStatus)){
+    void notifyAdmissionParent(application,'School application update',application.learnerName+' application status is now '+nextStatus+'.'+(note?' '+note:'')).catch(()=>{});
+  }
+  res.json({success:true,application:admissionApiView(application)});
+});
+app.post('/api/admissions/applications/:id/withdraw',(req,res)=>{
+  const actor=getSessionAccount(req),application=actor&&admissionForActor(actor,req.params.id);
+  if(!application||actor.role!=='parent'||normalizeUsername(application.createdBy)!==normalizeUsername(actor.username))return res.status(404).json({message:'Application not found.'});
+  if(['Enrolled','Rejected','Withdrawn'].includes(application.status))return res.status(409).json({message:'This application can no longer be withdrawn.'});
+  const previous=application.status;application.status='Withdrawn';application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:'Withdrawn',changedBy:actor.username,changedAt:application.updatedAt,note:'Withdrawn by parent'});
+  res.json({success:true,application:admissionApiView(application)});
+});
+app.put('/api/admissions/applications/:id/checklist',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  const incoming=Array.isArray(req.body?.items)?req.body.items:[];
+  if(!incoming.length)return res.status(400).json({message:'Add at least one checklist item.'});
+  const existing=new Map((application.checklist||[]).map(item=>[item.key,item]));
+  application.checklist=incoming.slice(0,30).map(raw=>{
+    const key=boundedText(raw?.key,80).replace(/[^a-z0-9_-]/gi,'_').toLowerCase(),label=limitedText(raw?.label,160);
+    const old=existing.get(key)||{};
+    return {key,label:label||old.label||key,required:Boolean(raw?.required),status:old.status||'missing',verifiedAt:old.verifiedAt||'',verifiedBy:old.verifiedBy||''};
+  }).filter(item=>item.key&&item.label);
+  if(!application.checklist.length)return res.status(400).json({message:'Checklist items must have valid names.'});
+  application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  res.json({success:true,application:admissionApiView(application)});
+});
+app.post('/api/admissions/applications/:id/documents/:fileId/verify',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  const file=(db.fileRecords||[]).find(item=>item.id===req.params.fileId&&item.entityType==='admission_application'&&item.recordId===application.id&&item.accessState==='active');
+  if(!file)return res.status(404).json({message:'Application document not found.'});
+  const status=boundedText(req.body?.status,30),reason=boundedText(req.body?.reason,500);
+  if(!['Verified','Rejected'].includes(status))return res.status(400).json({message:'Choose Verified or Rejected.'});
+  if(status==='Rejected'&&!reason)return res.status(400).json({message:'Add a reason when rejecting a document.'});
+  file.verificationStatus=status;file.verifiedAt=status==='Verified'?new Date().toISOString():'';file.verifiedBy=status==='Verified'?actor.username:'';file.rejectionReason=status==='Rejected'?reason:'';
+  db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:application.schoolId,entityType:'admission_application',recordId:application.id,fileId:file.id,action:status==='Verified'?'verified':'rejected',by:actor.username,at:new Date().toISOString(),details:reason||''});
+  const item=(application.checklist||[]).find(row=>row.key===file.purpose);
+  if(item){item.status=status==='Verified'?'verified':'rejected';item.verifiedAt=file.verifiedAt;item.verifiedBy=file.verifiedBy;}
+  application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  if(status==='Rejected')void notifyAdmissionParent(application,'Admission document rejected','The school rejected '+file.originalFilename+'. Reason: '+reason).catch(()=>{});
+  res.json({success:true,file:publicFileMetadata(file),application:admissionApiView(application)});
+});
+app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'Admissions management access is required.'});
+  const application=(db.admissionsApplications||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+  if(!application)return res.status(404).json({message:'Application not found.'});
+  if(application.status==='Enrolled')return res.status(409).json({message:'This application is already enrolled.',learnerId:application.convertedLearnerId});
+  if(!['Approved','Under review','Documents required','Waitlisted','Submitted'].includes(application.status))return res.status(409).json({message:'This application cannot be enrolled from its current status.'});
+  const documentState=admissionDocumentState(application);
+  if(!documentState.complete)return res.status(409).json({message:'Verify all required admission documents before enrolment.',missingRequired:documentState.missingRequired});
+  const className=limitedText(req.body?.className||application.gradeOrAgeGroup,120),address=limitedText(req.body?.address||decryptStoredField(application.homeArea),500);
+  const emergencyContact=limitedText(req.body?.emergencyContact,500),medicalNotes=limitedText(req.body?.medicalNotes,2000),consent=limitedText(req.body?.consent||'Pending verification',120);
+  if(!className||!address)return res.status(400).json({message:'Enter the learner class/grade and home address before enrolment.'});
+  const guardianName=application.guardianName,guardianPhone=decryptStoredField(application.contactPhone),guardianEmail=decryptStoredField(application.contactEmail),dateOfBirth=decryptStoredField(application.dateOfBirth);
+  let learner=tenantRecords(db.students,actor).find(student=>normalizeComparableText(student.studentName)===normalizeComparableText(application.learnerName)&&normalizeComparableText(student.className)===normalizeComparableText(className));
+  if(!learner){
+    const learnerLimit=schoolLearnerLimitState(actor);if(!learnerLimit.allowed)return res.status(409).json({message:`The ${learnerLimit.planCode||'current'} school package has reached its learner limit.`});
+    learner=tagSchoolRecord(actor,{id:crypto.randomUUID(),studentName:application.learnerName,className,parentName:guardianName,contactEmail:guardianEmail||'',dateOfBirth:encryptField(dateOfBirth),medicalNotes:encryptField(medicalNotes||''),emergencyContact:encryptField(emergencyContact||''),authorisedPickups:encryptField(''),registeredAt:new Date().toISOString(),registeredBy:actor.username,admissionApplicationId:application.id});
+    db.students.push(learner);ensureLearnerAccessCode(actor,learner);
+  }
+  let registry=tenantRecords(db.registry,actor).find(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(application.learnerName)&&normalizeComparableText(row.className)===normalizeComparableText(className));
+  if(!registry){
+    registry=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:application.learnerName,className,dateOfBirth:encryptField(dateOfBirth),guardianName,guardianPhone:encryptField(guardianPhone),guardianEmail:encryptField(guardianEmail||''),address:encryptField(address),emergencyContact:encryptField(emergencyContact||''),medicalNotes:encryptField(medicalNotes||''),consent,createdAt:new Date().toISOString(),createdBy:actor.username,admissionApplicationId:application.id});
+    db.registry.unshift(registry);
+  }
+  const parent=(db.users||[]).find(account=>account.role==='parent'&&normalizeUsername(account.username)===normalizeUsername(application.createdBy));
+  if(parent){
+    const links=new Set(Array.isArray(parent.linkedLearners)?parent.linkedLearners:[]);
+    links.add(application.learnerName);parent.linkedLearners=[...links];
+    parent.parentRelationshipStatus='Administrator approved';
+    parent.parentRelationshipApprovedAt=new Date().toISOString();
+    parent.parentRelationshipApprovedBy=actor.username;
+    if(!parent.schoolId){parent.schoolId=application.schoolId;parent.schoolName=application.schoolName;}
+  }
+  const priorStatus=application.status;application.status='Enrolled';application.convertedLearnerId=learner.id;application.convertedRegistryId=registry.id;application.enrolledAt=new Date().toISOString();application.enrolledBy=actor.username;application.updatedAt=application.enrolledAt;
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:priorStatus,toStatus:'Enrolled',changedBy:actor.username,changedAt:application.enrolledAt,note:'Converted to learner register'});
+  const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&recordInSchool(item,actor));if(ticket){ticket.status='Completed';ticket.updatedAt=application.enrolledAt;}
+  void notifyAdmissionParent(application,'Application enrolled',application.learnerName+' has been enrolled into '+className+' at '+application.schoolName+'.').catch(()=>{});
+  res.status(201).json({success:true,application:admissionApiView(application),learnerKey:learnerRecordKey(learner),registryId:registry.id});
+});
+app.get('/api/learner-documents',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view learner documents.'});
+  let learners=[];
+  if(actor.role==='parent')learners=(db.students||[]).filter(learner=>isParentLinkedToLearner(actor,learner));
+  else if(actor.role==='teacher')learners=learnerRecordsVisibleTo(db.students,actor);
+  else if(hasPlatformAccess(actor)||['principal','admin','staff'].includes(actor.role))learners=tenantRecords(db.students,actor);
+  else return res.status(403).json({message:'You cannot view learner documents.'});
+  const learnerIds=new Set(learners.map(item=>item.id));
+  const files=(db.fileRecords||[]).filter(file=>file.entityType==='learner'&&file.accessState==='active'&&learnerIds.has(file.recordId)&&relatedRecordForFile(file,actor));
+  res.json(learners.map(learner=>({learner:{id:learner.id,studentName:learner.studentName,className:learner.className},documents:files.filter(file=>file.recordId===learner.id).map(publicFileMetadata)})));
+});
+app.patch('/api/learner-documents/:learnerId/:fileId',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'School management access is required.'});
+  const learner=tenantRecords(db.students,actor).find(item=>item.id===req.params.learnerId);if(!learner)return res.status(404).json({message:'Learner not found.'});
+  const file=(db.fileRecords||[]).find(item=>item.id===req.params.fileId&&item.entityType==='learner'&&item.recordId===learner.id&&item.accessState==='active');
+  if(!file)return res.status(404).json({message:'Learner document not found.'});
+  const expiryDate=boundedText(req.body?.expiryDate,10);
+  if(expiryDate&&!validDateKey(expiryDate))return res.status(400).json({message:'Choose a valid expiry date.'});
+  const purpose=boundedText(req.body?.purpose||file.purpose,80);if(!purpose)return res.status(400).json({message:'Document type is required.'});
+  file.expiryDate=expiryDate;file.purpose=purpose;file.updatedAt=new Date().toISOString();
+  db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:learner.schoolId,entityType:'learner',recordId:learner.id,fileId:file.id,action:'metadata_updated',by:actor.username,at:file.updatedAt,details:expiryDate?('Expiry '+expiryDate):'Expiry cleared'});
+  res.json({success:true,file:publicFileMetadata(file)});
+});
+app.get('/api/learner-documents/:learnerId/audit',(req,res)=>{
+  const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view document history.'});
+  const learner=(db.students||[]).find(item=>item.id===req.params.learnerId);
+  if(!learner||!relatedRecordForFile({entityType:'learner',recordId:learner.id,schoolId:learner.schoolId},actor))return res.status(404).json({message:'Learner not found.'});
+  res.json((db.documentAudit||[]).filter(row=>row.entityType==='learner'&&row.recordId===learner.id).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)));
+});
+
+app.post('/api/learner-documents/:learnerId/:fileId/verify',(req,res)=>{
+  const actor=admissionsManagementActor(req);if(!actor)return res.status(403).json({message:'School management access is required.'});
+  const learner=tenantRecords(db.students,actor).find(item=>item.id===req.params.learnerId);if(!learner)return res.status(404).json({message:'Learner not found.'});
+  const file=(db.fileRecords||[]).find(item=>item.id===req.params.fileId&&item.entityType==='learner'&&item.recordId===learner.id&&item.accessState==='active');
+  if(!file)return res.status(404).json({message:'Learner document not found.'});
+  const status=boundedText(req.body?.status,30),reason=boundedText(req.body?.reason,500);if(!['Verified','Rejected'].includes(status))return res.status(400).json({message:'Choose Verified or Rejected.'});if(status==='Rejected'&&!reason)return res.status(400).json({message:'Add a rejection reason.'});
+  file.verificationStatus=status;file.verifiedAt=status==='Verified'?new Date().toISOString():'';file.verifiedBy=status==='Verified'?actor.username:'';file.rejectionReason=status==='Rejected'?reason:'';
+  db.documentAudit.unshift({id:crypto.randomUUID(),schoolId:learner.schoolId,entityType:'learner',recordId:learner.id,fileId:file.id,action:status==='Verified'?'verified':'rejected',by:actor.username,at:new Date().toISOString(),details:reason||''});
+  res.json({success:true,file:publicFileMetadata(file)});
 });
 
 // Posts
@@ -5898,6 +6118,16 @@ app.post('/api/attendance/clear', (req, res) => {
 });
 
 // Tickets
+const ADMISSION_STATUSES = new Set(['Submitted','Under review','Documents required','Waitlisted','Approved','Rejected','Enrolled','Withdrawn']);
+const admissionChecklistDefaults = () => [
+  { key:'birth_certificate', label:'Birth certificate', required:true },
+  { key:'guardian_id', label:'Parent / guardian identity document', required:true },
+  { key:'proof_of_address', label:'Proof of address', required:false },
+  { key:'immunisation_record', label:'Immunisation record', required:false },
+  { key:'previous_report', label:'Previous school report', required:false },
+  { key:'transfer_card', label:'Transfer card', required:false }
+].map(item=>({...item,status:'missing',verifiedAt:'',verifiedBy:''}));
+
 app.post('/api/school-applications', (req, res) => {
   const applicant = getSessionAccount(req);
   if (!applicant || String(applicant.verificationStatus || '').toLowerCase().includes('pending')) {
@@ -5926,14 +6156,29 @@ app.post('/api/school-applications', (req, res) => {
   if (!validDateKey(intendedStart)) return res.status(400).json({ message: 'Enter a valid intended start date.' });
   const principal = db.users.find(account => account.role === 'principal' && normalizeComparableText(account.schoolName) === normalizeComparableText(schoolName) && !String(account.verificationStatus || '').toLowerCase().includes('pending'));
   if (!principal) return res.status(409).json({ message: 'This school is not yet available for Little Feet applications. Ask the school to activate its principal account first.' });
-  const application = { guardianName, contactPhone, contactEmail, learnerName, dateOfBirth, intendedStart, gradeOrAgeGroup, educationStage, homeArea, notes };
+  const targetSchoolId=accountSchoolId(principal);
+  const duplicate=(db.admissionsApplications||[]).find(item=>item.schoolId===targetSchoolId&&normalizeUsername(item.createdBy)===normalizeUsername(applicant.username)&&normalizeComparableText(item.learnerName)===normalizeComparableText(learnerName)&&!['Rejected','Withdrawn','Enrolled'].includes(item.status));
+  if(duplicate)return res.status(409).json({message:'An active application for this learner already exists at this school.',applicationId:duplicate.id,status:duplicate.status});
+  const createdAt=new Date().toISOString();
+  const application = {
+    id:crypto.randomUUID(), applicationNumber:'LF-'+new Date().getUTCFullYear()+'-'+crypto.randomBytes(4).toString('hex').toUpperCase(),
+    schoolId:targetSchoolId, schoolName, guardianName,
+    contactPhone:encryptField(contactPhone), contactEmail:encryptField(contactEmail),
+    learnerName, dateOfBirth:encryptField(dateOfBirth), intendedStart,
+    gradeOrAgeGroup, educationStage, homeArea:encryptField(homeArea), notes:encryptField(notes),
+    checklist:admissionChecklistDefaults(), status:'Submitted', createdBy:applicant.username,
+    createdByName:applicant.name||applicant.username, assignedTo:principal.username,
+    createdAt, updatedAt:createdAt, convertedLearnerId:'', convertedRegistryId:''
+  };
+  db.admissionsApplications.unshift(application);
+  db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:targetSchoolId,fromStatus:'',toStatus:'Submitted',changedBy:applicant.username,changedAt:createdAt,note:'Application submitted'});
   const ticket = {
     id: crypto.randomUUID(), department: 'Admissions', category: 'School application', priority: 'Normal', subject: `School application · ${learnerName}`,
-    message: `Application for ${schoolName}`, application, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
-    assignedTo: principal.username, schoolId: accountSchoolId(principal), status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt: new Date().toISOString()
+    message: `Application ${application.applicationNumber} for ${schoolName}`, applicationId:application.id, schoolName, createdBy: applicant.username, createdByName: applicant.name || applicant.username,
+    assignedTo: principal.username, schoolId: targetSchoolId, status: 'Open', monthCategory: new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }), createdAt
   };
   db.tickets.unshift(ticket);
-  res.status(201).json({ success: true, ticket: { id: ticket.id, assignedTo: principal.name || principal.username, status: ticket.status } });
+  res.status(201).json({ success: true, application: { id:application.id, applicationNumber:application.applicationNumber, assignedTo: principal.name || principal.username, status: application.status }, ticketId:ticket.id });
 });
 
 app.post('/api/account-deletion-request', (req, res) => {
