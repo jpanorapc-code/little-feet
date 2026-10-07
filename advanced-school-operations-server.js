@@ -13,7 +13,7 @@ function registerAdvancedSchoolOperations(app, deps) {
   const {
     db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
     tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
-    isParentLinkedToLearner, validDateKey, createParentPaymentRecord, encryptField, decryptStoredField,
+    isParentLinkedToLearner, validDateKey, safeHttpsUrl, createParentPaymentRecord, encryptField, decryptStoredField,
     saveDatabaseState, scheduleReplicaSnapshot, logStructured
   } = deps;
 
@@ -56,6 +56,30 @@ function registerAdvancedSchoolOperations(app, deps) {
     account.role === 'parent' && isSameSchool(actor, account) &&
     (account.linkedLearners || []).some(name => normalizeComparableText(name) === normalizeComparableText(learnerName))
   );
+
+  const aiProviderConfig=()=>{
+    const raw=String(process.env.LF_AI_API_URL||'').trim();
+    const endpoint=process.env.NODE_ENV==='test'&&/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/i.test(raw)?raw:safeHttpsUrl(raw);
+    return {configured:Boolean(endpoint&&String(process.env.LF_AI_MODEL||'').trim()),approved:String(process.env.LF_AI_DATA_PROCESSING_APPROVED||'').toLowerCase()==='true',endpoint,model:String(process.env.LF_AI_MODEL||'').trim(),hasKey:Boolean(String(process.env.LF_AI_API_KEY||'').trim())};
+  };
+  app.get('/api/ai/observation/config',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const cfg=aiProviderConfig();res.json({configured:cfg.configured,approved:cfg.approved,ready:cfg.configured&&cfg.approved,model:cfg.configured?cfg.model:''});});
+  app.post('/api/ai/observation-assist',async(req,res,next)=>{
+    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
+    const cfg=aiProviderConfig();if(!cfg.configured)return res.status(409).json({message:'AI observation provider is not configured. Little Feet will not fabricate AI output.'});if(!cfg.approved)return res.status(409).json({message:'AI data-processing approval is not enabled for this deployment.'});
+    const observation=limitedText(req.body?.observation,1800);if(!observation)return res.status(400).json({message:'Enter an observation of 1,800 characters or fewer.'});
+    const areas=ELDA_AREAS.join(' | '),catalogue=schoolRecords('eldaSkillCatalogue',actor).slice(0,964).map(s=>s.code+' · '+s.area+' · '+s.label).join('\n');
+    const prompt='You assist South African ECD staff. Return strict JSON only with keys area, skillCodes (array), parentSummary, homeLearningSuggestions (array). Use only these ELDA areas: '+areas+'. Use only skill codes present in the supplied school catalogue. Do not diagnose a child or infer medical/developmental disorders. Observation:\n'+observation+'\nSchool ELDA catalogue:\n'+catalogue;
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+    try{
+      const headers={'Content-Type':'application/json'};const key=String(process.env.LF_AI_API_KEY||'').trim();if(key)headers.Authorization='Bearer '+key;
+      const response=await fetch(cfg.endpoint,{method:'POST',headers,signal:controller.signal,body:JSON.stringify({model:cfg.model,messages:[{role:'system',content:'Return valid JSON only.'},{role:'user',content:prompt}],temperature:0.2,response_format:{type:'json_object'}})});
+      const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error('AI provider returned HTTP '+response.status);
+      const raw=payload?.choices?.[0]?.message?.content??payload?.output_text??payload?.result;
+      const parsed=typeof raw==='string'?JSON.parse(raw):raw;if(!parsed||typeof parsed!=='object')throw new Error('AI provider response was not valid JSON.');
+      const allowedCodes=new Set(schoolRecords('eldaSkillCatalogue',actor).map(s=>s.code));
+      res.json({area:ELDA_AREAS.includes(parsed.area)?parsed.area:'',skillCodes:(Array.isArray(parsed.skillCodes)?parsed.skillCodes:[]).filter(code=>allowedCodes.has(code)).slice(0,20),parentSummary:boundedText(parsed.parentSummary,1200),homeLearningSuggestions:(Array.isArray(parsed.homeLearningSuggestions)?parsed.homeLearningSuggestions:[]).map(x=>boundedText(x,400)).filter(Boolean).slice(0,8),providerModel:cfg.model});
+    }catch(error){next(error);}finally{clearTimeout(timeout);}
+  });
 
   // ELDA catalogue + assessment engine. Catalogue is importable so Little Feet can
   // lawfully load an official/licensed full catalogue without copying a competitor's database.
