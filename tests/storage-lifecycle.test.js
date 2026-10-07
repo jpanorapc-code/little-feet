@@ -160,9 +160,13 @@ const login = async (username, pin) => {
     assert.equal(crossUpload.response.status, 201, crossUpload.data?.message);
     const crossReplacement = await request('/api/files/' + crossUpload.data.file.id, { method: 'PUT', cookie: bravoParentCookie, body: { originalFilename: 'cross-replacement.png', dataUrl: pngB } });
     assert.equal(crossReplacement.response.status, 200, crossReplacement.data?.message);
-    await new Promise(resolve => setTimeout(resolve, 120));
-    const persistedState = JSON.parse(fs.readFileSync(path.join(temp, 'littlefeet-replica.json'), 'utf8'));
-    const persistedReplacement = persistedState.fileRecords.find(file => file.id === crossReplacement.data.file.id);
+    let persistedReplacement;
+    for (let attempt = 0; attempt < 20 && !persistedReplacement; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const persistedState = JSON.parse(fs.readFileSync(path.join(temp, 'littlefeet-replica.json'), 'utf8'));
+      persistedReplacement = persistedState.fileRecords.find(file => file.id === crossReplacement.data.file.id);
+    }
+    assert.ok(persistedReplacement, 'Replacement metadata must reach the replica snapshot.');
     assert.equal(persistedReplacement.schoolId, 'school-alpha', 'Replacing an admission document must preserve the target school tenant.');
 
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
