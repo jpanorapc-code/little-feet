@@ -17,6 +17,7 @@ const ambientBackground = fs.readFileSync(path.join(root, 'assets', 'ambient-bac
 const preferencesEnhancements = fs.readFileSync(path.join(root, 'assets', 'preferences-enhancements.js'), 'utf8');
 const myDay = fs.readFileSync(path.join(root, 'assets', 'my-day.js'), 'utf8');
 const workplaceExtended = fs.readFileSync(path.join(root, 'assets', 'workplace-extended.js'), 'utf8');
+const advancedSchoolOperations = fs.readFileSync(path.join(root, 'assets', 'advanced-school-operations.js'), 'utf8');
 const startupWorkspaces = Object.freeze({
   approvals: fs.readFileSync(path.join(root, 'assets', 'approvals.js'), 'utf8'),
   maintenance: fs.readFileSync(path.join(root, 'assets', 'maintenance.js'), 'utf8'),
