@@ -103,6 +103,20 @@ const login = async (username, pin) => {
     const applicationId = submitted.data.application.id;
     assert.equal((await request('/api/admissions/applications', { cookie: otherParentCookie })).data.length, 0, 'Another parent must not see this application.');
 
+    const blockedEnrolment = await request('/api/admissions/applications/' + applicationId + '/enrol', { method: 'POST', cookie: alphaCookie, body: { className: 'Grade 1', address: '1 Test Street' } });
+    assert.equal(blockedEnrolment.response.status, 409, 'Missing required documents must block enrolment.');
+
+    const birthDocument = await request('/api/files', { method: 'POST', cookie: parentCookie, body: { entityType: 'admission_application', recordId: applicationId, purpose: 'birth_certificate', originalFilename: 'birth.png', dataUrl: pngA } });
+    const guardianDocument = await request('/api/files', { method: 'POST', cookie: parentCookie, body: { entityType: 'admission_application', recordId: applicationId, purpose: 'guardian_id', originalFilename: 'guardian.png', dataUrl: pngA } });
+    assert.equal(birthDocument.response.status, 201, birthDocument.data?.message);
+    assert.equal(guardianDocument.response.status, 201, guardianDocument.data?.message);
+    assert.equal((await fetch(origin + birthDocument.data.file.contentUrl, { headers: { cookie: otherParentCookie } })).status, 404, 'Another parent must not read application documents.');
+
+    for (const admissionFileId of [birthDocument.data.file.id, guardianDocument.data.file.id]) {
+      const verified = await request('/api/admissions/applications/' + applicationId + '/documents/' + admissionFileId + '/verify', { method: 'POST', cookie: principalCookie, body: { status: 'Verified' } });
+      assert.equal(verified.response.status, 200, verified.data?.message);
+    }
+
     const staffUpload = await request('/api/files', { method: 'POST', cookie: alphaCookie, body: { entityType: 'staff', recordId: 'alpha-teacher', purpose: 'profile-photo', originalFilename: 'teacher.png', dataUrl: pngA } });
     assert.equal(staffUpload.response.status, 201, staffUpload.data?.message);
     const staffFileUrl = staffUpload.data.file.contentUrl;
