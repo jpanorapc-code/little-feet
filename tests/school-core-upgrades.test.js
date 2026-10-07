@@ -34,7 +34,8 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
   ],
   users:[
     {username:'alpha-admin',pinHash:hash('AdminPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Admin',role:'admin',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
-    {username:'alpha-teacher',pinHash:hash('TeacherPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active'},
+    {username:'alpha-teacher',pinHash:hash('TeacherPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',assignedClasses:['Grade R']},
+    {username:'alpha-teacher-other',pinHash:hash('TeacherPass2'),name:'Other Teacher',role:'teacher',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',assignedClasses:['Grade 1']},
     {username:'alpha-parent',email:'parent@alpha.test',pinHash:hash('ParentPass1'),reportSigningPinHash:hash('Sign1234'),name:'Alpha Parent',role:'parent',schoolId:'school-alpha',schoolName:'Alpha School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Alpha Learner']},
     {username:'bravo-admin',pinHash:hash('BravoPass1'),name:'Bravo Admin',role:'admin',schoolId:'school-bravo',schoolName:'Bravo School',verificationStatus:'Active'}
   ],
@@ -215,6 +216,10 @@ async function login(username,pin){
     assert.equal(gatewayRequests.some(row=>row.url==='/sms'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/sms'&&row.body.to==='+27110000001'),true);
     assert.equal(gatewayRequests.some(row=>row.url==='/push'),true);
+
+    const classCampaign=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'Grade R update',message:'Class-only test',audience:'class',className:'Grade R',channels:['push']}});
+    assert.equal(classCampaign.response.status,201,classCampaign.text);
+    assert.deepEqual(classCampaign.data.campaign.deliveries.map(row=>row.recipient).sort(),['alpha-parent','alpha-teacher'],'Class campaign must exclude unrelated staff and management');
 
     console.log('School core upgrades test passed');
   } finally {
