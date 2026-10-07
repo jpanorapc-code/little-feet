@@ -31,9 +31,25 @@
     const learner=document.getElementById('lfMarksFilterLearner')?.value.trim()||'';
     const data=await api('/api/academics/marks'+(learner?'?learnerName='+encodeURIComponent(learner):''));
     const summary=(data.subjects||[]).map(row=>'<div class="item-row"><strong>'+esc(row.subject)+'</strong><span>'+esc(row.percentage)+'% · '+esc(row.assessments)+' assessment(s)</span></div>').join('');
-    const rows=(data.marks||[]).slice(0,80).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.subject)+'</strong><p>'+esc(row.assessmentName)+' · '+esc(row.score)+'/'+esc(row.maximum)+' · '+esc(row.percentage)+'% · weight '+esc(row.weight)+'</p><span class="meta">'+esc(row.term)+' '+esc(row.year)+' · revision '+esc(row.revision||1)+'</span></div></div>').join('');
+    window.__littleFeetSubjectMarks=data.marks||[];
+    const rows=(data.marks||[]).slice(0,80).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.subject)+'</strong><p>'+esc(row.assessmentName)+' · '+esc(row.score)+'/'+esc(row.maximum)+' · '+esc(row.percentage)+'% · weight '+esc(row.weight)+'</p><span class="meta">'+esc(row.term)+' '+esc(row.year)+' · revision '+esc(row.revision||1)+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="editLittleFeetSubjectMark(\''+esc(row.id)+'\')">Edit</button><button type="button" class="action-btn btn-blue" onclick="viewLittleFeetMarkHistory(\''+esc(row.id)+'\')">History</button></div></div>').join('');
     host.innerHTML=(summary?'<h4>Subject totals</h4>'+summary:'')+'<h4 style="margin-top:14px;">Mark records</h4>'+(rows||'<p class="meta">No subject marks yet.</p>');
   }
+  window.editLittleFeetSubjectMark=async id=>{
+    const row=(window.__littleFeetSubjectMarks||[]).find(item=>item.id===id);if(!row)return;
+    const score=prompt('Score',String(row.score));if(score===null)return;
+    const maximum=prompt('Out of',String(row.maximum));if(maximum===null)return;
+    const weight=prompt('Weight',String(row.weight));if(weight===null)return;
+    const comment=prompt('Comment',String(row.comment||''));if(comment===null)return;
+    try{await api('/api/academics/marks/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({score:Number(score),maximum:Number(maximum),weight:Number(weight),comment})});await refreshMarks();}catch(err){alert(err.message);}
+  };
+  window.viewLittleFeetMarkHistory=async id=>{
+    try{
+      const rows=await api('/api/academics/marks/'+encodeURIComponent(id)+'/history');
+      const html=rows.map(row=>'<div class="item-row"><div><strong>'+esc(row.action)+' · '+esc(row.changedBy)+'</strong><p>'+esc(row.changedAt)+'</p><span class="meta">'+esc(row.after?.score??'')+'/'+esc(row.after?.maximum??'')+' · '+esc(row.after?.percentage??'')+'%</span></div></div>').join('')||'<p>No history.</p>';
+      window.openModal?.('Mark history',html);
+    }catch(err){alert(err.message);}
+  };
   function setupMarks(){
     if(!staff()) return;
     const card=addCard('worksheetsTab','lfSubjectMarksCard','<div class="card-header-bar"><div><h2>Subject Marks</h2><p class="meta">Real weighted marks with edit history. Existing Learning Evidence stays unchanged.</p></div><span class="badge-tag info">LIVE RECORDS</span></div><form id="lfSubjectMarkForm" class="workspace-grid"><input name="learnerName" placeholder="Learner name" required><input name="className" placeholder="Class / grade"><input name="subject" placeholder="Subject" required><input name="assessmentName" placeholder="Assessment name" required><input name="term" placeholder="Term e.g. Term 4" required><input name="year" type="number" min="2000" max="2100" value="'+new Date().getFullYear()+'" required><input name="score" type="number" min="0" step="0.01" placeholder="Score" required><input name="maximum" type="number" min="0.01" step="0.01" placeholder="Out of" required><input name="weight" type="number" min="0.01" max="100" step="0.01" value="1" placeholder="Weight" required><input name="comment" placeholder="Teacher comment"><button class="submit-btn">Save subject mark</button></form><div class="flex-form-row" style="margin-top:16px;"><input id="lfMarksFilterLearner" placeholder="Filter learner"><button id="lfRefreshMarks" type="button" class="action-btn btn-blue">Refresh marks</button></div><div id="lfSubjectMarksList" class="record-list"></div>');
@@ -46,7 +62,7 @@
   async function refreshReportCards(){
     const host=document.getElementById('lfReportCardList'); if(!host) return;
     const rows=await api('/api/academics/report-cards');
-    host.innerHTML=rows.length?rows.slice(0,40).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.term)+' '+esc(row.year)+'</strong><p>Overall '+esc(row.average)+'% · '+esc(row.promotionOutcome||'No promotion result yet')+'</p><span class="meta">'+esc(row.createdAt)+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="window.printLittleFeetReportCard(\''+esc(row.id)+'\')">Print / PDF</button><button type="button" class="action-btn btn-green" onclick="window.useLittleFeetReportForSignoff(\''+esc(row.id)+'\')">Use sign-off</button></div></div>').join(''):'<p class="meta">No generated report cards yet.</p>';
+    host.innerHTML=rows.length?rows.slice(0,40).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.term)+' '+esc(row.year)+'</strong><p>Overall '+esc(row.average)+'% · '+esc(row.promotionOutcome||'No promotion result yet')+'</p><span class="meta">'+esc(row.createdAt)+(row.lastEmailedAt?' · emailed '+esc(row.lastEmailedAt):'')+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="window.printLittleFeetReportCard(\''+esc(row.id)+'\')">Print / PDF</button>'+(staff()?'<button type="button" class="action-btn btn-green" onclick="window.useLittleFeetReportForSignoff(\''+esc(row.id)+'\')">Use sign-off</button><button type="button" class="action-btn btn-blue" onclick="window.emailLittleFeetReportCard(\''+esc(row.id)+'\')">Email parent</button>':'')+'</div></div>').join(''):'<p class="meta">No generated report cards yet.</p>';
     window.__littleFeetReportCards=rows;
   }
   window.printLittleFeetReportCard=id=>window.open('/api/academics/report-cards/'+encodeURIComponent(id)+'/print','_blank','noopener');
@@ -55,13 +71,16 @@
     document.getElementById('reportStudent').value=row.learnerName||'';
     document.getElementById('reportTitle').value='Report Card · '+row.term+' '+row.year;
     document.getElementById('reportPeriod').value=row.term+' '+row.year;
+    if(row.parentUsername && document.getElementById('reportParentUsername')) document.getElementById('reportParentUsername').value=row.parentUsername;
     document.getElementById('teacherReportPublisher')?.scrollIntoView({behavior:'smooth',block:'start'});
   };
+  window.emailLittleFeetReportCard=async id=>{try{const result=await api('/api/academics/report-cards/'+encodeURIComponent(id)+'/email',{method:'POST',body:'{}'});alert('Report card emailed to '+result.sentTo+'.');await refreshReportCards();}catch(err){alert(err.message);}};
   function setupReportCards(){
-    if(!staff()) return;
-    const card=addCard('reportsTab','lfReportCardMaker','<div class="card-header-bar"><div><h2>Report Card Maker</h2><p class="meta">Builds from real subject marks, attendance and discipline records. Existing signed report flow stays in place.</p></div><span class="badge-tag info">REAL DATA</span></div><form id="lfReportCardForm" class="workspace-grid"><input name="learnerName" placeholder="Learner name" required><input name="term" placeholder="Term e.g. Term 4" required><input name="year" type="number" min="2000" max="2100" value="'+new Date().getFullYear()+'" required><textarea name="teacherComment" placeholder="Teacher comment"></textarea><input name="promotionOutcome" placeholder="Promotion / progression result"><button class="submit-btn">Build report card</button></form><div id="lfReportCardList" class="record-list"></div>');
+    if(!staff() && user()?.role!=='parent') return;
+    const maker=staff()?'<form id="lfReportCardForm" class="workspace-grid"><input name="learnerName" placeholder="Learner name" required><input name="term" placeholder="Term e.g. Term 4" required><input name="year" type="number" min="2000" max="2100" value="'+new Date().getFullYear()+'" required><textarea name="teacherComment" placeholder="Teacher comment"></textarea><input name="promotionOutcome" placeholder="Promotion / progression result"><button class="submit-btn">Build report card</button></form>':'<p class="meta">Your school report cards appear here when a teacher creates them.</p>';
+    const card=addCard('reportsTab','lfReportCardMaker','<div class="card-header-bar"><div><h2>Report Cards</h2><p class="meta">Built from real subject marks, attendance and discipline records. Existing signed report flow stays in place.</p></div><span class="badge-tag info">REAL DATA</span></div>'+maker+'<div id="lfReportCardList" class="record-list"></div>');
     if(!card)return;
-    card.querySelector('#lfReportCardForm').addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.year=Number(body.year);await api('/api/academics/report-cards',{method:'POST',body:JSON.stringify(body)});await refreshReportCards();window.playDingSound?.();}catch(err){alert(err.message);}});
+    card.querySelector('#lfReportCardForm')?.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.year=Number(body.year);await api('/api/academics/report-cards',{method:'POST',body:JSON.stringify(body)});await refreshReportCards();window.playDingSound?.();}catch(err){alert(err.message);}});
     refreshReportCards().catch(()=>{});
   }
 
@@ -72,12 +91,20 @@
     for(const row of rows){const key=row.learnerName;const item=grouped.get(key)||{points:0,count:0};item.points+=Number(row.pointDelta||0);item.count++;grouped.set(key,item);}
     host.innerHTML=[...grouped.entries()].map(([name,item])=>'<div class="item-row"><strong>'+esc(name)+'</strong><span>'+esc(item.points)+' points · '+esc(item.count)+' record(s)</span></div>').join('')||'<p class="meta">No discipline records yet.</p>';
   }
+  async function loadDisciplineSettings(){
+    const form=document.getElementById('lfDisciplineSettings');if(!form)return;
+    try{const s=await api('/api/discipline/settings');form.elements.warning.value=s.warning;form.elements.parentMeeting.value=s.parentMeeting;form.elements.principalReview.value=s.principalReview;}catch{}
+  }
   function setupDiscipline(){
     if(!staff() && user()?.role!=='parent') return;
-    const card=addCard('safeguardingTab','lfDisciplineCard','<div class="card-header-bar"><div><h2>Discipline & Conduct</h2><p class="meta">Merits, demerits, points, actions and parent-visible history.</p></div><span class="badge-tag info">CONDUCT</span></div>'+(staff()?'<form id="lfDisciplineForm" class="workspace-grid"><input name="learnerName" placeholder="Learner name" required><select name="kind"><option value="demerit">Demerit</option><option value="merit">Merit</option></select><input name="category" placeholder="Category" required><input name="points" type="number" min="1" max="100" value="1" required><textarea name="details" placeholder="What happened?" required></textarea><input name="actionTaken" placeholder="Action taken"><label><input name="parentNotified" type="checkbox"> Parent notified</label><button class="submit-btn">Save conduct record</button></form>':'')+'<div id="lfDisciplineList" class="record-list"></div>');
+    const target=user()?.role==='parent'?'reportsTab':'safeguardingTab';
+    const settings=management()?'<form id="lfDisciplineSettings" class="workspace-grid"><label>Warning points<input name="warning" type="number" min="1" required></label><label>Parent meeting points<input name="parentMeeting" type="number" min="2" required></label><label>Principal review points<input name="principalReview" type="number" min="3" required></label><button class="action-btn btn-blue">Save point rules</button></form>':'';
+    const entry=staff()?'<form id="lfDisciplineForm" class="workspace-grid"><input name="learnerName" placeholder="Learner name" required><select name="kind"><option value="demerit">Demerit</option><option value="merit">Merit</option></select><input name="category" placeholder="Category" required><input name="points" type="number" min="1" max="100" value="1" required><textarea name="details" placeholder="What happened?" required></textarea><input name="actionTaken" placeholder="Action taken"><label><input name="parentNotified" type="checkbox"> Email linked parent if email is ready</label><button class="submit-btn">Save conduct record</button></form>':'<p class="meta">Only conduct records marked for parent view are shown here.</p>';
+    const card=addCard(target,'lfDisciplineCard','<div class="card-header-bar"><div><h2>Discipline & Conduct</h2><p class="meta">Merits, demerits, points, actions and parent-visible history.</p></div><span class="badge-tag info">CONDUCT</span></div>'+settings+entry+'<div id="lfDisciplineList" class="record-list"></div>');
     if(!card)return;
-    card.querySelector('#lfDisciplineForm')?.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.points=Number(body.points);body.parentNotified=e.currentTarget.elements.parentNotified.checked;await api('/api/discipline',{method:'POST',body:JSON.stringify(body)});e.currentTarget.reset();e.currentTarget.elements.points.value='1';await refreshDiscipline();}catch(err){alert(err.message);}});
-    refreshDiscipline().catch(()=>{});
+    card.querySelector('#lfDisciplineSettings')?.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);for(const k of ['warning','parentMeeting','principalReview'])body[k]=Number(body[k]);await api('/api/discipline/settings',{method:'PUT',body:JSON.stringify(body)});await loadDisciplineSettings();}catch(err){alert(err.message);}});
+    card.querySelector('#lfDisciplineForm')?.addEventListener('submit',async e=>{e.preventDefault();try{const body=formBody(e.currentTarget);body.points=Number(body.points);body.parentNotified=e.currentTarget.elements.parentNotified.checked;const result=await api('/api/discipline',{method:'POST',body:JSON.stringify(body)});if(body.parentNotified&&result.record.parentNotificationStatus!=='sent')alert('Record saved. Parent email status: '+result.record.parentNotificationStatus+'.');e.currentTarget.reset();e.currentTarget.elements.points.value='1';await refreshDiscipline();}catch(err){alert(err.message);}});
+    loadDisciplineSettings();refreshDiscipline().catch(()=>{});
   }
 
   async function refreshAssets(){
