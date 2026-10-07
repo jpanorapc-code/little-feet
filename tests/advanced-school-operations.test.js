@@ -20,7 +20,7 @@ fs.writeFileSync(path.join(tmp,'littlefeet-replica.json'),JSON.stringify({
   users:[
     {username:'a-admin',pinHash,name:'A Admin',role:'admin',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
     {username:'a-teacher',pinHash,name:'A Teacher',role:'teacher',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
-    {username:'a-parent',pinHash,name:'A Parent',role:'parent',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active',linkedLearners:['Learner A']},
+    {username:'a-parent',pinHash,name:'A Parent',role:'parent',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Learner A']},
     {username:'b-admin',pinHash,name:'B Admin',role:'admin',schoolId:'s-b',schoolName:'School B',verificationStatus:'Active'},
     {username:'platform',pinHash,name:'Platform',role:'staff',platformAccess:true,schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'}
   ],
@@ -76,6 +76,35 @@ async function login(username){const r=await request('/api/login',{method:'POST'
   await wait(120);
   const persisted=fs.readFileSync(path.join(tmp,'littlefeet-replica.json'),'utf8');
   assert.equal(persisted.includes('Synthetic restriction'),false,'Dietary details must be encrypted at rest');
+  assert.equal(persisted.includes('Synthetic confidential support need'),false,'Learner support needs must be encrypted at rest');
+  assert.equal(persisted.includes('Synthetic staff-only support note'),false,'Learner support staff notes must be encrypted at rest');
+  assert.equal(persisted.includes('Synthetic confidential intervention strategy'),false,'Intervention strategies must be encrypted at rest');
+
+  const supportProfile=await request('/api/learning-support/profiles',{method:'POST',cookie:teacher,body:{learnerName:'Learner A',supportAreas:['Literacy','Attention & organisation'],supportNeeds:'Synthetic confidential support need',parentSummary:'Learner is receiving structured classroom support.',staffNotes:'Synthetic staff-only support note',reviewDate:'2026-11-15'}});
+  assert.equal(supportProfile.response.status,201,supportProfile.text);
+  const profileId=supportProfile.data.profile.id;
+  assert.equal((await request('/api/learning-support/profiles',{method:'POST',cookie:teacher,body:{learnerName:'Learner A',supportAreas:['Literacy'],supportNeeds:'Duplicate plan'}})).response.status,409);
+  assert.equal((await request('/api/learning-support/profiles/'+profileId+'/accommodations',{method:'POST',cookie:teacher,body:{type:'Extra time'}})).response.status,403);
+  const accommodation=await request('/api/learning-support/profiles/'+profileId+'/accommodations',{method:'POST',cookie:admin,body:{type:'Extra time',details:'Additional time for formal assessment tasks',startDate:'2026-10-07'}});
+  assert.equal(accommodation.response.status,201,accommodation.text);
+  const intervention=await request('/api/learning-support/interventions',{method:'POST',cookie:teacher,body:{profileId,title:'Reading support cycle',strategy:'Synthetic confidential intervention strategy',owner:'A Teacher',startDate:'2026-10-07',reviewDate:'2026-11-15',outcomeMeasure:'Synthetic internal outcome measure',staffNotes:'Synthetic intervention staff note',parentSummary:'Short structured reading practice is being used.',parentVisible:true}});
+  assert.equal(intervention.response.status,201,intervention.text);
+  const parentProfiles=await request('/api/learning-support/profiles',{cookie:parent});
+  assert.equal(parentProfiles.response.status,200,parentProfiles.text);
+  assert.equal(parentProfiles.data.length,1);
+  assert.equal(parentProfiles.data[0].parentSummary,'Learner is receiving structured classroom support.');
+  assert.equal(Object.hasOwn(parentProfiles.data[0],'supportNeeds'),false);
+  assert.equal(Object.hasOwn(parentProfiles.data[0],'staffNotes'),false);
+  assert.equal(parentProfiles.data[0].accommodations[0].type,'Extra time');
+  const parentInterventions=await request('/api/learning-support/interventions',{cookie:parent});
+  assert.equal(parentInterventions.data.length,1);
+  assert.equal(parentInterventions.data[0].parentSummary,'Short structured reading practice is being used.');
+  assert.equal(Object.hasOwn(parentInterventions.data[0],'strategy'),false);
+  assert.equal(Object.hasOwn(parentInterventions.data[0],'staffNotes'),false);
+  assert.equal((await request('/api/learning-support/profiles',{cookie:bravo})).data.length,0);
+  const supportHistory=await request('/api/learning-support/profiles/'+profileId+'/history',{cookie:teacher});
+  assert.equal(supportHistory.data.some(row=>row.action==='accommodation_added'),true);
+  assert.equal(supportHistory.data.some(row=>row.action==='intervention_created'),true);
 
   const aiConfig=await request('/api/ai/observation/config',{cookie:teacher});
   assert.equal(aiConfig.response.status,200);
