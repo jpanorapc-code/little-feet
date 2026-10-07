@@ -40,6 +40,7 @@ assert.match(page, /<h1 role="button" tabindex="0"/);
 assert.match(page, /rel="manifest" href="\/manifest\.webmanifest"/);
 assert.match(page, /ambient-background\.js\?v=20261006-login-cache-v2/);
 assert.match(page, /backup\.js\?v=20261007-school-core-audio-v1/);
+assert.match(page, /input\[type="checkbox"\],[\s\S]*input\[type="radio"\][\s\S]*width:18px;[\s\S]*max-width:18px;[\s\S]*box-shadow:none;/);
 assert.match(page, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /little-feet-shell-v54-school-core-audio/);
 assert.match(serviceWorker, /\/assets\/ambient-background\.js\?v=20261006-login-cache-v2/);
