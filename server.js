@@ -4460,6 +4460,12 @@ const admissionDocumentState=application=>{
   return {files:files.map(publicFileMetadata),checklist,missingRequired,complete:missingRequired.length===0};
 };
 const admissionApiView=application=>({...admissionApplicationView(application),documents:admissionDocumentState(application)});
+const notifyAdmissionParent=async(application,title,message)=>{
+  const parent=(db.users||[]).find(account=>account.role==='parent'&&normalizeUsername(account.username)===normalizeUsername(application.createdBy));
+  if(parent&&typeof addEmailInboxItem==='function')addEmailInboxItem(parent,{type:'Notification',title,message,sourceId:application.id,sourceTab:'homeTab',sender:application.schoolName||'Admissions'});
+  const email=decryptStoredField(application.contactEmail);
+  if(looksLikeEmailAddress(email)&&(smtpEmailConfigured()||apiEmailConfigured()))await sendLittleFeetEmail({to:email,subject:title,text:message,html:'<p>'+String(message).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])).replace(/\n/g,'<br>')+'</p>'}).catch(()=>false);
+};
 
 app.get('/api/admissions/applications',(req,res)=>{
   const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view admissions.'});
@@ -4489,6 +4495,12 @@ app.patch('/api/admissions/applications/:id/status',(req,res)=>{
   db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:previous,toStatus:nextStatus,changedBy:actor.username,changedAt:application.updatedAt,note});
   const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&recordInSchool(item,actor));
   if(ticket){ticket.status=['Approved','Rejected','Withdrawn'].includes(nextStatus)?'Completed':'Open';ticket.updatedAt=application.updatedAt;}
+  if(nextStatus==='Documents required'){
+    const missing=admissionDocumentState(application).checklist.filter(item=>item.required&&item.status!=='verified').map(item=>item.label);
+    void notifyAdmissionParent(application,'Admission documents required',missing.length?('Please upload or replace these required documents: '+missing.join(', ')+'.'):'The school requested additional admission documents.').catch(()=>{});
+  }else if(['Waitlisted','Approved','Rejected'].includes(nextStatus)){
+    void notifyAdmissionParent(application,'School application update',application.learnerName+' application status is now '+nextStatus+'.'+(note?' '+note:'')).catch(()=>{});
+  }
   res.json({success:true,application:admissionApiView(application)});
 });
 app.post('/api/admissions/applications/:id/withdraw',(req,res)=>{
@@ -4529,6 +4541,7 @@ app.post('/api/admissions/applications/:id/documents/:fileId/verify',(req,res)=>
   const item=(application.checklist||[]).find(row=>row.key===file.purpose);
   if(item){item.status=status==='Verified'?'verified':'rejected';item.verifiedAt=file.verifiedAt;item.verifiedBy=file.verifiedBy;}
   application.updatedAt=new Date().toISOString();application.updatedBy=actor.username;
+  if(status==='Rejected')void notifyAdmissionParent(application,'Admission document rejected','The school rejected '+file.originalFilename+'. Reason: '+reason).catch(()=>{});
   res.json({success:true,file:publicFileMetadata(file),application:admissionApiView(application)});
 });
 app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
@@ -4563,6 +4576,7 @@ app.post('/api/admissions/applications/:id/enrol',(req,res)=>{
   const priorStatus=application.status;application.status='Enrolled';application.convertedLearnerId=learner.id;application.convertedRegistryId=registry.id;application.enrolledAt=new Date().toISOString();application.enrolledBy=actor.username;application.updatedAt=application.enrolledAt;
   db.admissionsStatusHistory.unshift({id:crypto.randomUUID(),applicationId:application.id,schoolId:application.schoolId,fromStatus:priorStatus,toStatus:'Enrolled',changedBy:actor.username,changedAt:application.enrolledAt,note:'Converted to learner register'});
   const ticket=(db.tickets||[]).find(item=>item.applicationId===application.id&&recordInSchool(item,actor));if(ticket){ticket.status='Completed';ticket.updatedAt=application.enrolledAt;}
+  void notifyAdmissionParent(application,'Application enrolled',application.learnerName+' has been enrolled into '+className+' at '+application.schoolName+'.').catch(()=>{});
   res.status(201).json({success:true,application:admissionApiView(application),learnerKey:learnerRecordKey(learner),registryId:registry.id});
 });
 app.get('/api/learner-documents',(req,res)=>{
