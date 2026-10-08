@@ -1,6 +1,5 @@
-const CACHE_NAME = 'little-feet-shell-v56-admissions';
+const CACHE_NAME = 'little-feet-shell-v57-private-navigation';
 const SHELL_ASSETS = [
-  '/',
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20261004-portal-portraits-v1',
   '/assets/ambient-background.js?v=20261006-login-cache-v2',
@@ -55,15 +54,11 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin || isPrivateRequest(url)) return;
 
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const copy = response.clone();
-          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put('/', copy));
-          return response;
-        })
-        .catch(() => caches.match('/'))
-    );
+    // Never store authenticated HTML: a shared device must not replay a prior session's page.
+    event.respondWith(fetch(event.request).catch(() => new Response('Little Feet is offline. Please reconnect and reload.', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+    })));
     return;
   }
 
