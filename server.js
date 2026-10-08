@@ -1925,6 +1925,12 @@ async function initialisePersistence() {
     });
   }
   if (ownerAccountResetApplied && postgresPool) await postgresPool.query('DELETE FROM little_feet_sessions');
+  // saveDatabaseState already queued a debounced snapshot. Cancel it before the
+  // immediate startup publish so an unchanged state is not uploaded twice.
+  if (replicaSnapshotTimer) {
+    clearTimeout(replicaSnapshotTimer);
+    replicaSnapshotTimer = null;
+  }
   writeReplicaSnapshot();
 }
 
