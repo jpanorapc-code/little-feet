@@ -2,7 +2,7 @@ name: Little Feet CI
 
 on:
   push:
-    branches: [main, fix/real-subscriptions-payfast-89c6f75, security/login-notifications-human-check, fix/login-human-check-fast, feat/real-school-core-upgrades-a44f74]
+    branches: [main, fix/real-subscriptions-payfast-89c6f75, security/login-notifications-human-check, fix/login-human-check-fast, feat/real-school-core-upgrades-a44f74, fix/34634bd-route-audit-sw-cache]
   pull_request:
     branches: [main]
   workflow_dispatch:
