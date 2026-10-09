@@ -34,10 +34,14 @@ async function checkStartup({ trusted, urlMode }) {
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    if (trusted) assert.ok(ready, 'The application must connect when the database certificate is explicitly trusted. ' + errors);
-    else {
-      assert.equal(ready, false, 'An untrusted certificate must never be accepted.');
-      assert.ok(child.exitCode !== null && child.exitCode !== 0, 'Untrusted TLS must fail startup. ' + errors);
+    const shouldConnect = trusted || urlMode;
+    if (shouldConnect) {
+      assert.ok(ready, urlMode && !trusted
+        ? 'sslmode=require must allow an encrypted connection to a self-signed Render-style private endpoint. ' + errors
+        : 'The application must connect when the database certificate is explicitly trusted. ' + errors);
+    } else {
+      assert.equal(ready, false, 'Default verified TLS must reject an untrusted certificate.');
+      assert.ok(child.exitCode !== null && child.exitCode !== 0, 'Untrusted verified TLS must fail startup. ' + errors);
       assert.match(errors, /certificate|self.signed/i);
     }
   } finally {
@@ -50,7 +54,7 @@ async function checkStartup({ trusted, urlMode }) {
     await checkStartup({ trusted: false, urlMode: false });
     await checkStartup({ trusted: false, urlMode: true });
     await checkStartup({ trusted: true, urlMode: true });
-    console.log('PostgreSQL TLS integration passed: untrusted certificates rejected, sslmode=require cannot remove verification, and an explicit trusted CA connects successfully.');
+    console.log('PostgreSQL TLS integration passed: verified TLS rejects untrusted certificates, sslmode=require supports encrypted self-signed private endpoints, and an explicit trusted CA connects successfully.');
   } finally {
     const relative = path.relative(path.join(root, 'tmp'), fixture);
     assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative));
