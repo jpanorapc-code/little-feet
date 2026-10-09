@@ -1,5 +1,6 @@
-const CACHE_NAME = 'little-feet-shell-v69-neat-sidebar';
+const CACHE_NAME = 'little-feet-shell-v70-portal-polish';
 const SHELL_ASSETS = [
+  '/assets/portal-polish.css?v=20261009-polish-v1',
   '/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1',
   '/assets/my-day.js?v=20261009-neat-sidebar-v1',
   '/assets/dashboard-banners.css?v=20261009-reference-snow-v1',
