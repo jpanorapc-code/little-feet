@@ -1428,9 +1428,19 @@ async function openPostgresDatabase() {
     const filename = connectionUrl.searchParams.get(name);
     return filename ? fs.readFileSync(filename, 'utf8') : undefined;
   };
+  const configuredCa = process.env.LF_POSTGRES_CA_CERT
+    ? String(process.env.LF_POSTGRES_CA_CERT).replace(/\\n/g, '\n')
+    : connectionUrl.searchParams.has('sslrootcert')
+      ? tlsFile('sslrootcert')
+      : undefined;
   const ssl = sslMode === 'disable' || connectionUrl.searchParams.get('ssl') === 'false' ? false : {
-    rejectUnauthorized: true,
-    ...(process.env.LF_POSTGRES_CA_CERT ? { ca: String(process.env.LF_POSTGRES_CA_CERT).replace(/\\n/g, '\n') } : connectionUrl.searchParams.has('sslrootcert') ? { ca: tlsFile('sslrootcert') } : {}),
+    // PostgreSQL sslmode=require guarantees encryption but does not require
+    // certificate verification. Render's private Postgres endpoints use
+    // self-signed certificates and explicitly support sslmode=require.
+    // Keep verification enabled for every stricter/default mode and whenever
+    // a CA has been supplied.
+    rejectUnauthorized: Boolean(configuredCa) || sslMode !== 'require',
+    ...(configuredCa ? { ca: configuredCa } : {}),
     ...(connectionUrl.searchParams.has('sslcert') ? { cert: tlsFile('sslcert') } : {}),
     ...(connectionUrl.searchParams.has('sslkey') ? { key: tlsFile('sslkey') } : {})
   };
