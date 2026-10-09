@@ -135,7 +135,7 @@
     const item = document.createElement('li');
     item.dataset.roles = 'teacher,principal,admin,staff';
     item.dataset.myDayNav = 'true';
-    item.innerHTML = '<button type="button" class="nav-btn">My Day</button>';
+    item.innerHTML = '<button type="button" class="nav-btn"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sun"></use></svg><span>My Day</span></button>';
     item.querySelector('button').addEventListener('click', function () {
       if (typeof window.switchTab === 'function') window.switchTab('myDayTab', this);
       else open('myDayTab');

@@ -1,5 +1,7 @@
-const CACHE_NAME = 'little-feet-shell-v68-reference-snow';
+const CACHE_NAME = 'little-feet-shell-v69-neat-sidebar';
 const SHELL_ASSETS = [
+  '/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1',
+  '/assets/my-day.js?v=20261009-neat-sidebar-v1',
   '/assets/dashboard-banners.css?v=20261009-reference-snow-v1',
   '/assets/4k/little-feet-reference-snow-mascot-4k.jpg',
   '/assets/school-navigation.js?v=20261009-stage-navigation-v1',
