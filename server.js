@@ -1423,7 +1423,9 @@ function openStateDatabase() {
 
 async function openPostgresDatabase() {
   const connectionUrl = new URL(process.env.DATABASE_URL);
-  const sslMode = String(process.env.PGSSLMODE || connectionUrl.searchParams.get('sslmode') || 'verify-full').toLowerCase();
+  const explicitSslMode = process.env.PGSSLMODE || connectionUrl.searchParams.get('sslmode');
+  const defaultSslMode = String(process.env.RENDER || '').toLowerCase() === 'true' ? 'require' : 'verify-full';
+  const sslMode = String(explicitSslMode || defaultSslMode).toLowerCase();
   const tlsFile = name => {
     const filename = connectionUrl.searchParams.get(name);
     return filename ? fs.readFileSync(filename, 'utf8') : undefined;
