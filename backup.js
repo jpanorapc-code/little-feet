@@ -2002,6 +2002,7 @@ function renderRoleHomePanel() {
 
 
 const EXECUTIVE_CHART_COLORS = Object.freeze(['#5eead4', '#38bdf8', '#fbbf24', '#a78bfa', '#fb7185', '#34d399', '#f97316']);
+let executiveChartSequence = 0;
 const formatExecutiveInteger = value => new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 0 }).format(Number(value || 0));
 const formatExecutiveCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(Number(value || 0));
 const formatExecutiveCompactCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0));
@@ -2012,7 +2013,7 @@ function showExecutiveChartDetail(event) {
   if (detail && item.dataset.chartDetail) detail.textContent = item.dataset.chartDetail;
 }
 
-function executiveChartMarkup({ title, description, items = [], format = 'integer', workspaceId, actionLabel }) {
+function executiveChartMarkup({ title, description, items = [], format = 'integer', workspaceId, actionLabel, centerLabel = 'Total' }) {
   const safeItems = (Array.isArray(items) ? items : [])
     .map(item => ({ label: String(item?.label || ''), value: Number(item?.value || 0) }))
     .filter(item => item.label && Number.isFinite(item.value) && item.value > 0);
@@ -2029,6 +2030,8 @@ function executiveChartMarkup({ title, description, items = [], format = 'intege
     </article>`;
   }
   let cursor = 0;
+  const chartKey = `executive-ring-${++executiveChartSequence}`;
+  const gradients = safeItems.map((item, index) => `<linearGradient id="${chartKey}-${index}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e7fcff"/><stop offset=".3" stop-color="${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]}"/><stop offset="1" stop-color="${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]}" stop-opacity=".7"/></linearGradient>`).join('');
   const percentFormatter = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
   const share = item => item.value / total * 100 < .1 ? '<0.1' : percentFormatter.format(item.value / total * 100);
   const itemDetail = item => `${item.label}: ${formatter(item.value)} · ${share(item)}% of total`;
@@ -2036,7 +2039,11 @@ function executiveChartMarkup({ title, description, items = [], format = 'intege
     const start = (cursor / total) * 100;
     cursor += item.value;
     const end = (cursor / total) * 100;
-    return `<circle cx="60" cy="60" r="48" pathLength="100" fill="none" stroke="${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]}" stroke-width="18" stroke-dasharray="${end - start} ${100 - (end - start)}" stroke-dashoffset="${-start}" transform="rotate(-90 60 60)" tabindex="0" role="img" aria-label="${escapeWorkspaceText(itemDetail(item))}" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)"><title>${escapeWorkspaceText(itemDetail(item))}</title></circle>`;
+    const amount = end - start;
+    const arc = safeItems.length > 1 ? Math.max(amount - .8, amount * .85) : amount;
+    const angle = (start + amount / 2) / 100 * Math.PI * 2;
+    const label = amount >= 8 ? `<text x="${60 + Math.sin(angle) * 48}" y="${60 - Math.cos(angle) * 48}" class="executive-slice-label" aria-hidden="true">${percentFormatter.format(amount)}%</text>` : '';
+    return `<circle cx="60" cy="60" r="48" pathLength="100" fill="none" stroke="url(#${chartKey}-${index})" stroke-width="18" stroke-dasharray="${arc} ${100 - arc}" stroke-dashoffset="${-start}" transform="rotate(-90 60 60)" tabindex="0" role="img" aria-label="${escapeWorkspaceText(itemDetail(item))}" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)"><title>${escapeWorkspaceText(itemDetail(item))}</title></circle>${label}`;
   }).join('');
   const centerValue = format === 'currency' ? formatExecutiveCompactCurrency(total) : formatExecutiveInteger(total);
   const legend = safeItems.map((item, index) => `<button type="button" class="executive-legend-row" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" aria-label="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)">
@@ -2049,8 +2056,8 @@ function executiveChartMarkup({ title, description, items = [], format = 'intege
     <p>${escapeWorkspaceText(description)}</p>
     <div class="executive-chart-body">
       <div class="executive-pie" role="group" aria-label="${escapeWorkspaceText(title)} total ${escapeWorkspaceText(formatter(total))}">
-        <svg class="executive-pie-segments" viewBox="0 0 120 120" aria-label="Category breakdown"><circle cx="60" cy="60" r="48" fill="none" stroke="rgba(148,183,216,.18)" stroke-width="18"/>${segments}</svg>
-        <span class="executive-pie-center"><strong>${escapeWorkspaceText(centerValue)}</strong><small>Total</small></span>
+        <svg class="executive-pie-segments" viewBox="0 0 120 120" aria-label="Category breakdown"><defs>${gradients}</defs><circle cx="60" cy="60" r="48" fill="none" stroke="rgba(148,183,216,.18)" stroke-width="18"/>${segments}</svg>
+        <span class="executive-pie-center"><strong>${escapeWorkspaceText(centerValue)}</strong><small>${escapeWorkspaceText(centerLabel)}</small></span>
       </div>
       <div class="executive-chart-legend">${legend}</div>
     </div>
@@ -2074,7 +2081,7 @@ function renderExecutiveHomeOverview(payload) {
   const openFaults = Number(kpis.openFaults || 0);
 
   const kpiCards = [
-    ['Schools', formatExecutiveInteger(kpis.schools), payload?.scope === 'platform' ? 'Active platform schools' : 'Current school scope'],
+    ['Schools', formatExecutiveInteger(kpis.schools), payload?.scope === 'platform' ? 'Schools with approved accounts' : 'Current school scope'],
     ['Learners', formatExecutiveInteger(kpis.learners), 'Live learner records'],
     ['Accounts', formatExecutiveInteger(kpis.accounts), 'Visible active accounts'],
     ['Needs attention', formatExecutiveInteger(kpis.openAttention), 'High-level work queues'],
@@ -2093,7 +2100,7 @@ function renderExecutiveHomeOverview(payload) {
     ${kpiCards.map(([label, value, detail]) => `<div class="executive-kpi"><span>${escapeWorkspaceText(label)}</span><strong>${escapeWorkspaceText(value)}</strong><small>${escapeWorkspaceText(detail)}</small></div>`).join('')}
   </div>
   <div class="executive-chart-grid">
-    ${executiveChartMarkup({ title:'Account mix', description:'How visible accounts are distributed by role.', items:charts.accounts, workspaceId:'accountsTab', actionLabel:'Open accounts' })}
+    ${executiveChartMarkup({ title:'Account mix', description:'User accounts by role — not the number of schools.', items:charts.accounts, workspaceId:'accountsTab', actionLabel:'Open accounts', centerLabel:'Accounts' })}
     ${executiveChartMarkup({ title:'Operational attention', description:'Current work that still needs action, without duplicating My Day.', items:charts.attention, workspaceId:'myDayTab', actionLabel:'Open My Day' })}
     ${executiveChartMarkup({ title:'Fee collection', description:'Collected versus outstanding parent-fee value.', items:charts.finance, format:'currency', workspaceId:'parentPaymentsTab', actionLabel:'Open parent payments' })}
     ${executiveChartMarkup({ title:'Performance reviews', description:'Current review workflow status across staff records.', items:charts.reviews, workspaceId:'staffWorkTab', actionLabel:'Open staff work' })}

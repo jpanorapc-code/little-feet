@@ -52,8 +52,8 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v71-header-palette/);
-assert.match(serviceWorker, /backup\.js\?v=20261009-detailed-charts-v1/);
+assert.match(serviceWorker, /little-feet-shell-v72-registered-school-charts/);
+assert.match(serviceWorker, /backup\.js\?v=20261009-detailed-charts-v2/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /advanced-school-operations\.js\?v=20261009-stage-navigation-v1/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);

@@ -362,6 +362,16 @@ const accountSchoolId = (account) => {
   account.schoolId = ensureSchool(schoolName).id;
   return account.schoolId;
 };
+// A tenancy record can exist before a school signs up or approves any users.
+// Count actual registrations, not those placeholder/legacy records.
+const registeredSchools = () => {
+  const companyOwner = (db.users || []).find(isConfiguredPlatformOwner) || (db.users || []).find(hasPlatformAccess);
+  const schoolIds = new Set((db.users || [])
+    .filter(account => !PLATFORM_INTERNAL_ROLES.has(account.role) && !isAwaitingAccountVerification(account))
+    .filter(account => !hasPlatformAccess(account) || account === companyOwner)
+    .map(account => account.schoolId).filter(Boolean));
+  return (db.schools || []).filter(school => school.status !== 'deleted' && schoolIds.has(school.id));
+};
 const ensureSchoolTrialStarted = account => {
   if (!account || hasPlatformAccess(account) || !['principal', 'admin', 'school_accounts'].includes(account.role)) return null;
   const school = db.schools.find(entry => entry.id === accountSchoolId(account));
@@ -1537,7 +1547,7 @@ function migrateSchoolTenancy() {
       account.schoolName = '';
       return;
     }
-    const school = ensureSchool(account.schoolName);
+    const school = db.schools.find(entry => entry.id === account.schoolId) || ensureSchool(account.schoolName);
     account.schoolId = account.schoolId || school.id;
     account.schoolName = school.name;
   });
@@ -3399,7 +3409,7 @@ app.get('/api/company/clients', (req, res) => {
   const actor = getSessionAccount(req);
   if (!actor || !(hasPlatformAccess(actor) || actor.role === 'crm')) return res.status(403).json({ message: 'Sales access is required.' });
   const notes = db.moduleRecords.companyClients || [];
-  res.json(db.schools.map(school => ({
+  res.json(registeredSchools().map(school => ({
     id: school.id, name: school.name, area: school.area || school.city || '',
     status: school.subscriptionStatus || school.status || '',
     note: notes.find(record => record.clientSchoolId === school.id && record.createdBy === actor.username)?.details || ''
@@ -6022,11 +6032,11 @@ app.get('/api/executive-overview', (req, res) => {
   const platformWide = hasPlatformAccess(actor);
   const scoped = records => platformWide ? (Array.isArray(records) ? records.slice() : []) : tenantRecords(records, actor);
   const visibleAccounts = platformWide
-    ? (db.users || []).slice()
-    : (db.users || []).filter(account => !PLATFORM_INTERNAL_ROLES.has(account.role) && isSameSchool(actor, account));
+    ? (db.users || []).filter(account => !isAwaitingAccountVerification(account))
+    : (db.users || []).filter(account => !isAwaitingAccountVerification(account) && !PLATFORM_INTERNAL_ROLES.has(account.role) && isSameSchool(actor, account));
 
   const schools = platformWide
-    ? (db.schools || []).filter(school => school.status !== 'deleted')
+    ? registeredSchools()
     : (db.schools || []).filter(school => school.id === accountSchoolId(actor));
   const learners = scoped(db.students);
   const tasks = scoped(db.staffTasks);
