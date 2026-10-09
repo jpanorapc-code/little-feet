@@ -6,9 +6,9 @@
   overflow:hidden;
   min-height:260px;
   background-color:#071b30 !important;
-  background-image:linear-gradient(90deg,#071b30 0%,#071b30 calc(100% - 420px),rgba(7,27,48,.12) calc(100% - 260px),transparent 100%),url('/assets/4k/little-feet-school-office-banner-4k.jpg') !important;
-  background-size:cover,auto 100% !important;
-  background-position:center,right center !important;
+  background-image:linear-gradient(90deg,#071b30 0%,#071b30 calc(100% - 240px),rgba(7,27,48,.12) calc(100% - 140px),transparent 100%),url('/assets/4k/little-feet-reference-snow-mascot-4k.jpg') !important;
+  background-size:cover,auto 180% !important;
+  background-position:center,right bottom !important;
   background-repeat:no-repeat !important;
 }
 #homeTab > .portal-welcome-banner::before,
@@ -17,11 +17,11 @@
   display:block;
   position:absolute;
   z-index:0;
-  inset:0 370px 0 0;
-  /* Only the left 43% of the artwork is visible here: office, never mascot. */
-  background-image:linear-gradient(90deg,rgba(7,27,48,.70),rgba(7,27,48,.42)),url('/assets/4k/little-feet-school-office-banner-4k.jpg') !important;
-  background-size:cover,230% auto !important;
-  background-position:center,left center !important;
+  inset:0 200px 0 0;
+  /* Crop the mountain band above the mascot for the wide scenic backdrop. */
+  background-image:linear-gradient(90deg,rgba(7,27,48,.70),rgba(7,27,48,.42)),url('/assets/4k/little-feet-reference-snow-mascot-4k.jpg') !important;
+  background-size:cover,100% auto !important;
+  background-position:center,center 48% !important;
   background-repeat:no-repeat;
   mask-image:linear-gradient(90deg,#000 0%,#000 82%,transparent 100%);
   opacity:1 !important;
@@ -42,7 +42,7 @@
   #homeTab > .portal-welcome-banner,
   #myDayTab > .my-day-hero {
     min-height:280px;
-    background-image:linear-gradient(90deg,rgba(7,27,48,.96),rgba(7,27,48,.82) 58%,rgba(7,27,48,.48)),url('/assets/4k/little-feet-school-office-banner-4k.jpg') !important;
+    background-image:linear-gradient(90deg,rgba(7,27,48,.96),rgba(7,27,48,.82) 58%,rgba(7,27,48,.48)),url('/assets/4k/little-feet-reference-snow-mascot-4k.jpg') !important;
   }
   #homeTab > .portal-welcome-banner .portal-welcome-copy,
   #myDayTab > .my-day-hero p { max-width:100%; }

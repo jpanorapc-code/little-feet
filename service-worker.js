@@ -1,7 +1,7 @@
-const CACHE_NAME = 'little-feet-shell-v67-full-office-scene';
+const CACHE_NAME = 'little-feet-shell-v68-reference-snow';
 const SHELL_ASSETS = [
-  '/assets/dashboard-banners.css?v=20261009-school-office-v3',
-  '/assets/4k/little-feet-school-office-banner-4k.jpg',
+  '/assets/dashboard-banners.css?v=20261009-reference-snow-v1',
+  '/assets/4k/little-feet-reference-snow-mascot-4k.jpg',
   '/assets/school-navigation.js?v=20261009-stage-navigation-v1',
   '/assets/workspace-accessibility.js?v=20261008-repair-v1',
   '/manifest.webmanifest',
