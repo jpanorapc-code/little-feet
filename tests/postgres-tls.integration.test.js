@@ -12,7 +12,7 @@ const fixture = fs.mkdtempSync(path.join(root, 'tmp', 'postgres-tls-'));
 for (const name of fs.readdirSync(root).filter(name => name.endsWith('.js'))) fs.copyFileSync(path.join(root, name), path.join(fixture, name));
 fs.cpSync(path.join(root, 'lib'), path.join(fixture, 'lib'), { recursive: true });
 
-async function checkStartup({ trusted, urlMode }) {
+async function checkStartup({ trusted, urlMode, renderMode = false }) {
   const port = 26500 + Math.floor(Math.random() * 200);
   const url = new URL(databaseUrl);
   url.searchParams.delete('ssl');
@@ -21,7 +21,7 @@ async function checkStartup({ trusted, urlMode }) {
   else url.searchParams.delete('sslmode');
   const child = spawn(process.execPath, ['server.js'], {
     cwd: fixture,
-    env: { ...process.env, DATABASE_URL: url.toString(), PGSSLMODE: '', LF_REPLICA_MODE: '0', LF_SHARED_DATABASE_FAILOVER: '0', NODE_ENV: 'test', PORT: String(port), SESSION_SECRET: 'tls-regression-session', LF_POSTGRES_CA_CERT: trusted ? ca.replace(/\n/g, '\\n') : '' },
+    env: { ...process.env, DATABASE_URL: url.toString(), PGSSLMODE: '', RENDER: renderMode ? 'true' : '', LF_REPLICA_MODE: '0', LF_SHARED_DATABASE_FAILOVER: '0', NODE_ENV: 'test', PORT: String(port), SESSION_SECRET: 'tls-regression-session', LF_POSTGRES_CA_CERT: trusted ? ca.replace(/\n/g, '\\n') : '' },
     stdio: ['ignore', 'ignore', 'pipe']
   });
   let errors = '';
@@ -34,10 +34,10 @@ async function checkStartup({ trusted, urlMode }) {
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    const shouldConnect = trusted || urlMode;
+    const shouldConnect = trusted || urlMode || renderMode;
     if (shouldConnect) {
-      assert.ok(ready, urlMode && !trusted
-        ? 'sslmode=require must allow an encrypted connection to a self-signed Render-style private endpoint. ' + errors
+      assert.ok(ready, (urlMode || renderMode) && !trusted
+        ? 'Render/sslmode=require must allow an encrypted connection to a self-signed private endpoint. ' + errors
         : 'The application must connect when the database certificate is explicitly trusted. ' + errors);
     } else {
       assert.equal(ready, false, 'Default verified TLS must reject an untrusted certificate.');
@@ -53,8 +53,9 @@ async function checkStartup({ trusted, urlMode }) {
   try {
     await checkStartup({ trusted: false, urlMode: false });
     await checkStartup({ trusted: false, urlMode: true });
+    await checkStartup({ trusted: false, urlMode: false, renderMode: true });
     await checkStartup({ trusted: true, urlMode: true });
-    console.log('PostgreSQL TLS integration passed: verified TLS rejects untrusted certificates, sslmode=require supports encrypted self-signed private endpoints, and an explicit trusted CA connects successfully.');
+    console.log('PostgreSQL TLS integration passed: verified TLS rejects untrusted certificates, Render defaults to encrypted require mode for self-signed private endpoints, explicit sslmode=require works, and an explicit trusted CA connects successfully.');
   } finally {
     const relative = path.relative(path.join(root, 'tmp'), fixture);
     assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative));
