@@ -6,24 +6,13 @@
   overflow:hidden;
   min-height:260px;
   background-color:#071b30 !important;
-  background-image:linear-gradient(90deg,rgba(7,27,48,.94) 0%,rgba(7,27,48,.94) 58%,rgba(7,27,48,.18) 78%,transparent 100%),url('/assets/4k/little-feet-school-office-banner-4k.jpg'),linear-gradient(rgba(7,27,48,.8),rgba(7,27,48,.8)),url('/assets/4k/little-feet-school-office-banner-4k.jpg') !important;
-  background-size:cover,auto 100%,cover,cover !important;
-  background-position:center,right center,center,center 35% !important;
+  background-image:linear-gradient(90deg,#071b30 0%,#071b30 calc(100% - 420px),rgba(7,27,48,.12) calc(100% - 260px),transparent 100%),url('/assets/4k/little-feet-school-office-banner-4k.jpg') !important;
+  background-size:cover,auto 100% !important;
+  background-position:center,right center !important;
   background-repeat:no-repeat !important;
 }
 #homeTab > .portal-welcome-banner::before,
-#myDayTab > .my-day-hero::before {
-  display:none;
-  content:"";
-  position:absolute;
-  z-index:-1;
-  inset:0;
-  background:linear-gradient(90deg,rgba(7,27,48,.92),rgba(7,27,48,.80)),url('/assets/4k/little-feet-school-office-banner-4k.jpg') center 35%/cover no-repeat !important;
-  filter:none;
-  opacity:1;
-  animation:none;
-  pointer-events:none;
-}
+#myDayTab > .my-day-hero::before { display:none; }
 #myDayTab > .my-day-hero::after { display:none; }
 #homeTab > .portal-welcome-banner .portal-welcome-copy,
 #myDayTab > .my-day-hero > * { position:relative; z-index:1; }
