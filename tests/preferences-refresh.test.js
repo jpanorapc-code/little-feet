@@ -52,7 +52,7 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v64-stage-navigation/);
+assert.match(serviceWorker, /little-feet-shell-v65-school-office-banners/);
 assert.match(serviceWorker, /backup\.js\?v=20261009-stage-navigation-v1/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /advanced-school-operations\.js\?v=20261009-stage-navigation-v1/);
