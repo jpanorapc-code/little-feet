@@ -41,9 +41,9 @@
     const host=document.getElementById('lfSubjectMarksList'); if(!host) return;
     const learner=document.getElementById('lfMarksFilterLearner')?.value.trim()||'';
     const data=await api('/api/academics/marks'+(learner?'?learnerName='+encodeURIComponent(learner):''));
-    const summary=(data.subjects||[]).map(row=>'<div class="item-row"><strong>'+esc(row.subject)+'</strong><span>'+esc(row.percentage)+'% · '+esc(row.assessments)+' assessment(s)</span></div>').join('');
+    const summary=(window.getEducationStageContext?.() ? [] : data.subjects||[]).map(row=>'<div class="item-row"><strong>'+esc(row.subject)+'</strong><span>'+esc(row.percentage)+'% · '+esc(row.assessments)+' assessment(s)</span></div>').join('');
     window.__littleFeetSubjectMarks=data.marks||[];
-    const rows=(data.marks||[]).slice(0,80).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.subject)+'</strong><p>'+esc(row.assessmentName)+' · '+esc(row.score)+'/'+esc(row.maximum)+' · '+esc(row.percentage)+'% · weight '+esc(row.weight)+'</p><span class="meta">'+esc(row.term)+' '+esc(row.year)+' · revision '+esc(row.revision||1)+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="editLittleFeetSubjectMark(\''+esc(row.id)+'\')">Edit</button><button type="button" class="action-btn btn-blue" onclick="viewLittleFeetMarkHistory(\''+esc(row.id)+'\')">History</button><button type="button" class="action-btn btn-red" onclick="deleteLittleFeetSubjectMark(\''+esc(row.id)+'\')">Delete</button></div></div>').join('');
+    const rows=(data.marks||[]).filter(row=>!window.matchesEducationStageRecord || window.matchesEducationStageRecord(row)).slice(0,80).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.subject)+'</strong><p>'+esc(row.assessmentName)+' · '+esc(row.score)+'/'+esc(row.maximum)+' · '+esc(row.percentage)+'% · weight '+esc(row.weight)+'</p><span class="meta">'+esc(row.term)+' '+esc(row.year)+' · revision '+esc(row.revision||1)+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="editLittleFeetSubjectMark(\''+esc(row.id)+'\')">Edit</button><button type="button" class="action-btn btn-blue" onclick="viewLittleFeetMarkHistory(\''+esc(row.id)+'\')">History</button><button type="button" class="action-btn btn-red" onclick="deleteLittleFeetSubjectMark(\''+esc(row.id)+'\')">Delete</button></div></div>').join('');
     host.innerHTML=(summary?'<h4>Subject totals</h4>'+summary:'')+'<h4 style="margin-top:14px;">Mark records</h4>'+(rows||'<p class="meta">No subject marks yet.</p>');
   }
   window.editLittleFeetSubjectMark=async id=>{
@@ -77,7 +77,8 @@
   async function refreshReportCards(){
     const host=document.getElementById('lfReportCardList'); if(!host) return;
     const rows=await api('/api/academics/report-cards');
-    host.innerHTML=rows.length?rows.slice(0,40).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.term)+' '+esc(row.year)+'</strong><p>Overall '+esc(row.average)+'% · '+esc(row.promotionOutcome||'No promotion result yet')+'</p><span class="meta">'+esc(row.createdAt)+(row.lastEmailedAt?' · emailed '+esc(row.lastEmailedAt):'')+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="window.printLittleFeetReportCard(\''+esc(row.id)+'\')">Print / PDF</button>'+(staff()?'<button type="button" class="action-btn btn-green" onclick="window.useLittleFeetReportForSignoff(\''+esc(row.id)+'\')">Use sign-off</button><button type="button" class="action-btn btn-blue" onclick="window.emailLittleFeetReportCard(\''+esc(row.id)+'\')">Email parent</button>':'')+'</div></div>').join(''):'<p class="meta">No generated report cards yet.</p>';
+    const visibleRows=rows.filter(row=>!window.matchesEducationStageRecord || window.matchesEducationStageRecord(row));
+    host.innerHTML=visibleRows.length?visibleRows.slice(0,40).map(row=>'<div class="item-row"><div><strong>'+esc(row.learnerName)+' · '+esc(row.term)+' '+esc(row.year)+'</strong><p>Overall '+esc(row.average)+'% · '+esc(row.promotionOutcome||'No promotion result yet')+'</p><span class="meta">'+esc(row.createdAt)+(row.lastEmailedAt?' · emailed '+esc(row.lastEmailedAt):'')+'</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="window.printLittleFeetReportCard(\''+esc(row.id)+'\')">Print / PDF</button>'+(staff()?'<button type="button" class="action-btn btn-green" onclick="window.useLittleFeetReportForSignoff(\''+esc(row.id)+'\')">Use sign-off</button><button type="button" class="action-btn btn-blue" onclick="window.emailLittleFeetReportCard(\''+esc(row.id)+'\')">Email parent</button>':'')+'</div></div>').join(''):'<p class="meta">No generated report cards yet.</p>';
     window.__littleFeetReportCards=rows;
   }
   window.printLittleFeetReportCard=id=>window.open('/api/academics/report-cards/'+encodeURIComponent(id)+'/print','_blank','noopener');
@@ -101,7 +102,7 @@
 
   async function refreshDiscipline(){
     const host=document.getElementById('lfDisciplineList');if(!host)return;
-    const rows=await api('/api/discipline');
+    const rows=(await api('/api/discipline')).filter(row=>!window.matchesEducationStageRecord || window.matchesEducationStageRecord(row));
     const grouped=new Map();
     for(const row of rows){const key=row.learnerName;const item=grouped.get(key)||{points:0,count:0};item.points+=Number(row.pointDelta||0);item.count++;grouped.set(key,item);}
     const totals=[...grouped.entries()].map(([name,item])=>'<div class="item-row"><strong>'+esc(name)+'</strong><span>'+esc(item.points)+' points · '+esc(item.count)+' record(s)</span></div>').join('');
@@ -226,7 +227,7 @@
   }
   function setupGradeR(){
     if(!staff() && user()?.role!=='parent')return;
-    const gradeTarget=user()?.role==='parent'?'reportsTab':'progressTab';
+    const gradeTarget='gradeRTab';
     const card=addCard(gradeTarget,'lfGradeRSkillsCard','<div class="card-header-bar"><div><h2>Grade R Skills</h2><p class="meta">98 Little Feet observation skills mapped to CAPS Home Language, Mathematics and Life Skills.</p></div><span class="badge-tag info">98 SKILLS</span></div>'+(staff()?'<form id="lfGradeRForm" class="workspace-grid"><input id="lfGradeRLearner" name="learnerName" placeholder="Grade R learner" required><input id="lfGradeRTerm" name="term" placeholder="Term e.g. Term 4" required><select id="lfGradeRSkill" name="skillId"></select><select name="rating"><option value="1">1 · Not yet</option><option value="2">2 · Developing</option><option value="3">3 · Achieved</option><option value="4">4 · Strong / consistent</option></select><input name="observedAt" type="date"><textarea name="evidence" placeholder="Observation / evidence"></textarea><button class="submit-btn">Save skill observation</button></form>':'<input id="lfGradeRLearner" placeholder="Learner name"><input id="lfGradeRTerm" placeholder="Term e.g. Term 4"><button id="lfGradeRRefresh" type="button" class="action-btn btn-blue">View progress</button><select id="lfGradeRSkill" class="hidden"></select>')+'<div id="lfGradeRSummary"></div>');
     if(!card)return;
     const form=card.querySelector('#lfGradeRForm');if(form){form.elements.observedAt.value=new Date().toISOString().slice(0,10);form.addEventListener('submit',async e=>{const submittedForm=e.currentTarget;e.preventDefault();try{const body=formBody(submittedForm);body.rating=Number(body.rating);await api('/api/grade-r/assessments',{method:'POST',body:JSON.stringify(body)});await refreshGradeR();}catch(err){showError(err);}});}
@@ -324,6 +325,10 @@
     refreshAttendanceUpgrade().catch(()=>{});
   }
 
+  window.refreshLittleFeetGradeR=refreshGradeR;
+  window.refreshLittleFeetDiscipline=refreshDiscipline;
+  window.refreshLittleFeetSubjectMarks=refreshMarks;
+  window.refreshLittleFeetReportCards=refreshReportCards;
   function start(){
     if(!user()) return;
     setupMarks();

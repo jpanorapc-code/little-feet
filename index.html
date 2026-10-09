@@ -6376,6 +6376,10 @@
     body.light-mode #accountRole optgroup { background-color:#e6eff7; color:#244564; }
     body.light-mode #accountRole option { background-color:#f7fafc; color:#152d43; }
     @media (max-width:640px) { #accountsList .item-row { flex-wrap:wrap; } #accountsList .item-row > div:last-child { width:100%; } }
+
+.education-stage-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.education-tool-host { display:grid; gap:18px; min-width:0; }
+.education-tool-host > * { min-width:0; }
 </style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261006-login-cache-v2"></script>
@@ -6663,8 +6667,18 @@
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn active" onclick="switchTab('homeTab', this)"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></button></li>
         <li data-roles="teacher,principal,admin,staff" data-my-day-nav="true"><button type="button" class="nav-btn" onclick="switchTab('myDayTab', this)">My Day</button></li>
       </ul>
+
       <section data-nav-group>
-        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-academics"></use></svg><span>Academics</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-academics"></use></svg><span>School Stages</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
+        <ul class="sidebar-links">
+          <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('preschoolTab', this)">ECD &amp; Preschool</button></li>
+          <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('gradeRTab', this)">Grade R</button></li>
+          <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('primarySchoolTab', this)">Primary School</button></li>
+          <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('highSchoolTab', this)">High School</button></li>
+        </ul>
+      </section>
+      <section data-nav-group>
+        <button type="button" class="sidebar-group-toggle" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-academics"></use></svg><span>Shared Learning</span></span><svg class="sidebar-chevron" aria-hidden="true"><use href="#icon-chevron"></use></svg></button>
         <ul class="sidebar-links">
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('feedTab', this)">School Feed</button></li>
         <li data-roles="parent,teacher,principal,district,admin"><button type="button" class="nav-btn" onclick="switchTab('scheduleTab', this)">Timetable</button></li>
@@ -6672,7 +6686,7 @@
         <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('badgesTab', this)">Achievements</button></li>
         <li data-roles="parent,teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('reportsTab', this)">Reports &amp; Reviews</button></li>
         <li data-roles="parent,principal,district,admin" data-subscription="plus"><button type="button" class="nav-btn" onclick="switchTab('analyticsTab', this)">Progress Insights</button></li>
-        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('progressTab', this)">Development</button></li>
+        <li data-roles="teacher,principal,admin"><button type="button" class="nav-btn" onclick="switchTab('progressTab', this)">Portfolios &amp; Curriculum</button></li>
         </ul>
       </section>
       <section data-nav-group>
@@ -6754,6 +6768,10 @@
 
     <div class="container">
 
+<div id="preschoolTab" class="tab-content" data-roles="parent,teacher,principal,admin"><div class="card"><h2>Baby Care, ECD & Preschool</h2><p>NCF observations and early learning assessments.</p><div class="education-stage-actions" data-education-stage="preschoolTab"></div><p class="meta" data-education-stage-status role="status"></p></div><div class="education-tool-host"></div></div>
+<div id="gradeRTab" class="tab-content" data-roles="parent,teacher,principal,admin"><div class="card"><h2>Grade R</h2><p>CAPS observations and Grade R skills.</p><div class="education-stage-actions" data-education-stage="gradeRTab"></div><p class="meta" data-education-stage-status role="status"></p></div><div class="education-tool-host"></div></div>
+<div id="primarySchoolTab" class="tab-content" data-roles="parent,teacher,principal,admin"><div class="card"><h2>Primary School · Grades 1–7</h2><p>Subject marks, reports and conduct for primary grades.</p><div class="education-stage-actions" data-education-stage="primarySchoolTab"></div><p class="meta" data-education-stage-status role="status"></p></div><div class="education-tool-host"></div></div>
+<div id="highSchoolTab" class="tab-content" data-roles="parent,teacher,principal,admin"><div class="card"><h2>High School · Grades 8–12</h2><p>Subject marks, reports and conduct for high-school grades.</p><div class="education-stage-actions" data-education-stage="highSchoolTab"></div><p class="meta" data-education-stage-status role="status"></p></div><div class="education-tool-host"></div></div>
       <!-- 0. Home Page Tab Content -->
       <div id="homeTab" class="tab-content active">
         <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-heart-star"></use></svg></span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
@@ -8017,23 +8035,24 @@
 
   <script src="/assets/workspace-accessibility.js?v=20261008-repair-v1" defer></script>
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="backup.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/school-navigation.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20261004-navy-v1" defer></script>
-  <script src="/assets/staff-work.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/approvals.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/staff-notices.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/meeting-minutes.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/maintenance.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/resource-booking.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/purchase-requests.js?v=20261009-role-refinement-v1" defer></script>
-  <script src="/assets/workplace-extended.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/staff-work.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/approvals.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/staff-notices.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/meeting-minutes.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/maintenance.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/resource-booking.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/purchase-requests.js?v=20261009-stage-navigation-v1" defer></script>
+  <script src="/assets/workplace-extended.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20261006-login-i18n-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20261002-about-v1" defer></script>
-  <script src="/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1" defer></script>
+  <script src="/assets/curriculum-frameworks.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20261008-session-repair-v1" defer></script>
-  <script src="/assets/school-core-upgrades.js?v=20261008-workspace-repair-v1" defer></script>
-<script src="/assets/advanced-school-operations.js?v=20261008-workspace-repair-v1" defer></script>
+  <script src="/assets/school-core-upgrades.js?v=20261009-stage-navigation-v1" defer></script>
+<script src="/assets/advanced-school-operations.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/mobile-pwa.js?v=20261008-offline-status-v2" defer></script>
   <script>
     window.addEventListener('load', () => {

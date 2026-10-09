@@ -24,7 +24,7 @@ fs.writeFileSync(path.join(fixture,'littlefeet-replica.json'),JSON.stringify({
     {username:'core-parent',name:'Core Parent',role:'parent',pinHash,schoolId:'core-school',schoolName:'Core Browser School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Core Learner']},
     {username:'other-admin',name:'Other Admin',role:'admin',pinHash,schoolId:'other-school',schoolName:'Other Browser School',verificationStatus:'Active'}
   ],
-  students:[{id:'core-learner',studentName:'Core Learner',className:'Grade R',schoolId:'core-school',schoolName:'Core Browser School'}],
+  students:[{id:'core-learner',studentName:'Core Learner',className:'Grade R',schoolId:'core-school',schoolName:'Core Browser School'},{id:'primary-learner',studentName:'Primary Learner',className:'Grade 3A',schoolId:'core-school',schoolName:'Core Browser School'},{id:'high-learner',studentName:'High Learner',className:'Grade 9A',schoolId:'core-school',schoolName:'Core Browser School'}],
   moduleRecords:{},attendance:[],directMessages:[],chatGroups:[],groupMessages:{}
 }));
 
@@ -69,6 +69,39 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       await page.locator('#'+tabId).waitFor({state:'visible'});
     };
 
+    for (const [stage,name] of [['primarySchoolTab','Primary Learner'],['highSchoolTab','High Learner']]) {
+      await openTab(stage);
+      await page.locator('#'+stage+' .education-stage-actions').getByRole('button',{name:'Subject marks & assessments',exact:true}).click();
+      await page.locator('#'+stage+' #lfSubjectMarkForm').waitFor({state:'visible'});
+      await page.locator('#lfSubjectMarkForm input[name="learnerName"]').fill(name);
+      await page.locator('#lfSubjectMarkForm input[name="subject"]').fill('Mathematics');
+      await page.locator('#lfSubjectMarkForm input[name="assessmentName"]').fill('Stage assessment');
+      await page.locator('#lfSubjectMarkForm input[name="term"]').fill('Term 4');
+      await page.locator('#lfSubjectMarkForm input[name="score"]').fill('8');
+      await page.locator('#lfSubjectMarkForm input[name="maximum"]').fill('10');
+      await page.locator('#lfSubjectMarkForm button.submit-btn').click();
+      await page.locator('#lfSubjectMarksList').getByText(name+' · Mathematics',{exact:true}).waitFor();
+      assert.equal(await page.locator('#lfSubjectMarksCard').count(),1,'The actual form must move rather than be duplicated.');
+    }
+    assert.equal(await page.locator('#lfSubjectMarksList').getByText('Primary Learner · Mathematics',{exact:true}).count(),0,'High school view must not include primary marks.');
+    await openTab('worksheetsTab');
+    await page.locator('#worksheetsTab #lfSubjectMarksCard').waitFor({state:'visible'});
+    await page.locator('#lfSubjectMarksList').getByText('Primary Learner · Mathematics',{exact:true}).waitFor();
+    await page.locator('#lfSubjectMarksList').getByText('High Learner · Mathematics',{exact:true}).waitFor();
+    await openTab('gradeRTab');
+    await page.locator('#gradeRTab .education-stage-actions').getByRole('button',{name:'Curriculum observations',exact:true}).click();
+    assert.equal(await page.locator('#curriculumFramework').inputValue(),'caps_grade_r');
+    await page.locator('#curriculumObservationForm input[name="learnerName"]').fill('Core Learner');
+    await page.locator('#curriculumObservationForm textarea[name="observation"]').fill('Observed Grade R mathematics');
+    await page.locator('#curriculumObservationForm button.submit-btn').click();
+    await page.locator('#curriculumRecords').getByText('Observed Grade R mathematics',{exact:false}).waitFor();
+    await openTab('preschoolTab');
+    await page.locator('#preschoolTab .education-stage-actions').getByRole('button',{name:'Curriculum observations',exact:true}).click();
+    assert.equal(await page.locator('#curriculumFramework').inputValue(),'ncf_birth_to_four');
+    assert.equal(await page.locator('#curriculumRecords').getByText('Observed Grade R mathematics',{exact:false}).count(),0);
+    await openTab('progressTab');
+    await page.locator('#progressTab #curriculumObservationForm').waitFor({state:'visible'});
+    await page.locator('#curriculumRecords').getByText('Observed Grade R mathematics',{exact:false}).waitFor();
     await openTab('staffNoticesTab');
     await page.locator('#staffNoticeForm input[name="title"]').fill('Private browser personnel notice');
     await page.locator('#staffNoticeForm textarea[name="message"]').fill('Principal-only review for Core Browser School');
@@ -107,7 +140,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfDisciplineForm button.submit-btn').click();
     await page.locator('#lfDisciplineList').getByText('Core Learner').first().waitFor({state:'visible'});
 
-    await openTab('progressTab');
+    await openTab('preschoolTab');
     assert.equal(await page.locator('#lfEldaAiAssist').isDisabled(),true,'AI assist must stay disabled when no approved provider is configured');
 
     await openTab('operationsTab');
@@ -117,7 +150,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfAssetForm button.submit-btn').click();
     await page.locator('#lfAssetList').getByText('CORE-001').first().waitFor({state:'visible'});
 
-    await openTab('progressTab');
+    await openTab('gradeRTab');
     await page.locator('#lfGradeRForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfGradeRForm input[name="term"]').fill('Term 4');
     await page.locator('#lfGradeRForm select[name="rating"]').selectOption('3');

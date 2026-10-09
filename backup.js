@@ -2238,6 +2238,7 @@ requestAnimationFrame(() => {
 
 function switchTab(tabId, btn) {
   window.saveDashboardDrafts?.();
+  window.restoreEducationTools?.(tabId);
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const targetTab = document.getElementById(tabId);
@@ -2258,6 +2259,7 @@ function loadWorkspaceOnDemand(tabId) {
   const loaders = {
     scheduleTab: [loadSchedules], worksheetsTab: [loadWorksheets], badgesTab: [loadBadges],
     companyClientsTab: [loadCompanyClients], companyBillingTab: [loadCompanyBilling],
+    preschoolTab: [()=>window.refreshEducationWorkspace?.('preschoolTab')], gradeRTab: [()=>window.refreshEducationWorkspace?.('gradeRTab')], primarySchoolTab: [()=>window.refreshEducationWorkspace?.('primarySchoolTab')], highSchoolTab: [()=>window.refreshEducationWorkspace?.('highSchoolTab')],
     attendanceTab: [loadAttendance], ticketsTab: [() => runPortalRefreshJob('tickets', () => loadTickets()), loadTicketAssignees],
     broadcastsTab: [() => runPortalRefreshJob('broadcasts', () => loadBroadcasts())], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
     registryTab: [loadRegistry, loadLearnerAccessCodes],

@@ -11,7 +11,7 @@ const workplaceExtendedSource = fs.readFileSync(path.join(root, 'assets', 'workp
 assert.match(backupSource, /--portal-sidebar-top/, 'Sidebar runtime offset variable must be maintained');
 assert.match(backupSource, /addEventListener\(['"]scroll['"],\s*queuePortalHeaderOffsetSync/, 'Sidebar/header offset must resync while the page scrolls');
 assert.match(pageSource, /id="lfNotificationStack" class="lf-notification-stack is-collapsed"/, 'Emails control must be present in the header before API loading finishes');
-assert.match(pageSource, /workplace-extended\.js\?v=20261009-role-refinement-v1/, 'Responsive email/header JS must be cache-busted');
+assert.match(pageSource, /workplace-extended\.js\?v=20261009-stage-navigation-v1/, 'Responsive email/header JS must be cache-busted');
 assert.doesNotMatch(pageSource, /\.lf-notification-stack\{top:72px;right:8px;bottom:8px/, 'Legacy floating email offset must stay removed');
 assert.match(workplaceExtendedSource, /stack\.dataset\.notificationReady==='true'/, 'Existing header email dock must be safely initialised instead of recreated');
 const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [930, 520], [959, 900], [960, 900], [1024, 768], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
