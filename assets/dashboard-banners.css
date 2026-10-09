@@ -12,7 +12,23 @@
   background-repeat:no-repeat !important;
 }
 #homeTab > .portal-welcome-banner::before,
-#myDayTab > .my-day-hero::before { display:none; }
+#myDayTab > .my-day-hero::before {
+  content:"";
+  display:block;
+  position:absolute;
+  z-index:0;
+  inset:0 370px 0 0;
+  /* Only the left 43% of the artwork is visible here: office, never mascot. */
+  background-image:linear-gradient(90deg,rgba(7,27,48,.70),rgba(7,27,48,.42)),url('/assets/4k/little-feet-school-office-banner-4k.jpg') !important;
+  background-size:cover,230% auto !important;
+  background-position:center,left center !important;
+  background-repeat:no-repeat;
+  mask-image:linear-gradient(90deg,#000 0%,#000 82%,transparent 100%);
+  opacity:1 !important;
+  filter:none !important;
+  animation:none !important;
+  pointer-events:none;
+}
 #myDayTab > .my-day-hero::after { display:none; }
 #homeTab > .portal-welcome-banner .portal-welcome-copy,
 #myDayTab > .my-day-hero > * { position:relative; z-index:1; }
@@ -21,6 +37,8 @@
 #myDayTab > .my-day-hero .my-day-kicker,
 #myDayTab > .my-day-hero .my-day-date { position:relative; z-index:1; }
 @media(max-width:640px) {
+  #homeTab > .portal-welcome-banner::before,
+  #myDayTab > .my-day-hero::before { display:none; }
   #homeTab > .portal-welcome-banner,
   #myDayTab > .my-day-hero {
     min-height:280px;
