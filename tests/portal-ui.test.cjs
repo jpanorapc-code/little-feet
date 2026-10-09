@@ -15,7 +15,7 @@ const fixture = fs.mkdtempSync(path.join(tempRoot, 'source-browser-'));
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(fixture, 'node_modules'), 'junction');
 const port = 18000 + Math.floor(Math.random() * 1000);
 const origin = `http://127.0.0.1:${port}`;
-const roles = ['admin', 'principal', 'teacher', 'parent', 'district', 'school_accounts', 'staff', 'crm', 'accounts', 'support', 'owner'];
+const roles = ['admin', 'principal', 'teacher', 'parent', 'district', 'school_accounts', 'school_staff', 'school_hr', 'staff', 'crm', 'accounts', 'support', 'owner'];
 const pin = 'SectionBrowserPass1';
 const pinHash = crypto.scryptSync(pin, 'little-feet-pin-salt', 64).toString('hex');
 let child;
@@ -238,7 +238,7 @@ async function main() {
       const actual=await page.evaluate(()=>fetch('/api/tickets').then(r=>r.json()));
       assert.equal(actual.find(x=>x.id==='role-support-ticket').assignedTo,'browser-support');
     }
-    if (['staff','accounts','support'].includes(role)) {
+    if (['school_staff','school_hr','staff','accounts','support'].includes(role)) {
       assert.equal(await page.locator('.nav-btn[onclick="switchTab(\'accountsTab\', this)"]').isVisible(),false,'Employees must not see account administration.');
       const privateStatus=await page.evaluate(()=>fetch('/api/registry').then(r=>r.status));
       assert.equal(privateStatus,403,'Server must enforce employee child-data restrictions.');
@@ -261,6 +261,8 @@ async function main() {
       await page.locator('#accountRole').selectOption('teacher');
       await page.locator('#accountSchoolName').fill('Browser Test School');
       await page.locator('#accountAssignedClasses').fill('A1');
+      await page.locator('#accountPosition').selectOption('ECD Practitioner');
+      await page.locator('#accountSector').selectOption('Preschool');
       await page.locator('#accountSaveButton').click();
       const added=page.locator('#accountsList .item-row').filter({hasText:'Client Added Teacher'});
       await added.waitFor();
@@ -298,6 +300,7 @@ async function main() {
       const companyOptions=await page.locator('#accountRole option').evaluateAll(options=>options.filter(x=>['staff','crm','accounts','support'].includes(x.value)).map(x=>({role:x.value,disabled:x.disabled})));
       assert.equal(companyOptions.length,4);
       assert.ok(companyOptions.every(x=>x.disabled===(role!=='owner')),'Only company account managers may choose company employee roles.');
+      if (role==='owner') { await page.locator('#accountRole').selectOption('crm'); await page.locator('#accountForm').screenshot({path:path.join(root,'tmp','user-role-refinement.png')}); }
     }
     if (role === 'admin') {
       await page.evaluate(()=>{window.roleProbeCalls=0;window.roleProbe=()=>{window.roleProbeCalls++;return 0;};});

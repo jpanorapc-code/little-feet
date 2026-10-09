@@ -9,8 +9,9 @@ const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role
 const isFinanceUser = (user = currentUser) => Boolean(user && (isFullAccessUser(user) || user.role === 'school_accounts'));
 const displayRoleName = user => {
   if (!user) return '';
-  if (user.role === 'admin' && user.platformAccess) return 'CEO / ADMINISTRATOR';
-  return ({ staff:'LITTLE FEET STAFF', crm:'SALES / CRM', accounts:'LITTLE FEET ACCOUNTS', school_accounts:'SCHOOL ACCOUNTS', support:'SOFTWARE SUPPORT' }[user.role] || String(user.role || '').toUpperCase());
+  if (user.role === 'admin' && user.platformAccess) return 'CEO / Administrator Little Feet';
+  if (user.schoolPosition && !isInternalCompanyRole(user.role)) return user.schoolPosition;
+  return ({ parent:'Parent / Guardian', teacher:'Teacher / Educator', principal:'Principal / Head of School', district:'District / Circuit Official', admin:'School Administrator', school_staff:'School Support Staff', school_hr:'School HR', staff:'Staff Little Feet', crm:'CRM Little Feet', accounts:'Accounts Little Feet', school_accounts:'School Accounts', support:'Support Little Feet' }[user.role] || String(user.role || '').toUpperCase());
 };
 window.getLittleFeetCurrentUser = () => currentUser;
 window.isLittleFeetFullAccessUser = user => isFullAccessUser(user || currentUser);
@@ -23,6 +24,7 @@ let nearbySchoolRecords = [];
 let alertLocation = null;
 let accountsCache = [];
 let accountSessionGeneration = 0;
+let accountRoleCatalog = null;
 let accountSchoolSearchTimer = null;
 let accountSchoolSearchToken = 0;
 let broadcastsLoaded = false;
@@ -1848,7 +1850,8 @@ function applyRolePermissions(role) {
     const companyTabs = new Set(['homeTab','staffWorkTab','qualificationsTab','kpiHistoryTab','staffDevelopmentTab','emailIntegrationTab','chatTab','ticketsTab','guideTab','settingsTab','wallpaperTab', ...(role === 'crm' ? ['companyClientsTab','accountsTab'] : []), ...(role === 'accounts' ? ['companyBillingTab'] : [])]);
     const tabId = el.classList.contains('tab-content') ? el.id : el.querySelector('.nav-btn')?.getAttribute('onclick')?.match(/switchTab\('([^']+)'/)?.[1];
     const companyTool = tabId === 'companyClientsTab' || tabId === 'companyBillingTab';
-    const roleAllowed = companyTool
+    const supportTabs = new Set(['homeTab','staffWorkTab','qualificationsTab','kpiHistoryTab','staffDevelopmentTab','emailIntegrationTab','chatTab','ticketsTab','guideTab','settingsTab','wallpaperTab']);
+    const roleAllowed = ['school_staff','school_hr'].includes(role) && tabId ? supportTabs.has(tabId) : companyTool
       ? Boolean((role === 'admin' && currentUser.platformAccess === true) || (role === 'crm' && tabId === 'companyClientsTab') || (role === 'accounts' && tabId === 'companyBillingTab'))
       : fullAccess || (isInternalCompanyRole(role) && tabId ? companyTabs.has(tabId) : el.dataset.roles.split(',').includes(role));
     const subscriptionAllowed = !el.dataset.subscription || role !== 'parent' || currentUser?.subscription === el.dataset.subscription;
@@ -1967,23 +1970,25 @@ function renderRoleHomePanel() {
       message: currentUser.platformAccess ? 'Company-wide administrator access is active across Little Feet workspaces and schools.' : 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.'
     },
     staff: {
-      icon: '🐧', title: `Little Feet Staff · ${currentUser.name || 'Team member'}`,
+      icon: '🐧', title: `Staff Little Feet · ${currentUser.name || 'Team member'}`,
       message: 'Manage your assigned company tasks, leave, training, email and messages.'
     },
     crm: {
-      icon: '🤝', title: `CRM workspace · ${currentUser.name || 'Little Feet'}`,
+      icon: '🤝', title: `CRM Little Feet · ${currentUser.name || 'Little Feet'}`,
       message: 'Help clients set up their school users, manage client follow-ups and assigned tickets, and use your own work tools.'
     },
     accounts: {
-      icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'Little Feet'}`,
+      icon: '🧾', title: `Accounts Little Feet · ${currentUser.name || 'Little Feet'}`,
       message: 'Review Little Feet school subscription invoices and record confirmed payments. School and parent finances remain private.'
     },
+    school_hr: { icon:'🏫', title:`HR · ${currentUser.name || 'School team'}`, message:'Manage school staff work, leave, qualifications and reviews.' },
+    school_staff: { icon:'🏫', title:`${currentUser.schoolPosition || 'School Support'} · ${currentUser.name || 'Team member'}`, message:'Manage your assigned school work, leave, qualifications and communication.' },
     school_accounts: {
       icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'School accounts'}`,
       message: 'Work with the finance and accounting tools for your linked school.'
     },
     support: {
-      icon: '🛠️', title: `Software Support · ${currentUser.name || 'Little Feet'}`,
+      icon: '🛠️', title: `Support Little Feet · ${currentUser.name || 'Little Feet'}`,
       message: 'Handle support tickets, client messages and software-support communication for Little Feet.'
     }
   };
@@ -3680,7 +3685,7 @@ function renderTicketAssigneeOptions(selectId, query = '', selected = '') {
     const matchesSearch = !search || `${account.name || ''} ${account.username || ''}`.toLowerCase().includes(search);
     return matchesSearch;
   });
-  const roleGroups = [['teacher', 'Teachers'], ['principal', 'Principals'], ['parent', 'Parents'], ['admin', 'Administrators'], ['district', 'District'], ['school_accounts', 'School Accounts'], ['staff', 'Little Feet Staff'], ['crm', 'Sales / CRM'], ['accounts', 'Little Feet Accounts'], ['support', 'Software Support']];
+  const roleGroups = [['teacher', 'Teachers'], ['principal', 'Principals'], ['parent', 'Parents'], ['admin', 'Administrators'], ['district', 'District'], ['school_accounts', 'School Accounts'], ['staff', 'Staff Little Feet'], ['crm', 'CRM Little Feet'], ['accounts', 'Accounts Little Feet'], ['support', 'Support Little Feet']];
   const groupedOptions = roleGroups.map(([role, label]) => {
     const people = schoolAccounts.filter(account => account.role === role);
     return people.length ? `<optgroup label="${label}">${people.map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)}</option>`).join('')}</optgroup>` : '';
@@ -4316,6 +4321,8 @@ function setupFormListeners() {
         schoolStoreUrl: document.getElementById('accountStoreUrl').value.trim(),
         assignedClasses: document.getElementById('accountAssignedClasses').value.trim(),
         linkedLearners: document.getElementById('accountLinkedLearners').value.trim(),
+        schoolPosition: isInternalCompanyRole(document.getElementById('accountRole').value) ? '' : document.getElementById('accountPosition')?.value,
+        schoolSector: isInternalCompanyRole(document.getElementById('accountRole').value) ? '' : document.getElementById('accountSector')?.value,
         actorUsername: currentUser?.username
       };
       if (!originalUsername && !body.pin) return alert('Set a password or PIN for the new account.');
@@ -4994,6 +5001,14 @@ async function loadAccounts() {
     if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
     if (!response.ok) throw new Error(accounts?.message || 'Unable to load account records.');
     if (!Array.isArray(accounts)) throw new Error('Account records returned an invalid response.');
+    if (!accountRoleCatalog) {
+      const catalogResponse = await fetch('/api/accounts/catalog');
+      const catalog = await catalogResponse.json();
+      if (session !== accountSessionGeneration + ':' + workspaceSessionKey()) return;
+      if (!catalogResponse.ok) throw new Error(catalog.message || 'Unable to load positions.');
+      accountRoleCatalog = catalog;
+    }
+    updateAccountRoleFields();
     accountsCache = accounts;
     const accountSelector = document.getElementById('accountEditSelect');
     if (accountSelector) {
@@ -5001,7 +5016,7 @@ async function loadAccounts() {
       accountSelector.innerHTML = `<option value="">Create a new account / select an existing account</option>${accounts.map(account => `<option value="${encodeURIComponent(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.username)} · ${escapeWorkspaceText(displayRoleName(account))}</option>`).join('')}`;
       if (previousSelection && [...accountSelector.options].some(option => option.value === previousSelection)) accountSelector.value = previousSelection;
     }
-    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(displayRoleName(account))}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName || 'Not linked · Little Feet company account')}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${account.canManage !== false && String(account.verificationStatus || '').toLowerCase().includes('pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeInlineIdentifier(account.username)}')">Approve account</button>` : ''}${account.canManage !== false && account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeInlineIdentifier(account.username)}')">Approve learner request</button>` : ''}${account.canManage === false ? '<span class="meta">Protected company owner</span>' : `<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeInlineIdentifier(account.username)}')">Edit</button>`}${account.canDelete !== false ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeInlineIdentifier(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
+    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(displayRoleName(account))}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName || 'Not linked · Little Feet company account')}${account.schoolSector ? `<br>Sector: ${escapeWorkspaceText(account.schoolSector)}` : ''}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${account.canManage !== false && String(account.verificationStatus || '').toLowerCase().includes('pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeInlineIdentifier(account.username)}')">Approve account</button>` : ''}${account.canManage !== false && account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeInlineIdentifier(account.username)}')">Approve learner request</button>` : ''}${account.canManage === false ? '<span class="meta">Protected company owner</span>' : `<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeInlineIdentifier(account.username)}')">Edit</button>`}${account.canDelete !== false ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeInlineIdentifier(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
   } catch (error) {
     if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
     accountsCache = [];
@@ -5489,6 +5504,18 @@ function updateAccountRoleFields() {
   const schoolRequired = document.getElementById('accountSchoolRequired');
   const schoolHelp = document.getElementById('accountSchoolHelp');
   const internalRole = isInternalCompanyRole(role);
+  const positionField = document.getElementById('accountPosition');
+  const sectorField = document.getElementById('accountSector');
+  for (const field of [positionField, sectorField]) { field?.closest('.school-position-field')?.classList.toggle('hidden', internalRole); if (field) field.disabled = internalRole; }
+  if (positionField && accountRoleCatalog) { const value=positionField.value; positionField.replaceChildren(...(accountRoleCatalog.positions[role] || []).map(name => new Option(name,name))); if ([...positionField.options].some(option => option.value===value)) positionField.value=value; }
+  if (sectorField && accountRoleCatalog && !sectorField.options.length) sectorField.replaceChildren(...accountRoleCatalog.sectors.map(name => new Option(name,name)));
+  document.getElementById('accountAssignedClasses')?.closest('div')?.classList.toggle('hidden', role !== 'teacher');
+  document.getElementById('accountLinkedLearners')?.closest('div[style*="grid-column"]')?.classList.toggle('hidden', role !== 'parent');
+  document.getElementById('accountStoreUrl')?.closest('div')?.classList.toggle('hidden', internalRole);
+  const descriptions = { school_hr:'Manage staff tasks, leave, qualifications and performance reviews for the linked school.', school_staff:'Assigned school work, leave, qualifications and communication. No learner grades, medical files, finance or user administration.', parent:'Access to approved linked children and family payments.', teacher:'Assigned classrooms, learner records and teaching tools.', principal:'School leadership, operations and staff management.', district:'School oversight and permitted reports.', admin:'Manage users and administration for the linked school.', school_accounts:'Finance and payment records for the linked school.', staff:'Personal company tasks, leave, training and communication.', crm:'Client follow-ups and school user management for registered clients.', accounts:'Little Feet subscription invoices and confirmed payment records.', support:'Client support tickets, assignments and service communication.' };
+  const hint = document.getElementById('accountRoleDescription');
+  if (hint) hint.textContent = descriptions[role] || '';
+
   if (schoolField) {
     schoolField.required = !internalRole;
     schoolField.placeholder = internalRole ? 'Optional · link to a school only if needed' : 'e.g. Little Feet ECD Portal';
@@ -5512,6 +5539,8 @@ function editAccount(account) {
   if (schoolSearch) schoolSearch.value = account.schoolName || '';
   hideAccountSchoolSearchResults();
   updateAccountRoleFields();
+  if (document.getElementById('accountPosition') && account.schoolPosition) document.getElementById('accountPosition').value = account.schoolPosition;
+  if (document.getElementById('accountSector') && account.schoolSector) document.getElementById('accountSector').value = account.schoolSector;
   document.getElementById('accountStoreUrl').value = account.schoolStoreUrl || '';
   document.getElementById('accountAssignedClasses').value = (account.assignedClasses || []).join(', ');
   document.getElementById('accountLinkedLearners').value = (account.linkedLearners || []).join(', ');
@@ -6374,6 +6403,7 @@ document.addEventListener('littlefeet:session-ended', () => { ['companyClientsCo
 document.addEventListener('littlefeet:session-ended', () => {
   accountSessionGeneration++;
   accountsCache = [];
+  accountRoleCatalog = null;
   window.clearTimeout(accountSchoolSearchTimer);
   accountSchoolSearchToken++;
   document.getElementById('accountsList')?.replaceChildren();

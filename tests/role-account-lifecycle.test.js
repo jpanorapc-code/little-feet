@@ -86,6 +86,35 @@ const failures=[];const check=(label,actual,expected)=>{console.log(label+': '+J
  check('CRM cannot delete entire schools',(await request('/api/school-deletion/execute',cookies.crm,'POST',{ticketId:'protected-school-delete',confirmation:'DELETE SCHOOL'})).status,403);
  check('CRM can delete a client user',(await request('/api/accounts/crm-bravo-teacher',cookies.crm,'DELETE')).status,200);
  check('Deleted client user cannot sign in',(await request('/api/login',null,'POST',{username:'crm-bravo-teacher',pin})).status,401);
+ const catalog=(await request('/api/accounts/catalog',cookies.crm)).data;
+ let jobIndex=0;
+ for(const [role,positions] of Object.entries(catalog.positions)) for(const schoolPosition of positions) {
+  const username='position-'+jobIndex,schoolSector=catalog.sectors[jobIndex++ % catalog.sectors.length];
+  const created=await request('/api/accounts',cookies.crm,'POST',{username,name:schoolPosition,role,pin,schoolName:'Alpha School',schoolPosition,schoolSector,assignedClasses:role==='teacher'?['Grade R']:[]});
+  check('Real position creates: '+schoolPosition,created.status,201);
+  check('Position is persisted: '+schoolPosition,created.data.account?.schoolPosition,schoolPosition);
+  const jobCookie=await login(username);const user=(await request('/api/auth/session',jobCookie)).data.user;
+  check('Sector is persisted: '+schoolPosition,user.schoolSector,schoolSector);
+  if(role==='school_hr') {
+   const staffLeave=await request('/api/staff/leave',cookies.teacher,'POST',{startDate:'2026-11-02',endDate:'2026-11-03',reason:'Staff leave'});
+   check('HR can approve real leave',(await request('/api/staff/leave/'+staffLeave.data.item.id,jobCookie,'PATCH',{status:'Approved'})).status,200);
+   check('Finance cannot approve leave',(await request('/api/staff/leave/'+staffLeave.data.item.id,cookies.school_accounts,'PATCH',{status:'Rejected'})).status,403);
+   check('HR can create a real performance review',(await request('/api/staff/performance-reviews',jobCookie,'POST',{username:'role-teacher',reviewPeriod:'2026-10',criteria:[{name:'Delivery',rating:3}]})).status,201);
+   check('School HR can assign real staff work',(await request('/api/staff/tasks',jobCookie,'POST',{title:'HR assigned work',assignedTo:'role-teacher'})).status,201);
+   check('HR staff directory stays inside the school',(await request('/api/staff/directory',jobCookie)).data.every(x=>x.schoolId==='alpha'&&!company.has(x.role)&&!x.username.includes('owner')),true);
+   check('School HR cannot manage account privileges',(await request('/api/accounts',jobCookie)).status,403);
+   check('School HR cannot access learner grades',(await request('/api/academics/marks',jobCookie)).status,403);
+  }
+  if(role==='school_staff') {
+   check(schoolPosition+' can save actual work',(await request('/api/staff/tasks',jobCookie,'POST',{title:'Daily work for '+schoolPosition})).status,201);
+   check(schoolPosition+' can request actual leave',(await request('/api/staff/leave',jobCookie,'POST',{leaveType:'Annual',startDate:'2026-10-20',endDate:'2026-10-21',reason:'Annual leave'})).status,201);
+   check(schoolPosition+' can save actual training',(await request('/api/staff/qualifications',jobCookie,'POST',{name:'Job qualification',issuingBody:'Accredited provider',obtainedDate:'2026-10-09'})).status,201);
+   for(const route of ['/api/accounts','/api/registry','/api/academics/marks','/api/parent-payments'])check(schoolPosition+' keeps restricted boundary '+route,(await request(route,jobCookie)).status,403);
+   check(schoolPosition+' cannot alter another school employee',(await request('/api/staff/tasks',jobCookie,'POST',{title:'Wrong worker task',assignedTo:'role-teacher'})).status>=400,true);
+  }
+ }
+ check('Unmatched job cannot grant a higher permission group',(await request('/api/accounts',cookies.crm,'POST',{username:'job-escalation',name:'Blocked escalation',role:'school_staff',pin,schoolName:'Alpha School',schoolPosition:'Principal / Head of School'})).status,400);
+ check('Unsupported sector is rejected',(await request('/api/accounts',cookies.crm,'POST',{username:'sector-invalid',name:'Blocked sector',role:'teacher',pin,schoolName:'Alpha School',schoolSector:'Invalid sector'})).status,400);
  check('Teacher cannot read marks from an unassigned class',(await request('/api/academics/marks',cookies.teacher)).data.marks?.some(x=>x.learnerName==='Bob'),false);
  check('Teacher cannot submit marks for an unassigned class',(await request('/api/academics/marks',cookies.teacher,'POST',{learnerName:'Bob',subject:'Maths',assessmentName:'Unauthorised',term:'Term 4',year:2026,score:9,maximum:10})).status,404);
  check('Teacher cannot edit an unassigned class mark by ID',(await request('/api/academics/marks/bob-mark',cookies.teacher,'PATCH',{score:9})).status,404);
@@ -141,6 +170,9 @@ const failures=[];const check=(label,actual,expected)=>{console.log(label+': '+J
  check('Renamed parent retains their payment records',(await request('/api/parent-payments',renamedParent)).data.payments.some(x=>x.id==='rename-charge'),true);
  check('Configured owner identity cannot be renamed',(await request('/api/accounts/owner%40example.test',owner,'PUT',{username:'renamed-owner@example.test'})).status,400);
  await request('/api/term',cookies.admin,'POST',{term:'Term 4'});await stop();await start();owner=await login('owner@example.test');
+ const savedPosition=(await request('/api/auth/session',await login('position-'+(jobIndex-1)))).data.user;
+ check('School job persists across restart',savedPosition.schoolPosition,'Sports / Activities');
+ check('School sector persists across restart',savedPosition.schoolSector,catalog.sectors[(jobIndex-1) % catalog.sectors.length]);
  check('CRM-created school user persists and signs in after restart',(await request('/api/login',null,'POST',{username:'crm-created-teacher',pin})).status,200);
  check('Sales notes survive restart',(await request('/api/company/clients',await login('role-crm'))).data.find(x=>x.id==='alpha')?.note,'Follow up on requested school demonstration');
  check('Company work remains outside school records after restart',(await request('/api/staff/tasks',owner)).data.find(x=>x.id===officeTask.data.item.id)?.schoolId,'');

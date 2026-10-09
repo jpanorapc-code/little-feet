@@ -60,12 +60,12 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
     .sr-only { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
-    
-    body { 
-      background-color: var(--bg-dark); 
-      color: var(--text-dark); 
-      min-height: 100vh; 
-      display: flex; 
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
       flex-direction: column;
       position: relative;
       transition: background-color 0.3s ease, color 0.3s ease;
@@ -127,18 +127,18 @@
     @keyframes loaderWalk { from { transform:translateX(-7px) translateY(2px) rotate(-4deg); } to { transform:translateX(7px) translateY(-2px) rotate(4deg); } }
     @keyframes footstep { 0%,100% { opacity:.25; transform:translateY(5px) scale(.82); } 50% { opacity:1; transform:translateY(-2px) scale(1); } }
     @media (prefers-reduced-motion: reduce) { .walking-loader-mark img, .walking-loader-mark .loader-step, body.portal-active::after { animation:none; } }
-    
+
     .container { padding: 15px; max-width: 1150px; margin: 0 auto; width: 100%; flex: 1; position: relative; z-index: 1; }
-    
-    .card { 
-      position: relative; 
-      background-color: var(--panel-bg); 
-      border: 1px solid var(--border-color); 
-      border-top: 4px solid var(--primary-color); 
-      border-radius: 8px; 
-      padding: 20px; 
-      margin-bottom: 20px; 
-      box-shadow: 0 4px 14px rgba(0,0,0,0.25); 
+
+    .card {
+      position: relative;
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-top: 4px solid var(--primary-color);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
       color: var(--text-dark);
       animation: fadeIn 0.2s ease-in-out;
     }
@@ -158,40 +158,40 @@
     }
 
     h2 { color: var(--text-dark); font-size: 1.15rem; font-weight: 700; }
-    
+
     label, .form-label { font-size: 0.82rem; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; display: block; }
     label .req { color: #e11d48; margin-left: 2px; }
 
-    input, select, textarea { 
-      width: 100%; 
-      padding: 11px; 
-      margin-bottom: 10px; 
-      border-radius: 6px; 
-      border: 1px solid var(--border-color); 
-      background-color: var(--input-bg); 
-      color: var(--input-text); 
-      font-size: 0.9rem; 
-      transition: border-color 0.15s, box-shadow 0.15s; 
+    input, select, textarea {
+      width: 100%;
+      padding: 11px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background-color: var(--input-bg);
+      color: var(--input-text);
+      font-size: 0.9rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    input:focus, select:focus, textarea:focus { 
-      outline: none; 
-      border-color: var(--primary-color); 
-      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25); 
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25);
     }
     select option { background-color: var(--panel-bg); color: var(--text-dark); padding: 10px; }
-    
-    button.submit-btn { 
-      background-color: var(--primary-color); 
-      color: #ffffff; 
-      border: none; 
-      font-weight: 600; 
-      cursor: pointer; 
-      transition: background-color 0.1s; 
-      font-size: 0.95rem; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      gap: 8px; 
+
+    button.submit-btn {
+      background-color: var(--primary-color);
+      color: #ffffff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.1s;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       padding: 11px;
       border-radius: 6px;
       width: 100%;
@@ -199,20 +199,20 @@
     }
     button.submit-btn:hover { background-color: var(--primary-hover); }
     button.submit-btn:active { transform: scale(0.99); }
-    
-    .action-btn { 
-      width: auto; 
-      padding: 7px 12px; 
-      margin: 4px 4px 4px 0; 
-      font-size: 0.82rem; 
-      display: inline-flex; 
-      align-items: center; 
-      gap: 6px; 
-      cursor: pointer; 
-      border-radius: 6px; 
-      border: none; 
-      font-weight: 600; 
-      text-align: center; 
+
+    .action-btn {
+      width: auto;
+      padding: 7px 12px;
+      margin: 4px 4px 4px 0;
+      font-size: 0.82rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: none;
+      font-weight: 600;
+      text-align: center;
       transition: background-color 0.1s;
       user-select: none;
     }
@@ -4996,7 +4996,7 @@
       outline:none !important;
     }
 
-  
+
   /* Workplace feature surfaces integrated onto production 8.2.9. */
   .staff-work-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.staff-work-card{padding:18px;border:1px solid var(--border-color);border-radius:12px;background:var(--panel-bg)}.staff-work-card h3{margin-top:0}.staff-work-card form{display:grid;gap:8px;margin-bottom:16px}.staff-work-card form input,.staff-work-card form select,.staff-work-card form textarea{width:100%}.staff-work-list{display:grid;gap:8px}.staff-work-list article{display:grid;gap:7px;padding:11px;border:1px solid var(--border-color);border-radius:9px}.staff-work-list article span{color:var(--text-muted);font-size:.8rem}.staff-work-list article div{display:flex;gap:7px;flex-wrap:wrap}
 .staff-kpi-dashboard{grid-column:1/-1}.staff-kpi-scoreboard{display:grid;gap:9px;margin:14px 0}.staff-kpi-scoreboard article{display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,2fr);gap:8px 16px;align-items:center}.staff-kpi-scoreboard article span{font-size:.82rem;color:var(--text-muted)}.staff-kpi-bar{grid-column:1/-1;height:8px;border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden}.staff-kpi-bar i{display:block;height:100%;background:currentColor;border-radius:inherit}.staff-kpi-graph{display:flex;align-items:end;gap:10px;min-height:210px;padding:16px 8px 4px;overflow-x:auto}.staff-kpi-graph>div{display:grid;grid-template-rows:auto 150px auto;gap:5px;min-width:72px;text-align:center;font-size:.72rem}.staff-kpi-graph b{display:flex;align-items:end;justify-content:center;height:150px;border-bottom:1px solid var(--border-color)}.staff-kpi-graph b i{display:block;width:34px;min-height:3px;border-radius:6px 6px 0 0;background:currentColor}.staff-kpi-graph em{font-style:normal;font-weight:800}
@@ -6271,7 +6271,7 @@
         padding:4px 9px !important;
       }
     }
-  
+
     /* Mobile login interaction guard.
        Keep decorative branding from covering real form hit targets. */
     #authSection > .auth-card {
@@ -6359,7 +6359,24 @@
       }
     }
 
-  </style>
+
+    /* Account positions: readable native menu groups and consistent team labels. */
+    #accountRole { min-height:48px; border-radius:12px; border:1px solid rgba(148,190,229,.45); font-weight:600; padding:12px 14px; color-scheme:dark; }
+    #accountRole optgroup { background-color:#172b48; color:#bcd7ed; font-weight:700; }
+    #accountRole option { background-color:#0e2140; color:#f1f7fd; font-weight:400; }
+    #accountRole:focus-visible { outline:2px solid #7dd3fc; outline-offset:3px; }
+    .account-role-description { display:block; margin-top:9px; line-height:1.55; color:var(--text-muted); }
+    #accountsTab .card-header-bar .badge-tag { letter-spacing:.04em; font-size:.68rem; }
+    #accountsList .item-row { align-items:flex-start; gap:16px; padding:18px; border-radius:14px; }
+    #accountsList .item-row > div:first-child { flex:1 1 260px; min-width:0; overflow-wrap:anywhere; }
+    #accountsList .item-row > div:last-child { flex:0 1 auto; }
+    #accountsList .badge-tag { margin:5px 0 0 6px; font-size:.72rem; letter-spacing:.02em; }
+    body.light-mode #accountRole { color-scheme:light; }
+    body.light-mode #accountRole:focus-visible { outline-color:#0369a1; }
+    body.light-mode #accountRole optgroup { background-color:#e6eff7; color:#244564; }
+    body.light-mode #accountRole option { background-color:#f7fafc; color:#152d43; }
+    @media (max-width:640px) { #accountsList .item-row { flex-wrap:wrap; } #accountsList .item-row > div:last-child { width:100%; } }
+</style>
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261006-login-cache-v2"></script>
 </head>
@@ -6736,7 +6753,7 @@
     </aside>
 
     <div class="container">
-      
+
       <!-- 0. Home Page Tab Content -->
       <div id="homeTab" class="tab-content active">
         <aside id="wellbeingBanner" class="wellbeing-banner hidden" aria-live="polite"><span class="tip-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-heart-star"></use></svg></span><p id="wellbeingBannerText"></p><button type="button" onclick="dismissWellbeingBanner()" aria-label="Hide wellbeing tip" title="Hide wellbeing tips">×</button></aside>
@@ -6937,7 +6954,7 @@
             <h2>Timetable Records</h2>
             <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" onclick="downloadScheduleTemplate()" class="action-btn btn-blue">⬇ Download template</button><button type="button" onclick="exportScheduleExcel()" class="action-btn btn-green">📊 Export timetable</button></div>
           </div>
-          
+
           <div class="role-admin role-teacher" style="margin-bottom: 15px; background-color: var(--input-bg); border: 1px dashed var(--border-color); padding: 12px; border-radius: 6px;">
             <label for="excelFileInput">Import schedule template (Excel .xlsx or .csv)</label>
             <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 5px;">
@@ -6989,7 +7006,7 @@
       <div id="badgesTab" class="tab-content">
         <div data-roles="teacher,principal,admin" style="background: var(--panel-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); max-width: 900px; margin: 0 auto;">
           <h2 style="color: #fff; margin-top: 0;">Award Milestone Keepsake Badge</h2>
-          
+
           <form id="badgeForm">
             <div class="badge-form-lead">
               <div>
@@ -7092,7 +7109,7 @@
           <input type="file" id="attExcelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 8px;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" onclick="downloadAttendanceTemplate()" class="action-btn btn-blue">⬇ Download template</button><button type="button" onclick="importAttendanceExcel()" class="action-btn btn-green">Import attendance</button></div>
         </div>
-        
+
         <div class="card">
           <div class="card-header-bar">
             <div>
@@ -7101,7 +7118,7 @@
             </div>
             <button type="button" id="btnClearAttendance" class="action-btn btn-red"><svg class="ui-icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Clear today’s register</span></button>
           </div>
-          
+
           <div id="attendanceErrorIndex" style="margin-bottom: 12px; font-size: 0.78rem; background: #fff1f2; border: 1px solid #fecdd3; padding: 10px 14px; border-radius: 6px; display: none;">
             <strong style="color: #9f1239;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-alert"></use></svg> Diagnostic Error Log &amp; File Read Index:</strong>
             <ul id="errorListItems" style="margin-top: 6px; padding-left: 18px; color: #be123c;"></ul>
@@ -7468,8 +7485,8 @@
             <div><label for="accountName">Full name *</label><input id="accountName" name="accountName" autocomplete="section-managed-account name" required placeholder="e.g. Amina Jacobs"></div>
             <div><label for="accountUsername">Username / email *</label><input id="accountUsername" name="accountUsername" autocomplete="section-managed-account username" autocapitalize="none" spellcheck="false" required placeholder="e.g. amina@school.com"></div>
             <div><label for="accountPin">Password / PIN <span id="accountPinHint">*</span></label><input id="accountPin" name="accountPassword" type="password" autocomplete="section-managed-account new-password" placeholder="Required for a new account"></div>
-            <div><label for="accountRole">Role / user type *</label><select id="accountRole" required onchange="updateAccountRoleFields()"><optgroup label="School users"><option value="parent">Parent / Guardian</option><option value="teacher">Teacher / Educator</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option><option value="school_accounts">School Accounts</option></optgroup><optgroup label="Little Feet company employees" data-company-roles><option value="staff">Little Feet Staff</option><option value="crm">Sales / CRM</option><option value="accounts">Little Feet Accounts</option><option value="support">Software Support</option></optgroup></select></div>
-            <div><label for="accountSchoolName">Linked school name <span id="accountSchoolRequired">*</span></label><input id="accountSchoolName" name="schoolName" autocomplete="section-managed-account organization" required placeholder="e.g. Little Feet ECD Portal"><small id="accountSchoolHelp" style="display:block;margin-top:6px;color:var(--text-muted);">Required for school-facing accounts. Optional for Little Feet company staff.</small></div>
+            <div class="account-role-field"><label for="accountRole">Position / user type *</label><select id="accountRole" aria-describedby="accountRoleDescription" required onchange="updateAccountRoleFields()"><optgroup label="School users"><option value="parent">Parent / Guardian</option><option value="teacher">Teacher / Educator</option><option value="principal">Principal</option><option value="district">District</option><option value="admin">Administrator</option><option value="school_accounts">School Accounts</option><option value="school_staff">School Support Staff</option><option value="school_hr">School Human Resources</option></optgroup><optgroup label="Little Feet team" data-company-roles><option value="staff">Staff Little Feet</option><option value="crm">CRM Little Feet</option><option value="accounts">Accounts Little Feet</option><option value="support">Support Little Feet</option></optgroup></select><small id="accountRoleDescription" class="account-role-description" aria-live="polite"></small></div>
+            <div class="school-position-field"><label for="accountPosition">School position</label><select id="accountPosition" aria-describedby="accountRoleDescription"></select></div><div class="school-position-field"><label for="accountSector">School sector</label><select id="accountSector"></select></div><div><label for="accountSchoolName">Linked school name <span id="accountSchoolRequired">*</span></label><input id="accountSchoolName" name="schoolName" autocomplete="section-managed-account organization" required placeholder="e.g. Little Feet ECD Portal"><small id="accountSchoolHelp" style="display:block;margin-top:6px;color:var(--text-muted);">Required for school-facing accounts. Optional for Little Feet company staff.</small></div>
             <div><label for="accountStoreUrl">Official school web-store link</label><input id="accountStoreUrl" name="schoolStoreUrl" type="url" autocomplete="off" placeholder="https://... (leave empty if none)"></div>
             <div><label for="accountAssignedClasses">Assigned classroom(s)</label><input id="accountAssignedClasses" name="assignedClasses" placeholder="Teachers only · e.g. ECD Preschool, Grade R, Grade 4"></div>
             <div style="position:relative;"><label for="accountSchoolSearch">Find school by name</label><input id="accountSchoolSearch" type="search" autocomplete="off" placeholder="Search school name…" oninput="queueAccountSchoolSearch()" onfocus="queueAccountSchoolSearch(true)" aria-controls="accountSchoolSearchResults" aria-autocomplete="list"><small style="display:block;margin-top:6px;color:var(--text-muted);">Search saved Little Feet schools and live South African school listings. Select a result to fill Linked school name automatically.</small><div id="accountSchoolSearchResults" role="listbox" aria-label="School search results" style="display:none;position:absolute;z-index:40;left:0;right:0;top:100%;margin-top:4px;max-height:260px;overflow:auto;padding:6px;border:1px solid var(--border-color);border-radius:10px;background:var(--surface-color,#0b1f4a);box-shadow:0 14px 30px rgba(0,0,0,.28);"></div></div>
@@ -8000,17 +8017,17 @@
 
   <script src="/assets/workspace-accessibility.js?v=20261008-repair-v1" defer></script>
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
-  <script src="backup.js?v=20261009-role-repair-v3" defer></script>
+  <script src="backup.js?v=20261009-role-refinement-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
   <script src="/assets/my-day.js?v=20261004-navy-v1" defer></script>
-  <script src="/assets/staff-work.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/approvals.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/staff-notices.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/meeting-minutes.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/maintenance.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/resource-booking.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/purchase-requests.js?v=20261009-role-repair-v3" defer></script>
-  <script src="/assets/workplace-extended.js?v=20261009-role-repair-v3" defer></script>
+  <script src="/assets/staff-work.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/approvals.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/staff-notices.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/meeting-minutes.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/maintenance.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/resource-booking.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/purchase-requests.js?v=20261009-role-refinement-v1" defer></script>
+  <script src="/assets/workplace-extended.js?v=20261009-role-refinement-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20261006-login-i18n-v2" defer></script>
   <script src="/assets/legal-notices.js?v=20261002-about-v1" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1" defer></script>
