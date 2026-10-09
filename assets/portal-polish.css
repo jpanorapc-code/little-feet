@@ -1,3 +1,75 @@
+/* Shared header and sidebar palette, without changing status signal colours. */
+#dashboardSection > nav {
+  background:linear-gradient(110deg,#112d60 0%,#102744 55%,#091b3b 100%) !important;
+  border-bottom:1px solid rgba(134,183,222,.30) !important;
+  box-shadow:0 6px 22px rgba(2,10,26,.23),inset 0 1px 0 rgba(255,255,255,.06) !important;
+}
+#dashboardSection > nav .nav-term-panel {
+  background:rgba(7,22,44,.62) !important;
+  border-color:rgba(139,197,221,.28) !important;
+  color:#c1edf2 !important;
+}
+#dashboardSection > nav .nav-term-status,
+#dashboardSection > nav #liveSyncTag { color:#b1c7df !important; }
+#dashboardSection > nav .nav-shortcut,
+#dashboardSection > nav .nav-more-toggle,
+#dashboardSection > nav .nav-term-edit,
+#dashboardSection > nav .action-btn {
+  background:linear-gradient(130deg,#24456b,#163452) !important;
+  border-color:rgba(153,189,224,.32) !important;
+  color:#ecf5ff !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.065),0 2px 6px rgba(0,0,0,.13) !important;
+}
+#dashboardSection > nav .nav-shortcut:hover,
+#dashboardSection > nav .nav-more-toggle:hover,
+#dashboardSection > nav .nav-term-edit:hover,
+#dashboardSection > nav .action-btn:hover {
+  background:linear-gradient(130deg,#2b577c,#204564) !important;
+  border-color:#7ed4e3 !important;
+}
+#dashboardSection > nav button:focus-visible { outline:2px solid #99e9f5; outline-offset:2px; }
+body.light-mode #dashboardSection > nav {
+  background:linear-gradient(110deg,#f0f8fd,#dcebf6) !important;
+  border-color:#b9cde1 !important;
+  box-shadow:0 5px 18px rgba(22,51,80,.13) !important;
+}
+body.light-mode #dashboardSection > nav .site-name {
+  background:none !important;
+  color:#183b59 !important;
+  text-shadow:none !important;
+  animation:none;
+}
+body.light-mode #dashboardSection > nav .org-badge,
+body.light-mode #dashboardSection > nav .nav-term-panel {
+  background:#e5f0f8 !important;
+  color:#224762 !important;
+  border-color:#b9d1e3 !important;
+}
+body.light-mode #dashboardSection > nav .nav-term-status,
+body.light-mode #dashboardSection > nav #liveSyncTag,
+body.light-mode #dashboardSection > nav .user-switch-control,
+body.light-mode #dashboardSection > nav .nav-user-panel,
+body.light-mode #dashboardSection > nav .server-status { color:#35516c !important; }
+body.light-mode #dashboardSection > nav .nav-shortcut,
+body.light-mode #dashboardSection > nav .nav-more-toggle,
+body.light-mode #dashboardSection > nav .nav-term-edit,
+body.light-mode #dashboardSection > nav .action-btn {
+  background:linear-gradient(130deg,#fff,#e8f1f8) !important;
+  border-color:#b7ccdf !important;
+  color:#193b58 !important;
+  box-shadow:0 2px 5px rgba(22,51,80,.07) !important;
+}
+body.light-mode #dashboardSection > nav button:hover { border-color:#368d9f !important; }
+body.light-mode #dashboardSection > nav button:focus-visible { outline-color:#147589; }
+body.light-mode #homeTab > .wellbeing-banner:not(.runtime-error-banner) {
+  background:linear-gradient(110deg,#eef7fc,#dfedf7) !important;
+  border-color:#bdd6e6 !important;
+  border-left-color:#24899b !important;
+}
+body.light-mode #homeTab > .wellbeing-banner:not(.runtime-error-banner)::after { display:none; }
+body.light-mode #homeTab > .wellbeing-banner:not(.runtime-error-banner) p,
+body.light-mode #homeTab > .wellbeing-banner:not(.runtime-error-banner) button { color:#264760 !important; }
+body.light-mode #homeTab > .wellbeing-banner .tip-icon { color:#176c7d; border-color:#a8cedb; background:#d5eaf2; }
 /* A quiet navigation surface gives the snowy artwork and live content room. */
 #mainNavigation {
   background:linear-gradient(165deg,#112d60 0%,#091b3b 60%,#07162d 100%) !important;
@@ -46,6 +118,31 @@
 }
 #mainNavigation button:focus-visible { outline:2px solid #99e9f5; outline-offset:2px; }
 #mainNavigation .sidebar-signout { background:rgba(11,27,52,.55) !important; color:#edbec3 !important; }
+body.light-mode #mainNavigation {
+  background:linear-gradient(165deg,#edf5fc,#d8e9f6) !important;
+  border-color:#b9cde1;
+}
+body.light-mode #mainNavigation::before { opacity:.16; }
+body.light-mode #mainNavigation .sidebar-heading { color:#4d6c87 !important; }
+body.light-mode #mainNavigation .sidebar-group-toggle,
+body.light-mode #mainNavigation .sidebar-links .nav-btn {
+  background:linear-gradient(130deg,#fff,#eaf2fa) !important;
+  border-color:#b9cedf !important;
+  color:#244760 !important;
+  box-shadow:0 3px 8px rgba(22,51,80,.06);
+}
+body.light-mode #mainNavigation .ui-icon { color:#246f82 !important; background:#deedf5; border-color:#bad8e4; }
+body.light-mode #mainNavigation .sidebar-chevron { color:#365e78; }
+body.light-mode #mainNavigation .sidebar-links .nav-btn.active,
+body.light-mode #mainNavigation [data-nav-group]:has(.nav-btn.active) > .sidebar-group-toggle,
+body.light-mode #mainNavigation .sidebar-group-toggle:hover,
+body.light-mode #mainNavigation .sidebar-links .nav-btn:hover {
+  background:linear-gradient(115deg,#d5edf4,#e0edf8) !important;
+  border-color:#549bab !important;
+  color:#173d53 !important;
+}
+body.light-mode #mainNavigation .sidebar-signout { background:#eaf2f8 !important; color:#7b3852 !important; }
+body.light-mode #mainNavigation button:focus-visible { outline-color:#147589; }
 body:not(.light-mode) #homeTab > .wellbeing-banner {
   background:linear-gradient(110deg,rgba(25,55,91,.96),rgba(12,34,65,.94)) !important;
   border-color:rgba(125,196,220,.34) !important;
@@ -83,6 +180,23 @@ body:not(.light-mode) #myDayTab > .my-day-attention {
 #executiveHomeOverview .executive-chart-empty { background:rgba(45,75,110,.20); border-color:rgba(150,185,220,.20); }
 #executiveHomeOverview .executive-chart-body { flex-wrap:wrap; gap:14px; }
 #executiveHomeOverview .executive-chart-legend { flex:1 1 135px; }
+#executiveHomeOverview .executive-pie::after { display:none; }
+#executiveHomeOverview .executive-pie-segments { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+#executiveHomeOverview .executive-pie-segments [data-chart-detail] { cursor:pointer; pointer-events:stroke; }
+#executiveHomeOverview .executive-pie-segments [data-chart-detail]:focus-visible { outline:none; stroke-width:22; filter:drop-shadow(0 0 3px #fff); }
+#executiveHomeOverview .executive-pie-center { flex-direction:column; gap:4px; pointer-events:none; }
+#executiveHomeOverview .executive-pie-center strong { font-size:1.05rem; }
+#executiveHomeOverview .executive-pie-center small { font-size:.65rem; font-weight:500; color:#bdd2e5; }
+#executiveHomeOverview .executive-legend-row { width:100%; padding:8px; border:1px solid transparent; border-radius:8px; background:rgba(103,158,198,.07); text-align:left; cursor:pointer; }
+#executiveHomeOverview .executive-legend-row:hover,
+#executiveHomeOverview .executive-legend-row:focus-visible { border-color:#62c4d4; outline:none; background:rgba(103,158,198,.16); }
+#executiveHomeOverview .executive-legend-row small { display:block; margin-top:3px; font-size:.65rem; color:#a9c3db; }
+#executiveHomeOverview .executive-chart-total { border-top:1px solid rgba(140,181,216,.22); margin-top:14px; padding-top:12px; }
+#executiveHomeOverview .executive-chart-detail { min-height:36px; line-height:1.5; font-size:.75rem; }
+body.light-mode #executiveHomeOverview .executive-legend-row small,
+body.light-mode #executiveHomeOverview .executive-pie-center small { color:#476780; }
+body.light-mode #executiveHomeOverview .executive-pie-center strong { color:#193b58; }
+body.light-mode #executiveHomeOverview .executive-chart-total strong { color:#193b58 !important; }
 #executiveHomeOverview .executive-legend-row > span:not(.executive-legend-swatch) { overflow-wrap:anywhere; }
 body.light-mode #executiveHomeOverview { background:#f5f9fd !important; }
 body.light-mode #executiveHomeOverview .executive-kpi,

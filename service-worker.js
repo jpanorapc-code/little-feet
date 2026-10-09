@@ -1,6 +1,6 @@
-const CACHE_NAME = 'little-feet-shell-v70-portal-polish';
+const CACHE_NAME = 'little-feet-shell-v71-header-palette';
 const SHELL_ASSETS = [
-  '/assets/portal-polish.css?v=20261009-polish-v1',
+  '/assets/portal-polish.css?v=20261009-polish-v2',
   '/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1',
   '/assets/my-day.js?v=20261009-neat-sidebar-v1',
   '/assets/dashboard-banners.css?v=20261009-reference-snow-v1',
@@ -20,7 +20,7 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
   '/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3',
-  '/backup.js?v=20261009-stage-navigation-v1',
+  '/backup.js?v=20261009-detailed-charts-v1',
   '/assets/mobile-pwa.js?v=20261008-offline-status-v2',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20261009-stage-navigation-v1',

@@ -2006,12 +2006,20 @@ const formatExecutiveInteger = value => new Intl.NumberFormat('en-ZA', { maximum
 const formatExecutiveCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(Number(value || 0));
 const formatExecutiveCompactCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0));
 
+function showExecutiveChartDetail(event) {
+  const item = event.currentTarget;
+  const detail = item?.closest('[data-executive-chart]')?.querySelector('.executive-chart-detail');
+  if (detail && item.dataset.chartDetail) detail.textContent = item.dataset.chartDetail;
+}
+
 function executiveChartMarkup({ title, description, items = [], format = 'integer', workspaceId, actionLabel }) {
   const safeItems = (Array.isArray(items) ? items : [])
     .map(item => ({ label: String(item?.label || ''), value: Number(item?.value || 0) }))
     .filter(item => item.label && Number.isFinite(item.value) && item.value > 0);
   const total = safeItems.reduce((sum, item) => sum + item.value, 0);
-  const formatter = format === 'currency' ? formatExecutiveCurrency : formatExecutiveInteger;
+  const formatter = format === 'currency'
+    ? value => new Intl.NumberFormat('en-ZA', { style:'currency', currency:'ZAR', minimumFractionDigits:2, maximumFractionDigits:2 }).format(value)
+    : formatExecutiveInteger;
   if (!total) {
     return `<article class="executive-chart-card" data-executive-chart="${escapeWorkspaceText(title)}">
       <h3>${escapeWorkspaceText(title)}</h3>
@@ -2021,27 +2029,33 @@ function executiveChartMarkup({ title, description, items = [], format = 'intege
     </article>`;
   }
   let cursor = 0;
+  const percentFormatter = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
+  const share = item => item.value / total * 100 < .1 ? '<0.1' : percentFormatter.format(item.value / total * 100);
+  const itemDetail = item => `${item.label}: ${formatter(item.value)} · ${share(item)}% of total`;
   const segments = safeItems.map((item, index) => {
     const start = (cursor / total) * 100;
     cursor += item.value;
     const end = (cursor / total) * 100;
-    return `${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]} ${start.toFixed(3)}% ${end.toFixed(3)}%`;
-  }).join(', ');
+    return `<circle cx="60" cy="60" r="48" pathLength="100" fill="none" stroke="${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]}" stroke-width="18" stroke-dasharray="${end - start} ${100 - (end - start)}" stroke-dashoffset="${-start}" transform="rotate(-90 60 60)" tabindex="0" role="img" aria-label="${escapeWorkspaceText(itemDetail(item))}" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)"><title>${escapeWorkspaceText(itemDetail(item))}</title></circle>`;
+  }).join('');
   const centerValue = format === 'currency' ? formatExecutiveCompactCurrency(total) : formatExecutiveInteger(total);
-  const legend = safeItems.map((item, index) => `<div class="executive-legend-row">
+  const legend = safeItems.map((item, index) => `<button type="button" class="executive-legend-row" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" aria-label="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)">
     <span class="executive-legend-swatch" style="background:${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]};"></span>
-    <span>${escapeWorkspaceText(item.label)}</span>
+    <span>${escapeWorkspaceText(item.label)}<small>${escapeWorkspaceText(share(item))}% of total</small></span>
     <strong>${escapeWorkspaceText(formatter(item.value))}</strong>
-  </div>`).join('');
+  </button>`).join('');
   return `<article class="executive-chart-card" data-executive-chart="${escapeWorkspaceText(title)}">
     <h3>${escapeWorkspaceText(title)}</h3>
     <p>${escapeWorkspaceText(description)}</p>
     <div class="executive-chart-body">
-      <div class="executive-pie" role="img" aria-label="${escapeWorkspaceText(title)} total ${escapeWorkspaceText(formatter(total))}" style="background:conic-gradient(${segments});">
-        <span class="executive-pie-center">${escapeWorkspaceText(centerValue)}</span>
+      <div class="executive-pie" role="group" aria-label="${escapeWorkspaceText(title)} total ${escapeWorkspaceText(formatter(total))}">
+        <svg class="executive-pie-segments" viewBox="0 0 120 120" aria-label="Category breakdown"><circle cx="60" cy="60" r="48" fill="none" stroke="rgba(148,183,216,.18)" stroke-width="18"/>${segments}</svg>
+        <span class="executive-pie-center"><strong>${escapeWorkspaceText(centerValue)}</strong><small>Total</small></span>
       </div>
       <div class="executive-chart-legend">${legend}</div>
     </div>
+    <p class="executive-chart-total">Total: <strong>${escapeWorkspaceText(formatter(total))}</strong></p>
+    <p class="executive-chart-detail" aria-live="polite">Hover, focus or tap a category for its breakdown.</p>
     <button type="button" class="action-btn btn-blue executive-chart-link" onclick="openWorkspace('${workspaceId}')">${escapeWorkspaceText(actionLabel)}</button>
   </article>`;
 }
