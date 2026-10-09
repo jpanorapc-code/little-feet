@@ -60,7 +60,7 @@ child.stderr.on('data', chunk => { stderr += chunk.toString(); });
 
 const stop = () => new Promise(resolve => {
   if (child.exitCode !== null) return resolve();
-  child.once('exit', resolve);
+  child.once('close', resolve);
   child.kill();
 });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -131,7 +131,9 @@ const authed = async (route, cookie) => {
     console.log('Replica restore test passed.');
   } finally {
     await stop();
-    fs.rmSync(temp, { recursive: true, force: true });
+    const relative = path.relative(path.join(root, 'tmp'), path.resolve(temp));
+    assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), 'Unsafe replica fixture cleanup path');
+    fs.rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   }
 })().catch(error => {
   console.error(error);

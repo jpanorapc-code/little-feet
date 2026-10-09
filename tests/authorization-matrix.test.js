@@ -164,22 +164,16 @@ function assertDenied(result,label){
     assert.equal(districtEmailStatus.response.status,200);
     assert.equal(districtEmailStatus.data.address,'alpha-district@example.test');
 
-    // Little Feet company roles: Staff and CRM are company-wide full-platform roles.
-    const staffAccounts=await request('/api/accounts',{cookie:staff});
-    assert.equal(staffAccounts.response.status,200);
-    const staffSchoolSearch=await request('/api/schools/search?q=L',{cookie:staff});
-    assert.equal(staffSchoolSearch.response.status,200);
-    assert.deepEqual(staffSchoolSearch.data.results,[]);
-    assert.ok(staffAccounts.data.some(account=>account.username==='alpha-admin'));
-    const staffCreatesCrm=await request('/api/accounts',{method:'POST',cookie:staff,body:{username:'new-crm-user',pin:'Password1',name:'New CRM User',role:'crm',schoolName:''}});
-    assert.equal(staffCreatesCrm.response.status,201);
-    assert.equal(staffCreatesCrm.data.account.schoolName,'');
-    const schoolAdminCreatesCrm=await request('/api/accounts',{method:'POST',cookie:admin,body:{username:'blocked-crm-user',pin:'Password1',name:'Blocked CRM User',role:'crm',schoolName:''}});
-    assert.equal(schoolAdminCreatesCrm.response.status,403);
-    const crmAccounts=await request('/api/accounts',{cookie:crm});
-    assert.equal(crmAccounts.response.status,200);
-    assert.ok(crmAccounts.data.some(account=>account.username==='alpha-admin'));
+    // Company employees have job-scoped access and cannot administer schools/users.
+    for(const employee of [staff]) {
+      assertDenied(await request('/api/accounts',{cookie:employee}),'employee account administration');
+      assertDenied(await request('/api/schools/search?q=L',{cookie:employee}),'employee school administration');
+      assertDenied(await request('/api/accounts',{method:'POST',cookie:employee,body:{username:'blocked-company',pin:'Password1',name:'Blocked',role:'crm'}}),'employee privilege delegation');
+    }
+    assert.equal((await request('/api/accounts',{cookie:crm})).response.status,200);
+    assert.equal((await request('/api/company/clients',{cookie:crm})).response.status,200);
     assert.equal((await request('/api/tickets',{cookie:crm})).response.status,200);
+    assertDenied(await request('/api/accounts',{method:'POST',cookie:admin,body:{username:'blocked-crm-user',pin:'Password1',name:'Blocked CRM User',role:'crm',schoolName:''}}),'school admin company role');
 
     // Username collision by truncation must fail rather than create ambiguous identities.
     const prefix='a'.repeat(160);

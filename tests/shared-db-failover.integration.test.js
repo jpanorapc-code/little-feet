@@ -19,7 +19,8 @@ const commonEnv = {
   LF_BOOTSTRAP_ADMIN_PIN: 'FailoverPass123',
   LF_BOOTSTRAP_ADMIN_NAME: 'Failover Test Administrator',
   LF_ALLOWED_BROWSER_ORIGINS: 'https://littlefeet.co.za',
-  LF_TEST_ENFORCE_ORIGIN: '1'
+  LF_TEST_ENFORCE_ORIGIN: '1',
+  PG_POOL_MAX: '2'
 };
 
 function startServer(port, overrides = {}) {
@@ -98,6 +99,17 @@ async function request(port, route, { cookie = '', method = 'GET', body, origin 
     const standbyRead = await request(standbyPort, '/api/term', { cookie: standbyLogin.cookie });
     assert.equal(standbyRead.data.term, 'Primary is live');
 
+    const concurrentWrites=await Promise.all(Array.from({length:8},(_,index)=>request(
+      index%2?standbyPort:primaryPort,'/api/term',{
+        method:'POST',cookie:index%2?standbyLogin.cookie:primaryLogin.cookie,origin:true,
+        body:{term:'Concurrent durable write '+index}
+      }
+    )));
+    concurrentWrites.forEach((result,index)=>{
+      assert.equal(result.response.status,200,'Concurrent write '+index+': '+JSON.stringify(result.data));
+      assert.equal(result.data.term,'Concurrent durable write '+index);
+    });
+
     await stopServer(primary);
     primary = null;
     const failoverWrite = await request(standbyPort, '/api/term', {
@@ -107,7 +119,7 @@ async function request(port, route, { cookie = '', method = 'GET', body, origin 
     assert.equal(failoverWrite.data.term, 'Standby remains writable');
     const persistedRead = await request(standbyPort, '/api/term', { cookie: standbyLogin.cookie });
     assert.equal(persistedRead.data.term, 'Standby remains writable');
-    console.log('Shared PostgreSQL failover integration passed: primary and standby share durable writes; standby stayed writable after primary shutdown.');
+    console.log('Shared PostgreSQL failover integration passed: eight concurrent writes with two-connection pools; standby stayed writable after primary shutdown.');
   } finally {
     await stopServer(standby);
     await stopServer(primary);

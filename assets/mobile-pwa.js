@@ -14,7 +14,7 @@
     if (!target) return;
     target.textContent = navigator.onLine
       ? 'Online — live school data is available.'
-      : 'Offline — the portal shell is available, but live school records need a connection.';
+      : 'Offline — reconnect to open Little Feet and access live school records.';
     target.dataset.state = navigator.onLine ? 'online' : 'offline';
   }
 

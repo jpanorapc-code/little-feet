@@ -1,5 +1,6 @@
-const CACHE_NAME = 'little-feet-shell-v57-private-navigation';
+const CACHE_NAME = 'little-feet-shell-v62-role-repair';
 const SHELL_ASSETS = [
+  '/assets/workspace-accessibility.js?v=20261008-repair-v1',
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20261004-portal-portraits-v1',
   '/assets/ambient-background.js?v=20261006-login-cache-v2',
@@ -13,15 +14,15 @@ const SHELL_ASSETS = [
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
   '/assets/4k/cinematic-admin-assistant.png',
   '/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3',
-  '/backup.js?v=20261007-admissions-v2',
-  '/assets/mobile-pwa.js?v=20260925-pwa-v1',
+  '/backup.js?v=20261009-role-repair-v3',
+  '/assets/mobile-pwa.js?v=20261008-offline-status-v2',
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20260930-accounts-full-v1',
   '/assets/preferences-enhancements.js?v=20261006-login-i18n-v2',
   '/assets/legal-notices.js?v=20261002-about-v1',
-  '/assets/finance-automation.js?v=20260925-finance-v1',
-  '/assets/school-core-upgrades.js?v=20261007-school-core-v3',
-  '/assets/advanced-school-operations.js?v=20261007-admissions-v2'
+  '/assets/finance-automation.js?v=20261008-session-repair-v1',
+  '/assets/school-core-upgrades.js?v=20261008-workspace-repair-v1',
+  '/assets/advanced-school-operations.js?v=20261008-workspace-repair-v1'
 ];
 
 self.addEventListener('install', event => {

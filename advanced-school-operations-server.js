@@ -12,7 +12,7 @@ const ELDA_AREAS = Object.freeze([
 function registerAdvancedSchoolOperations(app, deps) {
   const {
     db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
-    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+    tenantRecords, learnerRecordsVisibleTo = tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
     isParentLinkedToLearner, validDateKey, safeHttpsUrl, createParentPaymentRecord, encryptField, decryptStoredField,
     saveDatabaseState, scheduleReplicaSnapshot, logStructured
   } = deps;
@@ -37,11 +37,17 @@ function registerAdvancedSchoolOperations(app, deps) {
     const actor = getSessionAccount(req);
     return actor?.role === 'parent' ? actor : null;
   };
-  const schoolRecords = (name, actor) => tenantRecords(db[name] || [], actor);
+  const canReadLearning = actor => Boolean(actor && (hasPlatformAccess(actor) || ['parent','teacher','principal','admin','staff'].includes(actor.role)));
+  const schoolRecords = (name, actor) => name === 'eldaAssessments' ? (canReadLearning(actor) ? learnerRecordsVisibleTo(db[name] || [], actor) : []) : tenantRecords(db[name] || [], actor);
   const schoolLearners = actor => tenantRecords(db.students || [], actor);
-  const findLearner = (actor, name) => schoolLearners(actor).find(row => normalizeComparableText(row.studentName) === normalizeComparableText(name));
+  const findLearner = (actor, name) => {
+    const matches = schoolLearners(actor).filter(row => normalizeComparableText(row.studentName) === normalizeComparableText(name));
+    if (matches.length > 1) throw Object.assign(new Error('Ambiguous learner name'), { code: 'AMBIGUOUS_LEARNER' });
+    return matches[0];
+  };
+  const tagLearnerRecord = (actor, learner, record) => tagSchoolRecord({ ...actor, schoolId: learner.schoolId, schoolName: learner.schoolName }, { ...record, className: record.className || learner.className || '' });
   const parentCanSee = (actor, learner) => actor?.role === 'parent' && learner && isParentLinkedToLearner(actor, learner);
-  const canSeeLearner = (actor, learner) => Boolean(actor && learner && (hasPlatformAccess(actor) || ['teacher','principal','admin','staff','school_accounts'].includes(actor.role) || parentCanSee(actor, learner)));
+  const canSeeLearner = (actor, learner) => Boolean(actor && learner && (hasPlatformAccess(actor) || ['principal','admin','staff'].includes(actor.role) || (actor.role === 'teacher' && learnerRecordsVisibleTo([learner],actor).length > 0) || parentCanSee(actor, learner)));
   const cleanMoney = value => {
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 && n <= 1000000 ? Math.round(n * 100) / 100 : null;
@@ -109,18 +115,19 @@ function registerAdvancedSchoolOperations(app, deps) {
   });
   app.get('/api/elda/assessments',(req,res)=>{
     const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view ELDA assessments.'});
+    if(!canReadLearning(actor))return res.status(403).json({message:'Learning-record access is restricted.'});
     let rows=schoolRecords('eldaAssessments',actor);
     if(actor.role==='parent') rows=rows.filter(row=>{const learner=findLearner(actor,row.learnerName);return parentCanSee(actor,learner);});
     const learner=boundedText(req.query?.learnerName,160);if(learner)rows=rows.filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learner));
     res.json(rows);
   });
   app.post('/api/elda/assessments',(req,res)=>{
-    const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
-    const learner=findLearner(actor,req.body?.learnerName);if(!learner)return res.status(404).json({message:'Learner not found in this school.'});
+    const actor=staffActor(req);if(!actor||!canReadLearning(actor))return res.status(403).json({message:'School staff access is required.'});
+    const learner=findLearner(actor,req.body?.learnerName);if(!learner||!learnerRecordsVisibleTo([learner],actor).length)return res.status(404).json({message:'Learner not found in your assigned school or class.'});
     const skill=schoolRecords('eldaSkillCatalogue',actor).find(row=>row.id===req.body?.skillId);
     if(!skill)return res.status(400).json({message:'Choose a skill from the school ELDA catalogue.'});
     const rating=Number(req.body?.rating);if(!Number.isInteger(rating)||rating<1||rating>4)return res.status(400).json({message:'Rating must be 1 to 4.'});
-    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,skillId:skill.id,skillCode:skill.code,skillLabel:skill.label,area:skill.area,rating,evidence:boundedText(req.body?.evidence,1600),observedAt:safeDate(req.body?.observedAt)||dateKeyInSouthAfrica(),createdAt:nowIso(),createdBy:actor.username});
+    const row=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName:learner.studentName,skillId:skill.id,skillCode:skill.code,skillLabel:skill.label,area:skill.area,rating,evidence:boundedText(req.body?.evidence,1600),observedAt:safeDate(req.body?.observedAt)||dateKeyInSouthAfrica(),createdAt:nowIso(),createdBy:actor.username});
     db.eldaAssessments.unshift(row);res.status(201).json({success:true,assessment:row});
   });
   app.get('/api/elda/summary/:learnerName',(req,res)=>{
@@ -156,7 +163,7 @@ function registerAdvancedSchoolOperations(app, deps) {
     const days=Array.isArray(req.body?.days)?[...new Set(req.body.days.map(x=>boundedText(x,20)).filter(Boolean))].slice(0,31):[];
     const rate=req.body?.dailyRate==null||req.body.dailyRate===''?aftercareSetting(actor).defaultDailyRate:cleanMoney(req.body.dailyRate);
     if(!type||rate===null)return res.status(400).json({message:'Choose a plan type and valid daily rate.'});
-    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,planType:type,days,dailyRate:rate,active:req.body?.active!==false,createdAt:nowIso(),createdBy:actor.username});db.aftercarePlans.unshift(row);res.status(201).json({success:true,plan:row});
+    const row=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName:learner.studentName,planType:type,days,dailyRate:rate,active:req.body?.active!==false,createdAt:nowIso(),createdBy:actor.username});db.aftercarePlans.unshift(row);res.status(201).json({success:true,plan:row});
   });
   app.get('/api/aftercare/sessions',(req,res)=>{
     const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view aftercare sessions.'});
@@ -167,7 +174,7 @@ function registerAdvancedSchoolOperations(app, deps) {
     const learner=findLearner(actor,req.body?.learnerName);if(!learner)return res.status(404).json({message:'Learner not found.'});
     const existing=schoolRecords('aftercareSessions',actor).find(row=>row.date===dateKeyInSouthAfrica()&&normalizeComparableText(row.learnerName)===normalizeComparableText(learner.studentName)&&!row.checkOutAt);
     if(existing)return res.status(409).json({message:'Learner is already checked into aftercare.'});
-    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,date:dateKeyInSouthAfrica(),checkInAt:nowIso(),checkOutAt:'',lateMinutes:0,lateFee:0,billingStatus:'not_due',createdBy:actor.username});db.aftercareSessions.unshift(row);res.status(201).json({success:true,session:row});
+    const row=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName:learner.studentName,date:dateKeyInSouthAfrica(),checkInAt:nowIso(),checkOutAt:'',lateMinutes:0,lateFee:0,billingStatus:'not_due',createdBy:actor.username});db.aftercareSessions.unshift(row);res.status(201).json({success:true,session:row});
   });
   app.post('/api/aftercare/sessions/:id/check-out',(req,res)=>{
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
@@ -188,7 +195,7 @@ function registerAdvancedSchoolOperations(app, deps) {
   });
 
   // Staff kiosk clocking + live ratio monitoring.
-  app.get('/api/staff-clock',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});res.json(schoolRecords('staffClockSessions',actor));});
+  app.get('/api/staff-clock',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'Staff access is required.'});const rows=schoolRecords('staffClockSessions',actor);res.json(managementActor(req)?rows:rows.filter(row=>normalizeUsername(row.username)===normalizeUsername(actor.username)));});
   app.post('/api/staff-clock/action',(req,res)=>{
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});
     const action=['clock_in','clock_out','step_out','return'].includes(req.body?.action)?req.body.action:null;if(!action)return res.status(400).json({message:'Choose a valid clock action.'});
@@ -253,7 +260,7 @@ function registerAdvancedSchoolOperations(app, deps) {
   app.post('/api/meals/plans',(req,res)=>{const actor=managementActor(req);if(!actor)return res.status(403).json({message:'Management access is required.'});const date=safeDate(req.body?.date),meal=limitedText(req.body?.meal,120),menu=limitedText(req.body?.menu,1200);if(!date||!meal||!menu)return res.status(400).json({message:'Enter date, meal and menu.'});const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),date,meal,menu,notes:boundedText(req.body?.notes,1000),createdAt:nowIso(),createdBy:actor.username});db.mealPlans.unshift(row);res.status(201).json({success:true,plan:row});});
   const dietaryView=row=>({...row,allergies:decryptStoredField(row.allergies||''),requirements:decryptStoredField(row.requirements||''),notes:decryptStoredField(row.notes||'')});
   app.get('/api/meals/dietary',(req,res)=>{const actor=getSessionAccount(req);if(!actor)return res.status(401).json({message:'Sign in to view dietary profiles.'});let rows=schoolRecords('dietaryProfiles',actor);if(actor.role==='parent')rows=rows.filter(r=>{const learner=findLearner(actor,r.learnerName);return parentCanSee(actor,learner);});res.json(rows.map(dietaryView));});
-  app.post('/api/meals/dietary',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const learner=findLearner(actor,req.body?.learnerName);if(!learner)return res.status(404).json({message:'Learner not found.'});let row=schoolRecords('dietaryProfiles',actor).find(r=>normalizeComparableText(r.learnerName)===normalizeComparableText(learner.studentName));const data={learnerName:learner.studentName,allergies:encryptField(boundedText(req.body?.allergies,800)),requirements:encryptField(boundedText(req.body?.requirements,800)),notes:encryptField(boundedText(req.body?.notes,800)),updatedAt:nowIso(),updatedBy:actor.username};if(row)Object.assign(row,data);else{row=tagSchoolRecord(actor,{id:crypto.randomUUID(),...data});db.dietaryProfiles.push(row);}res.status(201).json({success:true,profile:row});});
+  app.post('/api/meals/dietary',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const learner=findLearner(actor,req.body?.learnerName);if(!learner)return res.status(404).json({message:'Learner not found.'});let row=schoolRecords('dietaryProfiles',actor).find(r=>r.schoolId===learner.schoolId&&normalizeComparableText(r.learnerName)===normalizeComparableText(learner.studentName));const data={learnerName:learner.studentName,allergies:encryptField(boundedText(req.body?.allergies,800)),requirements:encryptField(boundedText(req.body?.requirements,800)),notes:encryptField(boundedText(req.body?.notes,800)),updatedAt:nowIso(),updatedBy:actor.username};if(row)Object.assign(row,data);else{row=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),...data});db.dietaryProfiles.push(row);}res.status(201).json({success:true,profile:row});});
   app.get('/api/meals/kitchen-counts',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const date=safeDate(req.query?.date)||dateKeyInSouthAfrica();const names=new Set(schoolRecords('attendance',actor).filter(r=>r.date===date&&normalizeComparableText(r.status)==='present').map(r=>normalizeComparableText(r.studentName)));schoolRecords('dayCareBookings',actor).filter(r=>r.date===date&&['confirmed','attended'].includes(r.status)).forEach(r=>names.add(normalizeComparableText(r.childName)));const dietary=schoolRecords('dietaryProfiles',actor).filter(r=>names.has(normalizeComparableText(r.learnerName))).map(dietaryView);res.json({date,totalMeals:names.size,dietaryCount:dietary.length,dietary});});
 
   // Flexible learner groups.
@@ -264,7 +271,7 @@ function registerAdvancedSchoolOperations(app, deps) {
 
   // Learner subject assignments and change history.
   app.get('/api/academics/subject-assignments',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});let rows=schoolRecords('learnerSubjectAssignments',actor);const learner=boundedText(req.query?.learnerName,160);if(learner)rows=rows.filter(r=>normalizeComparableText(r.learnerName)===normalizeComparableText(learner));res.json(rows);});
-  app.post('/api/academics/subject-assignments',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const learner=findLearner(actor,req.body?.learnerName),subject=limitedText(req.body?.subject,120),action=['add','remove','change'].includes(req.body?.action)?req.body.action:null;if(!learner||!subject||!action)return res.status(400).json({message:'Choose a learner, subject and assignment action.'});const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,subject,action,fromSubject:boundedText(req.body?.fromSubject,120),effectiveDate:safeDate(req.body?.effectiveDate)||dateKeyInSouthAfrica(),reason:boundedText(req.body?.reason,600),createdAt:nowIso(),createdBy:actor.username});db.learnerSubjectAssignments.unshift(row);res.status(201).json({success:true,assignment:row});});
+  app.post('/api/academics/subject-assignments',(req,res)=>{const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const learner=findLearner(actor,req.body?.learnerName),subject=limitedText(req.body?.subject,120),action=['add','remove','change'].includes(req.body?.action)?req.body.action:null;if(!learner||!subject||!action)return res.status(400).json({message:'Choose a learner, subject and assignment action.'});const row=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName:learner.studentName,subject,action,fromSubject:boundedText(req.body?.fromSubject,120),effectiveDate:safeDate(req.body?.effectiveDate)||dateKeyInSouthAfrica(),reason:boundedText(req.body?.reason,600),createdAt:nowIso(),createdBy:actor.username});db.learnerSubjectAssignments.unshift(row);res.status(201).json({success:true,assignment:row});});
 
   // Heavy academic analytics over the real subject-mark records.
   const analyticsSetting=actor=>{let row=schoolRecords('academicAnalyticsSettings',actor)[0];if(!row){row=tagSchoolRecord(actor,{id:crypto.randomUUID(),passMark:50,distinctionMark:80,updatedAt:nowIso()});db.academicAnalyticsSettings.unshift(row);}return row;};
@@ -293,7 +300,7 @@ function registerAdvancedSchoolOperations(app, deps) {
     const actor=parentActor(req)||managementActor(req);if(!actor)return res.status(403).json({message:'Parent or management access is required.'});
     const learner=findLearner(actor,req.body?.learnerName);if(!learner||actor.role==='parent'&&!parentCanSee(actor,learner))return res.status(403).json({message:'You cannot create a pickup pass for this learner.'});
     const token='LFP-'+crypto.randomBytes(18).toString('base64url');const expiresMinutes=Math.max(5,Math.min(720,Number(req.body?.expiresMinutes)||60));
-    const row=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName:learner.studentName,parentUsername:actor.role==='parent'?actor.username:boundedText(req.body?.parentUsername,160),collectorName:limitedText(req.body?.collectorName,160),tokenHash:crypto.createHash('sha256').update(token).digest('hex'),status:'active',createdAt:nowIso(),expiresAt:new Date(Date.now()+expiresMinutes*60000).toISOString(),createdBy:actor.username});db.pickupPasses.unshift(row);res.status(201).json({success:true,pass:{...row,tokenHash:undefined,token}});
+    const row=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName:learner.studentName,parentUsername:actor.role==='parent'?actor.username:boundedText(req.body?.parentUsername,160),collectorName:limitedText(req.body?.collectorName,160),tokenHash:crypto.createHash('sha256').update(token).digest('hex'),status:'active',createdAt:nowIso(),expiresAt:new Date(Date.now()+expiresMinutes*60000).toISOString(),createdBy:actor.username});db.pickupPasses.unshift(row);res.status(201).json({success:true,pass:{...row,tokenHash:undefined,token}});
   });
   app.post('/api/pickup-passes/redeem',(req,res)=>{
     const actor=staffActor(req);if(!actor)return res.status(403).json({message:'School staff access is required.'});const token=String(req.body?.token||'').trim();if(!token)return res.status(400).json({message:'Pickup token is required.'});const hash=crypto.createHash('sha256').update(token).digest('hex');const row=schoolRecords('pickupPasses',actor).find(r=>r.tokenHash===hash);if(!row)return res.status(404).json({message:'Pickup pass not found.'});if(row.status!=='active')return res.status(409).json({message:'Pickup pass has already been used or cancelled.'});if(Date.parse(row.expiresAt)<=Date.now()){row.status='expired';return res.status(410).json({message:'Pickup pass has expired.'});}row.status='used';row.usedAt=nowIso();row.usedBy=actor.username;res.json({success:true,pass:{id:row.id,learnerName:row.learnerName,collectorName:row.collectorName,status:row.status,usedAt:row.usedAt}});

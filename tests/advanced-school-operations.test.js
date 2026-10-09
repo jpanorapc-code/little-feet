@@ -19,10 +19,10 @@ fs.writeFileSync(path.join(tmp,'littlefeet-replica.json'),JSON.stringify({
   schools:[{id:'s-a',name:'School A',status:'active'},{id:'s-b',name:'School B',status:'active'}],
   users:[
     {username:'a-admin',pinHash,name:'A Admin',role:'admin',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
-    {username:'a-teacher',pinHash,name:'A Teacher',role:'teacher',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
-    {username:'a-parent',pinHash,name:'A Parent',role:'parent',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active',linkedLearners:['Learner A']},
+    {username:'a-teacher',pinHash,name:'A Teacher',role:'teacher',assignedClasses:['Grade R'],schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'},
+    {username:'a-parent',pinHash,name:'A Parent',role:'parent',schoolId:'s-a',schoolName:'School A',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Learner A']},
     {username:'b-admin',pinHash,name:'B Admin',role:'admin',schoolId:'s-b',schoolName:'School B',verificationStatus:'Active'},
-    {username:'platform',pinHash,name:'Platform',role:'staff',platformAccess:true,schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'}
+    {username:'platform',pinHash,name:'Platform',role: 'admin', platformAccess: true,schoolId:'s-a',schoolName:'School A',verificationStatus:'Active'}
   ],
   students:[{id:'la',studentName:'Learner A',className:'Grade R',schoolId:'s-a',schoolName:'School A'},{id:'lb',studentName:'Learner B',className:'Grade R',schoolId:'s-b',schoolName:'School B'}],
   attendance:[{id:'att',studentName:'Learner A',status:'Present',date:today,schoolId:'s-a',schoolName:'School A'}],
@@ -61,6 +61,9 @@ async function login(username){const r=await request('/api/login',{method:'POST'
   assert.ok(['invoice_created','billing_pending_configuration'].includes(checkout.data.session.billingStatus));
 
   assert.equal((await request('/api/staff-clock/action',{method:'POST',cookie:teacher,body:{action:'clock_in'}})).response.status,200);
+  const ownClock=await request('/api/staff-clock',{cookie:teacher});
+  assert.equal(ownClock.response.status,200);
+  assert.equal(ownClock.data.every(row=>row.username==='a-teacher'),true,'Staff must see their own clock entries without viewing other staff.');
   await request('/api/staff-ratio/settings',{method:'PUT',cookie:admin,body:{maxChildrenPerStaff:1}});
   assert.equal((await request('/api/staff-ratio/live',{cookie:teacher})).data.withinRatio,true);
 
@@ -102,4 +105,4 @@ async function login(username){const r=await request('/api/login',{method:'POST'
 
   console.log('Advanced school operations regression passed');
  }finally{await stop();fs.rmSync(tmp,{recursive:true,force:true});}
-})().catch(async error=>{console.error(error);await stop().catch(()=>{});process.exitCode=1;});
+})().catch(error=>{console.error(error);process.exitCode=1;});

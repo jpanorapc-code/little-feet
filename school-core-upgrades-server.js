@@ -42,10 +42,11 @@ const BODY_REGIONS = new Set([
 function registerSchoolCoreUpgrades(app, deps) {
   const {
     db, getSessionAccount, hasPlatformAccess, accountSchoolId, isSameSchool, recordInSchool, tagSchoolRecord,
-    tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
+    tenantRecords, learnerRecordsVisibleTo = tenantRecords, normalizeUsername, normalizeComparableText, limitedText, boundedText, dateKeyInSouthAfrica,
     isParentLinkedToLearner, sendLittleFeetEmail, looksLikeEmailAddress, safeHttpsUrl, validDateKey,
     validSignatureData, encryptField, decryptStoredField, validSecretLength, matchesPin, saveDatabaseState,
-    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured
+    scheduleReplicaSnapshot, logStructured, smtpEmailConfigured, apiEmailConfigured,
+    withPersistentMutation = task => task(), readOnlySnapshotMode = false
   } = deps;
 
   const nowIso = () => new Date().toISOString();
@@ -61,13 +62,26 @@ function registerSchoolCoreUpgrades(app, deps) {
     const actor = getSessionAccount(req);
     return actor && (hasPlatformAccess(actor) || ['teacher','principal','admin','staff','crm','support'].includes(actor.role)) ? actor : null;
   };
-  const schoolRecords = (name, actor) => tenantRecords(db[name] || [], actor);
+  const learnerCollections = new Set(['subjectMarks','reportCards','disciplineRecords','gradeRSkillAssessments','dsdIncidents']);
+  const canReadLearning = actor => Boolean(actor && (hasPlatformAccess(actor) || ['parent','teacher','principal','admin','staff'].includes(actor.role)));
+  const learnerReadActor = (req, res) => {
+    const actor = getSessionAccount(req);
+    if (!actor) { res.status(401).json({ message: 'Sign in to view learner records.' }); return null; }
+    if (!canReadLearning(actor)) { res.status(403).json({ message: 'Learning-record access is restricted.' }); return null; }
+    return actor;
+  };
+  const schoolRecords = (name, actor) => learnerCollections.has(name) ? (canReadLearning(actor) ? learnerRecordsVisibleTo(db[name] || [], actor) : []) : tenantRecords(db[name] || [], actor);
   const cleanNumber = (value, min, max) => {
     const number = Number(value);
     return Number.isFinite(number) && number >= min && number <= max ? number : null;
   };
-  const schoolLearners = actor => tenantRecords(db.students || [], actor);
-  const findLearner = (actor, name) => schoolLearners(actor).find(row => normalizeComparableText(row.studentName) === normalizeComparableText(name));
+  const schoolLearners = actor => learnerRecordsVisibleTo(db.students || [], actor);
+  const findLearner = (actor, name) => {
+    const matches = schoolLearners(actor).filter(row => normalizeComparableText(row.studentName) === normalizeComparableText(name));
+    if (matches.length > 1) throw Object.assign(new Error('Ambiguous learner name'), { code: 'AMBIGUOUS_LEARNER' });
+    return matches[0];
+  };
+  const tagLearnerRecord = (actor, learner, record) => tagSchoolRecord({ ...actor, schoolId: learner.schoolId, schoolName: learner.schoolName }, { ...record, className: record.className || learner.className || '' });
   const parentCanSeeLearner = (actor, learner) => actor?.role === 'parent' && learner && isParentLinkedToLearner(actor, learner);
   const canSeeLearner = (actor, learner) => Boolean(actor && learner && (hasPlatformAccess(actor) || ['teacher','principal','admin','staff'].includes(actor.role) || parentCanSeeLearner(actor, learner)));
   const parentForLearner = (actor, learner) => (db.users || []).find(account =>
@@ -94,8 +108,7 @@ function registerSchoolCoreUpgrades(app, deps) {
   };
 
   app.get('/api/academics/marks', (req,res) => {
-    const actor = getSessionAccount(req);
-    if (!actor) return res.status(401).json({message:'Sign in to view marks.'});
+    const actor = learnerReadActor(req, res); if (!actor) return;
     let rows = schoolRecords('subjectMarks', actor);
     const learnerName = boundedText(req.query?.learnerName,160);
     if (learnerName) {
@@ -126,20 +139,20 @@ function registerSchoolCoreUpgrades(app, deps) {
     if (!subject || !assessmentName || !term || !Number.isInteger(year) || year < 2000 || year > 2100 || score === null || maximum === null || score > maximum || weight === null) {
       return res.status(400).json({message:'Add a valid learner, subject, term, year, score, total and weight.'});
     }
-    const record = tagSchoolRecord(actor,{
+    const record = tagLearnerRecord(actor,learner,{
       id:crypto.randomUUID(), learnerName, learnerKey:learner.id || '', className:boundedText(learner.className,120),
       subject, assessmentName, term, year, score, maximum, weight,
       percentage:Math.round((score/maximum)*10000)/100,
       comment:boundedText(req.body?.comment,600), createdBy:actor.username, createdAt:nowIso(), updatedAt:nowIso(), revision:1
     });
     db.subjectMarks.unshift(record);
-    db.markHistory.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),markId:record.id,action:'created',changedBy:actor.username,changedAt:nowIso(),before:null,after:{...record}}));
+    db.markHistory.unshift(tagLearnerRecord(actor,record,{id:crypto.randomUUID(),markId:record.id,action:'created',changedBy:actor.username,changedAt:nowIso(),before:null,after:{...record}}));
     res.status(201).json({success:true,mark:record});
   });
 
   app.patch('/api/academics/marks/:id', (req,res) => {
     const actor = staffActor(req);
-    const mark = actor && (db.subjectMarks || []).find(row => row.id === req.params.id && recordInSchool(row,actor));
+    const mark = actor && schoolRecords('subjectMarks',actor).find(row => row.id === req.params.id);
     if (!mark) return res.status(404).json({message:'Mark record not found.'});
     const before = {...mark};
     const score = req.body?.score === undefined ? mark.score : cleanNumber(req.body.score,0,100000);
@@ -160,13 +173,13 @@ function registerSchoolCoreUpgrades(app, deps) {
     }
     mark.score=score; mark.maximum=maximum; mark.weight=weight; mark.percentage=Math.round((score/maximum)*10000)/100;
     mark.updatedAt=nowIso(); mark.revision=Number(mark.revision||1)+1;
-    db.markHistory.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),markId:mark.id,action:'updated',changedBy:actor.username,changedAt:nowIso(),before,after:{...mark}}));
+    db.markHistory.unshift(tagLearnerRecord(actor,mark,{id:crypto.randomUUID(),markId:mark.id,action:'updated',changedBy:actor.username,changedAt:nowIso(),before,after:{...mark}}));
     res.json({success:true,mark});
   });
 
   app.get('/api/academics/marks/:id/history', (req,res) => {
     const actor = staffActor(req);
-    const mark = actor && (db.subjectMarks || []).find(row => row.id === req.params.id && recordInSchool(row,actor));
+    const mark = actor && schoolRecords('subjectMarks',actor).find(row => row.id === req.params.id);
     if (!mark) return res.status(404).json({message:'Mark record not found.'});
     res.json(schoolRecords('markHistory',actor).filter(row=>row.markId===mark.id));
   });
@@ -175,13 +188,14 @@ function registerSchoolCoreUpgrades(app, deps) {
     const index=actor?(db.subjectMarks||[]).findIndex(row=>row.id===req.params.id&&recordInSchool(row,actor)):-1;
     if(index<0)return res.status(404).json({message:'Mark record not found.'});
     const [mark]=db.subjectMarks.splice(index,1);
-    db.markHistory.unshift(tagSchoolRecord(actor,{id:crypto.randomUUID(),markId:mark.id,action:'deleted',changedBy:actor.username,changedAt:nowIso(),before:{...mark},after:null}));
+    db.markHistory.unshift(tagLearnerRecord(actor,mark,{id:crypto.randomUUID(),markId:mark.id,action:'deleted',changedBy:actor.username,changedAt:nowIso(),before:{...mark},after:null}));
     res.json({success:true,mark});
   });
 
   const reportViewAllowed = (actor, report) => {
     if (!actor || !report || !recordInSchool(report,actor)) return false;
-    if (hasPlatformAccess(actor) || ['teacher','principal','admin','staff'].includes(actor.role)) return true;
+    if (actor.role === 'teacher') return learnerRecordsVisibleTo([report], actor).length > 0;
+    if (hasPlatformAccess(actor) || ['principal','admin','staff'].includes(actor.role)) return true;
     const learner = findLearner(actor, report.learnerName);
     return parentCanSeeLearner(actor,learner);
   };
@@ -203,8 +217,7 @@ function registerSchoolCoreUpgrades(app, deps) {
   };
 
   app.get('/api/academics/report-cards', (req,res) => {
-    const actor=getSessionAccount(req);
-    if(!actor) return res.status(401).json({message:'Sign in to view report cards.'});
+    const actor = learnerReadActor(req, res); if (!actor) return;
     res.json(schoolRecords('reportCards',actor).filter(row=>reportViewAllowed(actor,row)));
   });
 
@@ -215,7 +228,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     if(!learner) return res.status(404).json({message:'Choose a learner in your school.'});
     const built=buildReport(actor,learner,req.body);
     if(built.error) return res.status(400).json({message:built.error});
-    const record=tagSchoolRecord(actor,{
+    const record=tagLearnerRecord(actor,learner,{
       id:crypto.randomUUID(), learnerName, learnerKey:learner.id||'', className:boundedText(learner.className,120),
       ...built, teacherComment:boundedText(req.body?.teacherComment,2000), promotionOutcome:boundedText(req.body?.promotionOutcome,120),
       parentUsername:parentForLearner(actor,learner)?.username || '',
@@ -274,7 +287,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     res.json({success:true,settings:item});
   });
   app.get('/api/discipline',(req,res)=>{
-    const actor=getSessionAccount(req); if(!actor)return res.status(401).json({message:'Sign in to view discipline records.'});
+    const actor = learnerReadActor(req, res); if (!actor) return;
     let rows=schoolRecords('disciplineRecords',actor);
     if(actor.role==='parent') {
       const allowed=new Set(schoolLearners(actor).filter(learner=>parentCanSeeLearner(actor,learner)).map(learner=>normalizeComparableText(learner.studentName)));
@@ -291,7 +304,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     const points=cleanNumber(req.body?.points,1,100);
     const category=limitedText(req.body?.category,120), details=limitedText(req.body?.details,1600);
     if(!kind||points===null||!category||!details)return res.status(400).json({message:'Add type, points, category and details.'});
-    const record=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',className:boundedText(learner.className,120),kind,points,pointDelta:kind==='demerit'?points:-points,category,details,actionTaken:boundedText(req.body?.actionTaken,1000),parentNotified:Boolean(req.body?.parentNotified),parentVisible:req.body?.parentVisible!==false,parentNotificationStatus:'not_requested',recordedBy:actor.username,createdAt:nowIso(),status:'Open'});
+    const record=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',className:boundedText(learner.className,120),kind,points,pointDelta:kind==='demerit'?points:-points,category,details,actionTaken:boundedText(req.body?.actionTaken,1000),parentNotified:Boolean(req.body?.parentNotified),parentVisible:req.body?.parentVisible!==false,parentNotificationStatus:'not_requested',recordedBy:actor.username,createdAt:nowIso(),status:'Open'});
     db.disciplineRecords.unshift(record);
     const all=schoolRecords('disciplineRecords',actor).filter(row=>normalizeComparableText(row.learnerName)===normalizeComparableText(learnerName));
     const total=all.reduce((sum,row)=>sum+Number(row.pointDelta||0),0), settings=disciplineSettingsFor(actor);
@@ -317,7 +330,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     res.status(201).json({success:true,record,totalPoints:total,action});
   });
   app.get('/api/discipline/:id/print',(req,res)=>{
-    const actor=getSessionAccount(req),row=actor&&(db.disciplineRecords||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    const actor=getSessionAccount(req),row=actor&&schoolRecords('disciplineRecords',actor).find(item => item.id === req.params.id);
     if(!row)return res.status(404).send('Discipline record not found.');
     const learner=findLearner(actor,row.learnerName);
     if(!(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor.role)||parentCanSeeLearner(actor,learner)))return res.status(403).send('Not allowed.');
@@ -327,7 +340,7 @@ function registerSchoolCoreUpgrades(app, deps) {
   });
 
   app.patch('/api/discipline/:id',(req,res)=>{
-    const actor=staffActor(req), row=actor&&(db.disciplineRecords||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    const actor=staffActor(req), row=actor&&schoolRecords('disciplineRecords',actor).find(item => item.id === req.params.id);
     if(!row)return res.status(404).json({message:'Discipline record not found.'});
     for(const key of ['actionTaken','status']) if(req.body?.[key]!==undefined) row[key]=boundedText(req.body[key],1000);
     if(req.body?.parentNotified!==undefined) row.parentNotified=Boolean(req.body.parentNotified);
@@ -378,7 +391,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     res.json(GRADE_R_SKILLS);
   });
   app.get('/api/grade-r/assessments',(req,res)=>{
-    const actor=getSessionAccount(req); if(!actor)return res.status(401).json({message:'Sign in to view Grade R assessments.'});
+    const actor = learnerReadActor(req, res); if (!actor) return;
     let rows=schoolRecords('gradeRSkillAssessments',actor);
     if(actor.role==='parent'){
       const allowed=new Set(schoolLearners(actor).filter(l=>parentCanSeeLearner(actor,l)).map(l=>normalizeComparableText(l.studentName)));
@@ -396,7 +409,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     if(!skill||![1,2,3,4].includes(rating))return res.status(400).json({message:'Choose a Grade R skill and a rating from 1 to 4.'});
     const term=boundedText(req.body?.term,60);
     if(!term)return res.status(400).json({message:'Choose a term for this Grade R skill observation.'});
-    const record=tagSchoolRecord(actor,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',skillId:skill.id,subject:skill.subject,skill:skill.label,rating,term,evidence:boundedText(req.body?.evidence,1200),observedAt:validDateKey(req.body?.observedAt)||dateKeyInSouthAfrica(),recordedBy:actor.username,createdAt:nowIso()});
+    const record=tagLearnerRecord(actor,learner,{id:crypto.randomUUID(),learnerName,learnerKey:learner.id||'',skillId:skill.id,subject:skill.subject,skill:skill.label,rating,term,evidence:boundedText(req.body?.evidence,1200),observedAt:validDateKey(req.body?.observedAt)||dateKeyInSouthAfrica(),recordedBy:actor.username,createdAt:nowIso()});
     db.gradeRSkillAssessments.unshift(record); res.status(201).json({success:true,assessment:record});
   });
   app.get('/api/grade-r/summary/:learnerName',(req,res)=>{
@@ -442,7 +455,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     const sequence=schoolRecords('dsdIncidents',actor).length+1;
     const signingPin=req.body?.signingPin, signatureData=req.body?.signatureData;
     if(signatureData && (!actor.reportSigningPinHash||!validSecretLength(signingPin)||!matchesPin(signingPin,actor.reportSigningPinHash)||!validSignatureData(signatureData))) return res.status(403).json({message:'A valid staff signing PIN and signature are required for signed submission.'});
-    const record=tagSchoolRecord(actor,{
+    const record=tagLearnerRecord(actor,learner,{
       id:crypto.randomUUID(),incidentNumber:String(incidentDate).replaceAll('-','')+'-'+String(sequence).padStart(4,'0'),
       learnerName,learnerKey:learner.id||'',className:boundedText(learner.className,120),
       incidentDate,incidentTime,location,incidentType:boundedText(req.body?.incidentType,120),description,
@@ -460,7 +473,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     db.dsdIncidents.unshift(record);res.status(201).json({success:true,incident:incidentView(record)});
   });
   app.get('/api/dsd-incidents/:id/print',(req,res)=>{
-    const actor=getSessionAccount(req),row=actor&&(db.dsdIncidents||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    const actor=getSessionAccount(req),row=actor&&schoolRecords('dsdIncidents',actor).find(item => item.id === req.params.id);
     const learner=row&&findLearner(actor,row.learnerName);
     if(!row||!(hasPlatformAccess(actor)||['teacher','principal','admin','staff'].includes(actor?.role)||parentCanSeeLearner(actor,learner)))return res.status(404).send('Incident not found.');
     const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -474,14 +487,14 @@ function registerSchoolCoreUpgrades(app, deps) {
   });
 
   app.post('/api/dsd-incidents/:id/principal-sign',(req,res)=>{
-    const actor=managementActor(req),row=actor&&(db.dsdIncidents||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    const actor=managementActor(req),row=actor&&schoolRecords('dsdIncidents',actor).find(item => item.id === req.params.id);
     if(!row)return res.status(404).json({message:'Incident not found.'});
     if(!actor.reportSigningPinHash||!validSecretLength(req.body?.signingPin)||!matchesPin(req.body.signingPin,actor.reportSigningPinHash)||!validSignatureData(req.body?.signatureData)) return res.status(403).json({message:'Enter your signing PIN and add a valid signature.'});
     row.principalReview=boundedText(req.body?.principalReview||row.principalReview,1600);row.principalSignature=encryptField(req.body.signatureData);row.principalSignedAt=nowIso();row.status='Awaiting parent acknowledgement';row.updatedAt=nowIso();
     res.json({success:true,incident:incidentView(row)});
   });
   app.post('/api/dsd-incidents/:id/parent-acknowledge',(req,res)=>{
-    const actor=getSessionAccount(req),row=actor&&(db.dsdIncidents||[]).find(item=>item.id===req.params.id&&recordInSchool(item,actor));
+    const actor=getSessionAccount(req),row=actor&&schoolRecords('dsdIncidents',actor).find(item => item.id === req.params.id);
     const learner=row&&findLearner(actor,row.learnerName);
     if(!row||actor?.role!=='parent'||!parentCanSeeLearner(actor,learner))return res.status(403).json({message:'Only the linked parent can acknowledge this incident.'});
     if(!actor.reportSigningPinHash||!validSecretLength(req.body?.signingPin)||!matchesPin(req.body.signingPin,actor.reportSigningPinHash)||!validSignatureData(req.body?.signatureData)) return res.status(403).json({message:'Enter your signing PIN and add a valid signature.'});
@@ -498,7 +511,7 @@ function registerSchoolCoreUpgrades(app, deps) {
     const prefix=kind==='sms'?'LF_SMS':kind==='whatsapp'?'LF_WHATSAPP':'LF_PUSH';
     const endpoint=providerEndpoint(prefix+'_API_URL'),key=String(process.env[prefix+'_API_KEY']||'').trim();
     if(!endpoint||!key)return {ok:false,status:'not_configured'};
-    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify(payload)});
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
     if(!response.ok)throw new Error(kind.toUpperCase()+' provider returned HTTP '+response.status);
     return {ok:true,status:'sent'};
   };
@@ -610,6 +623,8 @@ function registerSchoolCoreUpgrades(app, deps) {
     }catch(error){next(error);}
   });
   const runScheduledCommunicationCampaigns=async()=>{
+    if(readOnlySnapshotMode)return;
+    return withPersistentMutation(async()=>{
     const due=(db.communicationCampaigns||[]).filter(c=>c.status==='scheduled'&&c.scheduledAt&&Date.parse(c.scheduledAt)<=Date.now());
     let changed=false;
     for(const campaign of due){
@@ -620,6 +635,7 @@ function registerSchoolCoreUpgrades(app, deps) {
       await executeCommunicationCampaign(campaign,actor);changed=true;
     }
     if(changed){await saveDatabaseState();scheduleReplicaSnapshot?.();}
+    });
   };
   const scheduledCommunicationTimer=setInterval(()=>{runScheduledCommunicationCampaigns().catch(error=>logStructured?.('error','communications.schedule_failed',{category:'communications',message:error.message}));},60000);
   scheduledCommunicationTimer.unref?.();
@@ -689,12 +705,15 @@ function registerSchoolCoreUpgrades(app, deps) {
   });
 
   const automationTimer=setInterval(async()=>{
+    if(readOnlySnapshotMode)return;
+    await withPersistentMutation(async()=>{
     const schools=[...new Set((db.attendanceAutomationSettings||[]).filter(s=>s.autoAbsent||s.remindStaff).map(s=>s.schoolId).filter(Boolean))];
     for(const schoolId of schools){
       const actor=(db.users||[]).find(u=>u.schoolId===schoolId&&u.verificationStatus==='Active'&&['principal','admin'].includes(u.role));
       if(!actor)continue;
       try{const result=await runAttendanceAutomation(actor);if(result.stateChanged){await saveDatabaseState();scheduleReplicaSnapshot?.();}}catch(error){logStructured?.('error','attendance.automation_failed',{category:'attendance',schoolId,message:error.message});}
     }
+    }).catch(error=>logStructured?.('error','attendance.automation_failed',{category:'attendance',message:error.message}));
   },5*60*1000);
   automationTimer.unref?.();
 

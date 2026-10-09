@@ -6,7 +6,8 @@ function registerFinanceAutomation(app, deps) {
     findAccountByUsername, normalizeUsername, limitedText, billingAmount, cents, validDateKey,
     dateKeyInSouthAfrica, createParentPaymentRecord, parentPaymentFinancials, parentPaymentView,
     applyPaymentEvent, findPaymentTarget, expectedPaymentAmount, saveDatabaseState,
-    scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured
+    scheduleReplicaSnapshot, persistenceReady, hasPlatformAccess, logStructured,
+    withPersistentMutation = task => task(), readOnlySnapshotMode = false
   } = deps;
 
   const financeActor = req => {
@@ -98,6 +99,8 @@ function registerFinanceAutomation(app, deps) {
   }
 
   async function runDueRecurringRules() {
+    if (readOnlySnapshotMode) return;
+    return withPersistentMutation(async () => {
     let changed = false;
     const createdIds = new Set();
     const ruleSnapshots = new Map();
@@ -126,6 +129,7 @@ function registerFinanceAutomation(app, deps) {
       });
       throw error;
     }
+    });
   }
 
   function statementFor(actor, parentUsername, from, to) {

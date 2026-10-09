@@ -15,15 +15,16 @@ const fixture = fs.mkdtempSync(path.join(tempRoot, 'source-browser-'));
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(fixture, 'node_modules'), 'junction');
 const port = 18000 + Math.floor(Math.random() * 1000);
 const origin = `http://127.0.0.1:${port}`;
-const roles = ['admin', 'principal', 'teacher', 'parent', 'district'];
+const roles = ['admin', 'principal', 'teacher', 'parent', 'district', 'school_accounts', 'staff', 'crm', 'accounts', 'support', 'owner'];
 const pin = 'SectionBrowserPass1';
 const pinHash = crypto.scryptSync(pin, 'little-feet-pin-salt', 64).toString('hex');
 let child;
 let browser;
 let stderr = '';
+let auditPage=null,auditRole='';
 
 async function main() {
-  for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
+  for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'school-core-upgrades-server.js', 'advanced-school-operations-server.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));
   }
   // Keep the browser fixture aligned with every local server dependency.
@@ -32,16 +33,16 @@ async function main() {
   fs.cpSync(path.join(root, 'assets'), path.join(fixture, 'assets'), { recursive: true });
   fs.writeFileSync(path.join(fixture, 'littlefeet-replica.json'), JSON.stringify({
     schools: [{ id: 'browser-school', name: 'Browser Test School', status: 'active' }],
-    users: roles.map(role => ({
-      username: `browser-${role}`, name: `Browser ${role}`, role, pinHash,
-      schoolId: 'browser-school', schoolName: 'Browser Test School', verificationStatus: 'Active',
+    users: [...roles.map(role => ({
+      username: `browser-${role}`, name: `Browser ${role}`, role:role==='owner'?'admin':role, pinHash, ...(role==='owner'?{platformAccess:true}:{}),
+      schoolId: ['staff','crm','accounts','support'].includes(role) ? '' : 'browser-school', schoolName: ['staff','crm','accounts','support'].includes(role) ? '' : 'Browser Test School', verificationStatus: 'Active',
       parentRelationshipStatus: 'Administrator approved', linkedLearners: ['browser learner'],
       assignedClasses: ['a1'], subscription: 'basic'
-    })),
+    })), {username:"quoted'-window.roleProbe()-'",name:'Quoted Staff Identity',role:'teacher',pinHash,schoolId:'browser-school',schoolName:'Browser Test School',verificationStatus:'Active',assignedClasses:['a1']}],
     students: [{ id: 'browser-learner', studentName: 'Browser Learner', className: 'A1', schoolId: 'browser-school', schoolName: 'Browser Test School' }],
-    posts: [], learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}
+    tickets:[{id:'role-support-ticket',schoolId:'browser-school',schoolName:'Browser Test School',subject:'Real browser support workflow',message:'School support request',department:'Support',priority:'Normal',status:'Open',createdBy:'browser-parent',assignedTo:'browser-teacher'}],posts: [], learnerAccessCodes: [], schoolBilling: {'browser-school':{orders:[{reference:'LF-BROWSER-INVOICE',monthlyTotal:120,paymentStatus:'awaiting_payment',planCode:'ecd'}]}}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}
   }));
-  child = spawn(process.execPath, ['server.js'], { cwd: fixture, env: { ...process.env, NODE_ENV: 'test', PORT: String(port), LF_REPLICA_MODE: '1' }, stdio: ['ignore', 'ignore', 'pipe'] });
+  child = spawn(process.execPath, ['server.js'], { cwd: fixture, env: { ...process.env, NODE_ENV: 'test', PORT: String(port), LF_REPLICA_MODE: '1', LF_TEST_ALLOW_REPLICA_WRITES: '1', LF_OWNER_ADMIN_USERNAME:'browser-owner' }, stdio: ['ignore', 'ignore', 'pipe'] });
   child.stderr.on('data', chunk => { stderr += chunk; });
   let ready = false;
   for (let i = 0; i < 150; i++) {
@@ -67,9 +68,10 @@ async function main() {
   });
   const summary = [];
   for (const role of roles) {
+    auditRole=role;console.log('Checking browser role: '+role);
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await context.route('https://**', route => route.abort());
-    const page = await context.newPage();
+    const page = await context.newPage();auditPage=page;
     await page.addInitScript(() => {
       const nativeFetch = window.fetch.bind(window);
       window.__littleFeetFetchStacks = [];
@@ -224,6 +226,85 @@ async function main() {
         assert.equal(apiRequestCounts.get(endpoint) || 0, beforeRepeatedSession.get(endpoint), `Repeated session-ready reloaded ${endpoint}`);
       }
     }
+    if (role === 'support') {
+      await page.locator('.nav-btn[onclick="switchTab(\'ticketsTab\', this)"]').click();
+      await page.locator('#ticketList').getByRole('button',{name:'Edit & Respond'}).click();
+      await page.locator('#editTicketAssignee option[value="browser-support"]').waitFor({state:'attached'});
+      await page.locator('#editTicketAssignee').selectOption('browser-support');
+      await page.locator('#editFeedback').fill('Handled by the Little Feet support employee');
+      await page.locator('#editTicketForm button[type="submit"]').click();
+      await page.locator('#appModal').waitFor({state:'hidden'});
+      await page.locator('#ticketList').getByText('Handled by the Little Feet support employee',{exact:false}).waitFor();
+      const actual=await page.evaluate(()=>fetch('/api/tickets').then(r=>r.json()));
+      assert.equal(actual.find(x=>x.id==='role-support-ticket').assignedTo,'browser-support');
+    }
+    if (['staff','accounts','support'].includes(role)) {
+      assert.equal(await page.locator('.nav-btn[onclick="switchTab(\'accountsTab\', this)"]').isVisible(),false,'Employees must not see account administration.');
+      const privateStatus=await page.evaluate(()=>fetch('/api/registry').then(r=>r.status));
+      assert.equal(privateStatus,403,'Server must enforce employee child-data restrictions.');
+    }
+    if (role === 'admin') {
+      assert.equal(await page.locator('.nav-btn[onclick="switchTab(\'companyClientsTab\', this)"]').isVisible(),false,'School administrators must not see company sales tools.');
+      assert.equal(await page.locator('.nav-btn[onclick="switchTab(\'companyBillingTab\', this)"]').isVisible(),false,'School administrators must not see company billing.');
+    }
+    if (role === 'crm') {
+      await page.locator('.nav-btn[onclick="switchTab(\'companyClientsTab\', this)"]').click();
+      await page.locator('#companyClientsContent textarea').first().fill('Requested demonstration follow-up');
+      await page.locator('#companyClientsContent button').first().click();
+      await page.locator('#companyClientsContent [role="status"]').first().getByText('Saved.',{exact:true}).waitFor();
+      const clients=await page.evaluate(()=>fetch('/api/company/clients').then(r=>r.json()));
+      assert.equal(clients.find(x=>x.name==='Browser Test School').note,'Requested demonstration follow-up');
+      await page.locator('.nav-btn[onclick="switchTab(\'accountsTab\', this)"]').click();
+      await page.locator('#accountName').fill('Client Added Teacher');
+      await page.locator('#accountUsername').fill('crm-created-browser-teacher@example.test');
+      await page.locator('#accountPin').fill(pin);
+      await page.locator('#accountRole').selectOption('teacher');
+      await page.locator('#accountSchoolName').fill('Browser Test School');
+      await page.locator('#accountAssignedClasses').fill('A1');
+      await page.locator('#accountSaveButton').click();
+      const added=page.locator('#accountsList .item-row').filter({hasText:'Client Added Teacher'});
+      await added.waitFor();
+      const isolated=await browser.newContext();
+      const checkLogin=await isolated.request.post(origin+'/api/login',{data:{username:'crm-created-browser-teacher@example.test',pin}});
+      assert.equal(checkLogin.status(),200,'CRM-created school user must have a real working login');await isolated.close();
+      // Login verification uses an independent API context so the CRM browser session is preserved.
+      await added.getByRole('button',{name:'Edit',exact:true}).click();
+      await page.locator('#accountName').fill('Client Updated Teacher');
+      await page.locator('#accountSaveButton').click();
+      const updated=page.locator('#accountsList .item-row').filter({hasText:'Client Updated Teacher'});
+      await updated.waitFor();
+      page.removeAllListeners('dialog');page.once('dialog',dialog=>dialog.accept());
+      await updated.getByRole('button',{name:'Delete',exact:true}).click();
+      await updated.waitFor({state:'hidden'});page.on('dialog',dialog=>dialog.dismiss());
+      const remaining=await page.evaluate(()=>fetch('/api/accounts').then(r=>r.json()));
+      assert.equal(remaining.some(x=>x.username==='crm-created-browser-teacher@example.test'),false);
+      assert.equal(remaining.some(x=>x.username==='browser-owner'),false,'CRM must not be offered the owner account.');
+      assert.equal(await page.evaluate(()=>fetch('/api/registry').then(r=>r.status)),403,'User-management access must not grant private school registers.');
+
+
+    }
+    if (role === 'accounts') {
+      await page.locator('.nav-btn[onclick="switchTab(\'companyBillingTab\', this)"]').click();
+      await page.locator('#companyBillingContent input').first().fill('BROWSER-BANK-REFERENCE');
+      page.removeAllListeners('dialog');page.once('dialog',dialog=>dialog.accept());
+      await page.locator('#companyBillingContent button').first().click();
+      await page.locator('#companyBillingContent').getByText('LF-BROWSER-INVOICE · R 120.00 · paid',{exact:false}).waitFor();
+      page.on('dialog',dialog=>dialog.dismiss());
+      const billing=await page.evaluate(()=>fetch('/api/company/billing').then(r=>r.json()));
+      assert.equal(billing.ledger.filter(x=>x.reference==='LF-BROWSER-INVOICE').length,1);
+    }
+    if (['admin','crm','owner'].includes(role)) {
+      await page.locator('.nav-btn[onclick="switchTab(\'accountsTab\', this)"]').click();
+      const companyOptions=await page.locator('#accountRole option').evaluateAll(options=>options.filter(x=>['staff','crm','accounts','support'].includes(x.value)).map(x=>({role:x.value,disabled:x.disabled})));
+      assert.equal(companyOptions.length,4);
+      assert.ok(companyOptions.every(x=>x.disabled===(role!=='owner')),'Only company account managers may choose company employee roles.');
+    }
+    if (role === 'admin') {
+      await page.evaluate(()=>{window.roleProbeCalls=0;window.roleProbe=()=>{window.roleProbeCalls++;return 0;};});
+      await page.locator('#accountsList .item-row').filter({hasText:'Quoted Staff Identity'}).getByRole('button',{name:'Edit',exact:true}).click();
+      assert.equal(await page.evaluate(()=>window.roleProbeCalls),0,'Account identifiers must stay data when clicked.');
+      assert.equal(await page.locator('#accountOriginalUsername').inputValue(),"quoted'-window.roleProbe()-'");
+    }
     const missingHandlers = await page.evaluate(() => {
       const missing = new Set();
       for (const element of document.querySelectorAll('[onclick], [onchange], [onsubmit]')) {
@@ -266,9 +347,20 @@ async function main() {
       await page.locator('#navMoreToggle').click();
       await page.setViewportSize({width:1440,height:1000});
     }
+    let releaseAccountResponse, lateAccountLoad;
+    if (role === 'crm') {
+      let accountResponseReady; const ready = new Promise(resolve => { accountResponseReady = resolve; });
+      const held = new Promise(resolve => { releaseAccountResponse = resolve; });
+      await page.route('**/api/accounts?**', async route => {
+        const response = await route.fetch(); accountResponseReady(); await held; await route.fulfill({ response });
+      });
+      lateAccountLoad = page.evaluate(() => loadAccounts());
+      await ready;
+    }
     await page.locator('.sidebar-signout').click();
     await page.locator('#authSection').waitFor({ state: 'visible' });
     await page.waitForLoadState('domcontentloaded');
+    if (releaseAccountResponse) { releaseAccountResponse(); await lateAccountLoad; assert.equal(await page.locator('#accountsList .item-row').count(),0,'A late CRM account response must not restore data after logout.'); }
     const session = await page.evaluate(() => fetch('/api/auth/session').then(response => response.json()));
     assert.equal(session.authenticated, false, `${role}: logout did not clear server session`);
     assert.deepEqual(errors, [], `${role}: browser runtime errors`);
@@ -279,7 +371,7 @@ async function main() {
   console.log('Browser source regression passed:', JSON.stringify(summary));
 }
 
-main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
+main().catch(async error => { console.error('Failing role: '+auditRole);if(auditPage&&!auditPage.isClosed()){await auditPage.screenshot({path:path.join(root,'tmp','role-ui-failure.png')});const positions=await auditPage.locator('.nav-shortcut').evaluateAll(items=>items.map(x=>({text:x.textContent,rect:x.getBoundingClientRect().toJSON()})));console.error(JSON.stringify(positions));}console.error(error);process.exitCode=1; }).finally(async () => {
   await browser?.close();
   if (child && child.exitCode === null) await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
   const relative = path.relative(tempRoot, path.resolve(fixture));

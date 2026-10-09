@@ -1,30 +1,34 @@
 (() => {
   'use strict';
+let sessionGeneration=0;
+const staleSession=()=>Object.assign(new Error('Your session changed. Please refresh this screen.'),{code:'SESSION_CHANGED'});
+document.addEventListener('littlefeet:session-ended',()=>{sessionGeneration++;if(emailPoll)clearInterval(emailPoll);emailPoll=null;emailInboxSeen.clear();document.getElementById('lfNotificationStack')?.remove();["qualificationsContent","kpiHistoryContent","staffDevelopmentContent","emailIntegrationContent"].forEach(id=>document.getElementById(id)?.replaceChildren());});
+
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const json=async(url,opts={})=>{const r=await fetch(url,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||'Request failed.');return d;};
+  const json=async(url,opts={})=>{const generation=sessionGeneration;const r=await fetch(url,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});const d=await r.json().catch(()=>({}));if(generation!==sessionGeneration)throw staleSession();if(!r.ok)throw new Error(d.message||'Request failed.');return d;};
   const user=()=>window.getLittleFeetCurrentUser?.()||{};
-  const staffOptions=async()=>{try{const rows=await json('/api/accounts');return (Array.isArray(rows)?rows:rows.accounts||[]).filter(x=>['teacher','principal','admin'].includes(String(x.role).toLowerCase())).map(x=>`<option value="${esc(x.username)}">${esc(x.name||x.username)}</option>`).join('');}catch{return '';}};
+  const staffOptions=async()=>{try{const rows=await json('/api/staff/directory');return (Array.isArray(rows)?rows:rows.accounts||[]).filter(x=>['teacher','principal','admin','school_accounts','staff','crm','accounts','support'].includes(String(x.role).toLowerCase())).map(x=>`<option value="${esc(x.username)}">${esc(x.name||x.username)}</option>`).join('');}catch(error){if(error.code==='SESSION_CHANGED')throw error;return '';}};
   const statusBadge=s=>`<span class="badge-tag">${esc(s)}</span>`;
 
   async function qualifications(){
     const host=document.getElementById('qualificationsContent');if(!host)return;
     try{const rows=await json('/api/staff/qualifications'),u=user(),management=(window.isLittleFeetFullAccessUser?.(u) || ['admin','principal'].includes(String(u.role).toLowerCase())),opts=management?await staffOptions():'';
       host.innerHTML=`<div class="workspace-grid"><div class="workspace-card"><h3>Add qualification / certificate</h3><form id="qualificationForm">${management?`<label>Staff member<select name="username" required><option value="">Choose staff</option>${opts}</select></label>`:''}<label>Qualification<input name="name" maxlength="180" required></label><label>Issuing body<input name="issuingBody" maxlength="180" required></label><div class="flex-form-row"><label>Obtained<input name="obtainedDate" type="date" required></label><label>Expiry (optional)<input name="expiryDate" type="date"></label></div><label>Certificate / reference<input name="reference" maxlength="300" placeholder="Certificate number or approved document reference"></label><button class="submit-btn">Save qualification</button></form></div><div class="workspace-card"><h3>Compliance overview</h3><div class="staff-work-list">${rows.length?rows.map(x=>`<article><div>${statusBadge(x.status)} <strong>${esc(x.name)}</strong></div><span>${esc(x.staffName)} · ${esc(x.issuingBody)}</span><span>Obtained ${esc(x.obtainedDate)}${x.expiryDate?` · Expires ${esc(x.expiryDate)}`:' · No expiry'}</span>${x.reference?`<span>Reference: ${esc(x.reference)}</span>`:''}</article>`).join(''):'<p class="meta">No qualifications recorded yet.</p>'}</div></div></div>`;
-      document.getElementById('qualificationForm')?.addEventListener('submit',async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));try{await json('/api/staff/qualifications',{method:'POST',body:JSON.stringify(body)});await qualifications();window.refreshMyDay?.();}catch(err){alert(err.message);}});
-    }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
+      document.getElementById('qualificationForm')?.addEventListener('submit',async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));try{await json('/api/staff/qualifications',{method:'POST',body:JSON.stringify(body)});await qualifications();window.refreshMyDay?.();}catch(err){if(err.code==='SESSION_CHANGED')return;alert(err.message);}});
+    }catch(e){if(e.code==='SESSION_CHANGED')return;host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
 
   async function kpiHistory(){
     const host=document.getElementById('kpiHistoryContent');if(!host)return;
-    try{const d=await json('/api/staff/kpi-history?months=12');const max=100;host.innerHTML=`<div class="card"><h3>${esc(d.staffName)} · 12-month task KPI trend</h3><div class="staff-kpi-scoreboard">${d.rows.map(x=>`<article><strong>${esc(x.month)}</strong><span>${x.completed}/${x.total} tasks · ${esc(x.band)}</span><div class="staff-kpi-bar"><i style="width:${Math.min(max,x.completionRate)}%"></i></div><b>${x.completionRate}%</b></article>`).join('')}</div><p class="meta">KPI is calculated from completed staff tasks for each month.</p></div>`;}catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
+    try{const d=await json('/api/staff/kpi-history?months=12');const max=100;host.innerHTML=`<div class="card"><h3>${esc(d.staffName)} · 12-month task KPI trend</h3><div class="staff-kpi-scoreboard">${d.rows.map(x=>`<article><strong>${esc(x.month)}</strong><span>${x.completed}/${x.total} tasks · ${esc(x.band)}</span><div class="staff-kpi-bar"><i style="width:${Math.min(max,x.completionRate)}%"></i></div><b>${x.completionRate}%</b></article>`).join('')}</div><p class="meta">KPI is calculated from completed staff tasks for each month.</p></div>`;}catch(e){if(e.code==='SESSION_CHANGED')return;host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
 
   async function development(){
     const host=document.getElementById('staffDevelopmentContent');if(!host)return;
     try{const rows=await json('/api/staff/development-plans'),u=user(),management=(window.isLittleFeetFullAccessUser?.(u) || ['admin','principal'].includes(String(u.role).toLowerCase())),opts=management?await staffOptions():'';
       host.innerHTML=`${management?`<div class="card"><h3>Create staff development plan</h3><form id="developmentForm"><label>Staff member<select name="username" required><option value="">Choose staff</option>${opts}</select></label><label>Development goal<textarea name="goal" maxlength="1000" required></textarea></label><label>Actions / support<textarea name="actions" maxlength="2000"></textarea></label><label>Target date<input name="targetDate" type="date"></label><button class="submit-btn">Create plan</button></form></div>`:''}<div class="card"><h3>Development plans</h3><div class="staff-work-list">${rows.length?rows.map(x=>`<article><div>${statusBadge(x.status)} <strong>${esc(x.staffName)}</strong></div><p>${esc(x.goal)}</p><span>${esc(x.actions||'No actions recorded')}${x.targetDate?' · Target '+esc(x.targetDate):''}</span></article>`).join(''):'<p class="meta">No development plans yet.</p>'}</div></div>`;
-      document.getElementById('developmentForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/staff/development-plans',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await development();}catch(err){alert(err.message);}});
-    }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
+      document.getElementById('developmentForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/staff/development-plans',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await development();}catch(err){if(err.code==='SESSION_CHANGED')return;alert(err.message);}});
+    }catch(e){if(e.code==='SESSION_CHANGED')return;host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
 
   let emailInboxSeen=new Set();
@@ -112,23 +116,23 @@
       const notificationStack=ensureNotificationStack();inbox.forEach(showInboxPopup);if(!notificationStack.querySelector('.lf-notification-popup')){notificationStack.classList.add('is-collapsed');notificationStack.querySelector('[data-notification-collapse]').textContent='▸ Emails';}
 
       const composeForm=document.getElementById('mailboxComposeForm');
-      composeForm?.addEventListener('submit',async event=>{event.preventDefault();const submit=composeForm.querySelector('[type="submit"]');submit.disabled=true;submit.textContent='Sending…';try{await json('/api/email/mailbox/send',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(composeForm)))});composeForm.reset();alert('Email sent from your connected mailbox.');}catch(error){alert(error.message);}finally{submit.disabled=false;submit.textContent='Send email';}});
+      composeForm?.addEventListener('submit',async event=>{event.preventDefault();const submit=composeForm.querySelector('[type="submit"]');submit.disabled=true;submit.textContent='Sending…';try{await json('/api/email/mailbox/send',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(composeForm)))});composeForm.reset();alert('Email sent from your connected mailbox.');}catch(error){if(error.code==='SESSION_CHANGED')return;alert(error.message);}finally{submit.disabled=false;submit.textContent='Send email';}});
       document.getElementById('clearComposeEmail')?.addEventListener('click',()=>composeForm?.reset());
 
-      document.getElementById('syncConnectedMailbox')?.addEventListener('click',async()=>{try{await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});emailInboxSeen.clear();await email();}catch(error){alert(error.message);}});
-      document.getElementById('disconnectConnectedMailbox')?.addEventListener('click',async()=>{if(!confirm('Disconnect this mailbox from Little Feet? Imported dashboard copies will remain until you delete them.'))return;try{await json('/api/email/mailbox',{method:'DELETE'});await email();}catch(error){alert(error.message);}});
+      document.getElementById('syncConnectedMailbox')?.addEventListener('click',async()=>{try{await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});emailInboxSeen.clear();await email();}catch(error){if(error.code==='SESSION_CHANGED')return;alert(error.message);}});
+      document.getElementById('disconnectConnectedMailbox')?.addEventListener('click',async()=>{if(!confirm('Disconnect this mailbox from Little Feet? Imported dashboard copies will remain until you delete them.'))return;try{await json('/api/email/mailbox',{method:'DELETE'});await email();}catch(error){if(error.code==='SESSION_CHANGED')return;alert(error.message);}});
 
       document.getElementById('createForwardingAddress')?.addEventListener('click',async()=>{
-        try{await json('/api/email/forwarding/setup',{method:'POST',body:'{}'});await email();}catch(error){alert(error.message);}
+        try{await json('/api/email/forwarding/setup',{method:'POST',body:'{}'});await email();}catch(error){if(error.code==='SESSION_CHANGED')return;alert(error.message);}
       });
       document.getElementById('copyForwardingAddress')?.addEventListener('click',async()=>{
         const input=document.getElementById('forwardingAddress'),value=input?.value||'';if(!value)return;
         try{await navigator.clipboard.writeText(value);alert('Forwarding address copied.');}
         catch{input?.select();document.execCommand?.('copy');alert('Forwarding address copied.');}
       });
-      document.getElementById('refreshForwardedInbox')?.addEventListener('click',async()=>{try{if(mailbox.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});}catch(error){alert(error.message);}emailInboxSeen.clear();await email();});
-      document.getElementById('requestEmailCode')?.addEventListener('click',async()=>{try{await json('/api/email/verification/request',{method:'POST',body:'{}'});alert('Verification code sent. It expires in 10 minutes.');}catch(e){alert(e.message);}});
-      document.getElementById('confirmEmailForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/email/verification/confirm',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await email();}catch(err){alert(err.message);}});
+      document.getElementById('refreshForwardedInbox')?.addEventListener('click',async()=>{try{if(mailbox.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});}catch(error){if(error.code==='SESSION_CHANGED')return;alert(error.message);}emailInboxSeen.clear();await email();});
+      document.getElementById('requestEmailCode')?.addEventListener('click',async()=>{try{await json('/api/email/verification/request',{method:'POST',body:'{}'});alert('Verification code sent. It expires in 10 minutes.');}catch(e){if(e.code==='SESSION_CHANGED')return;alert(e.message);}});
+      document.getElementById('confirmEmailForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await json('/api/email/verification/confirm',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });await email();}catch(err){if(err.code==='SESSION_CHANGED')return;alert(err.message);}});
       host.querySelectorAll('[data-inbox-action]').forEach(btn=>btn.addEventListener('click',async()=>{
         const action=btn.dataset.inboxAction,id=btn.dataset.id;if(action==='open'){if(btn.dataset.tab)window.switchTab?.(btn.dataset.tab);return;}
         if(action==='reply'){const item=inbox.find(x=>x.id===id),form=document.getElementById('mailboxComposeForm');if(!item||!form)return;const address=(String(item.sender||'').match(/<([^<>\s]+@[^<>\s]+)>/)||[])[1]||String(item.sender||'').trim();form.elements.to.value=address;form.elements.subject.value=/^re:/i.test(item.title)?item.title:'Re: '+item.title;form.elements.text.focus();form.scrollIntoView({behavior:'smooth',block:'center'});return;}
@@ -137,9 +141,9 @@
         await email();
       }));
       document.getElementById('deleteAllInbox')?.addEventListener('click',async()=>{if(!confirm('Delete all dashboard inbox copies? Original forwarded emails and Little Feet records will stay in their source systems.'))return;await json('/api/email/inbox',{method:'DELETE'});emailInboxSeen.clear();await email();});
-    }catch(e){host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
+    }catch(e){if(e.code==='SESSION_CHANGED')return;host.innerHTML=`<p class="meta">${esc(e.message)}</p>`;}
   }
-  let emailPoll=null;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(async()=>{if(!user()?.username||document.hidden||!document.getElementById('emailIntegrationTab')?.classList.contains('active'))return;try{const sessionOk=await window.ensureLittleFeetAuthenticatedSession?.();if(sessionOk===false)return;const status=await json('/api/email/mailbox/status');if(status.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});await email();}catch{}},300000);};
+  let emailPoll=null,emailPollInFlight=false;const startEmailPoll=()=>{if(emailPoll)clearInterval(emailPoll);emailPoll=setInterval(async()=>{if(emailPollInFlight||!user()?.username||document.hidden||!document.getElementById('emailIntegrationTab')?.classList.contains('active'))return;emailPollInFlight=true;try{const sessionOk=await window.ensureLittleFeetAuthenticatedSession?.();if(sessionOk===false)return;const status=await json('/api/email/mailbox/status');if(status.connected)await json('/api/email/mailbox/sync',{method:'POST',body:'{}'});await email();}catch{}finally{emailPollInFlight=false;}},300000);};
 
   const load=()=>{qualifications();kpiHistory();development();email();startEmailPoll();};
   if(typeof window.registerLittleFeetWorkspace==='function') window.registerLittleFeetWorkspace('workplace-extended',load);

@@ -18,10 +18,11 @@ fs.cpSync(path.join(root,'assets'),path.join(fixture,'assets'),{recursive:true})
 const pin='BrowserCorePass1';
 const pinHash=crypto.scryptSync(pin,'little-feet-pin-salt',64).toString('hex');
 fs.writeFileSync(path.join(fixture,'littlefeet-replica.json'),JSON.stringify({
-  schools:[{id:'core-school',name:'Core Browser School',status:'active'}],
+  schools:[{id:'core-school',name:'Core Browser School',status:'active'},{id:'other-school',name:'Other Browser School',status:'active'}],
   users:[
     {username:'core-admin',name:'Core Admin',role:'admin',pinHash,schoolId:'core-school',schoolName:'Core Browser School',verificationStatus:'Active'},
-    {username:'core-parent',name:'Core Parent',role:'parent',pinHash,schoolId:'core-school',schoolName:'Core Browser School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Core Learner']}
+    {username:'core-parent',name:'Core Parent',role:'parent',pinHash,schoolId:'core-school',schoolName:'Core Browser School',verificationStatus:'Active',parentRelationshipStatus:'Administrator approved',linkedLearners:['Core Learner']},
+    {username:'other-admin',name:'Other Admin',role:'admin',pinHash,schoolId:'other-school',schoolName:'Other Browser School',verificationStatus:'Active'}
   ],
   students:[{id:'core-learner',studentName:'Core Learner',className:'Grade R',schoolId:'core-school',schoolName:'Core Browser School'}],
   moduleRecords:{},attendance:[],directMessages:[],chatGroups:[],groupMessages:{}
@@ -44,7 +45,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       if(ready)break;await wait(100);
     }
     assert.ok(ready,'School core browser fixture did not start: '+stderr);
-    browser=await chromium.launch({headless:true});
+    browser=await chromium.launch({headless:true,...(process.env.LF_BROWSER_CHANNEL?{channel:process.env.LF_BROWSER_CHANNEL}:{})});
     const page=await browser.newPage({viewport:{width:1440,height:1000}});
     const errors=[],failedApi=[];
     page.on('pageerror',error=>errors.push(error.message));
@@ -53,7 +54,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.goto(origin,{waitUntil:'domcontentloaded'});
     await page.locator('#loginUsername').fill('core-admin');
     await page.locator('#loginPin').fill(pin);
-    await page.locator('#loginForm button[type="submit"]').click();
+    await page.locator('#loginForm button.submit-btn').click();
     await page.locator('#dashboardSection').waitFor({state:'visible'});
 
     for(const selector of ['#lfSubjectMarksCard','#lfReportCardMaker','#lfDisciplineCard','#lfAssetRegisterCard','#lfCommunicationHub','#lfGradeRSkillsCard','#lfDsdIncidentCard','#lfSmartAttendanceCard','#lfAdvancedEldaCard','#lfAftercareCard','#lfStaffRatioCard','#lfStaffClockCard','#lfDayCareCard','#lfMealsCard','#lfLearnerGroupsCard','#lfAdvancedAcademicAnalytics','#lfPickupQrCard','#lfCommunicationInboxCard','#lfStaffAdmissionsCard','#lfLearnerDocumentVault']){
@@ -68,6 +69,18 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       await page.locator('#'+tabId).waitFor({state:'visible'});
     };
 
+    await openTab('staffNoticesTab');
+    await page.locator('#staffNoticeForm input[name="title"]').fill('Private browser personnel notice');
+    await page.locator('#staffNoticeForm textarea[name="message"]').fill('Principal-only review for Core Browser School');
+    await page.locator('#staffNoticeForm select[name="audience"]').selectOption('principal');
+    await page.locator('#staffNoticeForm button.submit-btn').click();
+    await page.locator('#staffNoticeList').getByText('Private browser personnel notice').waitFor({state:'visible'});
+    assert.equal(await page.locator('#staffNoticeForm input[name="title"]').inputValue(),'','Successful notice submit must reset the actual form.');
+    await page.locator('#staffNoticeForm input[name="title"]').fill('Optional browser notice');
+    await page.locator('#staffNoticeForm textarea[name="message"]').fill('Information only');
+    await page.locator('#staffNoticeForm input[name="required"]').uncheck();
+    await page.locator('#staffNoticeForm button.submit-btn').click();
+    await page.locator('#staffNoticeList').getByText('No acknowledgement required').waitFor();
     await openTab('worksheetsTab');
     await page.locator('#lfSubjectMarkForm input[name="learnerName"]').fill('Core Learner');
     await page.locator('#lfSubjectMarkForm input[name="subject"]').fill('Mathematics');
@@ -75,7 +88,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfSubjectMarkForm input[name="term"]').fill('Term 4');
     await page.locator('#lfSubjectMarkForm input[name="score"]').fill('18');
     await page.locator('#lfSubjectMarkForm input[name="maximum"]').fill('20');
-    await page.locator('#lfSubjectMarkForm button[type="submit"]').click();
+    await page.locator('#lfSubjectMarkForm button.submit-btn').click();
     await assert.doesNotReject(async()=>page.locator('#lfSubjectMarksList').getByText('90%').first().waitFor({state:'visible'}));
 
     await openTab('reportsTab');
@@ -83,7 +96,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfReportCardForm input[name="term"]').fill('Term 4');
     await page.locator('#lfReportCardForm textarea[name="teacherComment"]').fill('Good progress');
     await page.locator('#lfReportCardForm input[name="promotionOutcome"]').fill('Progress');
-    await page.locator('#lfReportCardForm button[type="submit"]').click();
+    await page.locator('#lfReportCardForm button.submit-btn').click();
     await page.locator('#lfReportCardList').getByText('Core Learner').first().waitFor({state:'visible'});
 
     await openTab('safeguardingTab');
@@ -91,7 +104,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfDisciplineForm input[name="category"]').fill('Class conduct');
     await page.locator('#lfDisciplineForm textarea[name="details"]').fill('Needs a conduct note');
     await page.locator('#lfDisciplineForm input[name="points"]').fill('2');
-    await page.locator('#lfDisciplineForm button[type="submit"]').click();
+    await page.locator('#lfDisciplineForm button.submit-btn').click();
     await page.locator('#lfDisciplineList').getByText('Core Learner').first().waitFor({state:'visible'});
 
     await openTab('progressTab');
@@ -101,7 +114,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfAssetForm input[name="assetCode"]').fill('CORE-001');
     await page.locator('#lfAssetForm input[name="name"]').fill('Class tablet');
     await page.locator('#lfAssetForm input[name="location"]').fill('Grade R');
-    await page.locator('#lfAssetForm button[type="submit"]').click();
+    await page.locator('#lfAssetForm button.submit-btn').click();
     await page.locator('#lfAssetList').getByText('CORE-001').first().waitFor({state:'visible'});
 
     await openTab('progressTab');
@@ -109,7 +122,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfGradeRForm input[name="term"]').fill('Term 4');
     await page.locator('#lfGradeRForm select[name="rating"]').selectOption('3');
     await page.locator('#lfGradeRForm textarea[name="evidence"]').fill('Observed in class');
-    await page.locator('#lfGradeRForm button[type="submit"]').click();
+    await page.locator('#lfGradeRForm button.submit-btn').click();
     await page.locator('#lfGradeRSummary').getByText('1 /').first().waitFor({state:'visible'});
 
     await openTab('careTab');
@@ -120,14 +133,14 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await page.locator('#lfDsdIncidentForm input[name="incidentType"]').fill('Minor injury');
     await page.locator('#lfDsdIncidentForm textarea[name="description"]').fill('Learner tripped while playing.');
     await page.locator('#lfDsdIncidentForm input[name="bodyRegions"][value="left-leg"]').check();
-    await page.locator('#lfDsdIncidentForm button[type="submit"]').click();
+    await page.locator('#lfDsdIncidentForm button.submit-btn').click();
     await page.locator('#lfDsdIncidentList').getByText('Core Learner').first().waitFor({state:'visible'});
 
     await openTab('attendanceTab');
     await page.locator('#lfAttendanceSettings input[name="cutoffTime"]').fill('09:00');
     await page.locator('#lfAttendanceSettings input[name="autoAbsent"]').check();
     await page.locator('#lfAttendanceSettings input[name="remindStaff"]').check();
-    await page.locator('#lfAttendanceSettings button[type="submit"]').click();
+    await page.locator('#lfAttendanceSettings button.submit-btn').click();
     await wait(150);
     assert.equal(await page.locator('#lfAttendanceSettings input[name="autoAbsent"]').isChecked(),true);
     assert.equal(await page.locator('#lfAttendanceSettings input[name="remindStaff"]').isChecked(),true);
@@ -152,13 +165,13 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await openTab('operationsTab');
     await page.locator('#lfLearnerGroupForm input[name="name"]').fill('Browser Team');
     await page.locator('#lfLearnerGroupForm input[name="type"]').fill('Sport');
-    await page.locator('#lfLearnerGroupForm button[type="submit"]').click();
+    await page.locator('#lfLearnerGroupForm button.submit-btn').click();
     await page.locator('#lfLearnerGroupList').getByText('Browser Team').waitFor({state:'visible'});
     await page.locator('#lfDayCareForm input[name="childName"]').fill('Holiday Child');
     await page.locator('#lfDayCareForm input[name="className"]').fill('Holiday Group');
     await page.locator('#lfDayCareForm input[name="date"]').fill('2026-12-15');
     await page.locator('#lfDayCareForm input[name="rate"]').fill('0');
-    await page.locator('#lfDayCareForm button[type="submit"]').click();
+    await page.locator('#lfDayCareForm button.submit-btn').click();
     await page.locator('#lfDayCareList').getByText('Holiday Child').waitFor({state:'visible'});
 
     await openTab('staffWorkTab');
@@ -171,10 +184,40 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
     assert.deepEqual(errors,[],'New school core UI must not throw browser errors: '+errors.join(' | '));
     assert.deepEqual(failedApi,[],'New school core UI must not produce server errors: '+failedApi.join(' | '));
-    console.log('School core browser regression passed');
+    // Delay a genuine API response to reproduce a request completing after a school switch.
+    // Its body comes from the real server; no replacement response is fabricated.
+    let releaseOldNotice,noticeReady;
+    const noticeGate=new Promise(resolve=>{releaseOldNotice=resolve;});
+    const noticeFetched=new Promise(resolve=>{noticeReady=resolve;});
+    let delayedNoticeStarted=false;
+    const delayNotice=async route=>{if(delayedNoticeStarted)return route.continue();delayedNoticeStarted=true;const response=await route.fetch();noticeReady();await noticeGate;await route.fulfill({response});};
+    await page.route('**/api/staff/notices',delayNotice);
+    await page.evaluate(()=>{window.refreshStaffNotices().catch(()=>{});});
+    await noticeFetched;
+    await page.locator('.sidebar-signout').click();
+    await page.locator('#authSection').waitFor({state:'visible'});
+    await page.waitForFunction(()=>!document.getElementById('lfStaffAdmissionsCard')&&!document.getElementById('lfLearnerGroupsCard'));
+    for(const id of ['staffWorkContent','approvalsList','staffNoticeList','meetingMinutesList','maintenanceList','resourceBookingList','purchaseRequestList','qualificationsContent','kpiHistoryContent','staffDevelopmentContent','emailIntegrationContent'])assert.equal(await page.locator('#'+id).innerText(),'','Logout must clear '+id);
+    await page.locator('#loginUsername').fill('other-admin');
+    await page.locator('#loginPin').fill(pin);
+    await page.locator('#loginForm button[type="submit"]').click();
+    await page.locator('#dashboardSection').waitFor({state:'visible'});
+    await openTab('operationsTab');
+    await page.locator('#lfLearnerGroupList').getByText('No learner groups yet.').waitFor();
+    assert.equal(await page.locator('#lfLearnerGroupList').getByText('Browser Team').count(),0,'A new school session must not retain the prior school records.');
+    await openTab('staffNoticesTab');
+    await page.locator('#staffNoticeList').getByText('No staff notices yet.').waitFor();
+    releaseOldNotice();
+    await page.waitForTimeout(200);
+    await page.unroute('**/api/staff/notices',delayNotice);
+    assert.equal(await page.getByText('Private browser personnel notice').count(),0,'A delayed real response from the previous school must not reappear.');
+    assert.deepEqual(errors,[],'Account switching must not throw browser errors.');
+    const accessibleNames=await page.locator('#lfGroupSelect').getAttribute('aria-label');
+    assert.equal(accessibleNames,'Learner group');
+    console.log('School core browser regression passed, including account-switch isolation and accessible controls');
   }finally{
     if(browser)await browser.close();
     await stop();
     fs.rmSync(fixture,{recursive:true,force:true});
   }
-})().catch(async error=>{console.error(error);if(browser)await browser.close().catch(()=>{});await stop();process.exitCode=1;});
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -3,13 +3,14 @@ let serverSessionValidatedAt = 0;
 let sessionValidationPromise = null;
 const SESSION_VALIDATION_TTL_MS = 2500;
 const LITTLE_FEET_INTERNAL_ROLES = new Set(['staff', 'crm', 'accounts', 'support']);
-const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'staff' || user.role === 'crm' || user.role === 'accounts' || user.platformAccess === true));
+const isFullAccessUser = (user = currentUser) => Boolean(user && (user.role === 'admin'));
+const canManageSchoolAccounts = (user = currentUser) => Boolean(user && (user.role === 'admin' || user.role === 'crm'));
 const isInternalCompanyRole = role => LITTLE_FEET_INTERNAL_ROLES.has(String(role || ''));
 const isFinanceUser = (user = currentUser) => Boolean(user && (isFullAccessUser(user) || user.role === 'school_accounts'));
 const displayRoleName = user => {
   if (!user) return '';
   if (user.role === 'admin' && user.platformAccess) return 'CEO / ADMINISTRATOR';
-  return ({ staff:'LITTLE FEET STAFF', crm:'CRM', accounts:'ACCOUNTS', school_accounts:'ACCOUNTS', support:'SOFTWARE SUPPORT' }[user.role] || String(user.role || '').toUpperCase());
+  return ({ staff:'LITTLE FEET STAFF', crm:'SALES / CRM', accounts:'LITTLE FEET ACCOUNTS', school_accounts:'SCHOOL ACCOUNTS', support:'SOFTWARE SUPPORT' }[user.role] || String(user.role || '').toUpperCase());
 };
 window.getLittleFeetCurrentUser = () => currentUser;
 window.isLittleFeetFullAccessUser = user => isFullAccessUser(user || currentUser);
@@ -21,6 +22,7 @@ let schoolMapRequestToken = 0;
 let nearbySchoolRecords = [];
 let alertLocation = null;
 let accountsCache = [];
+let accountSessionGeneration = 0;
 let accountSchoolSearchTimer = null;
 let accountSchoolSearchToken = 0;
 let broadcastsLoaded = false;
@@ -1380,7 +1382,7 @@ function renderInspectDashboard() {
   if (logRows) {
     logRows.innerHTML = logs.length ? logs.map(entry => {
       const requestId = String(entry.requestId || '');
-      const encodedRequestId = encodeURIComponent(requestId);
+      const encodedRequestId = encodeInlineIdentifier(requestId);
       const userContext = entry.user
         ? `<strong>${escapeWorkspaceText(entry.user)}</strong><br><span class="meta">${escapeWorkspaceText(entry.role || 'account')}${entry.schoolName ? ` · ${escapeWorkspaceText(entry.schoolName)}` : ''}</span>`
         : '<span class="meta">System / unauthenticated</span>';
@@ -1403,8 +1405,8 @@ function renderInspectDashboard() {
   const faultRows = document.getElementById('inspectFaultRows');
   if (faultRows) {
     faultRows.innerHTML = faults.length ? faults.slice(0, 100).map(fault => {
-      const encodedId = encodeURIComponent(fault.id);
-      const encodedRequestId = encodeURIComponent(fault.requestId || '');
+      const encodedId = encodeInlineIdentifier(fault.id);
+      const encodedRequestId = encodeInlineIdentifier(fault.requestId || '');
       const actions = fault.status === 'resolved'
         ? '<span class="badge-tag info">RESOLVED</span>'
         : `<button type="button" class="action-btn btn-blue" onclick="updateSystemErrorStatus('${encodedId}','acknowledged')">Acknowledge</button><button type="button" class="action-btn btn-green" onclick="updateSystemErrorStatus('${encodedId}','resolved')">Resolve</button>`;
@@ -1840,9 +1842,15 @@ function setupSession() {
 
 function applyRolePermissions(role) {
   const fullAccess = isFullAccessUser(currentUser);
+  updateAccountRoleFields();
   document.querySelectorAll('.role-admin, .role-teacher').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('[data-roles]').forEach(el => {
-    const roleAllowed = fullAccess || el.dataset.roles.split(',').includes(role);
+    const companyTabs = new Set(['homeTab','staffWorkTab','qualificationsTab','kpiHistoryTab','staffDevelopmentTab','emailIntegrationTab','chatTab','ticketsTab','guideTab','settingsTab','wallpaperTab', ...(role === 'crm' ? ['companyClientsTab','accountsTab'] : []), ...(role === 'accounts' ? ['companyBillingTab'] : [])]);
+    const tabId = el.classList.contains('tab-content') ? el.id : el.querySelector('.nav-btn')?.getAttribute('onclick')?.match(/switchTab\('([^']+)'/)?.[1];
+    const companyTool = tabId === 'companyClientsTab' || tabId === 'companyBillingTab';
+    const roleAllowed = companyTool
+      ? Boolean((role === 'admin' && currentUser.platformAccess === true) || (role === 'crm' && tabId === 'companyClientsTab') || (role === 'accounts' && tabId === 'companyBillingTab'))
+      : fullAccess || (isInternalCompanyRole(role) && tabId ? companyTabs.has(tabId) : el.dataset.roles.split(',').includes(role));
     const subscriptionAllowed = !el.dataset.subscription || role !== 'parent' || currentUser?.subscription === el.dataset.subscription;
     el.classList.toggle('hidden', !roleAllowed || !subscriptionAllowed);
   });
@@ -1854,10 +1862,84 @@ function applyRolePermissions(role) {
     document.querySelectorAll('#attendanceTab, #schoolDayTab, #chatTab, #operationsTab, #careTab, #registryTab, #financeTab').forEach(el => el.classList.remove('hidden'));
   } else if (role === 'district') {
     document.querySelectorAll('#analyticsTab, #lookupTab').forEach(el => el.classList.remove('hidden'));
+  } else if (role === 'crm') {
+    document.getElementById('accountsTab')?.classList.remove('hidden');
   }
+  document.getElementById('debugModePanel')?.classList.toggle('hidden', !fullAccess);
   document.querySelectorAll('[data-nav-group]').forEach(group => {
     group.classList.toggle('hidden', ![...group.querySelectorAll('li[data-roles]')].some(item => !item.classList.contains('hidden')));
   });
+}
+
+async function loadCompanyClients() {
+  const host = document.getElementById('companyClientsContent');
+  if (!host || !(isFullAccessUser() || currentUser?.role === 'crm')) return;
+  const session = workspaceSessionKey();
+  try {
+    const response = await fetch('/api/company/clients');
+    const clients = await response.json();
+    if (session !== workspaceSessionKey()) return;
+    if (!response.ok) throw new Error(clients.message || 'Could not load clients.');
+    host.replaceChildren();
+    if (!clients.length) { host.textContent = 'No schools registered yet.'; return; }
+    for (const client of clients) {
+      const card = document.createElement('div'); card.className = 'workspace-card';
+      const name = document.createElement('h3'); name.textContent = client.name;
+      const detail = document.createElement('p'); detail.textContent = [client.area, client.status].filter(Boolean).join(' · ');
+      const label = document.createElement('label'); label.textContent = 'Your client follow-up note';
+      const input = document.createElement('textarea'); input.maxLength = 2000; input.value = client.note || ''; label.append(input);
+      const save = document.createElement('button'); save.type = 'button'; save.className = 'action-btn'; save.textContent = 'Save note';
+      const status = document.createElement('p'); status.setAttribute('role', 'status');
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        try {
+          const result = await fetch('/api/company/clients/' + encodeURIComponent(client.id), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({note:input.value}) });
+          const data = await result.json(); if (session !== workspaceSessionKey()) return;
+          if (!result.ok) throw new Error(data.message || 'Could not save note.'); status.textContent = 'Saved.';
+        } catch (error) { if (session === workspaceSessionKey()) status.textContent = error.message; }
+        finally { save.disabled = false; }
+      });
+      card.append(name, detail, label, save, status); host.append(card);
+    }
+  } catch (error) { if (session === workspaceSessionKey()) host.textContent = error.message; }
+}
+
+async function loadCompanyBilling() {
+  const host = document.getElementById('companyBillingContent');
+  if (!host || !(isFullAccessUser() || currentUser?.role === 'accounts')) return;
+  const session = workspaceSessionKey();
+  try {
+    const response = await fetch('/api/company/billing'); const data = await response.json();
+    if (session !== workspaceSessionKey()) return;
+    if (!response.ok) throw new Error(data.message || 'Could not load company invoices.');
+    host.replaceChildren();
+    if (!data.orders.length) { host.textContent = 'No school subscription invoices recorded yet.'; return; }
+    for (const invoice of data.orders) {
+      const card = document.createElement('div'); card.className = 'workspace-card';
+      const title = document.createElement('h3'); title.textContent = invoice.schoolName;
+      const detail = document.createElement('p'); detail.textContent = `${invoice.reference} · R ${Number(invoice.amount || 0).toFixed(2)} · ${invoice.status}`;
+      card.append(title,detail);
+      if (!/paid/i.test(invoice.status)) {
+        const form = document.createElement('form');
+        const reference = document.createElement('input'); reference.required = true; reference.maxLength = 160;
+        const label = document.createElement('label'); label.textContent = 'Bank payment reference'; label.append(reference);
+        const save = document.createElement('button'); save.type = 'submit'; save.className = 'action-btn'; save.textContent = 'Record confirmed payment';
+        const status = document.createElement('p'); status.setAttribute('role','status');
+        const eventId = crypto.randomUUID();
+        form.append(label,save,status); form.addEventListener('submit', async event => {
+          event.preventDefault(); if (!confirm('Have you verified this payment against the bank record?')) return;
+          save.disabled = true;
+          try {
+            const result = await fetch('/api/company/billing/reconcile', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({reference:invoice.reference,amount:invoice.amount,bankReference:reference.value,eventId})});
+            const payload = await result.json(); if (session !== workspaceSessionKey()) return;
+            if (!result.ok) throw new Error(payload.message || 'Could not record payment.'); await loadCompanyBilling();
+          } catch (error) { if (session === workspaceSessionKey()) status.textContent = error.message; }
+          finally { save.disabled = false; }
+        }); card.append(form);
+      }
+      host.append(card);
+    }
+  } catch (error) { if (session === workspaceSessionKey()) host.textContent = error.message; }
 }
 
 function renderRoleHomePanel() {
@@ -1886,15 +1968,15 @@ function renderRoleHomePanel() {
     },
     staff: {
       icon: '🐧', title: `Little Feet Staff · ${currentUser.name || 'Team member'}`,
-      message: 'Company-wide staff access is active. This account can work across every Little Feet workspace and does not need a school link.'
+      message: 'Manage your assigned company tasks, leave, training, email and messages.'
     },
     crm: {
       icon: '🤝', title: `CRM workspace · ${currentUser.name || 'Little Feet'}`,
-      message: 'Manage client communication, support tickets, messages, email and engagement work without requiring a school link.'
+      message: 'Help clients set up their school users, manage client follow-ups and assigned tickets, and use your own work tools.'
     },
     accounts: {
       icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'Little Feet'}`,
-      message: 'Company-wide Little Feet Accounts access is active across all platform workspaces and schools.'
+      message: 'Review Little Feet school subscription invoices and record confirmed payments. School and parent finances remain private.'
     },
     school_accounts: {
       icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'School accounts'}`,
@@ -1909,7 +1991,7 @@ function renderRoleHomePanel() {
   panel.classList.add('mascot-role-home');
   panel.innerHTML = `<div class="role-home-content"><div><span class="portal-welcome-kicker">YOUR LITTLE FEET WORKSPACE</span><h1>${escapeWorkspaceText(experience.title)}</h1><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
   const setupCard = document.getElementById('schoolSetupCard');
-  if (setupCard && currentUser.platformAccess) setupCard.classList.add('hidden');
+  if (setupCard && (currentUser.platformAccess || isInternalCompanyRole(currentUser.role))) setupCard.classList.add('hidden');
 }
 
 
@@ -2170,6 +2252,7 @@ function loadWorkspaceOnDemand(tabId) {
   if (!currentUser) return Promise.resolve([]);
   const loaders = {
     scheduleTab: [loadSchedules], worksheetsTab: [loadWorksheets], badgesTab: [loadBadges],
+    companyClientsTab: [loadCompanyClients], companyBillingTab: [loadCompanyBilling],
     attendanceTab: [loadAttendance], ticketsTab: [() => runPortalRefreshJob('tickets', () => loadTickets()), loadTicketAssignees],
     broadcastsTab: [() => runPortalRefreshJob('broadcasts', () => loadBroadcasts())], chatTab: [loadChatGroups, loadGroupChatMessages, loadDirectChatUsers],
     registryTab: [loadRegistry, loadLearnerAccessCodes],
@@ -2584,7 +2667,7 @@ async function loadHouseholdSwitcher() {
     }
     localStorage.setItem('lf_selected_learner', selectedLearner.studentName);
     box.classList.remove('hidden');
-    box.innerHTML = `<div class="card-header-bar"><h2>👨‍👩‍👧 Your linked learners</h2><span class="badge-tag info">PARENT</span></div><p style="color:var(--text-muted);margin-bottom:10px;">Only children linked to this parent account are shown here.</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${learners.map((learner, index) => `<button type="button" class="action-btn ${learner.studentName === selectedLearner.studentName || (!index && !selectedLearner) ? 'btn-green' : 'btn-blue'}" onclick="selectHouseholdLearner('${encodeURIComponent(learner.studentName)}')">${escapeWorkspaceText(learner.studentName)} · ${escapeWorkspaceText(learner.className)}</button>`).join('')}</div><p id="householdSelection" class="meta" style="margin-top:9px;">Selected learner: ${escapeWorkspaceText(selectedLearner.studentName)}</p>`;
+    box.innerHTML = `<div class="card-header-bar"><h2>👨‍👩‍👧 Your linked learners</h2><span class="badge-tag info">PARENT</span></div><p style="color:var(--text-muted);margin-bottom:10px;">Only children linked to this parent account are shown here.</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${learners.map((learner, index) => `<button type="button" class="action-btn ${learner.studentName === selectedLearner.studentName || (!index && !selectedLearner) ? 'btn-green' : 'btn-blue'}" onclick="selectHouseholdLearner('${encodeInlineIdentifier(learner.studentName)}')">${escapeWorkspaceText(learner.studentName)} · ${escapeWorkspaceText(learner.className)}</button>`).join('')}</div><p id="householdSelection" class="meta" style="margin-top:9px;">Selected learner: ${escapeWorkspaceText(selectedLearner.studentName)}</p>`;
   } catch { box.classList.add('hidden'); }
 }
 
@@ -2660,6 +2743,7 @@ const validateSpreadsheetFile = (file, maxBytes = STANDARD_SPREADSHEET_MAX_BYTES
 
 // Editable Academic Term Functions
 async function loadAcademicTerm() {
+  if (isInternalCompanyRole(currentUser?.role)) return;
   try {
     const res = await fetch('/api/term');
     const data = await res.json();
@@ -2836,7 +2920,7 @@ async function loadSchoolProximityMap() {
           : '<p class="school-muted" style="font-size:0.75rem; margin:7px 0 0;"><strong>Photo:</strong> Not publicly listed in OpenStreetMap.</p>';
         const contact = `<p style="font-size:0.8rem; margin:7px 0 0;"><strong>Phone:</strong> ${phone ? `<a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : 'Not publicly listed'}<br><strong>Email:</strong> ${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : `Not publicly listed · <a href="${escapeHtml(contactSearchUrl)}" target="_blank" rel="noopener noreferrer">Find official contact</a>`}</p>`;
         school.details = { street, suburb, town, category, phone, email, website, imageUrl };
-        const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-green" style="margin:0 0 7px;" onclick="openSchoolDetail(${nearbySchools.indexOf(school)})">View details / apply</button><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeURIComponent(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses verified public details only. No AI-generated school details are saved automatically.</p></div></div>`;
+        const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-green" style="margin:0 0 7px;" onclick="openSchoolDetail(${nearbySchools.indexOf(school)})">View details / apply</button><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeInlineIdentifier(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses verified public details only. No AI-generated school details are saved automatically.</p></div></div>`;
         const marker = L.marker([school.lat, school.lng], { riseOnHover: true }).bindPopup(content, { autoClose: false, closeOnClick: false, closeOnEscapeKey: false, keepInView: true, autoPanPadding: [20, 20], maxWidth: 310 });
         marker.on('click', event => {
           if (event.originalEvent) L.DomEvent.stop(event.originalEvent);
@@ -2985,6 +3069,7 @@ async function enrichSchoolPin(button, schoolName, latitude, longitude) {
 
 // Posts
 async function loadPosts() {
+  if (isInternalCompanyRole(currentUser?.role)) return;
   try {
     const res = await fetch('/api/posts');
     const posts = await res.json();
@@ -2996,7 +3081,7 @@ async function loadPosts() {
                 <span class="badge-tag info">Audience: ${escapeWorkspaceText(p.audience || 'All')}</span>
                 <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${escapeWorkspaceText(p.caption)}</p>
               </div>
-              <button type="button" onclick="deletePost('${encodeURIComponent(p.id)}')" class="action-btn btn-red">🗑️ Delete</button>
+              <button type="button" onclick="deletePost('${encodeInlineIdentifier(p.id)}')" class="action-btn btn-red">🗑️ Delete</button>
             </div>
             ${p.mediaUrl ? `<img src="${p.mediaUrl}" class="post-item" onclick="openModal('Media File Preview', '<img src=\\'${p.mediaUrl}\\' style=\\'max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;\\'>')">` : ''}
             <div class="meta"><span>Posted by Staff (${escapeWorkspaceText(p.createdAt || 'Recent')})</span></div>
@@ -3051,7 +3136,7 @@ async function loadSchedules() {
               <strong>${escapeWorkspaceText(s.studentName)}</strong> - <span style="color:#0d9488; font-weight:600;">${escapeWorkspaceText(s.timeSlot)}</span>
               <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${escapeWorkspaceText(s.activity)}</p>
             </div>
-            <button type="button" onclick="deleteSchedule('${encodeURIComponent(s.id)}')" class="action-btn btn-red">🗑️ Delete</button>
+            <button type="button" onclick="deleteSchedule('${encodeInlineIdentifier(s.id)}')" class="action-btn btn-red">🗑️ Delete</button>
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active schedule records found.</p>';
   } catch (err) {
@@ -3162,8 +3247,8 @@ async function loadWorksheets() {
                 <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${escapeWorkspaceText(w.grade)}%</span>
               </div>
               <div>
-                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${encodeURIComponent(w.id)}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
-                <button type="button" onclick="deleteWorksheet('${encodeURIComponent(w.id)}')" class="action-btn btn-red">🗑️ Delete</button>
+                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${encodeInlineIdentifier(w.id)}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
+                <button type="button" onclick="deleteWorksheet('${encodeInlineIdentifier(w.id)}')" class="action-btn btn-red">🗑️ Delete</button>
               </div>
             </div>
             
@@ -3356,7 +3441,7 @@ async function loadBadges() {
               <span style="color:#a7f3d0;">— ${escapeWorkspaceText(b.studentName)}</span>
               <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${escapeWorkspaceText(b.note)}"</p>
             </div>
-            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${encodeURIComponent(String(b.id || ''))}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${encodeInlineIdentifier(String(b.id || ''))}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No milestone badges awarded yet.</p>';
   } catch (err) {
@@ -3566,8 +3651,16 @@ async function clearAttendanceRegistry() {
 }
 
 // Support Tickets Archive & Queue
+function canManageTicketQueue() {
+  return isFullAccessUser() || ['crm', 'support'].includes(currentUser?.role);
+}
+
+function encodeInlineIdentifier(value) {
+  return encodeURIComponent(value).replace(/'/g, '%27');
+}
+
 function ticketCanBeManaged(ticket) {
-  return isFullAccessUser() || String(ticket.assignedTo || '').toLowerCase() === String(currentUser?.username || '').toLowerCase();
+  return canManageTicketQueue() || String(ticket.assignedTo || '').toLowerCase() === String(currentUser?.username || '').toLowerCase();
 }
 
 function showTicketNotification(ticket) {
@@ -3585,9 +3678,9 @@ function renderTicketAssigneeOptions(selectId, query = '', selected = '') {
   const search = String(query || '').trim().toLowerCase();
   const schoolAccounts = ticketAssigneeAccounts.filter(account => {
     const matchesSearch = !search || `${account.name || ''} ${account.username || ''}`.toLowerCase().includes(search);
-    return account.username !== currentUser?.username && account.schoolName === currentUser?.schoolName && matchesSearch;
+    return matchesSearch;
   });
-  const roleGroups = [['teacher', 'Teachers'], ['principal', 'Principals'], ['parent', 'Parents']];
+  const roleGroups = [['teacher', 'Teachers'], ['principal', 'Principals'], ['parent', 'Parents'], ['admin', 'Administrators'], ['district', 'District'], ['school_accounts', 'School Accounts'], ['staff', 'Little Feet Staff'], ['crm', 'Sales / CRM'], ['accounts', 'Little Feet Accounts'], ['support', 'Software Support']];
   const groupedOptions = roleGroups.map(([role, label]) => {
     const people = schoolAccounts.filter(account => account.role === role);
     return people.length ? `<optgroup label="${label}">${people.map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)}</option>`).join('')}</optgroup>` : '';
@@ -3603,9 +3696,9 @@ function filterTicketAssignees(searchId, selectId) {
 }
 
 async function loadTicketAssignees() {
-  if (!document.getElementById('ticketAssignee') || !isFullAccessUser()) return;
+  if (!document.getElementById('ticketAssignee') || !canManageTicketQueue()) return;
   try {
-    const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
+    const response = await fetch('/api/tickets/assignees');
     const accounts = await response.json();
     if (!response.ok) return;
     const selected = document.getElementById('ticketAssignee').value;
@@ -3642,14 +3735,14 @@ async function loadTickets(checkForNew = false) {
                 <strong>${escapeWorkspaceText(t.subject)}</strong>
                 <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
               </div>
-              ${isFullAccessUser() && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeURIComponent(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+              ${isFullAccessUser() && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeInlineIdentifier(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeInlineIdentifier(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
             </div>
             <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
             ${t.ticketType === 'Meeting request' ? `<p class="meta" style="margin-top:6px;"><strong>Requested meeting:</strong> ${escapeWorkspaceText(t.meetingDate || 'Date not set')} ${escapeWorkspaceText(t.meetingTime || '')}${t.meetingLocation ? ' · ' + escapeWorkspaceText(t.meetingLocation) : ''}</p>` : ''}
             ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
             ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
             ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
-              <button type="button" onclick="editTicketModal('${encodeURIComponent(String(t.id || ''))}', '${encodeURIComponent(String(t.status || 'Open'))}', '${encodeURIComponent(t.feedback || '')}', '${encodeURIComponent(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
+              <button type="button" onclick="editTicketModal('${encodeInlineIdentifier(String(t.id || ''))}', '${encodeInlineIdentifier(String(t.status || 'Open'))}', '${encodeInlineIdentifier(t.feedback || '')}', '${encodeInlineIdentifier(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
             </div>` : ''}
           </div>`).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
@@ -3668,7 +3761,7 @@ async function loadTickets(checkForNew = false) {
         <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
           <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
             <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
-            ${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeURIComponent(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
+            ${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeInlineIdentifier(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
           </div>
           <p style="font-size:0.85rem; margin-top:4px;">${escapeWorkspaceText(t.message)}</p>
           ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${escapeWorkspaceText(t.feedback)}</p>` : ''}
@@ -3715,7 +3808,7 @@ if (ticketForm) {
       subject: document.getElementById('ticketSubject').value,
       message: document.getElementById('ticketMessage').value,
       createdBy: currentUser?.username,
-      assignedTo: isFullAccessUser() ? document.getElementById('ticketAssignee')?.value : ''
+      assignedTo: canManageTicketQueue() ? document.getElementById('ticketAssignee')?.value : ''
     };
     const response = await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const result = await response.json();
@@ -3742,11 +3835,11 @@ function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssig
         <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
         <label for="editCompleted" style="margin-bottom:0;">Mark Ticket as Completed</label>
       </div>
-      ${isFullAccessUser() ? '<div><label for="editTicketAssigneeSearch">Find an account</label><input id="editTicketAssigneeSearch" type="search" placeholder="Search a teacher, principal, or parent" oninput="filterTicketAssignees(\'editTicketAssigneeSearch\', \'editTicketAssignee\')"><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
+      ${canManageTicketQueue() ? '<div><label for="editTicketAssigneeSearch">Find an account</label><input id="editTicketAssigneeSearch" type="search" placeholder="Search a school user or company employee" oninput="filterTicketAssignees(\'editTicketAssigneeSearch\', \'editTicketAssignee\')"><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
       <button type="submit" class="submit-btn">Save Ticket Resolution</button>
     </form>`;
   openModal('Edit Support Ticket', html);
-  if (isFullAccessUser()) loadTicketAssignees().then(() => renderTicketAssigneeOptions('editTicketAssignee', '', currentAssignee));
+  if (canManageTicketQueue()) loadTicketAssignees().then(() => renderTicketAssigneeOptions('editTicketAssignee', '', currentAssignee));
 
   document.getElementById('editTicketForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3755,7 +3848,7 @@ function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssig
     const response = await fetch('/api/tickets/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin', assignedTo: isFullAccessUser() ? document.getElementById('editTicketAssignee')?.value : undefined })
+      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin', assignedTo: canManageTicketQueue() ? document.getElementById('editTicketAssignee')?.value : undefined })
     });
     const result = await response.json();
     if (!response.ok) return alert(result.message || 'Unable to update this ticket.');
@@ -3811,6 +3904,7 @@ async function executeSchoolDeletion(ticketId) {
 
 // Emergency Broadcasts
 async function loadBroadcasts() {
+  if (isInternalCompanyRole(currentUser?.role)) return;
   try {
     const userPosition = getCachedAlertPosition();
     const locationQuery = userPosition ? `?lat=${encodeURIComponent(userPosition.latitude)}&lng=${encodeURIComponent(userPosition.longitude)}` : '';
@@ -3835,10 +3929,10 @@ async function loadBroadcasts() {
           <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
               <span class="badge-tag urgent">${escapeWorkspaceText(b.bcPriority || 'Urgent Notice')}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${(isFullAccessUser() || currentUser?.role === 'principal') ? `<button type="button" onclick="deleteBroadcast('${encodeURIComponent(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${(isFullAccessUser() || currentUser?.role === 'principal') ? `<button type="button" onclick="deleteBroadcast('${encodeInlineIdentifier(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
             </div>
             <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${escapeWorkspaceText(b.bcMessage)}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeURIComponent(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
+            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeInlineIdentifier(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
           </div>
         `).join('')
       : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
@@ -4060,7 +4154,7 @@ async function loadGroupChatMessages() {
       ? msgs.map(m => {
           const isMe = currentUser && m.sender === currentUser.username;
           const moderation = isFullAccessUser() && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${encodeURIComponent(groupId)}','${encodeURIComponent(m.id)}')">Delete</button>` : '';
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${encodeInlineIdentifier(groupId)}','${encodeInlineIdentifier(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
               <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
@@ -4162,7 +4256,7 @@ async function loadDirectChatMessages() {
       ? msgs.map(m => {
           const isMe = m.sender === currentUser.username;
           const moderation = isFullAccessUser() && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${encodeURIComponent(m.id)}')">Delete</button>` : '';
+            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${encodeInlineIdentifier(m.id)}')">Delete</button>` : '';
           return `
             <div class="msg ${isMe ? 'sent' : 'received'}">
               <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
@@ -4477,7 +4571,7 @@ async function loadSubscriptionBillingOverview() {
     const orders = (data.orders || []).slice(0, 6).map(order => {
       const paymentStatus = String(order.paymentStatus || order.status || '').replaceAll('_', ' ');
       const reconcile = isAdmin && !['paid', 'refunded'].includes(String(order.paymentStatus || order.status || '').toLowerCase())
-        ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeURIComponent(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
+        ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeInlineIdentifier(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
         : '';
       return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(paymentStatus)}${reconcile}</li>`;
     }).join('') || '<li>No payment requests yet.</li>';
@@ -4502,7 +4596,7 @@ async function openSubscriptionBillingAdmin() {
   const payment = data.payment || {};
   const orders = (data.orders || []).slice(0, 8).map(order => {
     const reconcile = !['paid', 'refunded'].includes(String(order.paymentStatus || order.status || '').toLowerCase())
-      ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeURIComponent(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
+      ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeInlineIdentifier(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
       : '';
     return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(String(order.paymentStatus || order.status || '').replaceAll('_', ' '))}${reconcile}</li>`;
   }).join('') || '<li>No subscription payment requests yet.</li>';
@@ -4580,7 +4674,7 @@ async function createSubscriptionOrder(event) {
 function openSubscriptionPaymentReconcile(encodedReference, expectedAmount) {
   if (!isFinanceUser()) return alert('Only an administrator or Accounts user can reconcile a subscription payment.');
   const reference = decodeURIComponent(encodedReference);
-  openModal('Record subscription payment', `<form onsubmit="reconcileSubscriptionPayment(event,'${encodeURIComponent(reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">Payment reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Confirm the bank or provider transaction only after the funds have cleared. The school subscription activates immediately after this record is accepted.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(expectedAmount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
+  openModal('Record subscription payment', `<form onsubmit="reconcileSubscriptionPayment(event,'${encodeInlineIdentifier(reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">Payment reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Confirm the bank or provider transaction only after the funds have cleared. The school subscription activates immediately after this record is accepted.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(expectedAmount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
 }
 
 async function reconcileSubscriptionPayment(event, encodedReference) {
@@ -4662,8 +4756,8 @@ async function loadParentPayments() {
     list.innerHTML = data.payments?.length ? data.payments.map(payment => {
       const arrangement = payment.arrangementActive ? `<p style="margin:4px 0;color:#99f6e4;">Approved arrangement: ${formatSubscriptionMoney(payment.arrangementAmount)} due ${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementNote ? ` · ${escapeWorkspaceText(payment.arrangementNote)}` : ''}</p>` : '';
       const destination = payment.payment?.paymentLink ? `<a class="action-btn btn-green" style="display:inline-block;text-decoration:none;" target="_blank" rel="noopener" href="${escapeWorkspaceText(payment.payment.paymentLink)}">Pay securely</a>` : payment.payment?.accountNumber ? `<span class="meta">Pay by bank transfer to ${escapeWorkspaceText(payment.payment.bankName)} · ${escapeWorkspaceText(payment.payment.accountNumber)} · Ref ${escapeWorkspaceText(payment.reference)}</span>` : '<span class="meta">Payment destination not configured.</span>';
-      const actions = admin && payment.balance > 0 ? `<button type="button" class="action-btn btn-blue" onclick="openParentPaymentReconcile('${encodeURIComponent(payment.id)}')">Record payment</button>` : '';
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? ` · ${escapeWorkspaceText(payment.learnerName)}` : ''}</strong> ${parentPaymentStatusLabel(payment)}<p style="margin:4px 0;">${escapeWorkspaceText(payment.description)} · Due ${escapeWorkspaceText(payment.effectiveDueDate)} · Ref <strong>${escapeWorkspaceText(payment.reference)}</strong></p>${arrangement}<p class="meta">Due ${formatSubscriptionMoney(payment.amountDue)}${Number(payment.creditTotal || 0) > 0 ? ` · Credits ${formatSubscriptionMoney(payment.creditTotal)}` : ''} · Paid ${formatSubscriptionMoney(payment.paidAmount)} · Balance ${formatSubscriptionMoney(payment.balance)}${payment.arrears > 0 ? ` · Arrears ${formatSubscriptionMoney(payment.arrears)}` : ''}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${destination}${actions}${currentUser.role === 'parent' && !payment.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signParentPayment('${encodeURIComponent(payment.id)}')">Confirm account</button>` : ''}</div></div>`;
+      const actions = admin && payment.balance > 0 ? `<button type="button" class="action-btn btn-blue" onclick="openParentPaymentReconcile('${encodeInlineIdentifier(payment.id)}')">Record payment</button>` : '';
+      return `<div class="item-row"><div><strong>${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? ` · ${escapeWorkspaceText(payment.learnerName)}` : ''}</strong> ${parentPaymentStatusLabel(payment)}<p style="margin:4px 0;">${escapeWorkspaceText(payment.description)} · Due ${escapeWorkspaceText(payment.effectiveDueDate)} · Ref <strong>${escapeWorkspaceText(payment.reference)}</strong></p>${arrangement}<p class="meta">Due ${formatSubscriptionMoney(payment.amountDue)}${Number(payment.creditTotal || 0) > 0 ? ` · Credits ${formatSubscriptionMoney(payment.creditTotal)}` : ''} · Paid ${formatSubscriptionMoney(payment.paidAmount)} · Balance ${formatSubscriptionMoney(payment.balance)}${payment.arrears > 0 ? ` · Arrears ${formatSubscriptionMoney(payment.arrears)}` : ''}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${destination}${actions}${currentUser.role === 'parent' && !payment.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signParentPayment('${encodeInlineIdentifier(payment.id)}')">Confirm account</button>` : ''}</div></div>`;
     }).join('') : '<p class="meta">No parent payment requests have been created.</p>';
   } catch (error) {
     summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load parent payments.'))}</p>`;
@@ -4702,7 +4796,7 @@ async function createParentPayment(event) {
 function openParentPaymentReconcile(encodedId) {
   const payment = parentPaymentData?.payments?.find(item => item.id === decodeURIComponent(encodedId));
   if (!payment) return;
-  openModal('Record parent payment', `<form onsubmit="reconcileParentPayment(event,'${encodeURIComponent(payment.reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">${escapeWorkspaceText(payment.parentName)} · ${escapeWorkspaceText(payment.description)}</p><p class="meta" style="margin:0;">Remaining balance: ${formatSubscriptionMoney(payment.balance)}. Part-payments are accepted and the arrears label will recalculate immediately.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" max="${payment.balance}" step="0.01" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160"></label><button class="submit-btn">Record payment</button></form>`);
+  openModal('Record parent payment', `<form onsubmit="reconcileParentPayment(event,'${encodeInlineIdentifier(payment.reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">${escapeWorkspaceText(payment.parentName)} · ${escapeWorkspaceText(payment.description)}</p><p class="meta" style="margin:0;">Remaining balance: ${formatSubscriptionMoney(payment.balance)}. Part-payments are accepted and the arrears label will recalculate immediately.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" max="${payment.balance}" step="0.01" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160"></label><button class="submit-btn">Record payment</button></form>`);
 }
 
 async function reconcileParentPayment(event, encodedReference) {
@@ -4749,7 +4843,7 @@ function exportParentPaymentReport() {
 function signParentPayment(encodedId) {
   const payment = parentPaymentData?.payments?.find(item => item.id === decodeURIComponent(encodedId));
   if (!payment) return;
-  openModal('Confirm parent payment account', `<form onsubmit="submitParentPaymentSignature(event,'${encodeURIComponent(payment.id)}')" style="display:grid;gap:12px;"><p class="meta">Type your name to confirm that you have received and reviewed this payment request.</p><label>Your signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm</button></form>`);
+  openModal('Confirm parent payment account', `<form onsubmit="submitParentPaymentSignature(event,'${encodeInlineIdentifier(payment.id)}')" style="display:grid;gap:12px;"><p class="meta">Type your name to confirm that you have received and reviewed this payment request.</p><label>Your signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm</button></form>`);
 }
 
 async function submitParentPaymentSignature(event, encodedId) {
@@ -4777,8 +4871,8 @@ async function loadBookRegister() {
     list.innerHTML = data.records?.length ? data.records.map(record => {
       const returnDetails = record.status === 'returned' ? `<p class="meta">Returned ${record.returnedAt ? new Date(record.returnedAt).toLocaleString() : ''} · ${escapeWorkspaceText(record.returnCondition)} · ${escapeWorkspaceText(record.returnStatus)}${record.penaltyAmount ? ` · Penalty ${formatSubscriptionMoney(record.penaltyAmount)}` : ''}</p>` : '';
       const signatures = `<p class="meta">Admin signed: ${escapeWorkspaceText(record.adminSignature || '—')} ${record.adminSignedAt ? `(${new Date(record.adminSignedAt).toLocaleString()})` : ''} · Parent signed: ${escapeWorkspaceText(record.parentSignature || '—')} ${record.parentSignedAt ? `(${new Date(record.parentSignedAt).toLocaleString()})` : ''}</p>`;
-      const parentActions = currentUser.role === 'parent' ? `${!record.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeURIComponent(record.id)}','received')">Sign received</button>` : ''}${record.status === 'returned' && !record.returnParentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeURIComponent(record.id)}','returned')">Sign returned</button>` : ''}` : '';
-      const staffActions = (isFullAccessUser() || currentUser.role === 'principal') && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeURIComponent(record.id)}')">Record return</button>` : '';
+      const parentActions = currentUser.role === 'parent' ? `${!record.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeInlineIdentifier(record.id)}','received')">Sign received</button>` : ''}${record.status === 'returned' && !record.returnParentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeInlineIdentifier(record.id)}','returned')">Sign returned</button>` : ''}` : '';
+      const staffActions = (isFullAccessUser() || currentUser.role === 'principal') && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeInlineIdentifier(record.id)}')">Record return</button>` : '';
       return `<div class="item-row"><div><strong>${escapeWorkspaceText(record.bookTitle)}${record.bookCode ? ` · ${escapeWorkspaceText(record.bookCode)}` : ''}</strong> ${bookStatusLabel(record)}<p style="margin:4px 0;">Learner: ${escapeWorkspaceText(record.learnerName)} · Class: ${escapeWorkspaceText(record.className || 'Not recorded')} · Parent: ${escapeWorkspaceText(record.parentName)}</p><p class="meta">Handover condition: ${escapeWorkspaceText(record.issueCondition)} · Replacement price: ${formatSubscriptionMoney(record.bookPrice)}</p>${returnDetails}${signatures}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${parentActions}${staffActions}</div></div>`;
     }).join('') : '<p class="meta">No books have been added to the school checklist yet.</p>';
   } catch (error) { summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load book checklist.'))}</p>`; list.innerHTML = ''; }
@@ -4802,7 +4896,7 @@ async function createBookRecord(event) {
 function openBookReturnModal(encodedId) {
   const record = bookRegisterData?.records?.find(item => item.id === decodeURIComponent(encodedId));
   if (!record) return;
-  openModal('Record returned book', `<form onsubmit="recordBookReturn(event,'${encodeURIComponent(record.id)}')" style="display:grid;gap:12px;"><p style="margin:0;"><strong>${escapeWorkspaceText(record.bookTitle)}</strong> · ${escapeWorkspaceText(record.learnerName)} · Replacement price ${formatSubscriptionMoney(record.bookPrice)}</p><label>Return result<select name="returnStatus" required><option value="returned_good">Returned in acceptable condition</option><option value="damaged">Damaged — charge replacement price</option><option value="lost">Lost — charge replacement price</option></select></label><label>Condition at return<textarea name="returnCondition" rows="3" required placeholder="Describe the final condition or loss."></textarea></label><label>Admin signature<input name="returnAdminSignature" value="${escapeWorkspaceText(currentUser.name || '')}" required maxlength="160"></label><button class="submit-btn">Save return</button></form>`);
+  openModal('Record returned book', `<form onsubmit="recordBookReturn(event,'${encodeInlineIdentifier(record.id)}')" style="display:grid;gap:12px;"><p style="margin:0;"><strong>${escapeWorkspaceText(record.bookTitle)}</strong> · ${escapeWorkspaceText(record.learnerName)} · Replacement price ${formatSubscriptionMoney(record.bookPrice)}</p><label>Return result<select name="returnStatus" required><option value="returned_good">Returned in acceptable condition</option><option value="damaged">Damaged — charge replacement price</option><option value="lost">Lost — charge replacement price</option></select></label><label>Condition at return<textarea name="returnCondition" rows="3" required placeholder="Describe the final condition or loss."></textarea></label><label>Admin signature<input name="returnAdminSignature" value="${escapeWorkspaceText(currentUser.name || '')}" required maxlength="160"></label><button class="submit-btn">Save return</button></form>`);
 }
 
 async function recordBookReturn(event, encodedId) {
@@ -4814,7 +4908,7 @@ async function recordBookReturn(event, encodedId) {
 function signBookRecord(encodedId, action) {
   const record = bookRegisterData?.records?.find(item => item.id === decodeURIComponent(encodedId));
   if (!record) return;
-  openModal(action === 'returned' ? 'Confirm returned book' : 'Confirm book received', `<form onsubmit="submitBookSignature(event,'${encodeURIComponent(record.id)}','${action}')" style="display:grid;gap:12px;"><p class="meta">Type your name to save your signature and the current date and time.</p><label>Parent signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm signature</button></form>`);
+  openModal(action === 'returned' ? 'Confirm returned book' : 'Confirm book received', `<form onsubmit="submitBookSignature(event,'${encodeInlineIdentifier(record.id)}','${action}')" style="display:grid;gap:12px;"><p class="meta">Type your name to save your signature and the current date and time.</p><label>Parent signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm signature</button></form>`);
 }
 
 async function submitBookSignature(event, encodedId, action) {
@@ -4892,10 +4986,12 @@ function downloadScheduleTemplate() {
 
 async function loadAccounts() {
   const list = document.getElementById('accountsList');
-  if (!list || !isFullAccessUser()) return;
+  if (!list || !canManageSchoolAccounts()) return;
+  const session = accountSessionGeneration + ":" + workspaceSessionKey();
   try {
     const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
     const accounts = await response.json();
+    if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
     if (!response.ok) throw new Error(accounts?.message || 'Unable to load account records.');
     if (!Array.isArray(accounts)) throw new Error('Account records returned an invalid response.');
     accountsCache = accounts;
@@ -4905,8 +5001,9 @@ async function loadAccounts() {
       accountSelector.innerHTML = `<option value="">Create a new account / select an existing account</option>${accounts.map(account => `<option value="${encodeURIComponent(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.username)} · ${escapeWorkspaceText(displayRoleName(account))}</option>`).join('')}`;
       if (previousSelection && [...accountSelector.options].some(option => option.value === previousSelection)) accountSelector.value = previousSelection;
     }
-    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(displayRoleName(account))}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName || 'Not linked · Little Feet company account')}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${String(account.verificationStatus || '').includes('verification pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeURIComponent(account.username)}')">Approve account</button>` : ''}${account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeURIComponent(account.username)}')">Approve learner request</button>` : ''}<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeURIComponent(account.username)}')">Edit</button>${account.username !== 'Teacher' ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeURIComponent(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
+    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(displayRoleName(account))}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName || 'Not linked · Little Feet company account')}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${account.canManage !== false && String(account.verificationStatus || '').toLowerCase().includes('pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeInlineIdentifier(account.username)}')">Approve account</button>` : ''}${account.canManage !== false && account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeInlineIdentifier(account.username)}')">Approve learner request</button>` : ''}${account.canManage === false ? '<span class="meta">Protected company owner</span>' : `<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeInlineIdentifier(account.username)}')">Edit</button>`}${account.canDelete !== false ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeInlineIdentifier(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
   } catch (error) {
+    if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
     accountsCache = [];
     const accountSelector = document.getElementById('accountEditSelect');
     if (accountSelector) accountSelector.innerHTML = '<option value="">Unable to load accounts — try again</option>';
@@ -5192,12 +5289,13 @@ function renderLearnerAccessCodes() {
     return;
   }
   list.innerHTML = records.map(record => {
-    const encodedKey = encodeURIComponent(record.learnerKey);
+    const encodedKey = encodeInlineIdentifier(record.learnerKey);
+    const encodedSchool = encodeInlineIdentifier(record.schoolId || "");
     const details = `${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}`;
     const status = record.accessCode ? `<p style="margin-top:5px;">Current code: <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(record.accessCode)}</strong></p>` : record.hasPrintableForm ? '<p class="meta" style="margin-top:5px;">Prepared for printing. The code is not displayed to this role.</p>' : '<p class="meta" style="margin-top:5px;">No active learner code issued.</p>';
     const history = canManage && record.codeHistory?.length ? `<details style="margin-top:8px;"><summary class="meta">${record.codeHistory.length} code record${record.codeHistory.length === 1 ? '' : 's'} in history</summary><div class="meta" style="margin:7px 0 0;line-height:1.55;">${record.codeHistory.map(entry => `${escapeWorkspaceText(entry.status)} · issued ${entry.issuedAt ? new Date(entry.issuedAt).toLocaleDateString() : 'date unknown'}${entry.changedAt ? ` · updated ${new Date(entry.changedAt).toLocaleDateString()}` : ''}`).join('<br>')}</div></details>` : '';
-    const actions = record.hasPrintableForm ? `<button type="button" class="action-btn btn-blue" onclick="printLearnerCodeForm('${encodedKey}')">🖨️ Print form</button>` : '';
-    const management = canManage ? (record.accessCode ? `<button type="button" class="action-btn btn-green" onclick="replaceLearnerAccessCode('${record.codeRecordId}')">♻️ New random code</button><button type="button" class="action-btn btn-red" onclick="revokeLearnerAccessCode('${record.codeRecordId}')">Scrap code</button>` : `<button type="button" class="action-btn btn-green" onclick="openLearnerCodeIssue('${encodedKey}')">Generate code</button>`) : '';
+    const actions = record.hasPrintableForm ? `<button type="button" class="action-btn btn-blue" onclick="printLearnerCodeForm('${encodedKey}', '${encodedSchool}')">🖨️ Print form</button>` : '';
+    const management = canManage ? (record.accessCode ? `<button type="button" class="action-btn btn-green" onclick="replaceLearnerAccessCode('${record.codeRecordId}')">♻️ New random code</button><button type="button" class="action-btn btn-red" onclick="revokeLearnerAccessCode('${record.codeRecordId}')">Scrap code</button>` : `<button type="button" class="action-btn btn-green" onclick="openLearnerCodeIssue('${encodedKey}', '${encodedSchool}')">Generate code</button>`) : '';
     return `<div class="item-row"><div><strong>${details}</strong>${status}<span class="meta">${record.issuedAt ? `Issued ${new Date(record.issuedAt).toLocaleString()} by ${escapeWorkspaceText(record.issuedBy || 'school administrator')}` : 'Awaiting administrator issue'}${record.parentName ? ` · Parent: ${escapeWorkspaceText(record.parentName)}` : ''}</span>${history}</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}${management}</div></div>`;
   }).join('');
 }
@@ -5223,21 +5321,21 @@ async function toggleLearnerCodeTeacherPreview() {
   }
 }
 
-function learnerCodeRecord(encodedKey) {
-  return learnerAccessCodeRecords.find(record => record.learnerKey === decodeURIComponent(encodedKey));
+function learnerCodeRecord(encodedKey, encodedSchool = "") {
+  return learnerAccessCodeRecords.find(record => record.learnerKey === decodeURIComponent(encodedKey) && (!encodedSchool || record.schoolId === decodeURIComponent(encodedSchool)));
 }
 
-function openLearnerCodeIssue(encodedKey) {
+function openLearnerCodeIssue(encodedKey, encodedSchool = "") {
   if (!isFullAccessUser()) return alert('Only an administrator can issue a learner access code.');
-  const record = learnerCodeRecord(encodedKey);
+  const record = learnerCodeRecord(encodedKey, encodedSchool);
   if (!record) return alert('Learner record not found. Refresh the code list and try again.');
-  openModal('Issue learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Issue a physical code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Leave the field blank to generate a secure school code automatically, or enter a school-approved code in the shown format.</p><label for="manualLearnerAccessCode">Manual code (optional)</label><input id="manualLearnerAccessCode" placeholder="LF-AB12-CD34" maxlength="11" style="text-transform:uppercase;"><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}')">Issue code</button>`);
+  openModal('Issue learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Issue a physical code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Little Feet will generate a secure, random code for this learner.</p><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}', '${encodedSchool}')">Issue code</button>`);
 }
 
-async function issueLearnerAccessCode(encodedKey) {
+async function issueLearnerAccessCode(encodedKey, encodedSchool = "") {
   const response = await fetch('/api/learner-access-codes', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actorUsername: currentUser?.username, learnerKey: decodeURIComponent(encodedKey), manualCode: document.getElementById('manualLearnerAccessCode')?.value || '' })
+    body: JSON.stringify({ actorUsername: currentUser?.username, learnerKey: decodeURIComponent(encodedKey), schoolId: decodeURIComponent(encodedSchool) })
   });
   const result = await response.json();
   if (!response.ok) return alert(result.message || 'Unable to issue this learner code.');
@@ -5267,9 +5365,9 @@ async function revokeLearnerAccessCode(id) {
   await loadLearnerAccessCodes();
 }
 
-async function printLearnerCodeForm(encodedKey) {
+async function printLearnerCodeForm(encodedKey, encodedSchool = "") {
   if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only an administrator or principal can print this learner form.');
-  const response = await fetch(`/api/learner-access-codes/${encodedKey}/printable`);
+  const response = await fetch(`/api/learner-access-codes/${encodedKey}/printable?schoolId=${encodedSchool}`);
   const record = await response.json();
   if (!response.ok) return alert(record.message || 'An active learner code is required before this form can be printed.');
   const printWindow = window.open('', '_blank', 'width=820,height=980');
@@ -5323,7 +5421,7 @@ async function searchAccountSchools(query, token) {
     if (!response.ok) throw new Error(data.message || 'Unable to search schools.');
     const results = Array.isArray(data.results) ? data.results : [];
     if (!results.length) {
-      box.innerHTML = `<div class="meta" style="padding:9px 10px;">No school matched “${escapeWorkspaceText(query)}”. You can still type the linked school name manually.</div>`;
+      box.innerHTML = `<div class="meta" style="padding:9px 10px;">No school matched “${escapeWorkspaceText(query)}”. ${currentUser?.role === 'crm' ? 'Choose a registered client school.' : 'You can still type the linked school name manually.'}</div>`;
       return;
     }
     box.innerHTML = results.map(result => {
@@ -5380,7 +5478,13 @@ function resetAccountForm() {
 }
 
 function updateAccountRoleFields() {
-  const role = document.getElementById('accountRole')?.value || 'parent';
+  const roleSelect = document.getElementById('accountRole');
+  const companyAccess = Boolean(currentUser && (currentUser.role === 'admin' && currentUser.platformAccess === true));
+  roleSelect?.querySelectorAll('option').forEach(option => { const denied = isInternalCompanyRole(option.value) && !companyAccess; option.disabled = denied; option.hidden = denied; });
+  const companyGroup = roleSelect?.querySelector('optgroup[data-company-roles]');
+  if (companyGroup) companyGroup.hidden = !companyAccess;
+  if (roleSelect?.selectedOptions[0]?.disabled) roleSelect.value = 'parent';
+  const role = roleSelect?.value || 'parent';
   const schoolField = document.getElementById('accountSchoolName');
   const schoolRequired = document.getElementById('accountSchoolRequired');
   const schoolHelp = document.getElementById('accountSchoolHelp');
@@ -5391,13 +5495,14 @@ function updateAccountRoleFields() {
   }
   if (schoolRequired) schoolRequired.textContent = internalRole ? '(optional)' : '*';
   if (schoolHelp) schoolHelp.textContent = internalRole
-    ? 'Little Feet company staff can work without a school link. Add one only when this account should be scoped to a specific school.'
+    ? 'Little Feet company staff can work without a school link. A school link is an association; company-role permissions still apply.'
     : 'Required for school-facing accounts.';
 }
 
 function editAccount(account) {
+  if (account.canManage === false) return alert('Only the company owner can change this protected owner account.');
   const accountSelector = document.getElementById('accountEditSelect');
-  if (accountSelector) accountSelector.value = encodeURIComponent(account.username);
+  if (accountSelector) accountSelector.value = encodeInlineIdentifier(account.username);
   document.getElementById('accountOriginalUsername').value = account.username;
   document.getElementById('accountName').value = account.name || '';
   document.getElementById('accountUsername').value = account.username || '';
@@ -5415,7 +5520,7 @@ function editAccount(account) {
   document.getElementById('accountPin').placeholder = 'Enter only to reset password';
   document.getElementById('accountSaveButton').textContent = 'Save account changes';
   const deleteButton = document.getElementById('accountDeleteButton');
-  if (deleteButton) deleteButton.style.display = 'inline-flex';
+  if (deleteButton) deleteButton.style.display = account.canDelete === false ? 'none' : 'inline-flex';
   const resetLoginButton = document.getElementById('accountResetLoginWaitButton');
   if (resetLoginButton) resetLoginButton.style.display = 'inline-flex';
   document.getElementById('accountsTab').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5442,9 +5547,13 @@ function selectAccountForEditing(encodedUsername) {
 async function openLearnerLinkPicker() {
   const role = document.getElementById('accountRole')?.value;
   if (role !== 'parent') return alert('Linked learners can only be assigned to a parent account. Choose the Parent role first.');
+  const schoolName = document.getElementById('accountSchoolName')?.value.trim();
+  if (currentUser?.role === 'crm' && !schoolName) return alert('Choose the client school first.');
+  const session = accountSessionGeneration + ":" + workspaceSessionKey();
   try {
-    const response = await fetch(`/api/students/search?username=${encodeURIComponent(currentUser?.username || '')}`);
+    const response = await fetch(currentUser?.role === 'crm' ? `/api/accounts/learner-options?schoolName=${encodeURIComponent(schoolName)}` : `/api/students/search?username=${encodeURIComponent(currentUser?.username || '')}`);
     const learners = await response.json();
+    if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
     if (!response.ok) return alert(learners.message || 'Unable to load learner records.');
     if (!learners.length) return alert('No learner records are available to link yet. Add or import learners first.');
     const field = document.getElementById('accountLinkedLearners');
@@ -5513,7 +5622,7 @@ async function approveAccount(encodedUsername) {
 }
 
 async function approveRequestedLearnerLinks(encodedUsername) {
-  if (!isFullAccessUser()) return alert('Only an administrator can approve learner relationships.');
+  if (!canManageSchoolAccounts()) return alert('Account management access is required to approve learner relationships.');
   const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
   if (!account?.requestedLearnerLinks?.length) return alert('There are no pending learner requests for this account.');
   const requested = account.requestedLearnerLinks.join(', ');
@@ -5658,7 +5767,7 @@ function renderParentContacts(records) {
     return;
   }
   list.innerHTML = visible.map(record => {
-    const encodedId = encodeURIComponent(String(record.id || ''));
+    const encodedId = encodeInlineIdentifier(String(record.id || ''));
     const phone = String(record.guardianPhone || '').trim();
     const email = String(record.guardianEmail || '').trim();
     const emergency = String(record.emergencyContact || '').trim();
@@ -5901,7 +6010,7 @@ async function cancelStoreOrder(orderId) {
 
 function recordStorePayment(orderId, reference, amount) {
   if (!isFinanceUser()) return alert('Only an administrator or Accounts user can record a cleared store payment.');
-  openModal('Record cleared store payment', `<form onsubmit="submitStorePayment(event,'${encodeURIComponent(orderId)}','${encodeURIComponent(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Use this only after the money has actually cleared.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
+  openModal('Record cleared store payment', `<form onsubmit="submitStorePayment(event,'${encodeInlineIdentifier(orderId)}','${encodeInlineIdentifier(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Use this only after the money has actually cleared.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
 }
 
 async function submitStorePayment(event, encodedOrderId, encodedReference, expectedAmount) {
@@ -5932,7 +6041,7 @@ async function updateStoreFulfilment(orderId, status) {
 
 function recordStoreRefund(orderId, reference, amount) {
   if (!isFinanceUser()) return alert('Only an administrator or Accounts user can record a confirmed refund.');
-  openModal('Record confirmed store refund', `<form onsubmit="submitStoreRefund(event,'${encodeURIComponent(orderId)}','${encodeURIComponent(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">This does not send money. Use it only after PayFast or the bank has actually confirmed the refund. Little Feet will then return the item quantity to stock.</p><label>Refunded amount (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Refund/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Record confirmed refund</button></form>`);
+  openModal('Record confirmed store refund', `<form onsubmit="submitStoreRefund(event,'${encodeInlineIdentifier(orderId)}','${encodeInlineIdentifier(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">This does not send money. Use it only after PayFast or the bank has actually confirmed the refund. Little Feet will then return the item quantity to stock.</p><label>Refunded amount (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Refund/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Record confirmed refund</button></form>`);
 }
 
 async function submitStoreRefund(event, encodedOrderId, encodedReference, expectedAmount) {
@@ -6259,3 +6368,17 @@ async function deleteWorkspaceRecord(module, id) {
   await fetch(`/api/modules/${module}/${id}`, { method: 'DELETE' });
   loadWorkspaceRecords(module);
 }
+
+document.addEventListener('littlefeet:session-ended', () => { ['companyClientsContent','companyBillingContent'].forEach(id => document.getElementById(id)?.replaceChildren()); });
+
+document.addEventListener('littlefeet:session-ended', () => {
+  accountSessionGeneration++;
+  accountsCache = [];
+  window.clearTimeout(accountSchoolSearchTimer);
+  accountSchoolSearchToken++;
+  document.getElementById('accountsList')?.replaceChildren();
+  const select = document.getElementById('accountEditSelect');
+  if (select) { const option = document.createElement('option'); option.value = ''; option.textContent = 'Create a new account / select an existing account'; select.replaceChildren(option); }
+  resetAccountForm();
+  if (document.querySelector('.learner-link-choice')) closeModal();
+});

@@ -216,7 +216,7 @@ async function login(username,pin){
 
     const config=await request('/api/communications/config',{cookie:teacher});
     assert.equal(config.response.status,200);
-    assert.deepEqual(config,{email:true,sms:true,push:true,whatsapp:true});
+    assert.deepEqual(config.data,{email:true,sms:true,push:true,whatsapp:true});
     const campaign=await request('/api/communications/campaigns',{method:'POST',cookie:teacher,body:{title:'School update',message:'Real provider test',audience:'parents',channels:['email','sms','push','whatsapp']}});
     assert.equal(campaign.response.status,201,campaign.text);
     assert.equal(campaign.data.campaign.deliveries.length,4);
@@ -250,4 +250,4 @@ async function login(username,pin){
     await stopGateway();
     fs.rmSync(tmp,{recursive:true,force:true});
   }
-})().catch(async error=>{console.error(error);await stop();await stopGateway().catch(()=>{});process.exitCode=1;});
+})().catch(error=>{console.error(error);process.exitCode=1;});

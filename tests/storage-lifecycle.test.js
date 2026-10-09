@@ -29,10 +29,11 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
     { username: 'alpha-principal', pinHash: pinHash('Principal1'), name: 'Alpha Principal', role: 'principal', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), name: 'Alpha Teacher', role: 'teacher', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active' },
     { username: 'alpha-parent-one', pinHash: pinHash('ParentPass1'), name: 'Parent One', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: [] },
-    { username: 'alpha-parent-two', pinHash: pinHash('ParentPass2'), name: 'Parent Two', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', linkedLearners: ['Other Learner'] },
-    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
+    { username: 'alpha-parent-two', pinHash: pinHash('ParentPass2'), name: 'Parent Two', role: 'parent', schoolId: 'school-alpha', schoolName: 'Alpha School', verificationStatus: 'Active', parentRelationshipStatus: 'Administrator approved', linkedLearners: ['Other Learner'] },
+    { username: 'bravo-admin', pinHash: pinHash('BravoPass1'), name: 'Bravo Admin', role: 'admin', schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' },
+    { username: 'platform-staff', pinHash: pinHash('PlatformPass1'), name: 'Platform Staff', role: 'admin', platformAccess: true, schoolId: 'school-bravo', schoolName: 'Bravo School', verificationStatus: 'Active' }
   ],
-  students: [{ id: 'other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-alpha', schoolName: 'Alpha School' }], registry: [], tickets: [],
+  students: [{ id: 'other-learner', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-alpha', schoolName: 'Alpha School' }, { id: 'bravo-same-name', studentName: 'Other Learner', className: 'Grade 2', schoolId: 'school-bravo', schoolName: 'Bravo School' }], registry: [], tickets: [],
   posts: [], worksheets: [], fileRecords: [], storageCleanupJobs: [], admissionsApplications: [], admissionsStatusHistory: [], documentAudit: [],
   importJobs: [], learnerAccessCodes: [], emailInbox: [], emailDismissals: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}
 }));
@@ -94,6 +95,13 @@ const login = async (username, pin) => {
     const principalCookie = await login('alpha-principal', 'Principal1');
     const parentCookie = await login('alpha-parent-one', 'ParentPass1');
     const otherParentCookie = await login('alpha-parent-two', 'ParentPass2');
+    const platformCookie = await login('platform-staff', 'PlatformPass1');
+    const vaultBravoCookie = await login('bravo-admin', 'BravoPass1');
+    const bravoFile = await request('/api/files', { method: 'POST', cookie: vaultBravoCookie, body: { entityType: 'learner', recordId: 'bravo-same-name', purpose: 'guardian_id', originalFilename: 'bravo.png', dataUrl: pngA } });
+    assert.equal(bravoFile.response.status, 201);
+    assert.equal((await request('/api/learner-documents', { cookie: otherParentCookie })).data.some(row => row.learner.id === 'bravo-same-name'), false, 'Matching learner names must not cross school boundaries.');
+    assert.equal((await fetch(origin + bravoFile.data.file.contentUrl, { headers: { cookie: otherParentCookie } })).status, 404);
+    assert.equal((await request('/api/files', { method: 'POST', cookie: otherParentCookie, body: { entityType: 'learner', recordId: 'bravo-same-name', purpose: 'other', originalFilename: 'blocked.png', dataUrl: pngA } })).response.status, 404);
     const submitted = await request('/api/school-applications', { method: 'POST', cookie: parentCookie, body: {
       schoolName: 'Alpha School', guardianName: 'Parent One', contactPhone: '0820000000', contactEmail: 'parent@example.test',
       learnerName: 'New Learner', dateOfBirth: '2020-04-20', intendedStart: '2027-01-15', gradeOrAgeGroup: 'Grade 1',
@@ -101,6 +109,9 @@ const login = async (username, pin) => {
     } });
     assert.equal(submitted.response.status, 201, submitted.data?.message);
     const applicationId = submitted.data.application.id;
+    const invalidChecklist = await request('/api/admissions/applications/' + applicationId + '/checklist', { method: 'PUT', cookie: alphaCookie, body: { items: [{}] } });
+    assert.equal(invalidChecklist.response.status, 400);
+    assert.equal((await request('/api/admissions/applications/' + applicationId, { cookie: alphaCookie })).data.documents.checklist.length, 6, 'Rejected validation must leave the required checklist unchanged.');
     assert.equal((await request('/api/admissions/applications', { cookie: otherParentCookie })).data.length, 0, 'Another parent must not see this application.');
 
     const blockedEnrolment = await request('/api/admissions/applications/' + applicationId + '/enrol', { method: 'POST', cookie: alphaCookie, body: { className: 'Grade 1', address: '1 Test Street' } });
@@ -121,12 +132,20 @@ const login = async (username, pin) => {
     assert.equal(approved.response.status, 200, approved.data?.message);
     assert.equal(approved.data.application.documents.complete, true);
 
-    const enrolled = await request('/api/admissions/applications/' + applicationId + '/enrol', { method: 'POST', cookie: alphaCookie, body: {
+    const enrolled = await request('/api/admissions/applications/' + applicationId + '/enrol', { method: 'POST', cookie: platformCookie, body: {
       className: 'Grade 1', address: '1 Test Street', emergencyContact: 'Emergency contact', medicalNotes: '', consent: 'Parent consent received'
     } });
     assert.equal(enrolled.response.status, 201, enrolled.data?.message);
     assert.equal(enrolled.data.application.status, 'Enrolled');
     const learnerId = enrolled.data.application.convertedLearnerId;
+    const collision = await request('/api/school-applications', { method: 'POST', cookie: parentCookie, body: {
+      schoolName: 'Alpha School', guardianName: 'Parent One', contactPhone: '0820000000', contactEmail: 'parent@example.test',
+      learnerName: 'Other Learner', dateOfBirth: '2020-04-20', intendedStart: '2027-01-15', gradeOrAgeGroup: 'Grade 2', homeArea: 'Test Area', notes: 'Identity collision regression'
+    } });
+    assert.equal(collision.response.status, 201);
+    const collisionId = collision.data.application.id;
+    await request('/api/admissions/applications/' + collisionId + '/checklist', { method: 'PUT', cookie: alphaCookie, body: { items: [{ key: 'other', label: 'Other', required: false }] } });
+    assert.equal((await request('/api/admissions/applications/' + collisionId + '/enrol', { method: 'POST', cookie: alphaCookie, body: { className: 'Grade 2', address: 'Test Street' } })).response.status, 409, 'Matching a name must never enroll or link an existing child.');
 
     const learnerUpload = await request('/api/files', { method: 'POST', cookie: parentCookie, body: { entityType: 'learner', recordId: learnerId, purpose: 'previous_report', originalFilename: 'report.png', dataUrl: pngA } });
     assert.equal(learnerUpload.response.status, 201, learnerUpload.data?.message);
@@ -138,6 +157,7 @@ const login = async (username, pin) => {
     assert.equal(verifiedLearnerDoc.response.status, 200, verifiedLearnerDoc.data?.message);
 
     const parentVault = await request('/api/learner-documents', { cookie: parentCookie });
+    assert.equal(parentVault.data.some(row => row.learner.id === 'other-learner'), false);
     assert.equal(parentVault.data.some(row => row.learner.id === learnerId && row.documents.some(file => file.id === learnerUpload.data.file.id && file.verificationStatus === 'Verified')), true);
     assert.equal((await request('/api/learner-documents', { cookie: otherParentCookie })).data.some(row => row.learner.id === learnerId), false, 'Learner vault must remain parent-linked.');
 

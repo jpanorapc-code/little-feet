@@ -3,6 +3,14 @@
   let latestStatement = null;
   let pendingBankLines = [];
   let pendingBankPreview = null;
+  let sessionGeneration = 0;
+  document.addEventListener('littlefeet:session-ended', () => {
+    sessionGeneration += 1;
+    financeAutomationState = null;
+    latestStatement = null;
+    pendingBankLines = [];
+    pendingBankPreview = null;
+  });
 
   const safe = value => window.escapeWorkspaceText ? window.escapeWorkspaceText(value) : String(value ?? '');
   const money = value => window.formatSubscriptionMoney ? window.formatSubscriptionMoney(value) : 'R' + Number(value || 0).toFixed(2);
@@ -14,8 +22,10 @@
   const yearStart = () => today().slice(0, 4) + '-01-01';
 
   async function api(url, options = {}) {
+    const generation = sessionGeneration;
     const response = await fetch(url, options);
     const data = await response.json().catch(() => ({}));
+    if (generation !== sessionGeneration) throw new Error('Your session has changed. Reopen this action after signing in.');
     if (!response.ok) throw new Error(data.message || 'Finance request failed.');
     return data;
   }

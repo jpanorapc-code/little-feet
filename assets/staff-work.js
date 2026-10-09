@@ -1,19 +1,25 @@
 (function () {
   'use strict';
+let sessionGeneration=0;
+const staleSession=()=>Object.assign(new Error('Your session changed. Please refresh this screen.'),{code:'SESSION_CHANGED'});
+document.addEventListener('littlefeet:session-ended',()=>{sessionGeneration++;user=null;accounts=[];["staffWorkContent"].forEach(id=>document.getElementById(id)?.replaceChildren());});
+
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let user = null, accounts = [];
 
   const api = async (url, options={}) => {
+    const generation=sessionGeneration;
     const response = await fetch(url, { credentials:'same-origin', ...options, headers:{ Accept:'application/json', ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.headers || {}) } });
     const data = await response.json().catch(()=>({}));
+    if(generation!==sessionGeneration)throw staleSession();
     if (!response.ok) throw new Error(data.message || 'Request failed.');
     return data;
   };
-  const optionList = (roles=['teacher','principal','admin']) => accounts.filter(a=>roles.includes(a.role)).map(a=>`<option value="${esc(a.username)}">${esc(a.name || a.username)} · ${esc(a.role)}</option>`).join('');
+  const optionList = (roles=['teacher','principal','admin','school_accounts','staff','crm','accounts','support']) => accounts.filter(a=>roles.includes(a.role)).map(a=>`<option value="${esc(a.username)}">${esc(a.name || a.username)} · ${esc(a.role)}</option>`).join('');
 
   const render = async () => {
     const selectedMonth = document.getElementById('staffKpiMonth')?.value || new Date().toISOString().slice(0,7);
-    const [tasks, leave, cover, reviews, kpi] = await Promise.all([api('/api/staff/tasks'),api('/api/staff/leave'),api('/api/staff/cover'),api('/api/staff/performance-reviews'),api('/api/staff/kpi-monthly?month='+encodeURIComponent(selectedMonth))]);
+    const [tasks, leave, cover, reviews, kpi] = await Promise.all([api('/api/staff/tasks'),api('/api/staff/leave'),(['staff','crm','accounts','support'].includes(user.role) ? Promise.resolve([]) : api('/api/staff/cover')),api('/api/staff/performance-reviews'),api('/api/staff/kpi-monthly?month='+encodeURIComponent(selectedMonth))]);
     const root=document.getElementById('staffWorkContent'); if(!root) return;
     const manager=(window.isLittleFeetFullAccessUser?.(user) || ['admin','principal'].includes(user.role));
     root.innerHTML=`
@@ -43,6 +49,7 @@
           <div class="staff-work-list">${reviews.length?reviews.map(r=>`<article><strong>${esc(r.staffName)} · ${esc(r.reviewPeriod||r.reviewDate)}</strong><span>Overall KPI: ${esc(r.averageRating)} / 5 · ${esc(r.status)}</span><span>${r.criteria.map(k=>esc(k.name)+': '+esc(k.rating)+'/5').join(' · ')}</span>${manager&&r.status==='Draft'?`<button data-review-share="${esc(r.id)}">Share with staff member</button>`:''}${!manager&&r.status==='Shared'?`<textarea data-review-comment="${esc(r.id)}" maxlength="2500" placeholder="Your comment on this review"></textarea><button data-review-ack="${esc(r.id)}">Acknowledge review</button>`:''}</article>`).join(''):'<p>No performance reviews yet.</p>'}</div>
         </section>
       </div>`;
+    if (['staff','crm','accounts','support'].includes(user.role)) [...root.querySelectorAll('.staff-work-card')].find(card => card.querySelector('h3')?.textContent === 'Teacher Cover')?.remove();
     bind();
   };
   const bind=()=>{
@@ -58,10 +65,10 @@
     document.querySelectorAll('[data-review-ack]').forEach(el=>el.addEventListener('click',async()=>{const id=el.dataset.reviewAck;const comment=document.querySelector('[data-review-comment="'+CSS.escape(id)+'"]')?.value||'';await api('/api/staff/performance-reviews/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({employeeComment:comment,acknowledged:true})});await render();}));
   };
   const init=async()=>{
-    user=window.getLittleFeetCurrentUser?.(); if(!user||!(window.isLittleFeetFullAccessUser?.(user) || ['teacher','principal','admin'].includes(user.role))) return;
-    if((window.isLittleFeetFullAccessUser?.(user) || ['admin','principal'].includes(user.role))) { try { accounts=await api('/api/accounts'); } catch { accounts=[]; } }
+    user=window.getLittleFeetCurrentUser?.(); if(!user||!(window.isLittleFeetFullAccessUser?.(user) || ['teacher','principal','admin','school_accounts','staff','crm','accounts','support'].includes(user.role))) return;
+    if((window.isLittleFeetFullAccessUser?.(user) || ['admin','principal'].includes(user.role))) { try { accounts=await api('/api/staff/directory'); } catch(error) { if(error.code==='SESSION_CHANGED')return; accounts=[]; } }
     else accounts=[user];
-    await render().catch(err=>{const r=document.getElementById('staffWorkContent');if(r)r.innerHTML='<p>'+esc(err.message)+'</p>';});
+    await render().catch(err=>{if(err.code==='SESSION_CHANGED')return;const r=document.getElementById('staffWorkContent');if(r)r.innerHTML='<p>'+esc(err.message)+'</p>';});
   };
   window.refreshStaffWork=init;
   if(typeof window.registerLittleFeetWorkspace==='function') window.registerLittleFeetWorkspace('staff-work',init);
