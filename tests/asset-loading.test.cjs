@@ -16,9 +16,10 @@ let child, browser, errors = '';
   for (const directory of ['assets','lib']) fs.cpSync(path.join(root,directory),path.join(fixture,directory),{recursive:true});
   if (process.env.LF_ASSET_BASELINE) {
     assert.match(process.env.LF_ASSET_BASELINE, /^[0-9a-f]{40}$/);
-    for (const file of ['index.html','service-worker.js','assets/ambient-background.js','assets/features/school-directory.js']) {
+    for (const file of ['index.html','service-worker.js','assets/ambient-background.js','assets/features/school-directory.js','assets/my-day.js','assets/tour-image-loader.js']) {
       fs.writeFileSync(path.join(fixture,file), execFileSync('git',['show',`${process.env.LF_ASSET_BASELINE}:${file}`],{cwd:root,maxBuffer:2000000}));
     }
+    try { fs.writeFileSync(path.join(fixture,'assets/styles/portal.css'),execFileSync('git',['show',`${process.env.LF_ASSET_BASELINE}:assets/styles/portal.css`],{cwd:root,maxBuffer:2000000,stdio:['ignore','pipe','ignore']})); } catch { /* Older baselines embed this stylesheet in HTML. */ }
   }
   const pin = 'AssetBrowserPass1';
   fs.writeFileSync(path.join(fixture,'littlefeet-replica.json'), JSON.stringify({schools:[{id:'asset-school',name:'Asset Test School'}],users:[{username:'asset-owner',name:'Asset Test Owner',role:'admin',platformAccess:true,schoolId:'asset-school',schoolName:'Asset Test School',verificationStatus:'Active',pinHash:crypto.scryptSync(pin,'little-feet-pin-salt',64).toString('hex')}],students:[],moduleRecords:{}}));
@@ -30,18 +31,46 @@ let child, browser, errors = '';
   assert.ok(ready,errors);
   browser=await chromium.launch({headless:true,channel:process.env.LF_BROWSER_CHANNEL || 'msedge'});
   const metrics=[];
+  const reportPath = process.argv[2] && path.resolve(process.argv[2]);
   for(const motion of ['reduce','no-preference']) {
-    const context=await browser.newContext({reducedMotion:motion,serviceWorkers:'block'});
+    const context=await browser.newContext({reducedMotion:motion,serviceWorkers:'block', ...(reportPath ? {recordHar:{path:reportPath.replace(/\.json$/, `-${motion}.har`),content:'omit',mode:'full',urlFilter:/\/(?:assets|vendor)\//}} : {})});
+    await context.addInitScript(() => {
+      window.littleFeetLoadEvidence = { lcp: [], longTasks: [] };
+      new PerformanceObserver(list => list.getEntries().forEach(entry => window.littleFeetLoadEvidence.lcp.push({ms:Math.round(entry.startTime),size:entry.size,tag:entry.element?.tagName,id:entry.element?.id,url:entry.url}))).observe({type:'largest-contentful-paint',buffered:true});
+      new PerformanceObserver(list => list.getEntries().forEach(entry => window.littleFeetLoadEvidence.longTasks.push({startMs:Math.round(entry.startTime),durationMs:Math.round(entry.duration)}))).observe({type:'longtask',buffered:true});
+    });
     const page=await context.newPage();
+    await page.bringToFront();
     const network = await context.newCDPSession(page);
     await network.send('Network.enable');
     await network.send('Network.setBlockedURLs', { urls: ['https://*'] });
-    let received = new Map(), urls = new Map();
-    network.on('Network.requestWillBeSent', event => urls.set(event.requestId, event.request.url));
-    network.on('Network.dataReceived', event => received.set(event.requestId, (received.get(event.requestId) || 0) + event.encodedDataLength));
+    let received = new Map(), urls = new Map(), waterfall = new Map(), firstTick;
+    network.on('Network.requestWillBeSent', event => {
+      urls.set(event.requestId, event.request.url);
+      firstTick ??= event.timestamp;
+      if(event.request.url.startsWith(origin)) waterfall.set(event.requestId,{url:new URL(event.request.url).pathname,type:event.type,priority:event.request.initialPriority,initiator:event.initiator.type,startMs:Math.round((event.timestamp-firstTick)*1000),sentAt:event.timestamp});
+    });
+    network.on('Network.responseReceived', event => {
+      const row=waterfall.get(event.requestId); if(!row)return;
+      const timing=event.response.timing;
+      Object.assign(row,{status:event.response.status,cache:Boolean(row.cache||event.response.fromDiskCache||event.response.fromPrefetchCache),ttfbMs:timing?.receiveHeadersEnd>=0 ? Math.round((timing.requestTime-row.sentAt)*1000+timing.receiveHeadersEnd) : Math.round((event.timestamp-row.sentAt)*1000),timing});
+    });
+    network.on('Network.requestServedFromCache', event=>{const row=waterfall.get(event.requestId);if(row)row.cache=true;});
+    network.on('Network.loadingFailed', event=>{const row=waterfall.get(event.requestId);if(row)row.failure=event.errorText;});
+    network.on('Network.loadingFinished', event => {
+      const row=waterfall.get(event.requestId);if(row)Object.assign(row,{durationMs:Math.round((event.timestamp-row.sentAt)*1000),complete:true});
+    });
+    const captureWaterfall = () => [...waterfall.entries()].map(([id,{sentAt,...row}])=>({...row,bytes:received.get(id)||0}));
+    network.on('Network.dataReceived', event => {
+      received.set(event.requestId, (received.get(event.requestId) || 0) + event.encodedDataLength);
+      const row=waterfall.get(event.requestId);if(row)row.observedMs=Math.round((event.timestamp-row.sentAt)*1000);
+    });
+    network.on('Network.resourceChangedPriority', event => {
+      const row=waterfall.get(event.requestId);if(row)row.finalPriority=event.newPriority;
+    });
     network.on('Network.loadingFinished', event => received.set(event.requestId, event.encodedDataLength));
     for(const visit of ['cold','warm']) {
-      received = new Map(); urls = new Map();
+      received = new Map(); urls = new Map(); waterfall = new Map(); firstTick=undefined;
       await page.goto(origin,{waitUntil:'load'});
       await page.waitForTimeout(1800);
       const result=await page.evaluate(()=>({
@@ -49,6 +78,9 @@ let child, browser, errors = '';
         domReadyMs:Math.round(performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd),
         loadMs:Math.round(performance.getEntriesByType('navigation')[0].loadEventEnd),
         paint:performance.getEntriesByType('paint').map(entry=>({name:entry.name,ms:Math.round(entry.startTime)})),
+        evidence:window.littleFeetLoadEvidence,
+        visibilityState:document.visibilityState,
+        mediaEvidence:[...document.querySelectorAll('video')].map(video=>({id:video.id,width:video.videoWidth,height:video.videoHeight,duration:video.duration,currentTime:video.currentTime,paused:video.paused,droppedFrames:video.getVideoPlaybackQuality().droppedVideoFrames,totalFrames:video.getVideoPlaybackQuality().totalVideoFrames})),
         resources:performance.getEntriesByType('resource').filter(entry=>entry.name.startsWith(location.origin)).map(entry=>({url:new URL(entry.name).pathname,transfer:entry.transferSize,body:entry.encodedBodySize,type:entry.initiatorType})),
         nodes:document.querySelectorAll('*').length,
         loginVisible:document.getElementById('loginForm').getBoundingClientRect().width>0
@@ -56,14 +88,16 @@ let child, browser, errors = '';
       result.networkBytes=[...received.entries()].filter(([id])=>urls.get(id)?.startsWith(origin)).reduce((sum,[,bytes])=>sum+bytes,0);
       result.mediaBytes=[...received.entries()].filter(([id])=>/\.(?:mp3|mp4)(?:\?|$)/.test(urls.get(id)||'')).reduce((sum,[,bytes])=>sum+bytes,0);
       result.scriptBodyBytes=result.resources.filter(entry=>entry.type==='script').reduce((sum,entry)=>sum+entry.body,0);
+      result.waterfall=captureWaterfall();
       assert.ok(result.loginVisible,'Real login form must render');
+      assert.equal(result.visibilityState,'visible','Browser load measurements require a foreground page');
       if(process.env.LF_ASSERT_ASSET_LOADING==='1' && motion==='reduce') assert.ok(!result.resources.some(entry=>/\.(?:mp3|mp4)$/.test(entry.url)),'Paused motion and muted sound must not fetch media');
       metrics.push({motion,visit,...result});
       if (process.env.LF_ASSERT_ASSET_LOADING === '1') {
         assert.ok(!result.resources.some(entry => /\/vendor\/leaflet/.test(entry.url)), 'Map libraries must not load on the login page');
       }
     }
-    received = new Map(); urls = new Map();
+    received = new Map(); urls = new Map(); waterfall = new Map(); firstTick=undefined;
     await page.evaluate(() => performance.clearResourceTimings());
     await page.locator('#loginUsername').fill('asset-owner');
     await page.locator('#loginPin').fill(pin);
@@ -74,15 +108,33 @@ let child, browser, errors = '';
     await page.waitForTimeout(1800);
     const dashboardResources=await page.evaluate(()=>performance.getEntriesByType('resource').filter(entry=>entry.name.startsWith(location.origin)).map(entry=>({url:new URL(entry.name).pathname,transfer:entry.transferSize,body:entry.encodedBodySize,type:entry.initiatorType})));
     metrics.push({motion,visit:'dashboard',dashboardReadyMs,resources:dashboardResources,
+      waterfall:captureWaterfall(),
       networkBytes:[...received.entries()].filter(([id])=>urls.get(id)?.startsWith(origin)).reduce((sum,[,bytes])=>sum+bytes,0),
       mediaBytes:[...received.entries()].filter(([id])=>/\.(?:mp3|mp4)(?:\?|$)/.test(urls.get(id)||'')).reduce((sum,[,bytes])=>sum+bytes,0)
     });
     if (motion === 'no-preference' && process.env.LF_ASSERT_ASSET_LOADING === '1') {
+      if (process.env.LF_ASSERT_LOSSLESS_ARTWORK === '1') {
+        const proof = await page.evaluate(async records => {
+          const digest = async url => {
+            const image = new Image(); image.src = '/' + url; await image.decode();
+            const canvas = document.createElement('canvas'); canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+            const context=canvas.getContext('2d',{willReadFrequently:true});context.drawImage(image,0,0);
+            const bytes=context.getImageData(0,0,canvas.width,canvas.height).data;
+            const hash=await crypto.subtle.digest('SHA-256',bytes);
+            return {width:canvas.width,height:canvas.height,hash:[...new Uint8Array(hash)].map(byte=>byte.toString(16).padStart(2,'0')).join('')};
+          };
+          const results=[];
+          for(const record of records) results.push({target:record.target,original:await digest(record.source),encoded:await digest(record.target)});
+          return results;
+        }, require('./fixtures/lossless-artwork.json'));
+        proof.forEach(record=>assert.deepEqual(record.encoded,record.original,record.target+' changes browser-rendered pixels'));
+        console.log('Browser-rendered pixel equality passed for all six lossless artwork files.');
+      }
       for (const image of await page.locator('.portal-tour-image').all()) {
         if (!(await image.isVisible())) continue;
         await image.scrollIntoViewIfNeeded();
         await page.waitForFunction(element => element.complete && element.naturalWidth > 0, await image.elementHandle());
-        assert.match(await image.getAttribute('src'), /^assets\/4k\/tour-[a-z-]+\.png$/, 'The original full-quality tour image appears when scrolled into view');
+        assert.match(await image.getAttribute('src'), /^assets\/4k\/tour-[a-z-]+\.webp$/, 'The original full-quality tour image appears when scrolled into view');
       }
       await network.send('Network.setBlockedURLs', { urls: [] });
       const mapRequests=[];
@@ -99,6 +151,14 @@ let child, browser, errors = '';
       console.log('Real Leaflet and clustering libraries load on demand, once, with verified styles.');
     }
     await context.close();
+    if(reportPath){
+      const harPath=reportPath.replace(/\.json$/,`-${motion}.har`),har=JSON.parse(fs.readFileSync(harPath,'utf8'));
+      for(const entry of har.log.entries)for(const side of [entry.request,entry.response]){
+        side.cookies=[];
+        side.headers=side.headers.filter(header=>!['cookie','set-cookie','authorization'].includes(header.name.toLowerCase()));
+      }
+      fs.writeFileSync(harPath,JSON.stringify(har));
+    }
   }
   if (process.env.LF_ASSERT_ASSET_LOADING === '1') {
     const context = await browser.newContext({ reducedMotion: 'reduce' });
@@ -116,7 +176,7 @@ let child, browser, errors = '';
       const keys = await caches.keys();
       const shell = await caches.open(keys.find(key => key.startsWith('little-feet-shell-')));
       const urls = (await shell.keys()).map(request => new URL(request.url).pathname);
-      return { urls, styles: Boolean(await shell.match('/assets/styles/portal.css?v=20261010-styles-v1')) };
+      return { urls, styles: Boolean(await shell.match('/assets/styles/portal.css?v=20261010-styles-v2')) };
     });
     assert.ok(cache.styles, 'Extracted stylesheet must be installed with the actual service worker');
     assert.ok(!cache.urls.some(url => /^\/(?:api|auth)\//.test(url) || url === '/' || url.endsWith('.html')), 'Private requests and HTML remain uncached');
@@ -125,7 +185,7 @@ let child, browser, errors = '';
     // service-worker network context online, which would not test a real outage.
     await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
     await context.setOffline(true);
-    const offlineCss = await page.evaluate(async () => (await fetch('/assets/styles/portal.css?v=20261010-styles-v1')).status);
+    const offlineCss = await page.evaluate(async () => (await fetch('/assets/styles/portal.css?v=20261010-styles-v2')).status);
     assert.equal(offlineCss, 200, 'Installed styles remain available offline');
     const offlinePage = await page.goto(origin, { waitUntil: 'domcontentloaded' });
     assert.equal(offlinePage.status(), 503, 'Offline navigation must not replay any authenticated page');

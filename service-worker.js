@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v75-assets';
+const CACHE_NAME = 'little-feet-shell-v76-lossless-art';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261010-styles-v1',
+  '/assets/styles/portal.css?v=20261010-styles-v2',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
@@ -33,7 +33,7 @@ const SHELL_ASSETS = [
   '/assets/features/records.js?v=20261010-controlled-split-v2',
   '/assets/portal-polish.css?v=20261009-polish-v4',
   '/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1',
-  '/assets/my-day.js?v=20261009-neat-sidebar-v1',
+  '/assets/my-day.js?v=20261010-lossless-art-v1',
   '/assets/dashboard-banners.css?v=20261009-reference-snow-v1',
   '/assets/4k/little-feet-reference-snow-mascot-4k.jpg',
   '/assets/school-navigation.js?v=20261009-stage-navigation-v1',

@@ -25,7 +25,7 @@
   <!-- Map libraries load when the live school map is opened. -->
   <script src="/assets/map-loader.js?v=20261010-map-loading-v1" defer></script>
   <script src="/assets/tour-image-loader.js?v=20261010-tour-loading-v1" defer></script>
-  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261010-styles-v1">
+  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261010-styles-v2">
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261010-media-loading-v1"></script>
   <link rel="stylesheet" href="/assets/dashboard-banners.css?v=20261009-reference-snow-v1">
@@ -96,7 +96,7 @@
 
   <div id="portalLoader" role="status" aria-live="polite" aria-label="Little Feet is loading">
     <div class="walking-loader">
-      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/little-feet-mascot-hq.png" alt=""><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg></div>
+      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/little-feet-mascot-hq.optimized.png" alt=""><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg></div>
       <p>Little Feet is getting ready</p>
     </div>
   </div>
@@ -447,19 +447,19 @@
 
         <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
           <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-platform-operations.png" alt="Professional school operations workspace with planning dashboards">
+            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-platform-operations.webp" alt="Professional school operations workspace with planning dashboards">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected operations</span><h2>One platform for the whole school day.</h2><p>Coordinate communication, learning, attendance, finance, staff work, facilities and family engagement from role-aware workspaces.</p><div class="portal-tour-fact"><strong>Designed for focus:</strong> Each role sees the tools and records needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 2 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-secure-administration.png" alt="Secure school administration workspace with records and compliance tools">
+            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-secure-administration.webp" alt="Secure school administration workspace with records and compliance tools">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Leadership &amp; compliance</span><h2>Lead with a clear view of people, records and priorities.</h2><p>Administrators can manage accounts, imports, approvals, staff development, qualifications, notices and reporting in one secure platform.</p><div class="portal-tour-fact"><strong>Built in:</strong> Duplicate learner records are skipped, while medical, emergency and pickup fields are encrypted when saved.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('dataImportTab')">Open Data Import</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 3 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-finance-facilities.png" alt="Professional school finance and facilities coordination workspace">
+            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-finance-facilities.webp" alt="Professional school finance and facilities coordination workspace">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Finance &amp; service delivery</span><h2>Keep essential school services moving.</h2><p>Coordinate billing, parent payments, purchasing, inventory, resource bookings, maintenance and school-store workflows.</p><div class="portal-tour-fact"><strong>Connected records:</strong> Give the right staff a clear view of the work that needs action, without exposing unrelated school data.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('reportsTab')">View reports</button></div></div>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 4 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-safety-communications.png" alt="Secure school entrance and safeguarding operations workspace">
+            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-safety-communications.webp" alt="Secure school entrance and safeguarding operations workspace">
             <div class="portal-tour-copy"><span class="portal-tour-kicker">Safe communication &amp; response</span><h2>Respond clearly when every minute matters.</h2><p>Bring notices, email, tickets, family communication, consent, safeguarding, pickup and area alerts into controlled workflows.</p><div class="portal-tour-fact"><strong>Privacy by design:</strong> Location is used only for relevant area alerts and is not shown to other users.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('careTab')">Open Care &amp; Safety</button></div></div>
           </article>
           <div class="tour-controls"><button type="button" onclick="movePortalTour(-1)" aria-label="Previous slide">‹</button><div class="tour-dots" role="tablist" aria-label="Portal tour slides"><button type="button" class="is-active" onclick="showPortalTourSlide(0)" aria-label="Show slide 1"></button><button type="button" onclick="showPortalTourSlide(1)" aria-label="Show slide 2"></button><button type="button" onclick="showPortalTourSlide(2)" aria-label="Show slide 3"></button><button type="button" onclick="showPortalTourSlide(3)" aria-label="Show slide 4"></button></div><button type="button" onclick="movePortalTour(1)" aria-label="Next slide">›</button></div>
@@ -1713,7 +1713,7 @@
   <script src="backup.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/school-navigation.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/sa-sams-integration.js?v=20260929-sasams-v1" defer></script>
-  <script src="/assets/my-day.js?v=20261009-neat-sidebar-v1" defer></script>
+  <script src="/assets/my-day.js?v=20261010-lossless-art-v1" defer></script>
   <script src="/assets/welcome-clock.js?v=20261010-sa-clock-v1" defer></script>
   <script src="/assets/staff-work.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/approvals.js?v=20261009-stage-navigation-v1" defer></script>

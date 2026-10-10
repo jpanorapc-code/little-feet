@@ -23,7 +23,7 @@
     style.textContent = `
       .my-day-hero,.my-day-attention,.my-day-action{--text-dark:#f7fbff;--text-muted:#d8eaff;color:#f7fbff;}
       .my-day-hero{position:relative;overflow:hidden;margin-bottom:18px;padding:24px;border:1px solid rgba(94,234,212,.32);border-radius:16px;background:linear-gradient(155deg,#08287f,#061d5b);}
-      .my-day-hero::after{content:"";position:absolute;right:-28px;bottom:-36px;width:180px;height:180px;background:url('/assets/4k/sidebar-penguin-hq.png') center/contain no-repeat;opacity:.18;pointer-events:none;}
+      .my-day-hero::after{content:"";position:absolute;right:-28px;bottom:-36px;width:180px;height:180px;background:url('/assets/4k/sidebar-penguin-hq.optimized.png') center/contain no-repeat;opacity:.18;pointer-events:none;}
       .my-day-kicker{color:#99f6e4;font-size:.72rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;}
       .my-day-hero h2{position:relative;z-index:1;margin:5px 0 6px;font-size:clamp(1.35rem,3vw,2rem);}
       .my-day-hero p{position:relative;z-index:1;max-width:700px;color:var(--text-muted);line-height:1.5;}

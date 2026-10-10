@@ -1,0 +1,68 @@
+[
+  {
+    "source": "assets/4k/little-feet-mascot-hq.png",
+    "target": "assets/4k/little-feet-mascot-hq.optimized.png",
+    "width": 1254,
+    "height": 1254,
+    "pixelSha256": "681d7f22488c13b8ef5ffabbb06330a192904996a7f0fc8ff0a261534fe5bc57",
+    "sourceSha256": "0a92e6d8a19ad3fe83e8877fafa1636055961fb69bb5ce2fb49aa4691cb457ac",
+    "targetSha256": "f9d71413fa9cf792d3c0199326b97819b972a603bd6677187e6a5816b89f679b",
+    "beforeBytes": 1657364,
+    "afterBytes": 1594620
+  },
+  {
+    "source": "assets/4k/sidebar-penguin-hq.png",
+    "target": "assets/4k/sidebar-penguin-hq.optimized.png",
+    "width": 1215,
+    "height": 1295,
+    "pixelSha256": "08d3c91545f40397afb08f5f67b31021560b90914816bf4eb2ff596d1ba5761d",
+    "sourceSha256": "972da95e7113b85d27615708a5df0c4666eaf3c47fa170f1d23db52afdcac2e7",
+    "targetSha256": "f3c54877602e4cda1bb14d4a8664925b84224971f39858a4f3d562ddb6cff120",
+    "beforeBytes": 1540015,
+    "afterBytes": 1489504
+  },
+  {
+    "source": "assets/4k/tour-platform-operations.png",
+    "target": "assets/4k/tour-platform-operations.webp",
+    "width": 1672,
+    "height": 941,
+    "pixelSha256": "2456f4a602a8c1dc157146222fc7160027cdc9b149f90f8af38857b8d17f13d8",
+    "sourceSha256": "91f66bfa561e6f5adfe03d567685433bb624a5518f77a7ffb0d5cd4b3f1eb316",
+    "targetSha256": "2b5267395b15bbb13fdb834cf53970f8b16f4c1dce165e1a4004aeaf6bc8ad4f",
+    "beforeBytes": 1951180,
+    "afterBytes": 1452166
+  },
+  {
+    "source": "assets/4k/tour-secure-administration.png",
+    "target": "assets/4k/tour-secure-administration.webp",
+    "width": 1672,
+    "height": 941,
+    "pixelSha256": "b4fd61cb551ae5138eb424e76b0e2a5eda8c150d297897128c0424edad9df678",
+    "sourceSha256": "f98bb43343d607c637c90b800ad5fe19944e8b8cab9b84067b6ffc8eea7b142a",
+    "targetSha256": "f23689cc49a5d4efd8db2a6b0f361d01215ef385f4df04c49c12b9fd7309fdf1",
+    "beforeBytes": 1991342,
+    "afterBytes": 1449750
+  },
+  {
+    "source": "assets/4k/tour-finance-facilities.png",
+    "target": "assets/4k/tour-finance-facilities.webp",
+    "width": 1672,
+    "height": 941,
+    "pixelSha256": "aef294cfc1ad799c1724bfc0f1415af2b19ac40c3dc97ca525c05448f3cb6118",
+    "sourceSha256": "668e5308fedf3f6679eb43c7aeda1c2308b235a62c9b6036edcf51cd56ed7bcd",
+    "targetSha256": "471308a1c5d30620535800c333ea3afc61db4a387537df0168737abdbdcb53b7",
+    "beforeBytes": 2174304,
+    "afterBytes": 1576446
+  },
+  {
+    "source": "assets/4k/tour-safety-communications.png",
+    "target": "assets/4k/tour-safety-communications.webp",
+    "width": 1672,
+    "height": 941,
+    "pixelSha256": "1f0c18d53edd8d29f93c7f4d1a7eb365320557ffb27b489cd4ca0da4a09305c6",
+    "sourceSha256": "cb1c3a058b3cbaa0f27565cf67573829dd322fcce94494655f8bb858f7f80116",
+    "targetSha256": "b55ece30461f180ac2339d3b7b9165a41d7d75f0b40ceb49a93b49ce7a7aefee",
+    "beforeBytes": 2227011,
+    "afterBytes": 1635048
+  }
+]
