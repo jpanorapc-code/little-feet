@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
-const client = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const server = require('../scripts/source-layout').readBackendSource(root);
+const client = require('../scripts/source-layout').readFrontendSource(root);
 const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 const requiredServerPatterns = [

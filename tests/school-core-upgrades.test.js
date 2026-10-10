@@ -50,6 +50,7 @@ fs.writeFileSync(path.join(tmp, 'littlefeet-replica.json'), JSON.stringify({
   ], moduleRecords:{}, directMessages:[], chatGroups:[], groupMessages:{}
 }));
 
+fs.cpSync(path.join(root, 'lib'), path.join(tmp, 'lib'), { recursive: true });
 const child=spawn(process.execPath,['server.js'],{
   cwd:tmp,
   env:{...process.env,PORT:String(port),NODE_ENV:'test',LF_REPLICA_MODE:'1',LF_TEST_ALLOW_REPLICA_WRITES:'1',LF_EMAIL_FROM:'noreply@littlefeet.test',LF_EMAIL_API_KEY:'email-test',LF_EMAIL_API_URL:'http://127.0.0.1:'+gatewayPort+'/email',LF_SMS_FROM:'LittleFeet',LF_SMS_API_KEY:'sms-test',LF_SMS_API_URL:'http://127.0.0.1:'+gatewayPort+'/sms',LF_PUSH_API_KEY:'push-test',LF_PUSH_API_URL:'http://127.0.0.1:'+gatewayPort+'/push',LF_WHATSAPP_FROM:'LittleFeet',LF_WHATSAPP_API_KEY:'whatsapp-test',LF_WHATSAPP_API_URL:'http://127.0.0.1:'+gatewayPort+'/whatsapp'},

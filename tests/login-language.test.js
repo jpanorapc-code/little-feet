@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const preferences = fs.readFileSync(path.join(root, 'assets', 'preferences-enhancements.js'), 'utf8');
-const client = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const client = require('../scripts/source-layout').readFrontendSource(root);
 const ambient = fs.readFileSync(path.join(root, 'assets', 'ambient-background.js'), 'utf8');
 
 const extractFrozenObject = (source, name) => {

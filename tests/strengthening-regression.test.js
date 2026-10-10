@@ -49,6 +49,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   groupMessages: {}
 }));
 
+fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temp,
   env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', LF_TEST_ALLOW_REPLICA_WRITES: '1', NODE_ENV: 'test' },

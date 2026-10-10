@@ -42,7 +42,8 @@ let child;
 let stderr = '';
 const start = async () => {
   stderr = '';
-  child = spawn(process.execPath, ['server.js'], { cwd: temp, env: { ...process.env, PORT: String(port), NODE_ENV: 'test', SESSION_SECRET: 'storage-test-session', LF_FIELD_ENCRYPTION_KEY: 'storage-test-fields', LF_LOCAL_OBJECT_STORAGE_DIR: objectRoot }, stdio: ['ignore', 'ignore', 'pipe'] });
+  fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
+child = spawn(process.execPath, ['server.js'], { cwd: temp, env: { ...process.env, PORT: String(port), NODE_ENV: 'test', SESSION_SECRET: 'storage-test-session', LF_FIELD_ENCRYPTION_KEY: 'storage-test-fields', LF_LOCAL_OBJECT_STORAGE_DIR: objectRoot }, stdio: ['ignore', 'ignore', 'pipe'] });
   child.stderr.on('data', chunk => { stderr += chunk.toString(); });
   for (let attempt = 0; attempt < 120; attempt += 1) {
     try { if ((await fetch(`${origin}/api/health`)).ok) return; } catch {}

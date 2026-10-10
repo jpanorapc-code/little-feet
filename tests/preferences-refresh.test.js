@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const client = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const client = require('../scripts/source-layout').readFrontendSource(root);
 const preferences = fs.readFileSync(path.join(root, 'assets', 'preferences-enhancements.js'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
@@ -52,8 +52,8 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v72-registered-school-charts/);
-assert.match(serviceWorker, /backup\.js\?v=20261009-detailed-charts-v2/);
+assert.match(serviceWorker, /little-feet-shell-v74-sa-clock/);
+assert.match(serviceWorker, /backup\.js\?v=20261010-controlled-split-v2/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /advanced-school-operations\.js\?v=20261009-stage-navigation-v1/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);

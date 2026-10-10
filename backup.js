@@ -248,168 +248,37 @@ const wellbeingTips = [
 ];
 
 // Audio indicator. Mobile browsers require the audio engine to be unlocked by a tap.
-function getPortalAudioContext() {
-  if (!portalAudioContext || portalAudioContext.state === 'closed') portalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-  return portalAudioContext;
-}
+
 
 window.getPortalAudioContext = getPortalAudioContext;
 window.isPortalAudioMuted = () => portalAudioMuted;
 
-function announcePortalAudioState() {
-  try {
-    window.dispatchEvent(new CustomEvent('littlefeet:audiochange', { detail: { muted: portalAudioMuted } }));
-  } catch { /* Audio state broadcast is optional. */ }
-}
 
-function unlockPortalAudio() {
-  try {
-    if (portalAudioMuted) return;
-    const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-  } catch { /* Sound remains optional when unavailable on a device. */ }
-}
 
-function getLittleFeetAntarcticAudio() {
-  const audio = document.getElementById('littleFeetAntarcticAudio');
-  if (!audio) return null;
-  audio.loop = true;
-  audio.volume = 0.56;
-  audio.muted = portalAudioMuted;
-  return audio;
-}
 
-function removeLittleFeetAntarcticUnlockListeners() {
-  document.removeEventListener('pointerdown', startLittleFeetAntarcticAudioFromGesture, true);
-  document.removeEventListener('keydown', startLittleFeetAntarcticAudioFromGesture, true);
-}
 
-function installLittleFeetAntarcticUnlockListeners() {
-  if (portalAudioMuted || littleFeetAntarcticAudioPlaying) return;
-  document.addEventListener('pointerdown', startLittleFeetAntarcticAudioFromGesture, true);
-  document.addEventListener('keydown', startLittleFeetAntarcticAudioFromGesture, true);
-}
 
-function startLittleFeetAntarcticAudioFromGesture() {
-  if (portalAudioMuted) return;
-  const audio = getLittleFeetAntarcticAudio();
-  if (!audio) return;
-  audio.muted = false;
-  const playAttempt = audio.play();
-  if (!playAttempt?.then) {
-    littleFeetAntarcticAudioPlaying = true;
-    removeLittleFeetAntarcticUnlockListeners();
-    return;
-  }
-  playAttempt.then(() => {
-    littleFeetAntarcticAudioPlaying = true;
-    removeLittleFeetAntarcticUnlockListeners();
-  }).catch(() => {
-    littleFeetAntarcticAudioPlaying = false;
-    installLittleFeetAntarcticUnlockListeners();
-  });
-}
 
-function pauseLittleFeetAntarcticAudio() {
-  const audio = getLittleFeetAntarcticAudio();
-  if (!audio) return;
-  audio.muted = true;
-  audio.pause();
-  littleFeetAntarcticAudioPlaying = false;
-}
+
+
+
+
+
+
+
 
 window.getLittleFeetAntarcticAudio = getLittleFeetAntarcticAudio;
 
-function southAfricaNow(date = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-ZA', {
-    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
-    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-  }).formatToParts(date).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
-  return {
-    year: Number(parts.year), weekday: parts.weekday,
-    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
-    minutes: Number(parts.hour) * 60 + Number(parts.minute)
-  };
-}
 
-function campusHours() {
-  const text = document.getElementById('currentTermText')?.textContent || '';
-  const match = text.match(/Campus Hours:\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/i);
-  if (!match) return { open: 7 * 60, close: 17 * 60 + 30, label: '07:00 - 17:30' };
-  const open = Number(match[1]) * 60 + Number(match[2]);
-  const close = Number(match[3]) * 60 + Number(match[4]);
-  return { open, close, label: `${match[1].padStart(2, '0')}:${match[2]} - ${match[3].padStart(2, '0')}:${match[4]}` };
-}
 
-function updateSchoolDayStatus() {
-  const pill = document.getElementById('navLivePill');
-  if (!pill) return;
-  const now = southAfricaNow();
-  const hours = campusHours();
-  const calendar = SA_PUBLIC_SCHOOL_CALENDAR[now.year];
-  const weekday = !['Sat', 'Sun'].includes(now.weekday);
-  const inTerm = !calendar || calendar.terms.some(([start, end]) => now.dateKey >= start && now.dateKey <= end);
-  const holiday = Boolean(calendar?.closed.has(now.dateKey));
-  const withinHours = now.minutes >= hours.open && now.minutes < hours.close;
-  const open = weekday && inTerm && !holiday && withinHours;
-  pill.textContent = open ? 'School day in progress' : 'School closed';
-  pill.classList.toggle('is-closed', !open);
-  let reason = `Campus hours ${hours.label} SAST`;
-  if (!weekday) reason = 'Closed for the weekend';
-  else if (holiday) reason = 'Closed for a South African public or special school holiday';
-  else if (!inTerm) reason = 'Closed during the official public-school break';
-  else if (now.minutes < hours.open) reason = `Opens at ${hours.label.split(' - ')[0]} SAST`;
-  else if (now.minutes >= hours.close) reason = `Closed at ${hours.label.split(' - ')[1]} SAST`;
-  pill.title = `${reason} · ${now.dateKey}`;
-  pill.setAttribute('aria-label', `${pill.textContent}. ${reason}`);
-}
+
+
+
 
 // Audio indicator
-function playDingSound() {
-  if (portalAudioMuted) return;
-  try {
-    const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  } catch {
-    // Audio is optional; a blocked browser audio context is not an application fault.
-  }
-}
 
-function playTicketAlert() {
-  if (portalAudioMuted) return;
-  try {
-    const ctx = getPortalAudioContext();
-    if (ctx.state === 'suspended') return;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.03);
-    master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 6.4);
-    master.connect(ctx.destination);
-    const pattern = [659.25, 783.99, 987.77, 783.99, 659.25, 523.25, 659.25, 880];
-    Array.from({ length: 25 }, (_, index) => {
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const start = ctx.currentTime + index * 0.25;
-      oscillator.type = 'square';
-      oscillator.frequency.setValueAtTime(pattern[index % pattern.length], start);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.42, start + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
-      oscillator.connect(gain); gain.connect(master);
-      oscillator.start(start); oscillator.stop(start + 0.22);
-    });
-  } catch { /* Browser sound is optional and can be disabled by device settings. */ }
-}
+
+
 
 // DOM Initialization
 window.addEventListener('DOMContentLoaded', () => {
@@ -460,53 +329,11 @@ window.addEventListener('DOMContentLoaded', () => {
   setupWallpaperMode();
 });
 
-function upgradeLegacyIcons() {
-  const iconFor = (value = '') => {
-    const first = Array.from(String(value).trim())[0];
-    return ({ '📣':'alert', '📢':'alert', '🚨':'alert', '💳':'finance', '💰':'finance', '🛍':'finance', '🛡':'safety', '🤝':'handover', '📦':'operations', '⚙':'operations', '🖼':'image', '📅':'document', '📁':'book', '📚':'book', '📊':'chart', '💬':'chat', '🧷':'heart-star', '🌱':'growth', '🏆':'award', '🎨':'palette', '🏫':'home', '👤':'user', '🧑':'user', '👨':'users', '🐾':'heart-star', '🌟':'award', '📍':'pin', '🌍':'globe', '⬇':'download', '👥':'users', '📨':'send', '🔍':'search', '📝':'edit', '📋':'document', '🔐':'lock', '📥':'download', '🩺':'safety', '💾':'save', '🗑':'trash', '👁':'eye', '✏':'edit', '🖨':'print', '♻':'refresh', '🎫':'help', '✨':'award', '🚪':'lock', '✕':'close' })[first] || 'heart-star';
-  };
-  const svg = name => `<span class="professional-icon" aria-hidden="true"><svg class="ui-icon"><use href="#icon-${name}"></use></svg></span>`;
-  document.querySelectorAll('.card-header-bar h2:not(.icon-label), .guide-link-card h3:not(.icon-label), .workspace-card h3:not(.icon-label), .action-btn:not(.icon-label), .submit-btn:not(.icon-label)').forEach(heading => {
-    const text = heading.textContent.trim();
-    if (!/^[\p{Extended_Pictographic}]/u.test(text)) return;
-    heading.classList.add('icon-label');
-    heading.innerHTML = `${svg(iconFor(text))}<span>${text.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '')}</span>`;
-  });
-  document.querySelectorAll('.profile-icon-choice').forEach(button => {
-    if (button.querySelector('.ui-icon, .profile-avatar-image')) return;
-    const value = button.dataset.profileIcon || button.textContent.trim();
-    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${iconFor(value)}"></use></svg>`;
-  });
-}
 
-function observeProfessionalIcons() {
-  const portal = document.getElementById('portalApp') || document.body;
-  if (!portal || portal.dataset.iconObserverReady === 'true') return;
-  portal.dataset.iconObserverReady = 'true';
-  let queued = false;
-  new MutationObserver(() => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => {
-      queued = false;
-      upgradeLegacyIcons();
-    });
-  }).observe(portal, { childList:true, subtree:true });
-}
 
-async function completeProviderLogin() {
-  try {
-    const response = await fetch('/api/auth/session', { cache: 'no-store' });
-    const data = await response.json();
-    if (!response.ok || !data.authenticated || !data.user) throw new Error(data.message || 'Unable to complete provider sign-in.');
-    currentUser = data.user;
-    window.history.replaceState({}, document.title, '/');
-    setupSession();
-  } catch (error) {
-    alert(safeUserFacingError(error, 'Provider sign-in could not be completed.'));
-    window.history.replaceState({}, document.title, '/');
-  }
-}
+
+
+
 
 async function restoreAuthenticatedSession() {
   try {
@@ -519,360 +346,61 @@ async function restoreAuthenticatedSession() {
   } catch { /* The sign-in screen remains available if the session check is unavailable. */ }
 }
 
-async function syncProviderButtons() {
-  const buttons = [...document.querySelectorAll('[data-provider-signin]')];
-  if (!buttons.length) return;
-  try {
-    const response = await fetch('/api/auth/providers', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Provider status could not be loaded.');
-    connectedSignInProviders = await response.json();
-    buttons.forEach(button => {
-      const enabled = connectedSignInProviders[button.dataset.providerSignin] === true;
-      button.hidden = !enabled;
-      button.disabled = !enabled;
-    });
-    const providerPanel = buttons[0].closest('.social-signin');
-    if (providerPanel) providerPanel.hidden = !buttons.some(button => !button.hidden);
-  } catch {
-    // Keep the account sign-in form available even when the optional provider
-    // status check is temporarily unavailable.
-    buttons.forEach(button => { button.hidden = true; button.disabled = true; });
-  }
-}
 
-function startProviderSignIn(provider) {
-  if (connectedSignInProviders[provider] === false) return showProviderSetup(`${provider} sign-in`);
-  if (provider === 'google' || provider === 'yahoo' || provider === 'microsoft') window.location.assign(`/auth/${provider}`);
-  else showProviderSetup(`${provider} sign-in`);
-}
 
-function showOAuthSignInMessage(error) {
-  const messages = {
-    'google-not-configured': ['Google sign-in is not ready yet', 'An administrator still needs to finish the Google connection.'],
-    'yahoo-not-configured': ['Yahoo sign-in is not ready yet', 'An administrator still needs to add the Yahoo connection details in Render.'],
-    'microsoft-not-configured': ['Microsoft sign-in is not ready yet', 'An administrator still needs to add the Microsoft connection details in Render.'],
-    'google-sign-in-failed': ['Google sign-in could not finish', 'Please try again. If this continues, an administrator should check the Google app connection.'],
-    'account-not-linked': ['Account not linked', 'This email is not linked to an approved Little Feet account. Please use your approved school, teacher, parent, principal, or district email.'],
-    'account-link-ambiguous': ['Email linked more than once', 'An administrator must remove the duplicate email alias before provider sign-in can continue.'],
-    'account-pending': ['Account approval is pending', 'Your school administrator must approve this account before provider sign-in can continue.'],
-    'oauth-email-missing': ['Provider email unavailable', 'Your provider did not return a usable email address. Check the provider account and try again.'],
-    'session-failed': ['Secure sign-in session could not start', 'Please try again. If this continues, contact your administrator.'],
-    'yahoo-sign-in-failed': ['Yahoo sign-in could not finish', 'Please try again. If this continues, an administrator should check the Yahoo app connection.'],
-    'microsoft-sign-in-failed': ['Microsoft sign-in could not finish', 'Please try again. If this continues, an administrator should check the Microsoft app connection.']
-  };
-  const [title, text] = messages[error] || ['Sign-in could not finish', 'Please try again or contact your school administrator.'];
-  window.history.replaceState({}, document.title, '/');
-  setTimeout(() => openModal(title, `<p style="margin:0;line-height:1.6;">${escapeWorkspaceText(text)}</p>`), 0);
-}
 
-function setupKeyboardShortcuts() {
-  window.addEventListener('keydown', event => {
-    if (!currentUser || event.altKey || event.ctrlKey || event.metaKey) return;
-    const target = event.target;
-    if (target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
-    const key = event.key.toLowerCase();
-    if (key.length === 1) {
-      windtLegacyKeyTrail = `${windtLegacyKeyTrail}${key}`.slice(-5);
-      if (windtLegacyKeyTrail === 'windt') {
-        windtLegacyKeyTrail = '';
-        openWindtLegacy();
-        return;
-      }
-    }
-    const shortcuts = { h: 'homeTab', t: 'ticketsTab', f: 'feedTab', s: 'scheduleTab', g: 'guideTab' };
-    if (shortcuts[key]) { event.preventDefault(); openWorkspace(shortcuts[key]); }
-    if (key === '/') { event.preventDefault(); openGlobalSearch(); }
-  });
-}
 
-function handleMascotLegacyTap(event) {
-  event?.stopPropagation();
-  windtLegacyTapCount += 1;
-  if (windtLegacyTapTimer) clearTimeout(windtLegacyTapTimer);
-  if (windtLegacyTapCount >= 5) {
-    windtLegacyTapCount = 0;
-    openWindtLegacy();
-    return;
-  }
-  windtLegacyTapTimer = setTimeout(() => {
-    windtLegacyTapCount = 0;
-    goToMainMenu();
-  }, 650);
-}
 
-function openWindtLegacy() {
-  if (!currentUser) return;
-  openModal('The Windt Legacy 🐧', `<article style="display:grid;gap:14px;line-height:1.7;"><div style="padding:16px;border:1px solid rgba(45,212,191,.5);border-radius:14px;background:radial-gradient(circle at 80% 15%,rgba(45,212,191,.18),rgba(7,17,30,.15));"><p style="margin:0;color:#99f6e4;font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">A note for one day</p><h3 style="margin:5px 0 0;font-size:1.4rem;">To my son,</h3></div><p style="margin:0;">Your little feet and your small penguin waddle gave Little Feet its heart. When you were one year and four months old, you inspired this place more than you could have known.</p><p style="margin:0;">Through the late nights, the hard moments, and every small step of building, you kept me inspired to work hard and to care deeply. You changed me into a better man. I still have faults, and I am still learning, but you gave me a reason to keep becoming better.</p><p style="margin:0;">If you find this one day, I want you to know that I am proud of you. I will always love you. If it were not for you, I would never have come this far.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Every little step matters — especially yours.</p><details style="border-top:1px solid rgba(45,212,191,.35);padding-top:12px;"><summary style="cursor:pointer;color:#99f6e4;font-weight:800;">’n Brief van Pa</summary><div style="display:grid;gap:12px;margin-top:12px;color:var(--text-dark);"><p style="margin:0;">My seun ek is so trots op jou so ver as wat jy gekom het, as ek nie daar meer is nie ek is jammer jy is die beste ding wat in my lewe gebeur het en ek weet jy gan n success wees in lewe pa glo vas jy sal kan beter doen as wat ek sou kon, asseblief kyk mooi na jou ma as ek nie meer daar is nie.</p><p style="margin:0;">Btw jou middle naam is based op my child hood game hero Marcus Fenix jou ma wou nie hê ek moes jou dit noem nie maar pa het inageval want jy deserve die beste.</p><p style="margin:0;">Die Windt Legacy gan nie oor wat gedoen was nie en aan gaan met dit nie dit gaan oor wat jy voor sit vir jou familie sodat die volgende generation kan streef en nog beter doen as die laaste.</p><p style="margin:0;font-weight:700;color:var(--primary-color);">Christiaan Windt in and out, love you my Potato.</p></div></details></article>`);
-  playWindtLegacyNote();
-}
 
-function showPortalTourSlide(index) {
-  const slides = [...document.querySelectorAll('.portal-tour-slide')];
-  const dots = [...document.querySelectorAll('.tour-dots button')];
-  if (!slides.length) return;
-  portalTourIndex = (index + slides.length) % slides.length;
-  slides.forEach((slide, slideIndex) => slide.classList.toggle('is-active', slideIndex === portalTourIndex));
-  dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === portalTourIndex));
-}
 
-function portalAudioPreferenceKey() {
-  const username = String(currentUser?.username || '').trim().toLowerCase();
-  return username ? `lf_portal_audio_muted:${username}` : '';
-}
 
-function updatePortalAudioControls() {
-  document.querySelectorAll('[data-portal-audio-mute]').forEach(button => {
-    const muteLabel = window.translateLittleFeetText?.('soundOn') || button.dataset.muteLabel || 'Sound On';
-    const unmuteLabel = window.translateLittleFeetText?.('muted') || button.dataset.unmuteLabel || 'Muted';
-    const iconId = portalAudioMuted ? 'icon-volume-off' : 'icon-volume';
-    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#${iconId}"></use></svg><span>${portalAudioMuted ? unmuteLabel : muteLabel}</span>`;
-    button.classList.toggle('is-muted', portalAudioMuted);
-    button.setAttribute('aria-pressed', String(portalAudioMuted));
-    button.setAttribute('aria-label', portalAudioMuted ? 'Sound muted. Turn Little Feet sound on' : 'Sound on. Mute Little Feet sound');
-    button.title = portalAudioMuted ? 'Sound muted — click to turn sound on' : 'Sound on — click to mute';
-  });
-}
+
+
+
+
+
+
+
+
+
 
 window.addEventListener('littlefeet:languagechange', updatePortalAudioControls);
 
-function stopAllPortalAudio() {
-  pauseLittleFeetAntarcticAudio();
-  stopWindtLegacyNote();
-  stopWallpaperTheme();
-}
 
-function loadPortalAudioPreference() {
-  try {
-    const accountKey = portalAudioPreferenceKey();
-    const accountValue = accountKey ? localStorage.getItem(accountKey) : null;
-    const savedValue = portalAudioChangedBeforeLogin ? localStorage.getItem('lf_portal_audio_muted_last') : (accountValue === null ? localStorage.getItem('lf_portal_audio_muted_last') : accountValue);
-    portalAudioMuted = savedValue === 'true';
-    if (accountKey && portalAudioChangedBeforeLogin) {
-      localStorage.setItem(accountKey, String(portalAudioMuted));
-      portalAudioChangedBeforeLogin = false;
-    }
-  } catch { portalAudioMuted = false; }
-  if (portalAudioMuted) stopAllPortalAudio();
-  else installLittleFeetAntarcticUnlockListeners();
-  updatePortalAudioControls();
-  announcePortalAudioState();
-}
 
-function togglePortalAudioMute() {
-  portalAudioMuted = !portalAudioMuted;
-  if (!currentUser) portalAudioChangedBeforeLogin = true;
-  try {
-    localStorage.setItem('lf_portal_audio_muted_last', String(portalAudioMuted));
-    const accountKey = portalAudioPreferenceKey();
-    if (accountKey) localStorage.setItem(accountKey, String(portalAudioMuted));
-  } catch {}
-  if (portalAudioMuted) {
-    stopAllPortalAudio();
-  } else {
-    unlockPortalAudio();
-    startLittleFeetAntarcticAudioFromGesture();
-    if (document.getElementById('wallpaperOverlay')?.classList.contains('is-visible')) startWallpaperTheme();
-  }
-  updatePortalAudioControls();
-  announcePortalAudioState();
-}
 
-function playWindtLegacyNote() {
-  stopWindtLegacyNote();
-  if (portalAudioMuted) return;
-  windtLegacyAudio = new Audio('assets/audio/little-feet-note.mp3');
-  windtLegacyAudio.loop = true;
-  windtLegacyAudio.volume = 0.62;
-  windtLegacyAudio.play().catch(() => {});
-}
 
-function stopWindtLegacyNote() {
-  if (!windtLegacyAudio) return;
-  windtLegacyAudio.pause();
-  windtLegacyAudio.currentTime = 0;
-  windtLegacyAudio = null;
-}
 
-function movePortalTour(direction) {
-  showPortalTourSlide(portalTourIndex + direction);
-  restartPortalTour();
-}
 
-function restartPortalTour() {
-  if (portalTourTimer) window.clearInterval(portalTourTimer);
-  portalTourTimer = window.setInterval(() => showPortalTourSlide(portalTourIndex + 1), 7500);
-}
 
-function setupPortalTour() {
-  const tour = document.getElementById('portalTour');
-  if (!tour) return;
-  restartPortalTour();
-  tour.addEventListener('mouseenter', () => { if (portalTourTimer) window.clearInterval(portalTourTimer); });
-  tour.addEventListener('mouseleave', restartPortalTour);
-  tour.addEventListener('focusin', () => { if (portalTourTimer) window.clearInterval(portalTourTimer); });
-  tour.addEventListener('focusout', restartPortalTour);
-}
 
-function addFormTemplates(form, label, templates, applyTemplate) {
-  if (!form || form.dataset.templatesReady) return;
-  form.dataset.templatesReady = 'true';
-  const bar = document.createElement('div');
-  bar.className = 'form-template-bar';
-  const select = document.createElement('select');
-  select.name = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_template`;
-  select.id = `${form.id || 'form'}_template`;
-  select.setAttribute('aria-label', `${label} template`);
-  select.innerHTML = `<option value="">Choose a ${label.toLowerCase()} template…</option>${templates.map((template, index) => `<option value="${index}">${template.label}</option>`).join('')}`;
-  const button = document.createElement('button');
-  button.type = 'button'; button.className = 'action-btn btn-blue'; button.textContent = 'Use template';
-  button.addEventListener('click', () => { const template = templates[Number(select.value)]; if (!template) return; applyTemplate(template); });
-  const hint = document.createElement('span'); hint.textContent = 'Templates save time; review every field before saving.';
-  bar.append(select, button, hint); form.prepend(bar);
-}
 
-function setupFormTemplates() {
-  addFormTemplates(document.getElementById('scheduleForm'), 'schedule', [
-    { label: 'Morning learning block', day: 'Monday', time: '08:00 - 08:30', activity: 'Morning circle: welcome, weather, and attendance' },
-    { label: 'Literacy activity', day: 'Tuesday', time: '09:00 - 09:45', activity: 'Early literacy: story time, sounds, and name writing' },
-    { label: 'Outdoor movement', day: 'Wednesday', time: '10:00 - 10:40', activity: 'Outdoor play: gross-motor movement and cooperative games' }
-  ], template => { const [start, end] = template.time.split(' - '); document.getElementById('schDay').value = template.day; document.getElementById('schStartTime').value = start; document.getElementById('schEndTime').value = end; document.getElementById('schActivity').value = template.activity; });
 
-  addFormTemplates(document.getElementById('ticketForm'), 'support request', [
-    { label: 'Fee or payment question', department: 'Finance', priority: 'Normal', subject: 'Request for account assistance', message: 'Please review the account and advise on the next steps.' },
-    { label: 'Medical information update', department: 'Medical', priority: 'High', subject: 'Learner medical information update', message: 'Please contact me to confirm the correct process for updating this learner’s medical information.' },
-    { label: 'General school query', department: 'Admin', priority: 'Normal', subject: 'School administration query', message: 'Please provide guidance or arrange a suitable time to discuss this request.' },
-    { label: 'Request a meeting', department: 'Principal & School Leadership', priority: 'Medium', subject: 'Meeting request', message: 'I would like to arrange a meeting to discuss the following matter: [add details].' }
-  ], template => { document.getElementById('ticketDept').value = template.department; document.getElementById('ticketPriority').value = template.priority; document.getElementById('ticketSubject').value = template.subject; document.getElementById('ticketMessage').value = template.message; });
 
-  addFormTemplates(document.getElementById('broadcastForm'), 'alert', [
-    { label: 'Weather closure notice', priority: 'Weather Alert', message: 'Important: The school is monitoring severe weather conditions. Please check this notice for the next update and follow school collection instructions.' },
-    { label: 'Health and safety notice', priority: 'Urgent Medical', message: 'Important safety notice: Please follow the school’s collection and access instructions. Contact the school office if you need assistance.' },
-    { label: 'General campus notice', priority: 'Campus Notice', message: 'School notice: Please review this update and contact the school office if you have questions.' }
-  ], template => { document.getElementById('bcPriority').value = template.priority; document.getElementById('bcMessage').value = template.message; });
 
-  addFormTemplates(document.getElementById('reportPublishForm'), 'report', [
-    { label: 'Monthly learning summary', title: 'Monthly learning summary', period: new Date().toLocaleString(undefined, { month: 'long', year: 'numeric' }) },
-    { label: 'Assessment feedback', title: 'Assessment feedback and next steps', period: new Date().toLocaleString(undefined, { month: 'long', year: 'numeric' }) },
-    { label: 'Term progress report', title: 'Term progress report', period: 'Term 3, 2026' }
-  ], template => { document.getElementById('reportTitle').value = template.title; document.getElementById('reportPeriod').value = template.period; });
 
-  const incidentForm = document.querySelector("form[onsubmit*=\"'care','Incident report'\"]");
-  addFormTemplates(incidentForm, 'incident report', [
-    { label: 'Minor playground incident', details: 'Learner: [name]. Time: [time]. Location: playground. Objective facts: [what was observed]. Immediate action: [first aid / supervision]. Parent notified: [yes/no].' },
-    { label: 'Behaviour observation', details: 'Learner: [name]. Time: [time]. Location: [area]. Objective facts: [what was observed]. Support provided: [action]. Parent notified: [yes/no].' }
-  ], template => { const input = incidentForm.querySelector('[name="details"]'); if (input) input.value = template.details; });
-}
 
-function setupRuntimeErrorHelpdesk() {
-  window.addEventListener('error', event => {
-    const resource = event.target && event.target !== window ? event.target : null;
-    if (resource) {
-      const source = resource.src || resource.href || '';
-      if (source) routeErrorToHelpdesk({ code: 'WEB_RESOURCE_ERROR', message: 'A browser resource failed to load.', source });
-      return;
-    }
-    routeErrorToHelpdesk({
-      code: 'WEB_RUNTIME_ERROR',
-      message: event.message || 'Unexpected browser error',
-      line: event.lineno,
-      column: event.colno,
-      source: event.filename,
-      stack: event.error?.stack || ''
-    });
-  }, true);
-  window.addEventListener('unhandledrejection', event => routeErrorToHelpdesk({
-    code: 'WEB_PROMISE_ERROR',
-    message: event.reason?.message || String(event.reason || 'Unexpected background error'),
-    stack: event.reason?.stack || ''
-  }));
-}
 
-function routeErrorToHelpdesk(error) {
-  const redactedCrossOriginError = /^Script error\.?$/i.test(String(error.message || '').trim()) && !error.source;
-  const diagnosticMessage = redactedCrossOriginError
-    ? 'A cross-origin script failed, but the browser redacted its source. External libraries now load with CORS diagnostics so reproducing the fault should identify the exact file and line.'
-    : error.message;
-  const safeStack = String(error.stack || '').split('\n').slice(0, 5).join('\n');
-  const enrichedError = { ...error, message: diagnosticMessage, originalMessage: redactedCrossOriginError ? error.message : undefined };
-  captureDebugEvent({ category: 'Browser runtime', ...enrichedError });
-  const details = `${error.code}: ${diagnosticMessage}${error.source ? `\nSource: ${error.source}` : ''}${error.line ? `\nLine: ${error.line}${error.column ? `, column ${error.column}` : ''}` : ''}${safeStack ? `\nStack: ${safeStack}` : ''}`;
-  if (currentUser) void reportClientStructuredLog({
-    severity: 'error', code: error.code || 'WEB_RUNTIME_ERROR', message: diagnosticMessage,
-    source: error.source || '', line: error.line || null, column: error.column || null, page: window.location.pathname
-  });
-  if (!currentUser || sessionStorage.getItem(`lf_error_${details}`)) return;
-  sessionStorage.setItem(`lf_error_${details}`, '1');
-  sessionStorage.setItem('lf_pending_support_error', JSON.stringify({ code: error.code, details }));
-  document.getElementById('runtimeErrorBanner')?.classList.remove('hidden');
-}
 
-function dismissRuntimeErrorBanner() {
-  document.getElementById('runtimeErrorBanner')?.classList.add('hidden');
-}
 
-function openRuntimeErrorSupport() {
-  const pending = JSON.parse(sessionStorage.getItem('lf_pending_support_error') || 'null');
-  if (!pending) return dismissRuntimeErrorBanner();
-  const supportButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes("ticketsTab"));
-  switchTab('ticketsTab', supportButton);
-  const department = document.getElementById('ticketDept');
-  const priority = document.getElementById('ticketPriority');
-  const subject = document.getElementById('ticketSubject');
-  const message = document.getElementById('ticketMessage');
-  if (department) department.value = 'Technical Support';
-  if (priority) priority.value = 'High';
-  if (subject) subject.value = `Technical issue: ${pending.code}`;
-  if (message) {
-    message.value = `${pending.details}\n\nAdditional notes (optional): `;
-    message.focus();
-    message.setSelectionRange(message.value.length, message.value.length);
-  }
-  dismissRuntimeErrorBanner();
-}
 
-function showWellbeingBanner() {
-  const banner = document.getElementById('wellbeingBanner');
-  const text = document.getElementById('wellbeingBannerText');
-  if (!banner || !text || localStorage.getItem('lf_wellbeing_banner_hidden') === 'true') return;
-  const last = Number(localStorage.getItem('lf_wellbeing_tip_index'));
-  const choices = wellbeingTips.map((_, index) => index).filter(index => index !== last);
-  const next = choices[Math.floor(Math.random() * choices.length)];
-  localStorage.setItem('lf_wellbeing_tip_index', String(next));
-  text.textContent = wellbeingTips[next];
-  banner.classList.remove('hidden');
-}
 
-function dismissWellbeingBanner() {
-  document.getElementById('wellbeingBanner')?.classList.add('hidden');
-  localStorage.setItem('lf_wellbeing_banner_hidden', 'true');
-}
 
-function dismissTermsNotice() {
-  document.getElementById('termsNotice')?.classList.add('hidden');
-  localStorage.setItem('lf_terms_notice_acknowledged', 'true');
-}
 
-async function loadReleaseNotes() {
-  const board = document.getElementById('updatesBoard');
-  if (!board) return;
-  try {
-    const response = await fetch('/api/release-notes', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Unable to load release notes.');
-    const payload = await response.json();
-    const notes = (Array.isArray(payload) ? payload : []).slice().sort((first, second) => Date.parse(second.publishedAt || '') - Date.parse(first.publishedAt || ''));
-    const latest = notes[0];
-    const seen = localStorage.getItem('lf_latest_release_seen');
-    if (!latest || seen === latest.id) {
-      board.innerHTML = '';
-      board.classList.add('hidden');
-      return;
-    }
-    board.innerHTML = `<div class="card-header-bar"><div><h2>✨ What’s new</h2><span class="meta">Latest platform improvements</span></div><button type="button" class="action-btn btn-blue" onclick="dismissReleaseNotes('${latest.id}')">Mark as read</button></div>${notes.slice(0, 3).map(note => {
-      return `<div class="item-row"><div><strong>Version ${escapeWorkspaceText(note.version)} · ${escapeWorkspaceText(note.title)}</strong><p style="margin-top:4px;color:var(--text-muted);">${escapeWorkspaceText(note.summary)}</p><span class="meta" style="display:block;margin-top:5px;">${new Date(note.publishedAt).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' })}</span></div></div>`;
-    }).join('')}`;
-    board.classList.remove('hidden');
-  } catch { board.classList.add('hidden'); }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 async function runPortalBackgroundRefresh() {
   if (portalBackgroundRefreshInFlight || !currentUser || document.hidden) return false;
@@ -894,190 +422,33 @@ function startPortalBackgroundRefresh() {
   portalBackgroundRefreshTimer = window.setInterval(runPortalBackgroundRefresh, PORTAL_BACKGROUND_REFRESH_MS);
 }
 
-function dismissReleaseNotes(id) {
-  localStorage.setItem('lf_latest_release_seen', id);
-  document.getElementById('updatesBoard')?.classList.add('hidden');
-}
 
-function setupSignaturePads() {
-  ['teacherSignaturePad', 'parentSignaturePad'].forEach(id => {
-    const canvas = document.getElementById(id);
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    context.lineWidth = 2.5; context.lineCap = 'round'; context.strokeStyle = '#0f2b48';
-    let drawing = false; let hasStroke = false;
-    const position = event => { const rect = canvas.getBoundingClientRect(); const point = event.touches?.[0] || event; return { x: (point.clientX - rect.left) * (canvas.width / rect.width), y: (point.clientY - rect.top) * (canvas.height / rect.height) }; };
-    const start = event => { drawing = true; const point = position(event); context.beginPath(); context.moveTo(point.x, point.y); event.preventDefault(); };
-    const move = event => { if (!drawing) return; const point = position(event); context.lineTo(point.x, point.y); context.stroke(); hasStroke = true; event.preventDefault(); };
-    const stop = () => { drawing = false; };
-    canvas.addEventListener('pointerdown', start); canvas.addEventListener('pointermove', move); canvas.addEventListener('pointerup', stop); canvas.addEventListener('pointerleave', stop);
-    reportSignaturePads[id] = { canvas, context, hasStroke: () => hasStroke, clear: () => { context.clearRect(0, 0, canvas.width, canvas.height); hasStroke = false; } };
-  });
-}
 
-function clearSignature(id) { reportSignaturePads[id]?.clear(); }
 
-function toggleLoginPinVisibility() {
-  const input = document.getElementById('loginPin');
-  const button = document.getElementById('loginPinToggle');
-  if (!input || !button) return;
-  const shouldShow = input.type === 'password';
-  input.type = shouldShow ? 'text' : 'password';
-  const label = shouldShow
-    ? (window.translateLittleFeetText?.('hidePassword') || 'Hide password')
-    : (window.translateLittleFeetText?.('showPassword') || 'Show password');
-  button.setAttribute('aria-pressed', String(shouldShow));
-  button.setAttribute('aria-label', label);
-  button.setAttribute('title', label);
-  input.focus({ preventScroll: true });
-}
 
-function refreshLoginPasswordLanguage() {
-  const input = document.getElementById('loginPin');
-  const button = document.getElementById('loginPinToggle');
-  if (!input || !button) return;
-  const key = input.type === 'text' ? 'hidePassword' : 'showPassword';
-  const fallback = input.type === 'text' ? 'Hide password' : 'Show password';
-  const label = window.translateLittleFeetText?.(key) || fallback;
-  button.setAttribute('aria-label', label);
-  button.setAttribute('title', label);
-}
+
+
+
+
+
 
 window.addEventListener('littlefeet:languagechange', refreshLoginPasswordLanguage);
 
-function clearRememberedLogin() {
-  try { localStorage.removeItem(SAVED_LOGIN_USERNAME_KEY); } catch {}
-}
 
-function restoreRememberedLogin() {
-  try {
-    const username = localStorage.getItem(SAVED_LOGIN_USERNAME_KEY) || '';
-    if (!username) return;
-    const usernameInput = document.getElementById('loginUsername');
-    const rememberInput = document.getElementById('rememberLogin');
-    if (usernameInput && !usernameInput.value) usernameInput.value = username;
-    if (rememberInput) rememberInput.checked = true;
-  } catch {}
-}
 
-async function saveRememberedLogin(username, pin) {
-  try { localStorage.setItem(SAVED_LOGIN_USERNAME_KEY, username); } catch {}
-  if (!window.PasswordCredential || !navigator.credentials?.store) return;
-  try {
-    await navigator.credentials.store(new PasswordCredential({
-      id: username,
-      name: currentUser?.name || username,
-      password: pin
-    }));
-  } catch { /* The browser may choose its own password-save prompt instead. */ }
-}
+
+
+
 
 let loginHumanCheckEnabled = true;
 let loginHumanCheckLoadVersion = 0;
 let loginHumanCheckAbortController = null;
 
-async function loadLoginHumanCheck() {
-  const prompt = document.getElementById('loginHumanCheckPrompt');
-  const answer = document.getElementById('loginHumanCheckAnswer');
-  const challengeId = document.getElementById('loginHumanCheckId');
-  const submit = document.querySelector('#loginForm button[type="submit"]');
-  const refresh = document.querySelector('#loginHumanCheckPanel .action-btn');
-  if (!prompt || !answer || !challengeId) return false;
 
-  const loadVersion = ++loginHumanCheckLoadVersion;
-  loginHumanCheckAbortController?.abort();
-  prompt.dataset.lfI18n = 'loadingSecurityCheck';
-  prompt.textContent = window.translateLittleFeetText?.('loadingSecurityCheck') || 'Loading security check…';
-  delete prompt.dataset.humanLeft;
-  delete prompt.dataset.humanRight;
-  delete prompt.dataset.humanOperator;
-  answer.value = '';
-  answer.required = true;
-  answer.disabled = true;
-  challengeId.value = '';
-  if (submit) submit.disabled = true;
-  if (refresh) refresh.disabled = true;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const controller = new AbortController();
-    loginHumanCheckAbortController = controller;
-    const timeout = window.setTimeout(() => controller.abort(), 2500);
 
-    try {
-      const response = await fetch('/api/auth/human-check', {
-        credentials: 'same-origin',
-        cache: 'no-store',
-        signal: controller.signal
-      });
-      const data = await response.json().catch(() => ({}));
-      if (loadVersion !== loginHumanCheckLoadVersion) return false;
-      if (!response.ok) throw new Error('Security check unavailable.');
 
-      if (data.required === false) {
-        loginHumanCheckEnabled = false;
-        document.getElementById('loginHumanCheckPanel')?.classList.add('hidden');
-        answer.required = false;
-        answer.disabled = true;
-        if (submit) submit.disabled = false;
-        if (refresh) refresh.disabled = false;
-        return true;
-      }
 
-      if (!data.challengeId || !data.prompt) throw new Error('Security check unavailable.');
-      loginHumanCheckEnabled = true;
-      document.getElementById('loginHumanCheckPanel')?.classList.remove('hidden');
-      answer.required = true;
-      if (Number.isFinite(Number(data.left)) && Number.isFinite(Number(data.right)) && ['+', '−'].includes(data.operator)) {
-        prompt.dataset.lfI18n = 'humanCheckQuestion';
-        prompt.dataset.humanLeft = String(data.left);
-        prompt.dataset.humanRight = String(data.right);
-        prompt.dataset.humanOperator = data.operator;
-        prompt.textContent = window.translateLittleFeetText?.('humanCheckQuestion', {
-          left: data.left,
-          operator: data.operator,
-          right: data.right
-        }) || data.prompt;
-      } else {
-        prompt.textContent = data.prompt;
-      }
-      challengeId.value = data.challengeId;
-      answer.disabled = false;
-      if (submit) submit.disabled = false;
-      if (refresh) refresh.disabled = false;
-      answer.focus({ preventScroll: true });
-      return true;
-    } catch (error) {
-      if (loadVersion !== loginHumanCheckLoadVersion) return false;
-      if (attempt === 0) {
-        prompt.dataset.lfI18n = 'retryingSecurityCheck';
-        prompt.textContent = window.translateLittleFeetText?.('retryingSecurityCheck') || 'Retrying security check…';
-        await new Promise(resolve => window.setTimeout(resolve, 150));
-        continue;
-      }
-      prompt.dataset.lfI18n = 'securityUnavailable';
-      prompt.textContent = window.translateLittleFeetText?.('securityUnavailable') || 'Security check unavailable. Select New check to retry.';
-      if (submit) submit.disabled = true;
-      if (refresh) refresh.disabled = false;
-      return false;
-    } finally {
-      window.clearTimeout(timeout);
-      if (loginHumanCheckAbortController === controller) loginHumanCheckAbortController = null;
-    }
-  }
-  return false;
-}
-
-function showSignupForm() {
-  document.getElementById('loginForm').classList.add('hidden');
-  document.getElementById('signupForm').classList.remove('hidden');
-}
-
-function hideSignupForm() {
-  document.getElementById('signupForm').classList.add('hidden');
-  document.getElementById('loginForm').classList.remove('hidden');
-  document.getElementById('signupForm').reset();
-  void loadLoginHumanCheck();
-}
 
 // Authentication
 const loginForm = document.getElementById('loginForm');
@@ -1163,489 +534,64 @@ if (signupForm) {
 }
 
 // Diagnostic Error Log Index
-function reportClientStructuredLog({ severity = 'warn', code = 'CLIENT_EVENT', message = '', source = '', line = null, column = null, page = window.location.pathname } = {}) {
-  if (!currentUser) return Promise.resolve(null);
-  return fetch('/api/system/client-log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ severity, code, message, source, line, column, page })
-  }).catch(() => null);
-}
+
 
 window.reportLittleFeetClientLog = reportClientStructuredLog;
 
-function logAppError(code, reason) {
-  captureDebugEvent({ category: 'Application', code, message: reason });
-  void reportClientStructuredLog({ severity: 'warn', code, message: reason });
-  const errItem = { code, reason, timestamp: new Date().toLocaleTimeString() };
-  errorLog.unshift(errItem);
 
-  const errorBox = document.getElementById('attendanceErrorIndex');
-  const errorList = document.getElementById('errorListItems');
-
-  if (errorBox && errorList) {
-    errorBox.style.display = 'block';
-    errorList.innerHTML = errorLog.map(err => 
-      `<li><strong>[${escapeWorkspaceText(err.code)}]</strong> ${escapeWorkspaceText(err.reason)} <em>(${escapeWorkspaceText(err.timestamp)})</em></li>`
-    ).join('');
-  }
-}
 
 let modalReturnFocus = null;
 
-function openModal(title, contentHtml) {
-  const modal = document.getElementById('appModal');  modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  document.getElementById('modalTitle').textContent = title;
-  document.getElementById('modalBody').innerHTML = contentHtml;
-  document.querySelector('#appModal .modal-card').classList.remove('subscription-modal-card');
-  modal.classList.remove('hidden');
-  requestAnimationFrame(() => modal.querySelector('.modal-close')?.focus());
-}
 
-function sanitiseDebugText(value) {
-  return String(value || 'No additional detail').replace(/(password|pin|token)\s*[:=]\s*\S+/gi, '$1: [redacted]').slice(0, 600);
-}
+
+
 
 const INSPECT_BROWSER_CLEAN_SLATE_ID = 'inspect-clean-slate-20261001-v1';
-function applyBrowserDiagnosticHistoryReset() {
-  const markerKey = 'lf_inspect_clean_slate_id';
-  if (sessionStorage.getItem(markerKey) === INSPECT_BROWSER_CLEAN_SLATE_ID) return;
-  debugEvents = [];
-  sessionStorage.removeItem('lf_debug_events');
-  sessionStorage.removeItem('lf_pending_support_error');
-  [...Array(sessionStorage.length).keys()]
-    .map(index => sessionStorage.key(index))
-    .filter(key => key && key.startsWith('lf_error_'))
-    .forEach(key => sessionStorage.removeItem(key));
-  sessionStorage.setItem(markerKey, INSPECT_BROWSER_CLEAN_SLATE_ID);
-}
 
-function configureDebugMode() {
-  const isAdmin = isFullAccessUser();
-  if (isAdmin) applyBrowserDiagnosticHistoryReset();
-  debugModeEnabled = isAdmin && localStorage.getItem('lf_admin_debug_mode') === 'true';
-  if (isAdmin) {
-    try { debugEvents = JSON.parse(sessionStorage.getItem('lf_debug_events') || '[]'); } catch { debugEvents = []; }
-  } else {
-    debugEvents = [];
-    debugModeEnabled = false;
-  }
-  updateDebugModePanel();
-}
 
-function captureDebugEvent(event) {
-  if (!debugModeEnabled || !isFullAccessUser()) return;
-  const item = {
-    id: `DBG-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    category: sanitiseDebugText(event.category || 'Application'),
-    code: sanitiseDebugText(event.code || 'UNCLASSIFIED'),
-    message: sanitiseDebugText(event.message),
-    source: sanitiseDebugText(event.source || 'Not provided'),
-    line: Number(event.line) || null,
-    column: Number(event.column) || null,
-    page: window.location.pathname
-  };
-  debugEvents.unshift(item);
-  debugEvents = debugEvents.slice(0, 50);
-  sessionStorage.setItem('lf_debug_events', JSON.stringify(debugEvents));
-  updateDebugModePanel();
-}
 
-function updateDebugModePanel() {
-  const panel = document.getElementById('debugModePanel');
-  const toggle = document.getElementById('debugModeToggle');
-  const status = document.getElementById('debugModeStatus');
-  if (!panel || !isFullAccessUser()) return;
-  if (toggle) { toggle.textContent = debugModeEnabled ? 'Disable debug mode' : 'Enable debug mode'; toggle.className = `action-btn ${debugModeEnabled ? 'btn-red' : 'btn-blue'}`; }
-  if (status) status.textContent = debugModeEnabled ? `Debug mode is on. ${debugEvents.length} safe technical event${debugEvents.length === 1 ? '' : 's'} captured this session.` : 'Debug mode is off. Turn it on only while diagnosing a problem.';
-}
 
-function toggleDebugMode() {
-  if (!isFullAccessUser()) return alert('Debug mode is available to administrators only.');
-  debugModeEnabled = !debugModeEnabled;
-  localStorage.setItem('lf_admin_debug_mode', String(debugModeEnabled));
-  updateDebugModePanel();
-}
 
-async function openDebugReport() {
-  if (!isFullAccessUser()) return;
-  try {
-    const [diagnosticsResponse, errorsResponse] = await Promise.all([fetch('/api/system-diagnostics'), fetch('/api/system-errors')]);
-    latestServerDiagnostics = diagnosticsResponse.ok ? await diagnosticsResponse.json() : null;
-    latestServerErrors = errorsResponse.ok ? await errorsResponse.json() : [];
-  } catch (error) {
-    captureDebugEvent({ category: 'System doctor', code: 'DIAGNOSTICS_UNAVAILABLE', message: error.message });
-  }
-  const report = debugEvents.length ? debugEvents.map(event => `<div class="item-row"><strong>${escapeWorkspaceText(event.code)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(event.message)}</p><span class="meta">${escapeWorkspaceText(event.category)} · ${escapeWorkspaceText(event.source)}${event.line ? ` · Line ${event.line}${event.column ? `, column ${event.column}` : ''}` : ''}<br>${new Date(event.timestamp).toLocaleString()}</span></div>`).join('') : '<p class="meta">No debug events have been captured in this session.</p>';
-  const serverSummary = latestServerDiagnostics ? `<div class="workspace-card" style="margin-bottom:12px;"><h3>Live system doctor</h3><p><strong>Status:</strong> ${escapeWorkspaceText(latestServerDiagnostics.status)} · <strong>Database:</strong> ${escapeWorkspaceText(latestServerDiagnostics.persistence)} · <strong>Open server errors:</strong> ${Number(latestServerDiagnostics.records?.openErrors || 0)}</p><p class="meta">Learners ${Number(latestServerDiagnostics.records?.learners || 0)} · Accounts ${Number(latestServerDiagnostics.records?.accounts || 0)} · Attendance ${Number(latestServerDiagnostics.records?.attendance || 0)} · Payments ${Number(latestServerDiagnostics.records?.payments || 0)}<br>Generated ${new Date(latestServerDiagnostics.generatedAt).toLocaleString()}</p></div>` : '<p class="meta">Live server diagnostics are temporarily unavailable.</p>';
-  const serverErrors = latestServerErrors.length ? latestServerErrors.slice(0, 25).map(event => `<div class="item-row"><strong>${escapeWorkspaceText(event.name)} · ${escapeWorkspaceText(event.status)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(event.message)}</p><span class="meta">${escapeWorkspaceText(event.method)} ${escapeWorkspaceText(event.route)} · Request ${escapeWorkspaceText(event.requestId || event.id)}<br>${new Date(event.createdAt).toLocaleString()}</span></div>`).join('') : '<p class="meta">No server errors have been recorded.</p>';
-  openModal('Administrator debug report', `<p style="margin:0 0 12px;color:var(--text-muted);">This report contains safe technical context only. Do not add learner data or passwords to support requests.</p>${serverSummary}<h3>Server error history</h3>${serverErrors}<h3 style="margin-top:16px;">This browser session</h3>${report}`);
-}
 
-async function downloadDebugReport() {
-  if (!isFullAccessUser()) return;
-  if (!latestServerDiagnostics) {
-    try {
-      const [diagnosticsResponse, errorsResponse] = await Promise.all([fetch('/api/system-diagnostics'), fetch('/api/system-errors')]);
-      latestServerDiagnostics = diagnosticsResponse.ok ? await diagnosticsResponse.json() : null;
-      latestServerErrors = errorsResponse.ok ? await errorsResponse.json() : [];
-    } catch { /* The downloadable report still includes browser diagnostics. */ }
-  }
-  const content = JSON.stringify({ generatedAt: new Date().toISOString(), server: latestServerDiagnostics, serverErrors: latestServerErrors, browserEvents: debugEvents }, null, 2);
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
-  link.download = `LittleFeet_Debug_Report_${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
 
-function clearDebugReport() {
-  if (!isFullAccessUser() || !confirm('Clear this session’s debug report?')) return;
-  debugEvents = [];
-  sessionStorage.removeItem('lf_debug_events');
-  updateDebugModePanel();
-}
 
-function canUseInspectDashboard() {
-  return Boolean(currentUser && (isFullAccessUser(currentUser) || currentUser.role === 'staff'));
-}
 
-function inspectFilterParams() {
-  const params = new URLSearchParams({ limit: '500' });
-  const fields = [
-    ['severity', 'inspectFilterSeverity'],
-    ['status', 'inspectFilterStatus'],
-    ['method', 'inspectFilterMethod'],
-    ['user', 'inspectFilterUser'],
-    ['event', 'inspectFilterEvent'],
-    ['requestId', 'inspectFilterRequestId'],
-    ['search', 'inspectFilterSearch']
-  ];
-  fields.forEach(([key, id]) => {
-    const value = String(document.getElementById(id)?.value || '').trim();
-    if (value) params.set(key, value);
-  });
-  return params;
-}
 
-function inspectDateTime(value) {
-  const parsed = new Date(value || '');
-  return Number.isNaN(parsed.getTime()) ? 'Unknown time' : parsed.toLocaleString();
-}
 
-function inspectSeverityBadge(severity) {
-  const level = String(severity || 'info').toLowerCase();
-  if (level === 'error') return '<span class="badge-tag urgent">ERROR</span>';
-  if (level === 'warn') return '<span class="badge-tag urgent">WARN</span>';
-  if (level === 'debug') return '<span class="badge-tag">DEBUG</span>';
-  return '<span class="badge-tag info">INFO</span>';
-}
 
-function renderInspectDashboard() {
-  const payload = inspectStructuredLogPayload || { summary: {}, logs: [] };
-  const summary = payload.summary || {};
-  const faults = Array.isArray(inspectServerFaults) ? inspectServerFaults : [];
-  const diagnostics = inspectDiagnostics;
-  const setText = (id, value) => {
-    const node = document.getElementById(id);
-    if (node) node.textContent = String(value ?? '—');
-  };
 
-  setText('inspectRuntimeStatus', diagnostics?.status ? String(diagnostics.status).replaceAll('-', ' ').toUpperCase() : 'UNAVAILABLE');
-  setText('inspectRequestCount', summary.last15Minutes ?? 0);
-  setText('inspectErrorCount', summary.errors ?? 0);
-  setText('inspectWarningCount', summary.warnings ?? 0);
-  setText('inspectSlowCount', summary.slowRequests ?? 0);
-  setText('inspectOpenFaultCount', faults.filter(fault => fault.status === 'open').length);
-  setText('inspectGeneratedAt', payload.generatedAt ? `Updated ${inspectDateTime(payload.generatedAt)}` : 'Not loaded');
 
-  const diagnosticsSummary = document.getElementById('inspectDiagnosticsSummary');
-  if (diagnosticsSummary) {
-    if (!diagnostics) {
-      diagnosticsSummary.textContent = 'Live server diagnostics are unavailable.';
-    } else {
-      diagnosticsSummary.innerHTML = [
-        `<strong>Persistence:</strong> ${escapeWorkspaceText(diagnostics.persistence || 'unknown')}`,
-        `<strong>Active requests:</strong> ${Number(diagnostics.activeRequests || 0)}`,
-        `<strong>Accounts:</strong> ${Number(diagnostics.records?.accounts || 0)}`,
-        `<strong>Learners:</strong> ${Number(diagnostics.records?.learners || 0)}`,
-        `<strong>Attendance:</strong> ${Number(diagnostics.records?.attendance || 0)}`,
-        `<strong>Payments:</strong> ${Number(diagnostics.records?.payments || 0)}`,
-        `<strong>Open faults:</strong> ${Number(diagnostics.records?.openErrors || 0)}`,
-        `<strong>Logger capacity:</strong> ${Number(summary.maxEntries || 0)} · slow ≥ ${Number(summary.slowRequestMs || 0)} ms`
-      ].join(' &nbsp;·&nbsp; ');
-    }
-  }
 
-  const logs = Array.isArray(payload.logs) ? payload.logs : [];
-  setText('inspectLogCount', `${logs.length} shown · ${Number(summary.captured || 0)} captured in this runtime`);
-  const logRows = document.getElementById('inspectLogRows');
-  if (logRows) {
-    logRows.innerHTML = logs.length ? logs.map(entry => {
-      const requestId = String(entry.requestId || '');
-      const encodedRequestId = encodeInlineIdentifier(requestId);
-      const userContext = entry.user
-        ? `<strong>${escapeWorkspaceText(entry.user)}</strong><br><span class="meta">${escapeWorkspaceText(entry.role || 'account')}${entry.schoolName ? ` · ${escapeWorkspaceText(entry.schoolName)}` : ''}</span>`
-        : '<span class="meta">System / unauthenticated</span>';
-      const sourceLocation = entry.source ? `${entry.source}${entry.line ? `:${entry.line}${entry.column ? `:${entry.column}` : ''}` : ''}` : '';
-      const eventDetail = [entry.code, entry.message, entry.details, sourceLocation].filter(Boolean).map(escapeWorkspaceText).join(' · ');
-      return `<tr>
-        <td data-label="Time">${escapeWorkspaceText(inspectDateTime(entry.timestamp))}</td>
-        <td data-label="Severity">${inspectSeverityBadge(entry.severity)}</td>
-        <td data-label="Event"><strong>${escapeWorkspaceText(entry.event || 'event')}</strong>${eventDetail ? `<br><span class="meta">${eventDetail}</span>` : ''}</td>
-        <td data-label="User / school">${userContext}</td>
-        <td data-label="Request"><strong>${escapeWorkspaceText(entry.method || '—')}</strong> ${escapeWorkspaceText(entry.route || '—')}</td>
-        <td data-label="Status">${entry.status ? escapeWorkspaceText(entry.status) : '—'}</td>
-        <td data-label="Duration">${entry.durationMs === null || entry.durationMs === undefined ? '—' : `${Number(entry.durationMs).toFixed(1)} ms`}</td>
-        <td data-label="Result">${escapeWorkspaceText(entry.result || '—')}</td>
-        <td data-label="Trace">${requestId ? `<button type="button" class="action-btn btn-blue inspect-trace-button" onclick="inspectTraceRequest('${encodedRequestId}')">Trace</button><span class="inspect-trace-id">${escapeWorkspaceText(requestId.slice(0, 12))}…</span>` : '<span class="meta">No request ID</span>'}</td>
-      </tr>`;
-    }).join('') : '<tr><td colspan="9">No structured log entries match these filters.</td></tr>';
-  }
 
-  const faultRows = document.getElementById('inspectFaultRows');
-  if (faultRows) {
-    faultRows.innerHTML = faults.length ? faults.slice(0, 100).map(fault => {
-      const encodedId = encodeInlineIdentifier(fault.id);
-      const encodedRequestId = encodeInlineIdentifier(fault.requestId || '');
-      const actions = fault.status === 'resolved'
-        ? '<span class="badge-tag info">RESOLVED</span>'
-        : `<button type="button" class="action-btn btn-blue" onclick="updateSystemErrorStatus('${encodedId}','acknowledged')">Acknowledge</button><button type="button" class="action-btn btn-green" onclick="updateSystemErrorStatus('${encodedId}','resolved')">Resolve</button>`;
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(fault.name || 'Error')} · ${escapeWorkspaceText(fault.status || 'open')}</strong><p style="margin-top:4px;">${escapeWorkspaceText(fault.message || 'No message')}</p><span class="meta">${escapeWorkspaceText(fault.method || 'SYSTEM')} ${escapeWorkspaceText(fault.route || '')} · ${escapeWorkspaceText(inspectDateTime(fault.createdAt))}${fault.source ? ` · ${escapeWorkspaceText(fault.source)}${fault.line ? `:${Number(fault.line)}${fault.column ? `:${Number(fault.column)}` : ''}` : ''}` : ''}${fault.updatedBy ? ` · updated by ${escapeWorkspaceText(fault.updatedBy)}` : ''}</span></div><div style="display:flex;gap:7px;flex-wrap:wrap;">${fault.requestId ? `<button type="button" class="action-btn btn-blue inspect-trace-button" onclick="inspectTraceRequest('${encodedRequestId}')">Trace request</button>` : ''}${actions}</div></div>`;
-    }).join('') : '<p class="meta">No persistent server faults have been recorded.</p>';
-  }
-}
 
-async function loadInspectDashboard({ silent = false, automatic = false } = {}) {
-  if (!canUseInspectDashboard() || !document.getElementById('inspectTab')) return false;
-  if (automatic && document.hidden) return false;
-  if (inspectRefreshPromise) return inspectRefreshPromise;
 
-  const refreshJob = (async () => {
-    if (automatic && !await ensureAuthenticatedSession()) return false;
-    const expectedUsername = currentUser?.username || '';
-    const statusNode = document.getElementById('inspectGeneratedAt');
-    if (!silent && statusNode) statusNode.textContent = 'Refreshing…';
-    try {
-      const [logsResponse, diagnosticsResponse, errorsResponse] = await Promise.all([
-        fetch(`/api/system-logs?${inspectFilterParams().toString()}`),
-        fetch('/api/system-diagnostics'),
-        fetch('/api/system-errors')
-      ]);
-      const [logsPayload, diagnosticsPayload, errorsPayload] = await Promise.all([
-        logsResponse.json().catch(() => ({})),
-        diagnosticsResponse.json().catch(() => ({})),
-        errorsResponse.json().catch(() => [])
-      ]);
-      if (!logsResponse.ok) throw new Error(logsPayload.message || 'Unable to load structured logs.');
-      if (!diagnosticsResponse.ok) throw new Error(diagnosticsPayload.message || 'Unable to load diagnostics.');
-      if (!errorsResponse.ok) throw new Error(errorsPayload?.message || 'Unable to load persistent faults.');
-      if (!currentUser || currentUser.username !== expectedUsername) return false;
-      inspectStructuredLogPayload = logsPayload;
-      inspectDiagnostics = diagnosticsPayload;
-      inspectServerFaults = Array.isArray(errorsPayload) ? errorsPayload : [];
-      latestServerDiagnostics = inspectDiagnostics;
-      latestServerErrors = inspectServerFaults;
-      renderInspectDashboard();
-      return true;
-    } catch (error) {
-      if (statusNode) statusNode.textContent = 'Refresh failed';
-      const rows = document.getElementById('inspectLogRows');
-      if (rows) rows.innerHTML = `<tr><td colspan="9">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load the logging dashboard.'))}</td></tr>`;
-      return false;
-    }
-  })();
 
-  inspectRefreshPromise = refreshJob;
-  try {
-    return await refreshJob;
-  } finally {
-    if (inspectRefreshPromise === refreshJob) inspectRefreshPromise = null;
-  }
-}
 
-function clearInspectFilters() {
-  ['inspectFilterSeverity','inspectFilterStatus','inspectFilterMethod','inspectFilterUser','inspectFilterEvent','inspectFilterRequestId','inspectFilterSearch'].forEach(id => {
-    const field = document.getElementById(id);
-    if (field) field.value = '';
-  });
-  loadInspectDashboard();
-}
 
-function toggleInspectAutoRefresh() {
-  const button = document.getElementById('inspectAutoRefreshToggle');
-  if (inspectAutoRefreshTimer) {
-    window.clearInterval(inspectAutoRefreshTimer);
-    inspectAutoRefreshTimer = null;
-    if (button) button.textContent = 'Auto-refresh: Off';
-    return;
-  }
-  inspectAutoRefreshTimer = window.setInterval(() => {
-    if (!currentUser || document.hidden || !document.getElementById('inspectTab')?.classList.contains('active') || inspectRefreshPromise) return;
-    void loadInspectDashboard({ silent: true, automatic: true });
-  }, INSPECT_AUTO_REFRESH_MS);
-  if (button) button.textContent = 'Auto-refresh: 60s';
-  void loadInspectDashboard({ silent: true, automatic: true });
-}
 
-async function inspectTraceRequest(encodedRequestId) {
-  if (!canUseInspectDashboard()) return;
-  const requestId = decodeURIComponent(encodedRequestId || '');
-  if (!requestId) return;
-  try {
-    const response = await fetch(`/api/system-logs/trace/${encodeURIComponent(requestId)}`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to trace this request.');
-    const logs = Array.isArray(data.logs) ? data.logs : [];
-    const errors = Array.isArray(data.errors) ? data.errors : [];
-    const timeline = logs.length ? logs.slice().reverse().map(entry => `<div class="item-row"><div><strong>${escapeWorkspaceText(entry.event)} · ${escapeWorkspaceText(entry.severity)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(entry.method || '')} ${escapeWorkspaceText(entry.route || '')}${entry.status ? ` · HTTP ${escapeWorkspaceText(entry.status)}` : ''}${entry.durationMs !== null && entry.durationMs !== undefined ? ` · ${Number(entry.durationMs).toFixed(1)} ms` : ''}</p><span class="meta">${escapeWorkspaceText(entry.message || entry.details || entry.result || '')}<br>${escapeWorkspaceText(inspectDateTime(entry.timestamp))}</span></div></div>`).join('') : '<p class="meta">No runtime log entries were found.</p>';
-    const faultHistory = errors.length ? errors.map(error => `<div class="item-row"><div><strong>${escapeWorkspaceText(error.name)} · ${escapeWorkspaceText(error.status)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(error.message)}</p><span class="meta">${escapeWorkspaceText(inspectDateTime(error.createdAt))}</span></div></div>`).join('') : '<p class="meta">No persistent fault is attached to this request.</p>';
-    openModal('Request trace', `<p class="meta" style="word-break:break-all;">Request ID: <strong>${escapeWorkspaceText(requestId)}</strong></p><h3>Timeline</h3>${timeline}<h3 style="margin-top:16px;">Persistent faults</h3>${faultHistory}`);
-  } catch (error) {
-    alert(safeUserFacingError(error, 'Unable to trace this request.'));
-  }
-}
 
-async function updateSystemErrorStatus(encodedId, status) {
-  if (!canUseInspectDashboard()) return;
-  const id = decodeURIComponent(encodedId || '');
-  if (!id) return;
-  try {
-    const response = await fetch(`/api/system-errors/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to update this fault.');
-    await loadInspectDashboard({ silent: true });
-  } catch (error) {
-    alert(safeUserFacingError(error, 'Unable to update this fault.'));
-  }
-}
 
-function renderInspectSelfTest() {
-  const status = document.getElementById('inspectSelfTestStatus');
-  const summary = document.getElementById('inspectSelfTestSummary');
-  const findings = document.getElementById('inspectSelfTestFindings');
-  const result = inspectSelfTestResult;
-  if (!status || !summary || !findings) return;
-  if (!result) {
-    status.textContent = 'Not run';
-    summary.textContent = 'Press “Run full site test” to inspect the current deployment.';
-    findings.innerHTML = '';
-    return;
-  }
-  status.textContent = `${String(result.status || 'unknown').toUpperCase()} · ${Number(result.durationMs || 0)} ms · ${inspectDateTime(result.completedAt)}`;
-  summary.innerHTML = `<strong>${Number(result.summary?.checks || 0)} checks</strong> · ${Number(result.summary?.passed || 0)} passed · ${Number(result.summary?.attention || 0)} attention · ${Number(result.summary?.failed || 0)} failed · ${Number(result.summary?.errors || 0)} error finding(s) · ${Number(result.summary?.warnings || 0)} warning finding(s)`;
-  const rows = Array.isArray(result.findings) ? result.findings : [];
-  findings.innerHTML = rows.length ? rows.map(finding => {
-    const location = finding.source ? `${finding.source}${finding.line ? `:${finding.line}${finding.column ? `:${finding.column}` : ''}` : ''}` : 'Runtime / no source line';
-    return `<div class="item-row"><div><strong>${escapeWorkspaceText(String(finding.severity || '').toUpperCase())} · ${escapeWorkspaceText(finding.issue || 'Finding')}</strong><p style="margin-top:5px;"><strong>Why:</strong> ${escapeWorkspaceText(finding.why || 'No additional explanation was produced.')}</p><span class="meta">${escapeWorkspaceText(finding.category || 'diagnostic')} · ${escapeWorkspaceText(finding.check || '')}<br><strong>Location:</strong> ${escapeWorkspaceText(location)}${finding.recommendation ? `<br><strong>Next:</strong> ${escapeWorkspaceText(finding.recommendation)}` : ''}</span></div></div>`;
-  }).join('') : '<div class="record-empty-state"><span><strong>No faults or threat indicators found by this run.</strong><span>The deployed checks completed without producing any findings.</span></span></div>';
-}
 
-async function runInspectSiteTest() {
-  if (!canUseInspectDashboard()) return;
-  const button = document.getElementById('inspectRunSiteTestButton');
-  const status = document.getElementById('inspectSelfTestStatus');
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Running real checks…';
-  }
-  if (status) status.textContent = 'Running…';
-  try {
-    const response = await fetch('/api/system-self-test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'The site test could not complete.');
-    inspectSelfTestResult = result;
-    renderInspectSelfTest();
-    await loadInspectDashboard({ silent: true });
-  } catch (error) {
-    inspectSelfTestResult = null;
-    if (status) status.textContent = 'Test failed to run';
-    const findings = document.getElementById('inspectSelfTestFindings');
-    if (findings) findings.innerHTML = `<div class="item-row"><strong>Site test could not complete</strong><p>${escapeWorkspaceText(safeUserFacingError(error, 'The automated site test could not complete.'))}</p></div>`;
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Run full site test';
-    }
-  }
-}
 
-async function clearInspectHistory() {
-  if (!canUseInspectDashboard()) return;
-  const confirmed = confirm('Clear Inspect diagnostic history? This removes structured logs, persistent fault history, and this browser session’s debug events. Learner, finance, ticket, import, security/audit, and other business records are not deleted.');
-  if (!confirmed) return;
 
-  const button = document.getElementById('inspectClearHistoryButton');
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Clearing…';
-  }
-  try {
-    const response = await fetch('/api/system-inspect-history', { method: 'DELETE' });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || 'Unable to clear Inspect history.');
 
-    debugEvents = [];
-    sessionStorage.removeItem('lf_debug_events');
-    sessionStorage.removeItem('lf_pending_support_error');
-    [...Array(sessionStorage.length).keys()]
-      .map(index => sessionStorage.key(index))
-      .filter(key => key && key.startsWith('lf_error_'))
-      .forEach(key => sessionStorage.removeItem(key));
-    latestServerErrors = [];
-    inspectStructuredLogPayload = null;
-    inspectServerFaults = [];
-    inspectDiagnostics = null;
-    inspectSelfTestResult = null;
-    renderInspectSelfTest();
-    updateDebugModePanel();
-    await loadInspectDashboard({ silent: true });
-    alert(`Inspect history cleared. Removed ${Number(result.removedPersistentFaults || 0)} persistent fault(s) and ${Number(result.removedRuntimeLogs || 0)} structured log entr${Number(result.removedRuntimeLogs || 0) === 1 ? 'y' : 'ies'}. New events will start from this clean slate.`);
-  } catch (error) {
-    alert(safeUserFacingError(error, 'Unable to clear Inspect history.'));
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Clear Inspect history';
-    }
-  }
-}
 
-async function downloadInspectReport() {
-  if (!canUseInspectDashboard()) return;
-  if (!inspectStructuredLogPayload || !inspectDiagnostics) await loadInspectDashboard({ silent: true });
-  const report = {
-    generatedAt: new Date().toISOString(),
-    diagnostics: inspectDiagnostics,
-    structuredLogs: inspectStructuredLogPayload,
-    persistentFaults: inspectServerFaults,
-    siteSelfTest: inspectSelfTestResult,
-    browserDebugEvents: debugEvents
-  };
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
-  link.download = `LittleFeet_Inspect_Report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
 
-function closeModal() {
-  visitorScannerStream?.getTracks().forEach(track => track.stop());
-  visitorScannerStream = null;
-  stopWindtLegacyNote();
-  document.getElementById('appModal').classList.add('hidden');
-  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
-  modalReturnFocus = null;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
@@ -1653,9 +599,7 @@ document.addEventListener('keydown', event => {
   if (modal && !modal.classList.contains('hidden')) closeModal();
 });
 
-function toggleDarkMode() {
-  document.body.classList.toggle('light-mode');
-}
+
 
 let dashboardRefreshTimer = null;
 const profileIcons = ['classic', 'lady', 'tough', 'cute', 'happy', 'cool', 'boss', 'smart-lady'];
@@ -1682,123 +626,29 @@ const legacyProfileIconMap = Object.freeze({
   '🏆': 'boss'
 });
 
-function normalizeProfileIcon(icon) {
-  const migrated = legacyProfileIconMap[icon] || icon;
-  return profileIcons.includes(migrated) ? migrated : profileIcons[0];
-}
 
-function profileIconMarkup(icon) {
-  const selectedIcon = normalizeProfileIcon(icon);
-  return `<svg class="profile-avatar-image profile-avatar-${selectedIcon}" viewBox="0 0 128 128" aria-hidden="true" focusable="false"><use href="/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3#avatar-${selectedIcon}"></use></svg>`;
-}
 
-function getProfileIconStorageKey() {
-  const account = currentUser?.username || 'guest';
-  return `lf_profile_icon_${encodeURIComponent(account)}`;
-}
 
-function applyProfileIcon(icon = localStorage.getItem(getProfileIconStorageKey()) || profileIcons[0]) {
-  const selectedIcon = normalizeProfileIcon(icon);
-  if (icon !== selectedIcon) localStorage.setItem(getProfileIconStorageKey(), selectedIcon);
-  const avatar = document.getElementById('userAvatar');
-  if (avatar) {
-    avatar.innerHTML = profileIconMarkup(selectedIcon);
-    avatar.title = `${profileIconLabels[selectedIcon]} · ${currentUser?.name || currentUser?.username || 'Profile'}`;
-  }
-  document.querySelectorAll('.profile-icon-choice').forEach(button => {
-    const selected = button.dataset.profileIcon === selectedIcon;
-    button.classList.toggle('is-selected', selected);
-    button.setAttribute('aria-pressed', String(selected));
-  });
-}
 
-function selectProfileIcon(icon) {
-  const selectedIcon = normalizeProfileIcon(icon);
-  if (!profileIcons.includes(selectedIcon)) return;
-  localStorage.setItem(getProfileIconStorageKey(), selectedIcon);
-  applyProfileIcon(selectedIcon);
-}
 
-function userPreferencesStorageKey() {
-  return currentUser?.username ? `lf_user_preferences_${encodeURIComponent(currentUser.username)}` : 'lf_user_preferences';
-}
 
-function readUserPreferences() {
-  try {
-    const accountValue = localStorage.getItem(userPreferencesStorageKey());
-    if (accountValue) return JSON.parse(accountValue);
-    const legacyValue = localStorage.getItem('lf_user_preferences');
-    return legacyValue ? JSON.parse(legacyValue) : {};
-  } catch {
-    return {};
-  }
-}
 
-function applyUserPreferences() {
-  const preferences = readUserPreferences();
-  const language = document.getElementById('languagePreference');
-  const refresh = document.getElementById('refreshPreference');
-  if (language) language.value = preferences.language || 'en';
-  if (refresh) refresh.value = preferences.refresh || '0';
-  if (window.applyLittleFeetLanguage) window.applyLittleFeetLanguage(preferences.language || 'en');
-  else document.documentElement.lang = preferences.language || 'en';
-  const sidebarCollapsed = localStorage.getItem('lf_sidebar_collapsed') === 'true';
-  document.getElementById('dashboardSection')?.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-  document.getElementById('mainNavigation')?.classList.toggle('is-collapsed', sidebarCollapsed);
-  restoreSidebarGroups();
-  applyProfileIcon();
-  if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
-  dashboardRefreshTimer = null;
-  if (window.configureDashboardAutoRefresh) window.configureDashboardAutoRefresh(preferences.refresh || '0');
-}
 
-function saveUserPreferences() {
-  const preferences = {
-    language: document.getElementById('languagePreference')?.value || 'en',
-    refresh: document.getElementById('refreshPreference')?.value || '0'
-  };
-  localStorage.setItem(userPreferencesStorageKey(), JSON.stringify(preferences));
-  applyUserPreferences();
-}
 
-function openGlobalSearch() {
-  if (!currentUser) return;
-  const buttons = [...document.querySelectorAll('.nav-btn')].filter(button => !button.closest('li')?.classList.contains('hidden'));
-  const choices = buttons.map((button, index) => `<option value="${index}">${escapeWorkspaceText(button.textContent.trim())}</option>`).join('');
-  openModal('Search workspaces', `<p style="margin:0 0 12px;color:var(--text-muted);">Choose a workspace available to your role.</p><select id="globalWorkspaceSearch">${choices}</select><button type="button" class="submit-btn" style="margin-top:12px;" onclick="openSelectedWorkspace()">Open workspace</button>`);
-}
 
-function openSelectedWorkspace() {
-  const index = Number(document.getElementById('globalWorkspaceSearch')?.value);
-  const buttons = [...document.querySelectorAll('.nav-btn')].filter(button => !button.closest('li')?.classList.contains('hidden'));
-  const button = buttons[index];
-  if (!button) return;
-  closeModal();
-  button.click();
-}
 
-function enforceSchoolSubscriptionUi() {
-  const access = currentUser?.schoolSubscriptionAccess;
-  if (!access || access.allowed || isFullAccessUser(currentUser)) return false;
-  const canRenew = ['admin', 'principal', 'school_accounts'].includes(currentUser?.role);
-  window.setTimeout(async () => {
-    const statusLabel = String(access.status || 'expired').replaceAll('_', ' ');
-    const detail = access.status === 'trial_expired'
-      ? `The 14-day Little Feet trial for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> has ended.`
-      : access.status === 'trial_pending'
-        ? `The 14-day Little Feet trial for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> has not been activated yet.`
-        : `The Little Feet subscription for <strong>${escapeWorkspaceText(currentUser.schoolName || 'this school')}</strong> is ${escapeWorkspaceText(statusLabel)}.`;
-    if (canRenew) {
-      const financeButton = [...document.querySelectorAll('.nav-btn')].find(button => String(button.getAttribute('onclick') || '').includes("'financeTab'"));
-      if (financeButton) switchTab('financeTab', financeButton);
-      await loadSubscriptionBillingOverview();
-      openModal('School subscription required', `<p style="line-height:1.6;">${detail}</p><p class="meta">School data remains protected. Renew or activate a plan to restore normal portal access.</p><button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionCheckout();">Choose plan & create payment request</button>`);
-    } else {
-      openModal('School subscription inactive', `<p style="line-height:1.6;">${detail}</p><p class="meta">Please contact the school principal or administrator to renew Little Feet access.</p>`);
-    }
-  }, 0);
-  return true;
-}
+
+
+
+
+
+
+
+
+
+
+
+
 
 function setupSession() {
   markServerSessionValidated();
@@ -1874,130 +724,11 @@ function applyRolePermissions(role) {
   });
 }
 
-async function loadCompanyClients() {
-  const host = document.getElementById('companyClientsContent');
-  if (!host || !(isFullAccessUser() || currentUser?.role === 'crm')) return;
-  const session = workspaceSessionKey();
-  try {
-    const response = await fetch('/api/company/clients');
-    const clients = await response.json();
-    if (session !== workspaceSessionKey()) return;
-    if (!response.ok) throw new Error(clients.message || 'Could not load clients.');
-    host.replaceChildren();
-    if (!clients.length) { host.textContent = 'No schools registered yet.'; return; }
-    for (const client of clients) {
-      const card = document.createElement('div'); card.className = 'workspace-card';
-      const name = document.createElement('h3'); name.textContent = client.name;
-      const detail = document.createElement('p'); detail.textContent = [client.area, client.status].filter(Boolean).join(' · ');
-      const label = document.createElement('label'); label.textContent = 'Your client follow-up note';
-      const input = document.createElement('textarea'); input.maxLength = 2000; input.value = client.note || ''; label.append(input);
-      const save = document.createElement('button'); save.type = 'button'; save.className = 'action-btn'; save.textContent = 'Save note';
-      const status = document.createElement('p'); status.setAttribute('role', 'status');
-      save.addEventListener('click', async () => {
-        save.disabled = true;
-        try {
-          const result = await fetch('/api/company/clients/' + encodeURIComponent(client.id), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({note:input.value}) });
-          const data = await result.json(); if (session !== workspaceSessionKey()) return;
-          if (!result.ok) throw new Error(data.message || 'Could not save note.'); status.textContent = 'Saved.';
-        } catch (error) { if (session === workspaceSessionKey()) status.textContent = error.message; }
-        finally { save.disabled = false; }
-      });
-      card.append(name, detail, label, save, status); host.append(card);
-    }
-  } catch (error) { if (session === workspaceSessionKey()) host.textContent = error.message; }
-}
 
-async function loadCompanyBilling() {
-  const host = document.getElementById('companyBillingContent');
-  if (!host || !(isFullAccessUser() || currentUser?.role === 'accounts')) return;
-  const session = workspaceSessionKey();
-  try {
-    const response = await fetch('/api/company/billing'); const data = await response.json();
-    if (session !== workspaceSessionKey()) return;
-    if (!response.ok) throw new Error(data.message || 'Could not load company invoices.');
-    host.replaceChildren();
-    if (!data.orders.length) { host.textContent = 'No school subscription invoices recorded yet.'; return; }
-    for (const invoice of data.orders) {
-      const card = document.createElement('div'); card.className = 'workspace-card';
-      const title = document.createElement('h3'); title.textContent = invoice.schoolName;
-      const detail = document.createElement('p'); detail.textContent = `${invoice.reference} · R ${Number(invoice.amount || 0).toFixed(2)} · ${invoice.status}`;
-      card.append(title,detail);
-      if (!/paid/i.test(invoice.status)) {
-        const form = document.createElement('form');
-        const reference = document.createElement('input'); reference.required = true; reference.maxLength = 160;
-        const label = document.createElement('label'); label.textContent = 'Bank payment reference'; label.append(reference);
-        const save = document.createElement('button'); save.type = 'submit'; save.className = 'action-btn'; save.textContent = 'Record confirmed payment';
-        const status = document.createElement('p'); status.setAttribute('role','status');
-        const eventId = crypto.randomUUID();
-        form.append(label,save,status); form.addEventListener('submit', async event => {
-          event.preventDefault(); if (!confirm('Have you verified this payment against the bank record?')) return;
-          save.disabled = true;
-          try {
-            const result = await fetch('/api/company/billing/reconcile', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({reference:invoice.reference,amount:invoice.amount,bankReference:reference.value,eventId})});
-            const payload = await result.json(); if (session !== workspaceSessionKey()) return;
-            if (!result.ok) throw new Error(payload.message || 'Could not record payment.'); await loadCompanyBilling();
-          } catch (error) { if (session === workspaceSessionKey()) status.textContent = error.message; }
-          finally { save.disabled = false; }
-        }); card.append(form);
-      }
-      host.append(card);
-    }
-  } catch (error) { if (session === workspaceSessionKey()) host.textContent = error.message; }
-}
 
-function renderRoleHomePanel() {
-  const panel = document.getElementById('roleHomePanel');
-  if (!panel || !currentUser) return;
-  const experiences = {
-    parent: {
-      icon: '👨‍👩‍👧', title: `Welcome back, ${currentUser.name || 'Parent'}`,
-      message: 'Keep up with the learning, reports, achievements, and school updates that are available for your linked children.'
-    },
-    teacher: {
-      icon: '🧑‍🏫', title: `Ready for the day, ${currentUser.name || 'Educator'}?`,
-      message: 'Start with attendance, record care updates as they happen, and keep your classroom team in sync.'
-    },
-    principal: {
-      icon: '🏫', title: `School overview for ${currentUser.name || 'Principal'}`,
-      message: 'Review attendance, finance tasks, reports, and day-to-day operations from the workspaces below.'
-    },
-    district: {
-      icon: '🌍', title: `District workspace`,
-      message: 'Use the approved cross-school tools to review progress, find records, and stay informed about safety notices.'
-    },
-    admin: {
-      icon: '🐧', title: currentUser.platformAccess ? `CEO centre for ${currentUser.name || 'Little Feet'}` : `Admin centre for ${currentUser.name || 'your school'}`,
-      message: currentUser.platformAccess ? 'Company-wide administrator access is active across Little Feet workspaces and schools.' : 'Keep accounts, learner links, consent, and school data accurate before inviting families and staff.'
-    },
-    staff: {
-      icon: '🐧', title: `Staff Little Feet · ${currentUser.name || 'Team member'}`,
-      message: 'Manage your assigned company tasks, leave, training, email and messages.'
-    },
-    crm: {
-      icon: '🤝', title: `CRM Little Feet · ${currentUser.name || 'Little Feet'}`,
-      message: 'Help clients set up their school users, manage client follow-ups and assigned tickets, and use your own work tools.'
-    },
-    accounts: {
-      icon: '🧾', title: `Accounts Little Feet · ${currentUser.name || 'Little Feet'}`,
-      message: 'Review Little Feet school subscription invoices and record confirmed payments. School and parent finances remain private.'
-    },
-    school_hr: { icon:'🏫', title:`HR · ${currentUser.name || 'School team'}`, message:'Manage school staff work, leave, qualifications and reviews.' },
-    school_staff: { icon:'🏫', title:`${currentUser.schoolPosition || 'School Support'} · ${currentUser.name || 'Team member'}`, message:'Manage your assigned school work, leave, qualifications and communication.' },
-    school_accounts: {
-      icon: '🧾', title: `Accounts workspace · ${currentUser.name || 'School accounts'}`,
-      message: 'Work with the finance and accounting tools for your linked school.'
-    },
-    support: {
-      icon: '🛠️', title: `Support Little Feet · ${currentUser.name || 'Little Feet'}`,
-      message: 'Handle support tickets, client messages and software-support communication for Little Feet.'
-    }
-  };
-  const experience = experiences[currentUser.role] || experiences.parent;
-  panel.classList.add('mascot-role-home');
-  panel.innerHTML = `<div class="role-home-content"><div><span class="portal-welcome-kicker">YOUR LITTLE FEET WORKSPACE</span><h1>${escapeWorkspaceText(experience.title)}</h1><p>${escapeWorkspaceText(experience.message)}</p></div><div class="role-home-icon" aria-hidden="true">${experience.icon}</div></div>`;
-  const setupCard = document.getElementById('schoolSetupCard');
-  if (setupCard && (currentUser.platformAccess || isInternalCompanyRole(currentUser.role))) setupCard.classList.add('hidden');
-}
+
+
+
 
 
 
@@ -2007,149 +738,13 @@ const formatExecutiveInteger = value => new Intl.NumberFormat('en-ZA', { maximum
 const formatExecutiveCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(Number(value || 0));
 const formatExecutiveCompactCurrency = value => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0));
 
-function showExecutiveChartDetail(event) {
-  const item = event.currentTarget;
-  const detail = item?.closest('[data-executive-chart]')?.querySelector('.executive-chart-detail');
-  if (detail && item.dataset.chartDetail) detail.textContent = item.dataset.chartDetail;
-}
 
-function executiveChartMarkup({ title, description, items = [], format = 'integer', workspaceId, actionLabel, centerLabel = 'Total' }) {
-  const safeItems = (Array.isArray(items) ? items : [])
-    .map(item => ({ label: String(item?.label || ''), value: Number(item?.value || 0) }))
-    .filter(item => item.label && Number.isFinite(item.value) && item.value > 0);
-  const total = safeItems.reduce((sum, item) => sum + item.value, 0);
-  const formatter = format === 'currency'
-    ? value => new Intl.NumberFormat('en-ZA', { style:'currency', currency:'ZAR', minimumFractionDigits:2, maximumFractionDigits:2 }).format(value)
-    : formatExecutiveInteger;
-  if (!total) {
-    return `<article class="executive-chart-card" data-executive-chart="${escapeWorkspaceText(title)}">
-      <h3>${escapeWorkspaceText(title)}</h3>
-      <p>${escapeWorkspaceText(description)}</p>
-      <div class="executive-chart-empty">No live records to chart yet.</div>
-      <button type="button" class="action-btn btn-blue executive-chart-link" onclick="openWorkspace('${workspaceId}')">${escapeWorkspaceText(actionLabel)}</button>
-    </article>`;
-  }
-  let cursor = 0;
-  const chartKey = `executive-ring-${++executiveChartSequence}`;
-  const gradients = safeItems.map((item, index) => `<linearGradient id="${chartKey}-${index}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e7fcff"/><stop offset=".3" stop-color="${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]}"/><stop offset="1" stop-color="${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]}" stop-opacity=".7"/></linearGradient>`).join('');
-  const percentFormatter = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
-  const share = item => item.value / total * 100 < .1 ? '<0.1' : percentFormatter.format(item.value / total * 100);
-  const itemDetail = item => `${item.label}: ${formatter(item.value)} · ${share(item)}% of total`;
-  const segments = safeItems.map((item, index) => {
-    const start = (cursor / total) * 100;
-    cursor += item.value;
-    const end = (cursor / total) * 100;
-    const amount = end - start;
-    const arc = safeItems.length > 1 ? Math.max(amount - .8, amount * .85) : amount;
-    const angle = (start + amount / 2) / 100 * Math.PI * 2;
-    const label = amount >= 8 ? `<text x="${60 + Math.sin(angle) * 48}" y="${60 - Math.cos(angle) * 48}" class="executive-slice-label" aria-hidden="true">${percentFormatter.format(amount)}%</text>` : '';
-    return `<circle cx="60" cy="60" r="48" pathLength="100" fill="none" stroke="url(#${chartKey}-${index})" stroke-width="18" stroke-dasharray="${arc} ${100 - arc}" stroke-dashoffset="${-start}" transform="rotate(-90 60 60)" tabindex="0" role="img" aria-label="${escapeWorkspaceText(itemDetail(item))}" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)"><title>${escapeWorkspaceText(itemDetail(item))}</title></circle>${label}`;
-  }).join('');
-  const centerValue = format === 'currency' ? formatExecutiveCompactCurrency(total) : formatExecutiveInteger(total);
-  const legend = safeItems.map((item, index) => `<button type="button" class="executive-legend-row" data-chart-detail="${escapeWorkspaceText(itemDetail(item))}" aria-label="${escapeWorkspaceText(itemDetail(item))}" onpointerenter="showExecutiveChartDetail(event)" onfocus="showExecutiveChartDetail(event)" onclick="showExecutiveChartDetail(event)">
-    <span class="executive-legend-swatch" style="background:${EXECUTIVE_CHART_COLORS[index % EXECUTIVE_CHART_COLORS.length]};"></span>
-    <span>${escapeWorkspaceText(item.label)}<small>${escapeWorkspaceText(share(item))}% of total</small></span>
-    <strong>${escapeWorkspaceText(formatter(item.value))}</strong>
-  </button>`).join('');
-  return `<article class="executive-chart-card" data-executive-chart="${escapeWorkspaceText(title)}">
-    <h3>${escapeWorkspaceText(title)}</h3>
-    <p>${escapeWorkspaceText(description)}</p>
-    <div class="executive-chart-body">
-      <div class="executive-pie" role="group" aria-label="${escapeWorkspaceText(title)} total ${escapeWorkspaceText(formatter(total))}">
-        <svg class="executive-pie-segments" viewBox="0 0 120 120" aria-label="Category breakdown"><defs>${gradients}</defs><circle cx="60" cy="60" r="48" fill="none" stroke="rgba(148,183,216,.18)" stroke-width="18"/>${segments}</svg>
-        <span class="executive-pie-center"><strong>${escapeWorkspaceText(centerValue)}</strong><small>${escapeWorkspaceText(centerLabel)}</small></span>
-      </div>
-      <div class="executive-chart-legend">${legend}</div>
-    </div>
-    <p class="executive-chart-total">Total: <strong>${escapeWorkspaceText(formatter(total))}</strong></p>
-    <p class="executive-chart-detail" aria-live="polite">Hover, focus or tap a category for its breakdown.</p>
-    <button type="button" class="action-btn btn-blue executive-chart-link" onclick="openWorkspace('${workspaceId}')">${escapeWorkspaceText(actionLabel)}</button>
-  </article>`;
-}
 
-function renderExecutiveHomeOverview(payload) {
-  const root = document.getElementById('executiveHomeOverview');
-  if (!root || currentUser?.role !== 'admin') return;
-  const kpis = payload?.kpis || {};
-  const charts = payload?.charts || {};
-  const reviewCount = (Array.isArray(charts.reviews) ? charts.reviews : []).reduce((sum, item) => sum + Number(item?.value || 0), 0);
-  const scopeLabel = payload?.scope === 'platform' ? 'Company-wide live overview' : 'School live overview';
-  const generatedAt = payload?.generatedAt ? new Date(payload.generatedAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : 'now';
-  const reviewRating = Number.isFinite(Number(kpis.averageReviewRating)) ? `${Number(kpis.averageReviewRating).toFixed(2)}/5` : '—';
-  const outstanding = formatExecutiveCurrency(kpis.outstandingBalance);
-  const arrears = formatExecutiveCurrency(kpis.arrears);
-  const openFaults = Number(kpis.openFaults || 0);
 
-  const kpiCards = [
-    ['Schools', formatExecutiveInteger(kpis.schools), payload?.scope === 'platform' ? 'Schools with approved accounts' : 'Current school scope'],
-    ['Learners', formatExecutiveInteger(kpis.learners), 'Live learner records'],
-    ['Accounts', formatExecutiveInteger(kpis.accounts), 'Visible active accounts'],
-    ['Needs attention', formatExecutiveInteger(kpis.openAttention), 'High-level work queues'],
-    ['Outstanding', outstanding, Number(kpis.arrears || 0) > 0 ? `${arrears} currently in arrears` : 'No current arrears'],
-    ['Avg review', reviewRating, reviewCount ? `${formatExecutiveInteger(reviewCount)} performance review records` : 'No review records yet']
-  ];
 
-  root.innerHTML = `<div class="executive-overview-header">
-    <div>
-      <h2>Executive overview</h2>
-      <span class="meta">${escapeWorkspaceText(scopeLabel)} · updated ${escapeWorkspaceText(generatedAt)} · open system faults: ${formatExecutiveInteger(openFaults)}</span>
-    </div>
-    <button type="button" class="action-btn btn-blue" onclick="loadExecutiveHomeOverview()">Refresh overview</button>
-  </div>
-  <div class="executive-kpi-grid">
-    ${kpiCards.map(([label, value, detail]) => `<div class="executive-kpi"><span>${escapeWorkspaceText(label)}</span><strong>${escapeWorkspaceText(value)}</strong><small>${escapeWorkspaceText(detail)}</small></div>`).join('')}
-  </div>
-  <div class="executive-chart-grid">
-    ${executiveChartMarkup({ title:'Account mix', description:'User accounts by role — not the number of schools.', items:charts.accounts, workspaceId:'accountsTab', actionLabel:'Open accounts', centerLabel:'Accounts' })}
-    ${executiveChartMarkup({ title:'Operational attention', description:'Current work that still needs action, without duplicating My Day.', items:charts.attention, workspaceId:'myDayTab', actionLabel:'Open My Day' })}
-    ${executiveChartMarkup({ title:'Fee collection', description:'Collected versus outstanding parent-fee value.', items:charts.finance, format:'currency', workspaceId:'parentPaymentsTab', actionLabel:'Open parent payments' })}
-    ${executiveChartMarkup({ title:'Performance reviews', description:'Current review workflow status across staff records.', items:charts.reviews, workspaceId:'staffWorkTab', actionLabel:'Open staff work' })}
-  </div>`;
-  root.classList.remove('hidden');
 
-  const setupCard = document.getElementById('schoolSetupCard');
-  if (setupCard) {
-    const shouldHideSetup = currentUser.platformAccess === true || payload?.setup?.complete === true || payload?.setup?.show === false;
-    setupCard.classList.toggle('hidden', shouldHideSetup);
-  }
-}
 
-async function loadExecutiveHomeOverview({ silent = false } = {}) {
-  const root = document.getElementById('executiveHomeOverview');
-  if (!root) return false;
-  if (!currentUser || currentUser.role !== 'admin') {
-    root.classList.add('hidden');
-    return false;
-  }
-  if (executiveHomeOverviewPromise) return executiveHomeOverviewPromise;
-  const expectedSession = workspaceSessionKey();
-  if (!silent && !root.children.length) {
-    root.innerHTML = '<div class="executive-overview-header"><div><h2>Executive overview</h2><span class="meta">Loading live management data…</span></div></div>';
-    root.classList.remove('hidden');
-  }
-  const job = (async () => {
-    try {
-      const response = await fetch('/api/executive-overview', { cache: 'no-store' });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || 'Unable to load the executive overview.');
-      if (!currentUser || workspaceSessionKey() !== expectedSession) return false;
-      renderExecutiveHomeOverview(payload);
-      return true;
-    } catch (error) {
-      if (!silent && root) {
-        root.innerHTML = `<div class="executive-overview-header"><div><h2>Executive overview</h2><span class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Executive overview is temporarily unavailable.'))}</span></div><button type="button" class="action-btn btn-blue" onclick="loadExecutiveHomeOverview()">Try again</button></div>`;
-        root.classList.remove('hidden');
-      }
-      return false;
-    }
-  })();
-  executiveHomeOverviewPromise = job;
-  try {
-    return await job;
-  } finally {
-    if (executiveHomeOverviewPromise === job) executiveHomeOverviewPromise = null;
-  }
-}
+
 window.loadExecutiveHomeOverview = loadExecutiveHomeOverview;
 
 function logout() {
@@ -2202,52 +797,16 @@ function switchUser() {
 
 let portalHeaderResizeObserver = null;
 
-function syncMobileHeaderOffset() {
-  const dashboard = document.getElementById('dashboardSection');
-  const header = dashboard?.querySelector('nav');
-  if (!dashboard || dashboard.classList.contains('hidden') || !header) return;
-  const rect = header.getBoundingClientRect();
-  const height = Math.ceil(rect.height);
-  if (!Number.isFinite(height) || height < 1) return;
-  const value = `${height}px`;
-  const visibleHeaderBottom = Math.max(0, Math.min(height, Math.ceil(rect.bottom)));
-  document.documentElement.style.setProperty('--mobile-header-height', value);
-  document.documentElement.style.setProperty('--portal-header-height', value);
-  document.documentElement.style.setProperty('--portal-sidebar-top', `${visibleHeaderBottom}px`);
-}
 
-function usesDockedSnappedDesktopSidebar() {
-  return window.matchMedia?.('(min-width: 900px) and (max-width: 1199px) and (hover: hover) and (pointer: fine)').matches === true;
-}
 
-function syncNavigationViewportState() {
-  if (!usesDockedSnappedDesktopSidebar()) return;
-  const dashboard = document.getElementById('dashboardSection');
-  const toggle = document.getElementById('navMoreToggle');
-  dashboard?.classList.remove('sidebar-open');
-  if (toggle) {
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.textContent = '☰ Menu';
-  }
-}
 
-function observePortalHeaderSize() {
-  const header = document.querySelector('#dashboardSection > nav');
-  if (!header || typeof ResizeObserver !== 'function') return;
-  portalHeaderResizeObserver?.disconnect();
-  portalHeaderResizeObserver = new ResizeObserver(() => requestAnimationFrame(syncMobileHeaderOffset));
-  portalHeaderResizeObserver.observe(header);
-}
+
+
+
+
 
 let portalHeaderScrollFrame = 0;
-function queuePortalHeaderOffsetSync() {
-  if (portalHeaderScrollFrame) return;
-  portalHeaderScrollFrame = requestAnimationFrame(() => {
-    portalHeaderScrollFrame = 0;
-    syncMobileHeaderOffset();
-    syncNavigationViewportState();
-  });
-}
+
 
 window.addEventListener('resize', queuePortalHeaderOffsetSync);
 window.addEventListener('scroll', queuePortalHeaderOffsetSync, { passive: true });
@@ -2257,23 +816,7 @@ requestAnimationFrame(() => {
   syncNavigationViewportState();
 });
 
-function switchTab(tabId, btn) {
-  window.saveDashboardDrafts?.();
-  window.restoreEducationTools?.(tabId);
-  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  const targetTab = document.getElementById(tabId);
-  if (targetTab) {
-    targetTab.classList.remove('active');
-    // Restart the reveal animation when a user revisits a workspace.
-    void targetTab.offsetWidth;
-    targetTab.classList.add('active');
-  }
-  if (btn) btn.classList.add('active');
-  closeNavigation();
-  loadWorkspaceOnDemand(tabId);
-  window.setTimeout(() => window.restoreDashboardDrafts?.(), 80);
-}
+
 
 function loadWorkspaceOnDemand(tabId) {
   if (!currentUser) return Promise.resolve([]);
@@ -2301,344 +844,54 @@ function loadWorkspaceOnDemand(tabId) {
   });
 }
 
-function setupWallpaperMode() {
-  const noteActivity = (event) => {
-    const overlay = document.getElementById('wallpaperOverlay');
-    if (overlay?.classList.contains('is-visible')) {
-      exitWallpaperMode();
-      return;
-    }
-    resetWallpaperTimer();
-  };
-  ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'scroll'].forEach(eventName => {
-    document.addEventListener(eventName, noteActivity, { passive: eventName !== 'keydown' });
-  });
-}
 
-function resetWallpaperTimer() {
-  clearTimeout(wallpaperIdleTimer);
-  const dashboard = document.getElementById('dashboardSection');
-  if (!currentUser || !dashboard || dashboard.classList.contains('hidden')) return;
-  wallpaperIdleTimer = window.setTimeout(() => startWallpaperMode(), WALLPAPER_IDLE_MS);
-}
 
-function startWallpaperMode() {
-  const overlay = document.getElementById('wallpaperOverlay');
-  if (!currentUser || !overlay) return;
-  clearTimeout(wallpaperIdleTimer);
-  overlay.classList.add('is-visible');
-  overlay.setAttribute('aria-hidden', 'false');
-  startWallpaperTheme();
-  overlay.querySelector('.wallpaper-exit')?.focus({ preventScroll: true });
-}
 
-function exitWallpaperMode() {
-  const overlay = document.getElementById('wallpaperOverlay');
-  if (!overlay) return;
-  overlay.classList.remove('is-visible');
-  overlay.setAttribute('aria-hidden', 'true');
-  stopWallpaperTheme();
-  resetWallpaperTimer();
-}
+
+
+
+
 
 // The supplied wallpaper theme loops for as long as wallpaper mode remains open.
-function startWallpaperTheme() {
-  const overlay = document.getElementById('wallpaperOverlay');
-  if (!overlay?.classList.contains('is-visible')) return;
-  if (portalAudioMuted) {
-    updatePortalAudioControls();
-    return;
-  }
-  try {
-    if (!wallpaperThemeAudio) {
-      wallpaperThemeAudio = new Audio('assets/audio/little-feet-wallpaper.mp3');
-      wallpaperThemeAudio.preload = 'auto';
-      wallpaperThemeAudio.loop = true;
-      wallpaperThemeAudio.volume = 0.55;
-    }
-    wallpaperThemeAudio.currentTime = 0;
-    wallpaperThemeAudio.play().catch(() => {});
-    updatePortalAudioControls();
-  } catch { /* Wallpaper remains available even when a device has sound disabled. */ }
-}
 
-function stopWallpaperTheme() {
-  if (!wallpaperThemeAudio) return;
-  wallpaperThemeAudio.pause();
-  wallpaperThemeAudio.currentTime = 0;
-}
 
-function openWallpaperDatabase() {
-  return new Promise((resolve, reject) => {
-    if (!window.indexedDB) return reject(new Error('This browser cannot store a custom wallpaper.'));
-    const request = indexedDB.open('little-feet-device-assets', 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains('wallpapers')) request.result.createObjectStore('wallpapers');
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('Unable to open wallpaper storage.'));
-  });
-}
 
-async function saveCustomWallpaper(blob) {
-  const database = await openWallpaperDatabase();
-  await new Promise((resolve, reject) => {
-    const transaction = database.transaction('wallpapers', 'readwrite');
-    transaction.objectStore('wallpapers').put(blob, 'active');
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error || new Error('Unable to save the wallpaper.'));
-  });
-  database.close();
-}
 
-async function storedCustomWallpaper() {
-  const database = await openWallpaperDatabase();
-  const blob = await new Promise((resolve, reject) => {
-    const request = database.transaction('wallpapers', 'readonly').objectStore('wallpapers').get('active');
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error || new Error('Unable to read the wallpaper.'));
-  });
-  database.close();
-  return blob;
-}
 
-function applyCustomWallpaper(blob) {
-  const image = document.getElementById('wallpaperImage');
-  const overlay = document.getElementById('wallpaperOverlay');
-  if (!image) return;
-  if (customWallpaperObjectUrl) URL.revokeObjectURL(customWallpaperObjectUrl);
-  customWallpaperObjectUrl = blob ? URL.createObjectURL(blob) : '';
-  if (customWallpaperObjectUrl) {
-    image.src = customWallpaperObjectUrl;
-    overlay?.classList.add('has-custom-wallpaper');
-  } else {
-    image.removeAttribute('src');
-    overlay?.classList.remove('has-custom-wallpaper');
-  }
-}
 
-async function restoreCustomWallpaper() {
-  const blob = await storedCustomWallpaper();
-  if (blob) {
-    applyCustomWallpaper(blob);
-    const status = document.getElementById('customWallpaperStatus');
-    if (status) status.textContent = `${blob.name || 'Your custom wallpaper'} is saved on this device and active.`;
-  } else {
-    applyCustomWallpaper(null);
-  }
-}
 
-function gifDurationMs(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let total = 0;
-  let frames = 0;
-  for (let index = 0; index + 6 < bytes.length; index += 1) {
-    if (bytes[index] !== 0x21 || bytes[index + 1] !== 0xf9 || bytes[index + 2] !== 0x04) continue;
-    const delay = bytes[index + 4] | (bytes[index + 5] << 8);
-    total += Math.max(delay * 10, 20);
-    frames += 1;
-  }
-  return frames > 1 ? total : 0;
-}
 
-function wallpaperDimensions(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('The selected file is not a readable image.'));
-    };
-    image.src = url;
-  });
-}
 
-async function importCustomWallpaper() {
-  const input = document.getElementById('customWallpaperFile');
-  const status = document.getElementById('customWallpaperStatus');
-  const file = input?.files?.[0];
-  if (!file) return alert('Choose a JPG, PNG, WebP, or GIF first.');
-  const extension = file.name.split('.').pop()?.toLowerCase();
-  if (!['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension) || !file.type.startsWith('image/')) return alert('Use a JPG, PNG, WebP, or GIF wallpaper.');
-  if (file.size > CUSTOM_WALLPAPER_MAX_BYTES) return alert('The wallpaper must be 8 MB or smaller.');
-  try {
-    const dimensions = await wallpaperDimensions(file);
-    if (dimensions.width > 3840 || dimensions.height > 2160 || dimensions.width * dimensions.height > 8294400) throw new Error('Use an image no larger than 3840 × 2160 pixels.');
-    if (extension === 'gif') {
-      const duration = gifDurationMs(await file.arrayBuffer());
-      if (duration > CUSTOM_WALLPAPER_MAX_GIF_MS) throw new Error('Animated GIFs must be 8 seconds or shorter.');
-    }
-    await saveCustomWallpaper(file);
-    applyCustomWallpaper(file);
-    if (status) status.textContent = `${file.name} is saved on this device and ready to preview.`;
-  } catch (error) {
-    alert(safeUserFacingError(error, 'Unable to save this wallpaper.'));
-  }
-}
 
-async function resetCustomWallpaper() {
-  try {
-    const database = await openWallpaperDatabase();
-    await new Promise((resolve, reject) => {
-      const transaction = database.transaction('wallpapers', 'readwrite');
-      transaction.objectStore('wallpapers').delete('active');
-      transaction.oncomplete = resolve;
-      transaction.onerror = () => reject(transaction.error || new Error('Unable to restore the default wallpaper.'));
-    });
-    database.close();
-    applyCustomWallpaper(null);
-    const input = document.getElementById('customWallpaperFile');
-    const status = document.getElementById('customWallpaperStatus');
-    if (input) input.value = '';
-    if (status) status.textContent = 'The Little Feet northern lights wallpaper is active.';
-  } catch (error) {
-    alert(safeUserFacingError(error, 'Unable to restore the default wallpaper.'));
-  }
-}
 
-function openWorkspace(tabId) {
-  const navButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes(`'${tabId}'`));
-  if (!navButton || navButton.closest('li')?.classList.contains('hidden')) {    alert('This workspace is not available for your account. Please contact your school administrator if you need access.');
-    return;
-  }
-  switchTab(tabId, navButton);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
 
-function openGuideWorkspace(tabId) {
-  const navButton = [...document.querySelectorAll('.nav-btn')].find(button => button.getAttribute('onclick')?.includes(`'${tabId}'`));
-  const targetTab = document.getElementById(tabId);
-  if (!navButton || !targetTab || navButton.closest('li')?.classList.contains('hidden')) {
-    alert('This workspace is not available for your account. Please contact your school administrator if you need access.');
-    return;
-  }
-  switchTab(tabId, navButton);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
 
-function toggleNavigation() {
-  const dashboard = document.getElementById('dashboardSection');
-  const toggle = document.getElementById('navMoreToggle');
-  if (!dashboard || !toggle) return;
-  if (usesDockedSnappedDesktopSidebar()) {
-    syncNavigationViewportState();
-    return;
-  }
-  const isOpen = dashboard.classList.toggle('sidebar-open');
-  toggle.setAttribute('aria-expanded', String(isOpen));
-  toggle.textContent = isOpen ? '✕ Close' : '☰ Menu';
-}
 
-function toggleSidebarGroup(button) {
-  const group = button?.closest('[data-nav-group]');
-  if (!group) return;
-  group.classList.toggle('is-collapsed');
-  const collapsed = [...document.querySelectorAll('[data-nav-group].is-collapsed')].map(section => section.querySelector('.sidebar-group-toggle')?.textContent.trim()).filter(Boolean);
-  localStorage.setItem('lf_collapsed_nav_groups', JSON.stringify(collapsed));
-}
 
-function restoreSidebarGroups() {
-  let collapsed = [];
-  try { collapsed = JSON.parse(localStorage.getItem('lf_collapsed_nav_groups') || '[]'); } catch { collapsed = []; }
-  document.querySelectorAll('[data-nav-group]').forEach(group => group.classList.toggle('is-collapsed', collapsed.includes(group.querySelector('.sidebar-group-toggle')?.textContent.trim())));
-}
 
-function toggleSidebarCollapse() {
-  if (window.innerWidth < 960) return;
-  const dashboard = document.getElementById('dashboardSection');
-  const sidebar = document.getElementById('mainNavigation');
-  if (!dashboard || !sidebar) return;
-  const collapsed = dashboard.classList.toggle('sidebar-collapsed');
-  sidebar.classList.toggle('is-collapsed', collapsed);
-  localStorage.setItem('lf_sidebar_collapsed', String(collapsed));
-}
 
-function closeNavigation() {
-  const dashboard = document.getElementById('dashboardSection');
-  const toggle = document.getElementById('navMoreToggle');
-  if (!dashboard || !toggle) return;
-  dashboard.classList.remove('sidebar-open');
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.textContent = '☰ Menu';
-}
 
-function goToMainMenu() {
-  if (!currentUser) return alert("Please log in first.");
-  openWorkspace('homeTab');
-}
 
-async function startHealthMonitor() {
-  let consecutiveFailures = 0;
-  const configuredBackupUrl = String(window.LITTLE_FEET_BACKUP_URL || '').trim().replace(/\/$/, '');
-  const checkStatus = async () => {
-    const statusEl = document.getElementById('serverStatus');
-    const statusText = document.getElementById('serverStatusText');
-    const controller = new AbortController();
-    const requestTimeout = window.setTimeout(() => controller.abort(), 10000);
-    try {
-      const res = await fetch('/api/health', { cache: 'no-store', signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const health = await res.json();
-      consecutiveFailures = 0;
-      sessionStorage.removeItem('lf_backup_unready_notified');
-      if (statusEl && statusText) {
-        const busy = health.status === 'BUSY';
-        statusEl.className = `server-status ${busy ? 'busy' : 'good'}`;
-        statusText.textContent = busy ? 'Server busy' : health.instance === 'STANDBY' ? 'Backup server online' : 'Server online';
-      }
-      const footerStatus = document.getElementById('footerSystemStatus');
-      if (footerStatus) footerStatus.textContent = health.status === 'BUSY' ? 'Server busy — requests may take longer.' : health.instance === 'STANDBY' ? 'Backup server online.' : 'Server online.';
-    } catch (e) {
-      consecutiveFailures += 1;
-      if (statusEl && statusText) {
-        statusEl.className = 'server-status';
-        statusText.textContent = 'Server offline';
-      }
-      const footerStatus = document.getElementById('footerSystemStatus');
-      if (footerStatus) footerStatus.textContent = 'Server connection unavailable.';
-      logAppError('ERR_SRV_503', 'Live server connection lost to API.');
-      // Redirect only to a separately deployed standby with a recent replica
-      // snapshot and compatible code. An unready standby remains read-only and
-      // must not receive users with an empty or stale database.
-      if (configuredBackupUrl && consecutiveFailures >= 2 && !sessionStorage.getItem('lf_failover_redirected')) {
-        try {
-          const backupController = new AbortController();
-          const backupTimeout = window.setTimeout(() => backupController.abort(), 5000);
-          let backupReadiness;
-          try {
-            const backupResponse = await fetch(`${configuredBackupUrl}/api/failover-readiness`, {
-              cache: 'no-store', mode: 'cors', signal: backupController.signal
-            });
-            if (backupResponse.ok) backupReadiness = await backupResponse.json();
-          } finally {
-            window.clearTimeout(backupTimeout);
-          }
-          if (backupReadiness?.ready === true && backupReadiness.instance === 'STANDBY') {
-            sessionStorage.setItem('lf_failover_redirected', '1');
-            window.location.replace(configuredBackupUrl);
-          } else if (!sessionStorage.getItem('lf_backup_unready_notified')) {
-            sessionStorage.setItem('lf_backup_unready_notified', '1');
-            footerStatus && (footerStatus.textContent = 'Primary unavailable; backup is not current yet. Please retry shortly.');
-          }
-        } catch (backupError) {
-          if (!sessionStorage.getItem('lf_backup_unready_notified')) {
-            sessionStorage.setItem('lf_backup_unready_notified', '1');
-            footerStatus && (footerStatus.textContent = 'Primary unavailable; backup could not be reached. Please retry shortly.');
-          }
-        }
-      }
-    } finally {
-      window.clearTimeout(requestTimeout);
-    }
-  };
 
-  checkStatus();
-  setInterval(() => { if (!document.hidden) checkStatus(); }, 30000);
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 async function loadAllData() {
   // Initial/session refresh only. Background timers must not call this function.
@@ -2674,46 +927,11 @@ async function refreshActiveWorkspace(tabId = document.querySelector('#dashboard
 }
 window.refreshActiveWorkspace = refreshActiveWorkspace;
 
-async function loadHouseholdSwitcher() {
-  const box = document.getElementById('householdSwitcher');
-  if (!box || currentUser?.role !== 'parent') return;
-  try {
-    const response = await fetch(`/api/household?username=${encodeURIComponent(currentUser.username)}`);
-    const learners = await response.json();
-    if (!response.ok || !learners.length) return;
-    const analyticsInput = document.getElementById('analyticsStudent');
-    const analyticsSelect = document.getElementById('analyticsStudentSelect');
-    const storedSelection = localStorage.getItem('lf_selected_learner');
-    const selectedLearner = learners.find(learner => learner.studentName === storedSelection) || learners[0];
-    if (analyticsInput && analyticsSelect) {
-      analyticsInput.classList.add('hidden');
-      analyticsInput.required = false;
-      analyticsSelect.classList.remove('hidden');
-      analyticsSelect.required = true;
-      analyticsSelect.innerHTML = learners.map(learner => `<option value="${escapeWorkspaceText(learner.studentName)}">${escapeWorkspaceText(learner.studentName)} · ${escapeWorkspaceText(learner.className)}</option>`).join('');
-      analyticsSelect.value = selectedLearner.studentName;
-    }
-    localStorage.setItem('lf_selected_learner', selectedLearner.studentName);
-    box.classList.remove('hidden');
-    box.innerHTML = `<div class="card-header-bar"><h2>👨‍👩‍👧 Your linked learners</h2><span class="badge-tag info">PARENT</span></div><p style="color:var(--text-muted);margin-bottom:10px;">Only children linked to this parent account are shown here.</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${learners.map((learner, index) => `<button type="button" class="action-btn ${learner.studentName === selectedLearner.studentName || (!index && !selectedLearner) ? 'btn-green' : 'btn-blue'}" onclick="selectHouseholdLearner('${encodeInlineIdentifier(learner.studentName)}')">${escapeWorkspaceText(learner.studentName)} · ${escapeWorkspaceText(learner.className)}</button>`).join('')}</div><p id="householdSelection" class="meta" style="margin-top:9px;">Selected learner: ${escapeWorkspaceText(selectedLearner.studentName)}</p>`;
-  } catch { box.classList.add('hidden'); }
-}
 
-function selectHouseholdLearner(encodedName) {
-  const name = decodeURIComponent(encodedName);
-  localStorage.setItem('lf_selected_learner', name);
-  const analyticsSelect = document.getElementById('analyticsStudentSelect');
-  if (analyticsSelect) analyticsSelect.value = name;
-  const notice = document.getElementById('householdSelection');
-  if (notice) notice.textContent = `Selected learner: ${name}`;
-}
 
-function openAlertsTab() {
-  const alertButton = [...document.querySelectorAll('.nav-btn')].find(button =>
-    (button.getAttribute('onclick') || '').includes("broadcastsTab")
-  );
-  switchTab('broadcastsTab', alertButton);
-}
+
+
+
 
 const toBase64 = file => new Promise((resolve, reject) => {
   const maxBytes = 5 * 1024 * 1024;
@@ -2728,26 +946,9 @@ const toBase64 = file => new Promise((resolve, reject) => {
   reader.onload = () => resolve(reader.result);
   reader.onerror = error => reject(error);
 });
-function fileInputForFile(file) {
-  return [...document.querySelectorAll('input[type="file"]')].find(input => input.files?.[0] === file) || null;
-}
 
-function setFileLimitWarning(file, message = '') {
-  const input = fileInputForFile(file);
-  if (!input) return;
-  const warningId = `${input.id || 'file'}LimitWarning`;
-  let warning = document.getElementById(warningId);
-  if (!warning) {
-    warning = document.createElement('div');
-    warning.id = warningId;
-    warning.setAttribute('role', 'alert');
-    warning.setAttribute('aria-live', 'assertive');
-    warning.style.cssText = 'display:none;margin:7px 0 10px;padding:9px 11px;border:1px solid #f59e0b;border-radius:7px;background:rgba(245,158,11,.12);color:var(--text-dark);font-size:.82rem;font-weight:700;line-height:1.45;';
-    input.insertAdjacentElement('afterend', warning);
-  }
-  warning.textContent = message;
-  warning.style.display = message ? 'block' : 'none';
-}
+
+
 
 const validateSpreadsheetFile = (file, maxBytes = STANDARD_SPREADSHEET_MAX_BYTES) => {
   const extension = String(file?.name || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '';
@@ -2770,361 +971,29 @@ const validateSpreadsheetFile = (file, maxBytes = STANDARD_SPREADSHEET_MAX_BYTES
 };
 
 // Editable Academic Term Functions
-async function loadAcademicTerm() {
-  if (isInternalCompanyRole(currentUser?.role)) return;
-  try {
-    const res = await fetch('/api/term');
-    const data = await res.json();
-    if (data.term) {
-      document.getElementById('currentTermText').textContent = data.term;
-      updateSchoolDayStatus();
-    }
-  } catch (err) {
-    logAppError('ERR_TERM_LOAD', 'Failed to load academic term.');
-  }
-}
 
-function editTermModal() {
-  const currentText = document.getElementById('currentTermText').textContent;
-  const html = `
-    <form id="editTermForm">
-      <label for="termInput">Academic Term Description & Status:</label>
-      <input type="text" id="termInput" value="${currentText.replace(/"/g, '&quot;')}" required>
-      <button type="submit" class="submit-btn">💾 Save Academic Term</button>
-    </form>`;
-  openModal('Edit Academic Term Ribbon', html);
 
-  document.getElementById('editTermForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const newTerm = document.getElementById('termInput').value.trim();
-    if (!newTerm) return;
 
-    await fetch('/api/term', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ term: newTerm })
-    });
-    document.getElementById('currentTermText').textContent = newTerm;
-    updateSchoolDayStatus();
-    closeModal();
-    playDingSound();
-  });
-}
 
 // Interactive 20Km Radius School Finder Map using live OpenStreetMap data.
-async function loadSchoolProximityMap() {
-  const container = document.getElementById('schoolMapContainer');
-  const findButton = document.getElementById('findSchoolMapButton');
-  const closeButton = document.getElementById('closeSchoolMapButton');
-  if (!container) return;
-  const requestToken = ++schoolMapRequestToken;
-  container.classList.remove('hidden');
-  closeButton?.classList.remove('hidden');
-  findButton?.setAttribute('aria-expanded', 'true');
-  if (!navigator.geolocation) {
-    alert('Geolocation is not supported by your browser.');
-    return;
-  }
 
-  container.innerHTML = '📍 Requesting location permission and searching live school data…';
-  navigator.geolocation.getCurrentPosition(async (position) => {
-    if (requestToken !== schoolMapRequestToken) return;
-    const userLat = position.coords.latitude;
-    const userLng = position.coords.longitude;
-    const userPos = [userLat, userLng];
-    container.innerHTML = '<div id="interactiveMap" style="width:100%; height:100%; border-radius:8px;"></div>';
 
-    if (typeof L === 'undefined') {
-      container.textContent = 'Map service could not be loaded. Please refresh the page and try again.';
-      return;
-    }
-    if (mapInstance) mapInstance.remove();
 
-    // Disabling Leaflet's mobile tap shim prevents one physical tap being
-    // interpreted as a marker click followed by a map click that closes the card.
-    mapInstance = L.map('interactiveMap', { closePopupOnClick: false, tap: false }).setView(userPos, 12);
-    mapInstance.on('click', () => {
-      hideSchoolPinCard();
-      mapInstance.closePopup();
-    });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
-    const userLocationIcon = L.divIcon({ className: '', html: '<div class="user-location-pin" title="Your current location"></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
-    L.marker(userPos, { icon: userLocationIcon, zIndexOffset: 1000 }).addTo(mapInstance).bindPopup(`<strong>📍 Your Current Location</strong><br>Lat: ${userLat.toFixed(5)}, Long: ${userLng.toFixed(5)}`, { autoClose: false, closeOnClick: false, keepInView: true }).openPopup();
-    L.circle(userPos, { color: '#2dd4bf', fillColor: '#14b8a6', fillOpacity: 0.14, radius: 20000 }).addTo(mapInstance);
-    const latitudeOffset = 20000 / 111320;
-    const longitudeOffset = 20000 / (111320 * Math.cos(userLat * Math.PI / 180));
-    mapInstance.fitBounds([[userLat - latitudeOffset, userLng - longitudeOffset], [userLat + latitudeOffset, userLng + longitudeOffset]], { padding: [22, 22], maxZoom: 13 });
 
-    const status = L.control({ position: 'topright' });
-    status.onAdd = () => {
-      const element = L.DomUtil.create('div');
-      element.style.cssText = 'background:#fff; color:#0f172a; padding:8px 10px; border-radius:4px; box-shadow:0 1px 5px rgba(0,0,0,.35); font-size:12px; font-weight:600;';
-      element.textContent = 'Loading live nearby schools…';
-      return element;
-    };
-    status.addTo(mapInstance);
 
-    const escapeHtml = (value) => String(value || 'Not listed in OpenStreetMap').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-    const distanceInMetres = (lat, lng) => {
-      const radians = (degrees) => degrees * Math.PI / 180;
-      const earthRadius = 6371000;
-      const latDifference = radians(lat - userLat);
-      const lngDifference = radians(lng - userLng);
-      const a = Math.sin(latDifference / 2) ** 2 + Math.cos(radians(userLat)) * Math.cos(radians(lat)) * Math.sin(lngDifference / 2) ** 2;
-      return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
 
-    try {
-      const cacheKey = `lf_nearby_school_cache_${userLat.toFixed(2)}_${userLng.toFixed(2)}`;
-      let payload;
-      let usingCachedResults = false;
-      try {
-        const schoolSearchUrl = `/api/nearby-schools?lat=${encodeURIComponent(userLat)}&lng=${encodeURIComponent(userLng)}&radius=20000`;
-        let lastSearchError;
-        // Public map providers occasionally reject a single request while they are
-        // healthy again a moment later. Retry twice before using the saved result.
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          try {
-            const response = await fetch(schoolSearchUrl, { cache: 'no-store' });
-            const candidate = await response.json();
-            if (!response.ok) throw new Error(candidate.message || 'Unable to load live nearby schools.');
-            payload = candidate;
-            break;
-          } catch (error) {
-            lastSearchError = error;
-            if (attempt < 2) await new Promise(resolve => window.setTimeout(resolve, 700 * (attempt + 1)));
-          }
-        }
-        if (!payload) throw lastSearchError || new Error('Unable to load live nearby schools.');
-        // Storage can be blocked in private browsing or restricted web views.
-        // Map pins must still render when caching is unavailable.
-        try { sessionStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), payload })); } catch { /* live result remains usable without a cache */ }
-      } catch (liveError) {
-        let cached = null;
-        try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch { cached = null; }
-        if (!cached?.payload?.elements?.length || Date.now() - Number(cached.savedAt || 0) > 24 * 60 * 60 * 1000) throw liveError;
-        payload = cached.payload;
-        usingCachedResults = true;
-      }
 
-      if (requestToken !== schoolMapRequestToken || !mapInstance) return;
-      const seenSchools = new Set();
-      const nearbySchools = payload.elements.map((place) => {
-        const tags = place.tags || {};
-        const lat = Number(place.lat ?? place.center?.lat);
-        const lng = Number(place.lon ?? place.center?.lon);
-        const name = tags.name || tags['name:en'] || 'Unnamed education facility';
-        return { tags, lat, lng, name, key: `${name.toLowerCase()}|${lat.toFixed(5)}|${lng.toFixed(5)}` };
-      }).filter((school) => Number.isFinite(school.lat) && Number.isFinite(school.lng) && distanceInMetres(school.lat, school.lng) <= 20000)
-        .filter((school) => !seenSchools.has(school.key) && seenSchools.add(school.key))
-        .sort((a, b) => distanceInMetres(a.lat, a.lng) - distanceInMetres(b.lat, b.lng));
 
-      const safeExternalUrl = (value) => {
-        if (!value) return '';
-        const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-        try {
-          const url = new URL(candidate);
-          return /^https?:$/.test(url.protocol) ? url.href : '';
-        } catch {
-          return '';
-        }
-      };
-      const markerLayer = typeof L.markerClusterGroup === 'function'
-        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, chunkedLoading: true, chunkInterval: 80, chunkDelay: 15, animate: false, removeOutsideVisibleBounds: true, zoomToBoundsOnClick: true })
-        : L.layerGroup();
 
-      nearbySchools.forEach((school) => {
-        const street = [school.tags['addr:housenumber'], school.tags['addr:street']].filter(Boolean).join(' ') || 'Not listed in OpenStreetMap';
-        const suburb = school.tags['addr:suburb'] || school.tags['addr:neighbourhood'] || school.tags['addr:district'] || 'Not listed in OpenStreetMap';
-        const town = school.tags['addr:city'] || school.tags['addr:town'] || school.tags['addr:village'] || 'Not listed in OpenStreetMap';
-        const category = school.tags.amenity || school.tags.building || 'education facility';
-        const phone = school.tags['contact:phone'] || school.tags.phone || school.tags['contact:mobile'] || school.tags.mobile || '';
-        const email = school.tags['contact:email'] || school.tags.email || '';
-        const website = safeExternalUrl(school.tags['contact:website'] || school.tags.website || '');
-        const imageUrl = safeExternalUrl(school.tags.image || school.tags['contact:image'] || '');
-        const contactSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${school.name} ${town} contact`)}`;
-        const photo = imageUrl
-          ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(school.name)}" style="display:block; width:100%; max-height:130px; margin:0 0 8px; object-fit:cover; border-radius:5px;">`
-          : '<p class="school-muted" style="font-size:0.75rem; margin:7px 0 0;"><strong>Photo:</strong> Not publicly listed in OpenStreetMap.</p>';
-        const contact = `<p style="font-size:0.8rem; margin:7px 0 0;"><strong>Phone:</strong> ${phone ? `<a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : 'Not publicly listed'}<br><strong>Email:</strong> ${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : `Not publicly listed · <a href="${escapeHtml(contactSearchUrl)}" target="_blank" rel="noopener noreferrer">Find official contact</a>`}</p>`;
-        school.details = { street, suburb, town, category, phone, email, website, imageUrl };
-        const content = `<div class="school-popup" style="padding:4px; font-family:sans-serif; min-width:240px; max-width:290px;"><h3 style="margin:0 0 6px; font-size:0.95rem;">🏫 ${escapeHtml(school.name)}</h3>${photo}<p style="font-size:0.8rem; margin:0 0 4px;"><strong>Type:</strong> ${escapeHtml(category)}<br><strong>Coordinates:</strong> Lat ${school.lat.toFixed(5)}, Long ${school.lng.toFixed(5)}</p><p style="font-size:0.8rem; margin:0;"><strong>Street Address:</strong> ${escapeHtml(street)}<br><strong>Suburb:</strong> ${escapeHtml(suburb)}<br><strong>Town / City:</strong> ${escapeHtml(town)}</p>${contact}<div class="school-enrichment" style="margin-top:9px;"><button type="button" class="action-btn btn-green" style="margin:0 0 7px;" onclick="openSchoolDetail(${nearbySchools.indexOf(school)})">View details / apply</button><button type="button" class="action-btn btn-blue" style="margin:0;" onclick="enrichSchoolPin(this, decodeURIComponent('${encodeInlineIdentifier(school.name)}'), ${school.lat}, ${school.lng})">Check verified public details</button><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Uses verified public details only. No AI-generated school details are saved automatically.</p></div></div>`;
-        const marker = L.marker([school.lat, school.lng], { riseOnHover: true }).bindPopup(content, { autoClose: false, closeOnClick: false, closeOnEscapeKey: false, keepInView: true, autoPanPadding: [20, 20], maxWidth: 310 });
-        marker.on('click', event => {
-          if (event.originalEvent) L.DomEvent.stop(event.originalEvent);
-          showSchoolPinCard(nearbySchools.indexOf(school));
-          // Open after Leaflet's built-in marker handler has finished so the
-          // popup is not toggled away by the same tap on mobile browsers.
-          window.setTimeout(() => marker.openPopup(), 0);
-        });
-        markerLayer.addLayer(marker);
-      });
-      markerLayer.addTo(mapInstance);
-      mapInstance.on('popupopen', event => {
-        const popupElement = event.popup.getElement();
-        if (popupElement) {
-          L.DomEvent.disableClickPropagation(popupElement);
-          L.DomEvent.disableScrollPropagation(popupElement);
-        }
-      });
-      nearbySchoolRecords = nearbySchools;
-      renderNearbySchoolPicker();
-      status.getContainer().textContent = usingCachedResults
-        ? `${nearbySchools.length} recent school results shown - live refresh will retry next time`
-        : `${nearbySchools.length} live education facilities found within 20 km`;
-    } catch (error) {
-      status.getContainer().textContent = 'Live school search unavailable. Please try again shortly.';
-      logAppError('ERR_MAP_SCHOOLS', 'Unable to load live nearby school data.');
-    }
 
-    setTimeout(() => {
-      if (requestToken === schoolMapRequestToken && mapInstance) mapInstance.invalidateSize();
-    }, 300);
-  }, () => {
-    if (requestToken !== schoolMapRequestToken) return;
-    logAppError('ERR_MAP_GEO', 'Unable to retrieve device location for map search.');
-    container.textContent = 'Unable to detect your location. Enable browser location access, then try again.';
-    alert('Unable to detect your location. Please enable browser location access.');
-  });
-}
 
-function closeSchoolProximityMap() {
-  schoolMapRequestToken += 1;
-  if (mapInstance) {
-    mapInstance.remove();
-    mapInstance = null;
-  }
-  nearbySchoolRecords = [];
-  hideSchoolPinCard();
 
-  const container = document.getElementById('schoolMapContainer');
-  if (container) {
-    container.innerHTML = '📍 Press "Find schools near me" to render interactive map pins.';
-    container.classList.add('hidden');
-  }
 
-  const panel = document.getElementById('schoolPickerPanel');
-  const picker = document.getElementById('nearbySchoolPicker');
-  panel?.classList.add('hidden');
-  if (picker) picker.innerHTML = '';
-
-  document.getElementById('closeSchoolMapButton')?.classList.add('hidden');
-  document.getElementById('findSchoolMapButton')?.setAttribute('aria-expanded', 'false');
-}
-
-function renderNearbySchoolPicker() {
-  const panel = document.getElementById('schoolPickerPanel');
-  const picker = document.getElementById('nearbySchoolPicker');
-  if (!panel || !picker || !nearbySchoolRecords.length) return;
-  picker.innerHTML = nearbySchoolRecords.map((school, index) => `<option value="${index}">${escapeWorkspaceText(school.name)} · ${school.lat.toFixed(5)}, ${school.lng.toFixed(5)}</option>`).join('');
-  panel.classList.remove('hidden');
-}
-
-function openSelectedSchoolDetail() { openSchoolDetail(Number(document.getElementById('nearbySchoolPicker')?.value)); }
-function showSchoolPinCard(index) {
-  const school = nearbySchoolRecords[index];
-  const card = document.getElementById('schoolPinCard');
-  const picker = document.getElementById('nearbySchoolPicker');
-  if (!school || !card) return;
-  if (picker) picker.value = String(index);
-  const detail = school.details || {};
-  const address = [detail.street, detail.suburb, detail.town].filter(value => value && value !== 'Not listed in OpenStreetMap').join(', ') || 'Address not publicly listed';
-  card.innerHTML = `<div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;"><div><strong>🏫 ${escapeWorkspaceText(school.name)}</strong><p class="meta" style="margin:5px 0 0;">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(address)}</p><p class="meta" style="margin:4px 0 0;">Tap elsewhere on the map to close this selection.</p></div><div style="display:flex;gap:7px;align-items:center;"><button type="button" class="action-btn btn-green" onclick="openSchoolDetail(${index})">View details / apply</button><button type="button" class="action-btn btn-blue" aria-label="Close selected school" onclick="hideSchoolPinCard()">×</button></div></div>`;
-  card.classList.remove('hidden');
-}
-function hideSchoolPinCard() {
-  const card = document.getElementById('schoolPinCard');
-  if (!card) return;
-  card.classList.add('hidden');
-  card.innerHTML = '';
-}
-function openSchoolDetail(index) {
-  const school = nearbySchoolRecords[index];
-  if (!school) return;
-  const detail = school.details || {};
-  const coordinates = `${school.lat.toFixed(5)}, ${school.lng.toFixed(5)}`;
-  const verifiedParent = currentUser?.role === 'parent' && !String(currentUser?.verificationStatus || '').toLowerCase().includes('pending');
-  const application = verifiedParent
-    ? `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0 0 12px;color:var(--text-muted);font-size:.84rem;">Your verified Little Feet account is required. The application is sent directly to this school’s principal when its school account is active. Do not include medical or other sensitive details here.</p><div style="padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);margin-bottom:12px;"><strong>Which age group?</strong><p class="meta" style="margin:5px 0 0;">Day care / ECD usually covers birth to about 5; primary schools typically Grades R–7; secondary/high schools typically Grades 8–12. Curriculum phases overlap those school types, so choose the learner’s exact intended grade where possible.</p></div><form onsubmit="submitSchoolApplication(event, ${index})" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;"><label>Parent / guardian name<input name="guardianName" autocomplete="section-applicant name" required value="${escapeWorkspaceText(currentUser.name || '')}"></label><label>Contact email<input name="contactEmail" type="email" autocomplete="section-applicant email" required value="${escapeWorkspaceText(currentUser.username || '')}"></label><label>Contact phone<input name="contactPhone" autocomplete="section-applicant tel" required inputmode="tel"></label><label>Learner name<input name="learnerName" autocomplete="section-learner name" required></label><label>Date of birth<input name="dateOfBirth" type="date" autocomplete="section-learner bday" required></label><label>Age group / intended grade<select name="gradeOrAgeGroup" required>${window.LittleFeetEducationStages?.optionMarkup?.() || '<option value="">Choose age group / intended grade</option><option>Grade R · Reception</option><option>Grade 1</option><option>Grade 2</option><option>Grade 3</option><option>Grade 4</option><option>Grade 5</option><option>Grade 6</option><option>Grade 7</option><option>Grade 8</option><option>Grade 9</option><option>Grade 10</option><option>Grade 11</option><option>Grade 12</option>'}</select></label><label>Intended start date<input name="intendedStart" type="date" required></label><label>Home area / suburb<input name="homeArea" autocomplete="section-applicant address-level2" required></label><label style="grid-column:1/-1;">Application note<textarea name="notes" required rows="3" placeholder="Why you are applying, preferred contact time, and any non-sensitive information the school should know."></textarea></label><label for="schoolApplicationConsent" style="grid-column:1/-1;display:flex;gap:8px;align-items:flex-start;"><input id="schoolApplicationConsent" name="applicationConsent" type="checkbox" required> I confirm these details are accurate and I am authorised to apply for this learner.</label><button class="submit-btn" style="grid-column:1/-1;">Send application to principal</button></form></section>`
-    : `<section style="border-top:1px solid var(--border-color);padding-top:14px;"><h3 style="margin:0 0 5px;">Apply to this school</h3><p style="margin:0;color:var(--text-muted);">Applications require an active, verified parent account. Sign in with your approved Little Feet parent account first.</p></section>`;
-  openModal('School details', `<div style="display:grid;gap:12px;"><div><h3 style="margin:0 0 5px;">${escapeWorkspaceText(school.name)}</h3><p style="margin:0;color:var(--text-muted);">${escapeWorkspaceText(detail.category || 'Education facility')} · ${escapeWorkspaceText(detail.street || 'Address not listed')}, ${escapeWorkspaceText(detail.suburb || '')}, ${escapeWorkspaceText(detail.town || '')}</p></div><div><label for="schoolCoordinates">Coordinates</label><input id="schoolCoordinates" readonly value="${coordinates}"><button type="button" class="action-btn btn-blue" style="margin-top:8px;" onclick="navigator.clipboard?.writeText(document.getElementById('schoolCoordinates').value); this.textContent='Copied'">Copy coordinates</button></div>${application}</div>`);
-}
-async function submitSchoolApplication(event, index) {
-  event.preventDefault();
-  const school = nearbySchoolRecords[index];
-  if (!school) return;
-  const form = event.currentTarget;
-  const value = name => String(form.elements[name]?.value || '').trim();
-  try {
-    const response = await fetch('/api/school-applications', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ schoolName: school.name, guardianName: value('guardianName'), contactEmail: value('contactEmail'), contactPhone: value('contactPhone'), learnerName: value('learnerName'), dateOfBirth: value('dateOfBirth'), gradeOrAgeGroup: value('gradeOrAgeGroup'), intendedStart: value('intendedStart'), homeArea: value('homeArea'), notes: value('notes') }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to send the school application.');
-    closeModal();
-    alert(`Application sent to ${result.application.assignedTo}. Your admissions reference is ${result.application.applicationNumber}.`);
-    loadTickets();
-    window.refreshLittleFeetAdmissions?.();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to send the school application.')); }
-}
-
-async function enrichSchoolPin(button, schoolName, latitude, longitude) {
-  const panel = button?.closest('.school-enrichment');
-  if (!panel) return;
-  button.disabled = true;
-  button.textContent = 'Checking verified details…';
-  try {
-    const response = await fetch('/api/schools/enrich', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: schoolName, latitude, longitude })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Verified public lookup was unavailable.');
-    const escape = value => escapeWorkspaceText(value || 'Not publicly listed');
-    const website = /^https:\/\//i.test(result.website || '') ? `<a href="${escape(result.website)}" target="_blank" rel="noopener noreferrer">Visit school website</a>` : 'Not publicly listed';
-    panel.innerHTML = `<p style="font-size:.8rem;margin:0;"><strong>Verified public details</strong><br><strong>Address:</strong> ${escape(result.address)}<br><strong>Phone:</strong> ${result.phone ? `<a href="tel:${escape(result.phone)}">${escape(result.phone)}</a>` : 'Not publicly listed'}<br><strong>Website:</strong> ${website}</p><p class="school-muted" style="font-size:.72rem;margin:6px 0 0;">Source: ${escape(result.source)}. Review public details with the school before relying on them.</p>`;
-  } catch (error) {
-    button.disabled = false;
-    button.textContent = 'Check verified public details';
-    const notice = document.createElement('p');
-    notice.className = 'school-muted';
-    notice.style.cssText = 'font-size:.72rem;margin:6px 0 0;';
-    notice.textContent = safeUserFacingError(error, 'Verified school details could not be loaded.');
-    panel.querySelector('.school-enrichment-error')?.remove();
-    notice.classList.add('school-enrichment-error');
-    panel.append(notice);
-  }
-}
 
 // Posts
-async function loadPosts() {
-  if (isInternalCompanyRole(currentUser?.role)) return;
-  try {
-    const res = await fetch('/api/posts');
-    const posts = await res.json();
-    document.getElementById('postList').innerHTML = posts.length
-      ? posts.map(p => `
-          <div class="item-row" style="flex-direction: column; align-items: flex-start;">
-            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
-              <div>
-                <span class="badge-tag info">Audience: ${escapeWorkspaceText(p.audience || 'All')}</span>
-                <p style="font-size:0.95rem; margin-top:6px; color: var(--text-dark);">${escapeWorkspaceText(p.caption)}</p>
-              </div>
-              <button type="button" onclick="deletePost('${encodeInlineIdentifier(p.id)}')" class="action-btn btn-red">🗑️ Delete</button>
-            </div>
-            ${p.mediaUrl ? `<img src="${p.mediaUrl}" class="post-item" onclick="openModal('Media File Preview', '<img src=\\'${p.mediaUrl}\\' style=\\'max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;\\'>')">` : ''}
-            <div class="meta"><span>Posted by Staff (${escapeWorkspaceText(p.createdAt || 'Recent')})</span></div>
-          </div>`).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No updates published yet.</p>';
-  } catch (err) {
-    logAppError('ERR_POST_001', 'Failed to retrieve Activity Feed posts.');
-  }
-}
 
-async function deletePost(id) {
-  if (!confirm('Are you sure you want to delete this activity post?')) return;
-  await fetch(`/api/posts/${id}`, { method: 'DELETE' });
-  loadPosts();
-}
+
+
 
 const postForm = document.getElementById('postForm');
 if (postForm) {
@@ -3152,31 +1021,9 @@ if (postForm) {
 }
 
 // Schedules
-async function loadSchedules() {
-  try {
-    const res = await fetch('/api/schedules');
-    const list = await res.json();
-    document.getElementById('scheduleList').innerHTML = list.length
-      ? list.map(s => `
-          <div class="item-row">
-            <div>
-              <span class="badge-tag">${escapeWorkspaceText(s.dayOfWeek)}</span>
-              <strong>${escapeWorkspaceText(s.studentName)}</strong> - <span style="color:#0d9488; font-weight:600;">${escapeWorkspaceText(s.timeSlot)}</span>
-              <p style="font-size:0.88rem; margin-top:4px; color: var(--text-muted);">Activity / Subject: ${escapeWorkspaceText(s.activity)}</p>
-            </div>
-            <button type="button" onclick="deleteSchedule('${encodeInlineIdentifier(s.id)}')" class="action-btn btn-red">🗑️ Delete</button>
-          </div>`).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No active schedule records found.</p>';
-  } catch (err) {
-    logAppError('ERR_SCHED_001', 'Could not load student schedules.');
-  }
-}
 
-async function deleteSchedule(id) {
-  if (!confirm('Delete this submitted schedule record?')) return;
-  await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
-  loadSchedules();
-}
+
+
 
 const scheduleForm = document.getElementById('scheduleForm');
 if (scheduleForm) {
@@ -3196,127 +1043,16 @@ if (scheduleForm) {
   });
 }
 
-async function exportScheduleExcel() {
-  const res = await fetch('/api/schedules');
-  const list = await res.json();
-  if (!list.length) return alert('No schedules available to export.');
 
-  const exportData = list.map(s => ({
-    "ID": s.id,
-    "Student Name": s.studentName,
-    "Day of Week": s.dayOfWeek,
-    "Time Slot Block": s.timeSlot,
-    "Activity Module": s.activity
-  }));
 
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Test Results Schedule");
-  XLSX.writeFile(workbook, "LittleFeet_TestResultsSchedule.xlsx");
-}
 
-async function importScheduleExcel() {
-  const fileInput = document.getElementById('excelFileInput');
-  const file = fileInput ? fileInput.files[0] : null;
-  if (!file) {
-    logAppError('ERR_FILE_404', 'Excel file import attempted without selecting a file.');
-    return alert('Select a valid Excel (.xlsx / .xls) or CSV file.');
-  }
-  const fileError = validateSpreadsheetFile(file);
-  if (fileError) return alert(fileError);
-
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      if (rows.length > 2001) throw new Error('Schedule imports are limited to 2,000 records per file.');
-
-      const schedules = rows.slice(1).map(row => ({
-        id: row[0] ? String(row[0]) : Date.now().toString(),
-        studentName: row[1] || '',
-        dayOfWeek: row[2] || 'Monday',
-        timeSlot: row[3] || '',
-        activity: row[4] || ''
-      })).filter(s => s.studentName.trim() !== '');
-
-      const res = await fetch('/api/schedules/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schedules })
-      });
-
-      if (!res.ok) throw new Error('Backend failed to parse Excel rows.');
-
-      alert('Excel batch sync complete!');
-      fileInput.value = '';
-      loadSchedules();
-    } catch (err) {
-      logAppError('ERR_EXCEL_400', 'File cannot be read: corrupt format or invalid worksheet columns.');
-      alert('Error reading Excel spreadsheet file.');
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
 // Worksheets
-async function loadWorksheets() {
-  try {
-    const res = await fetch('/api/worksheets');
-    const list = await res.json();
-    document.getElementById('worksheetList').innerHTML = list.length
-      ? list.map(w => `
-          <div class="item-row" style="flex-direction: column; align-items: flex-start;">
-            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-              <div>
-                <strong>${escapeWorkspaceText(w.studentName)}</strong> — ${escapeWorkspaceText(w.title)} 
-                <span class="badge-tag" style="background-color: #16a34a; margin-left: 6px;">Score: ${escapeWorkspaceText(w.grade)}%</span>
-              </div>
-              <div>
-                ${w.photoUrl ? `<button type="button" onclick="viewWorksheetFile('${encodeInlineIdentifier(w.id)}')" class="action-btn btn-blue">👁️ View Attached File</button>` : ''}
-                <button type="button" onclick="deleteWorksheet('${encodeInlineIdentifier(w.id)}')" class="action-btn btn-red">🗑️ Delete</button>
-              </div>
-            </div>
-            
-            <div class="meta" style="margin-top:8px;">
-              <span>Submitted By: <strong style="color:var(--primary-color);">${escapeWorkspaceText(w.submittedBy || 'Educator')}</strong></span>
-              <span>• Upload Date: ${escapeWorkspaceText(w.uploadedAt || 'Recently')}</span>
-            </div>
-          </div>`).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No graded worksheets uploaded.</p>';
-  } catch (err) {
-    logAppError('ERR_WS_001', 'Unable to fetch worksheet submissions portfolio.');
-  }
-}
 
-async function viewWorksheetFile(id) {
-  try {
-    const res = await fetch('/api/worksheets');
-    const list = await res.json();
-    const item = list.find(w => w.id === id);
-    if (item && item.photoUrl) {
-      openModal(`Submission File View: ${item.studentName}`, `
-        <div style="text-align:center;">
-          <p style="font-size:0.85rem; margin-bottom:10px;">Submitted by: <strong>${escapeWorkspaceText(item.submittedBy)}</strong> | Title: ${escapeWorkspaceText(item.title)}</p>
-          <img src="${item.photoUrl}" style="max-width:100%; max-height:75vh; border-radius:6px; border:1px solid var(--border-color); object-fit:contain;">
-        </div>
-      `);
-    } else {
-      logAppError('ERR_FILE_404', `File content missing for ID: ${id}`);
-      alert('File payload could not be read.');
-    }
-  } catch (e) {
-    logAppError('ERR_WS_404', 'Error retrieving submission file preview.');
-  }
-}
 
-async function deleteWorksheet(id) {
-  if (!confirm('Delete this graded submission file record?')) return;
-  await fetch(`/api/worksheets/${id}`, { method: 'DELETE' });
-  loadWorksheets();
-}
+
+
+
 
 const worksheetForm = document.getElementById('worksheetForm');
 if (worksheetForm) {
@@ -3349,144 +1085,22 @@ if (worksheetForm) {
 }
 
 // Milestone Badges
-function canManageBadges() {
-  return isFullAccessUser() || ['teacher', 'principal'].includes(currentUser?.role);
-}
 
-function downloadLearnerImportTemplate() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
-  const rows = [{
-    'Learner Name': 'Example Learner',
-    'Grade / Class': 'Preschool',
-    'Parent / Guardian Name': 'Example Guardian',
-    'Parent Email': 'parent@example.com',
-    'Medical Notes': 'None known',
-    'Emergency Contact': 'Example Guardian · 071 000 0000',
-    'Authorised Pickups': 'Example Guardian'
-  }];
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Learner import');
-  XLSX.writeFile(workbook, 'LittleFeet_Learner_Import_Template.xlsx');
-}
 
-function importValue(row, candidates) {
-  const normalized = Object.entries(row).reduce((fields, [key, value]) => {
-    fields[String(key).trim().toLowerCase().replace(/[^a-z0-9]/g, '')] = value;
-    return fields;
-  }, {});
-  for (const candidate of candidates) {
-    const value = normalized[candidate];
-    if (value !== undefined && String(value).trim()) return String(value).trim();
-  }
-  return '';
-}
 
-function previewLearnerDatabaseImport() {
-  const input = document.getElementById('schoolDatabaseFile');
-  const preview = document.getElementById('schoolDatabasePreview');
-  const file = input?.files?.[0];
-  if (!file || !preview) return alert('Choose an Excel or CSV school register first.');
-  const fileError = validateSpreadsheetFile(file, SCHOOL_INTEGRATION_SPREADSHEET_MAX_BYTES);
-  if (fileError) return alert(fileError);
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const sourceRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-      if (sourceRows.length > 100000) throw new Error('This register contains more than 100,000 rows. Split it into school-approved files of 100,000 rows or fewer.');
-      const rows = sourceRows.map(row => ({
-        studentName: importValue(row, ['learnername', 'studentname', 'childname', 'name']),
-        className: importValue(row, ['gradeclass', 'classname', 'class', 'grade']),
-        parentName: importValue(row, ['parentguardianname', 'parentname', 'guardianname']),
-        contactEmail: importValue(row, ['parentemail', 'guardianemail', 'contactemail', 'email']),
-        medicalNotes: importValue(row, ['medicalnotes', 'medical', 'allergies']),
-        emergencyContact: importValue(row, ['emergencycontact', 'emergencyphone', 'emergency']),
-        authorisedPickups: importValue(row, ['authorisedpickups', 'authorizedpickups', 'pickups', 'pickup'])
-      })).filter(row => row.studentName || row.className || row.parentName || row.contactEmail);
-      const validRows = rows.filter(row => row.studentName && row.className);
-      pendingLearnerImport = validRows;
-      pendingLearnerImportId = (globalThis.crypto?.randomUUID?.() || `import-${Date.now()}-${Math.random().toString(16).slice(2)}`);
-      const previewRows = validRows.slice(0, 8).map(row => `<tr><td>${escapeWorkspaceText(row.studentName)}</td><td>${escapeWorkspaceText(row.className)}</td><td>${escapeWorkspaceText(row.parentName || 'Not supplied')}</td><td>${escapeWorkspaceText(row.contactEmail || 'Not supplied')}</td></tr>`).join('');
-      preview.innerHTML = `<div class="item-row" style="display:block;"><strong>${validRows.length} valid learner record${validRows.length === 1 ? '' : 's'} detected</strong><p class="meta" style="margin:7px 0 12px;">${rows.length - validRows.length} row${rows.length - validRows.length === 1 ? '' : 's'} need a learner name and class/grade before they can be imported. Only the first eight records are shown below.</p><div style="overflow-x:auto;"><table><thead><tr><th>Learner</th><th>Class</th><th>Parent / guardian</th><th>Contact email</th></tr></thead><tbody>${previewRows || '<tr><td colspan="4">No valid learner rows found.</td></tr>'}</tbody></table></div><button type="button" class="submit-btn" style="margin-top:14px;max-width:330px;" onclick="confirmLearnerDatabaseImport()">Review and import ${validRows.length} record${validRows.length === 1 ? '' : 's'}</button></div>`;
-    } catch (error) {
-      pendingLearnerImport = [];
-      pendingLearnerImportId = '';
-      preview.textContent = 'This file could not be read. Download the template to check the expected column headings.';
-      logAppError('ERR_IMPORT_FILE_400', error.message || 'The learner import file could not be read.');
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
-async function confirmLearnerDatabaseImport() {
-  if (!pendingLearnerImport.length) return alert('Preview a valid school register before importing it.');
-  if (!confirm(`Import ${pendingLearnerImport.length} learner record${pendingLearnerImport.length === 1 ? '' : 's'}? Existing matches will not be overwritten.`)) return;
-  const chunkSize = 250;
-  const totalBatches = Math.ceil(pendingLearnerImport.length / chunkSize);
-  const importId = pendingLearnerImportId || (globalThis.crypto?.randomUUID?.() || `import-${Date.now()}-${Math.random().toString(16).slice(2)}`);
-  pendingLearnerImportId = importId;
-  let imported = 0;
-  const rejected = [];
-  for (let offset = 0; offset < pendingLearnerImport.length; offset += chunkSize) {
-    const batchNumber = Math.floor(offset / chunkSize);
-    const response = await fetch('/api/students/import', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ importId, batchNumber, totalBatches, students: pendingLearnerImport.slice(offset, offset + chunkSize) })
-    });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'The learner import could not be completed.');
-    imported += Number(result.imported || 0);
-    rejected.push(...(result.rejected || []));
-    const preview = document.getElementById('schoolDatabasePreview');
-    if (preview) preview.querySelector('strong').textContent = `Importing batch ${batchNumber + 1} of ${totalBatches} · ${result.progress?.imported ?? imported} records saved`;
-  }
-  const duplicateSummary = rejected.length ? ` ${rejected.length} duplicate or incomplete row${rejected.length === 1 ? ' was' : 's were'} skipped.` : '';
-  alert(`${imported} learner record${imported === 1 ? '' : 's'} imported in smaller secure batches.${duplicateSummary}`);
-  document.getElementById('schoolDatabaseFile').value = '';
-  document.getElementById('schoolDatabasePreview').innerHTML = '';
-  pendingLearnerImport = [];
-  pendingLearnerImportId = '';
-  playDingSound();
-}
 
-async function loadBadges() {
-  try {
-    if (!currentUser) return;
-    const res = await fetch(`/api/badges?username=${encodeURIComponent(currentUser.username)}`);
-    if (!res.ok) throw new Error('Unable to load badges.');
-    const list = await res.json();
-    const wall = document.getElementById('badgeWallLog');
-    if (!wall) return;
 
-    wall.innerHTML = list.length
-      ? list.map(b => `
-          <div class="item-row" style="justify-content: space-between; align-items: flex-start;">
-            <div>
-              <span class="badge-tag" style="background:#10b981;">${escapeWorkspaceText(b.category)}</span>
-              <strong style="font-size:1.05rem; color:#fff;">${escapeWorkspaceText(b.title || b.awardName)}</strong>
-              <span style="color:#a7f3d0;">— ${escapeWorkspaceText(b.studentName)}</span>
-              <p style="font-size:0.88rem; margin-top:4px; font-style:italic; color:var(--text-muted);">"${escapeWorkspaceText(b.note)}"</p>
-            </div>
-            ${canManageBadges() ? `<button type="button" onclick="deleteBadge('${encodeInlineIdentifier(String(b.id || ''))}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
-          </div>`).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No milestone badges awarded yet.</p>';
-  } catch (err) {
-    logAppError('ERR_BDG_001', 'Failed to render digital badges archive.');
-  }
-}
+
+
+
+
+
 
 const badgeForm = document.getElementById('badgeForm');
 const badgeCategory = document.getElementById('badgeCategory');
 const milestoneChoices = [...document.querySelectorAll('.milestone-choice')];
-function syncMilestoneChoice(value = badgeCategory?.value) {
-  milestoneChoices.forEach(choice => {
-    const selected = choice.dataset.value === value;
-    choice.classList.toggle('is-selected', selected);
-    choice.setAttribute('aria-pressed', selected ? 'true' : 'false');
-  });
-}
+
 milestoneChoices.forEach(choice => choice.addEventListener('click', () => {
   if (badgeCategory) badgeCategory.value = choice.dataset.value;
   syncMilestoneChoice(choice.dataset.value);
@@ -3514,17 +1128,7 @@ if (badgeForm) {
   });
 }
 
-async function deleteBadge(encodedId) {
-  if (!canManageBadges()) return alert('Only authorised school staff can remove badges.');
-  if (!confirm('Are you sure you want to delete this awarded badge?')) return;
-  const id = decodeURIComponent(String(encodedId || ''));
-  const response = await fetch(`/api/badges/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
-  if (!response.ok) {
-    const result = await response.json();
-    return alert(result.message || 'Unable to remove this badge.');
-  }
-  loadBadges();
-}
+
 
 // Analytics
 const analyticsSearchForm = document.getElementById('analyticsSearchForm');
@@ -3568,75 +1172,9 @@ if (analyticsSearchForm) {
 }
 
 // Attendance Registry
-async function loadAttendance() {
-  try {
-    const res = await fetch('/api/attendance');
-    if (!res.ok) throw new Error('Attendance backend unreadable');
-    const list = await res.json();
 
-    document.getElementById('attendanceList').innerHTML = list.length
-      ? list.map(a => `
-          <div class="item-row">
-            <div>
-              <strong>${escapeWorkspaceText(a.studentName)}</strong> <span class="meta" style="display:inline;">(${escapeWorkspaceText(a.status)} at ${escapeWorkspaceText(a.timestamp || 'Today')})</span>
-            </div>
-            <div>
-              <button type="button" onclick="toggleAttendance('${a.id}', '${a.status === 'Checked In' ? 'Checked Out' : 'Checked In'}')" class="action-btn ${a.status === 'Checked In' ? 'btn-red' : 'btn-green'}">
-                ${a.status === 'Checked In' ? 'Mark Out' : 'Mark In'}
-              </button>
-              <button type="button" onclick="removeAttendance('${a.id}')" class="action-btn btn-red" style="padding: 4px 8px; font-size: 0.75rem;">🗑️ Delete</button>
-            </div>
-          </div>`).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No students checked in today.</p>';
-  } catch (err) {
-    logAppError('ERR_ATT_500', 'Failed to render Attendance Registry roster.');
-  }
-}
 
-async function importAttendanceExcel() {
-  const fileInput = document.getElementById('attExcelFileInput');
-  const file = fileInput ? fileInput.files[0] : null;
-  if (!file) {
-    logAppError('ERR_FILE_404', 'Attendance file import attempted without selecting a file.');
-    return alert('Select a valid Excel (.xlsx / .xls) or CSV file.');
-  }
-  const fileError = validateSpreadsheetFile(file);
-  if (fileError) return alert(fileError);
 
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      if (rows.length > 2001) throw new Error('Attendance imports are limited to 2,000 records per file.');
-
-      const attendanceData = rows.slice(1).map(row => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 4),
-        studentName: row[0] ? String(row[0]).trim() : '',
-        status: row[1] && String(row[1]).trim() ? String(row[1]).trim() : 'Checked In',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      })).filter(a => a.studentName !== '');
-
-      const res = await fetch('/api/attendance/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attendance: attendanceData })
-      });
-
-      if (!res.ok) throw new Error('Backend failed to parse Excel rows.');
-
-      alert('Attendance Excel Sheet imported successfully!');
-      fileInput.value = '';
-      loadAttendance();
-    } catch (err) {
-      logAppError('ERR_EXCEL_400', 'File cannot be read: corrupt format or invalid worksheet columns.');
-      alert('Error reading Attendance Excel spreadsheet file.');
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
 const attendanceForm = document.getElementById('attendanceForm');
 if (attendanceForm) {
@@ -3657,169 +1195,32 @@ if (attendanceForm) {
   });
 }
 
-async function toggleAttendance(id, status) {
-  await fetch('/api/attendance/toggle', { 
-    method: 'POST', 
-    headers: { 'Content-Type': 'application/json' }, 
-    body: JSON.stringify({ id, status }) 
-  });
-  loadAttendance();
-}
 
-async function removeAttendance(id) {
-  if (!confirm('Are you sure you want to delete this attendance record?')) return;
-  await fetch(`/api/attendance/${id}`, { method: 'DELETE' });
-  loadAttendance();
-}
 
-async function clearAttendanceRegistry() {
-  if (!confirm("Are you sure you want to clear Today's Attendance Registry?")) return;
-  await fetch('/api/attendance/clear', { method: 'POST' });
-  loadAttendance();
-}
+
+
+
 
 // Support Tickets Archive & Queue
-function canManageTicketQueue() {
-  return isFullAccessUser() || ['crm', 'support'].includes(currentUser?.role);
-}
 
-function encodeInlineIdentifier(value) {
-  return encodeURIComponent(value).replace(/'/g, '%27');
-}
 
-function ticketCanBeManaged(ticket) {
-  return canManageTicketQueue() || String(ticket.assignedTo || '').toLowerCase() === String(currentUser?.username || '').toLowerCase();
-}
 
-function showTicketNotification(ticket) {
-  const notice = document.createElement('div');
-  notice.className = 'ticket-toast';
-  notice.setAttribute('role', 'status');
-  notice.innerHTML = `<strong>🎫 New ticket assigned</strong><span>${escapeWorkspaceText(ticket.subject || 'Support request')}</span>`;
-  document.body.appendChild(notice);
-  window.setTimeout(() => notice.remove(), 8000);
-}
 
-function renderTicketAssigneeOptions(selectId, query = '', selected = '') {
-  const select = document.getElementById(selectId);
-  if (!select) return;
-  const search = String(query || '').trim().toLowerCase();
-  const schoolAccounts = ticketAssigneeAccounts.filter(account => {
-    const matchesSearch = !search || `${account.name || ''} ${account.username || ''}`.toLowerCase().includes(search);
-    return matchesSearch;
-  });
-  const roleGroups = [['teacher', 'Teachers'], ['principal', 'Principals'], ['parent', 'Parents'], ['admin', 'Administrators'], ['district', 'District'], ['school_accounts', 'School Accounts'], ['staff', 'Staff Little Feet'], ['crm', 'CRM Little Feet'], ['accounts', 'Accounts Little Feet'], ['support', 'Support Little Feet']];
-  const groupedOptions = roleGroups.map(([role, label]) => {
-    const people = schoolAccounts.filter(account => account.role === role);
-    return people.length ? `<optgroup label="${label}">${people.map(account => `<option value="${escapeWorkspaceText(account.username)}">${escapeWorkspaceText(account.name || account.username)}</option>`).join('')}</optgroup>` : '';
-  }).join('');
-  select.innerHTML = `<option value="">Unassigned</option>${groupedOptions}`;
-  select.value = [...select.options].some(option => option.value === selected) ? selected : '';
-}
 
-function filterTicketAssignees(searchId, selectId) {
-  const search = document.getElementById(searchId)?.value || '';
-  const selected = document.getElementById(selectId)?.value || '';
-  renderTicketAssigneeOptions(selectId, search, selected);
-}
 
-async function loadTicketAssignees() {
-  if (!document.getElementById('ticketAssignee') || !canManageTicketQueue()) return;
-  try {
-    const response = await fetch('/api/tickets/assignees');
-    const accounts = await response.json();
-    if (!response.ok) return;
-    const selected = document.getElementById('ticketAssignee').value;
-    ticketAssigneeAccounts = accounts;
-    renderTicketAssigneeOptions('ticketAssignee', document.getElementById('ticketAssigneeSearch')?.value || '', selected);
-  } catch { /* The ticket form remains available without preloading assignees. */ }
-}
 
-async function loadTickets(checkForNew = false) {
-  try {
-    if (!currentUser) return;
-    const res = await fetch(`/api/tickets?username=${encodeURIComponent(currentUser.username)}`);
-    const tickets = await res.json();
-    if (!res.ok) throw new Error('Unable to fetch tickets.');
-    const assignedTickets = tickets.filter(ticket => String(ticket.assignedTo || '').toLowerCase() === String(currentUser.username).toLowerCase());
-    const newTickets = assignedTickets.filter(ticket => !knownTicketIds.has(ticket.id));
-    if (ticketsLoaded && checkForNew && newTickets.length) { showTicketNotification(newTickets[0]); playTicketAlert(); }
-    tickets.forEach(ticket => knownTicketIds.add(ticket.id));
-    ticketsLoaded = true;
-    const filter = document.getElementById('ticketDeptFilter').value;
 
-    const filtered = tickets.filter(t => filter === 'All' || t.department === filter);
-    const active = filtered.filter(t => t.status !== 'Completed');
-    const completed = filtered.filter(t => t.status === 'Completed');
 
-    document.getElementById('ticketList').innerHTML = active.length
-      ? active.map(t => `
-          <div class="item-row" style="flex-direction: column; align-items: flex-start;">
-            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
-              <div>
-                <span class="badge-tag">${escapeWorkspaceText(t.department)}</span> 
-                <span class="badge-tag urgent">${escapeWorkspaceText(t.priority)} Priority</span>
-                ${t.ticketType === 'Meeting request' ? '<span class="badge-tag">Meeting request</span>' : ''}
-                <strong>${escapeWorkspaceText(t.subject)}</strong>
-                <p class="meta" style="margin-top:5px;">${t.assignedTo ? `Assigned to: ${escapeWorkspaceText(t.assignedTo)}` : 'Unassigned'}</p>
-              </div>
-              ${isFullAccessUser() && t.category === 'School deletion request' ? `<button type="button" onclick="executeSchoolDeletion('${encodeInlineIdentifier(t.id)}')" class="action-btn btn-red">Delete entire school</button>` : ''}${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeInlineIdentifier(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
-            </div>
-            <p style="margin-top:6px; font-size:0.88rem; color:var(--text-muted);">${escapeWorkspaceText(t.message)}</p>
-            ${t.ticketType === 'Meeting request' ? `<p class="meta" style="margin-top:6px;"><strong>Requested meeting:</strong> ${escapeWorkspaceText(t.meetingDate || 'Date not set')} ${escapeWorkspaceText(t.meetingTime || '')}${t.meetingLocation ? ' · ' + escapeWorkspaceText(t.meetingLocation) : ''}</p>` : ''}
-            ${t.application ? `<div style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);font-size:.82rem;line-height:1.55;"><strong>Application details</strong><br><strong>Parent / guardian:</strong> ${escapeWorkspaceText(t.application.guardianName)} · ${escapeWorkspaceText(t.application.contactPhone)} · ${escapeWorkspaceText(t.application.contactEmail)}<br><strong>Learner:</strong> ${escapeWorkspaceText(t.application.learnerName)} · DOB ${escapeWorkspaceText(t.application.dateOfBirth)} · ${escapeWorkspaceText(t.application.gradeOrAgeGroup)}<br><strong>Start date:</strong> ${escapeWorkspaceText(t.application.intendedStart)} · <strong>Area:</strong> ${escapeWorkspaceText(t.application.homeArea)}<br><strong>Note:</strong> ${escapeWorkspaceText(t.application.notes)}</div>` : ''}
-            ${t.feedback ? `<div style="background:var(--input-bg); padding:8px; border-radius:4px; font-size:0.8rem; margin-top:6px; color:#2dd4bf; border: 1px solid var(--border-color);"><strong>Feedback from ${escapeWorkspaceText(t.updatedBy)}:</strong> ${escapeWorkspaceText(t.feedback)}</div>` : ''}
-            ${ticketCanBeManaged(t) ? `<div style="margin-top: 8px;">
-              <button type="button" onclick="editTicketModal('${encodeInlineIdentifier(String(t.id || ''))}', '${encodeInlineIdentifier(String(t.status || 'Open'))}', '${encodeInlineIdentifier(t.feedback || '')}', '${encodeInlineIdentifier(t.assignedTo || '')}')" class="action-btn btn-blue">✏️ Edit & Respond</button>
-            </div>` : ''}
-          </div>`).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No active tickets in queue.</p>';
 
-    const grouped = {};
-    completed.forEach(t => {
-      const monthKey = t.monthCategory || 'August 2026';
-      if (!grouped[monthKey]) grouped[monthKey] = [];
-      grouped[monthKey].push(t);
-    });
 
-    let completedHtml = '';
-    for (const [month, list] of Object.entries(grouped)) {
-      completedHtml += `<h3 style="font-size:0.95rem; color:var(--primary-color); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📅 Submitted Category: ${escapeWorkspaceText(month)}</h3>`;
-      completedHtml += list.map(t => `
-        <div class="item-row" style="opacity: 0.85; flex-direction: column; align-items: flex-start;">
-          <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-            <div><span class="badge-tag" style="background:#16a34a;">Completed</span> <strong>${escapeWorkspaceText(t.subject)}</strong></div>
-            ${isFullAccessUser() ? `<button type="button" onclick="deleteTicket('${encodeInlineIdentifier(t.id)}')" class="action-btn btn-red">🗑️ Delete</button>` : ''}
-          </div>
-          <p style="font-size:0.85rem; margin-top:4px;">${escapeWorkspaceText(t.message)}</p>
-          ${t.feedback ? `<p style="font-size:0.78rem; color:#2dd4bf;">Feedback: ${escapeWorkspaceText(t.feedback)}</p>` : ''}
-        </div>
-      `).join('');
-    }
 
-    document.getElementById('completedTicketList').innerHTML = completedHtml || '<p style="font-size:0.85rem; color:var(--text-muted);">No completed tickets archived.</p>';
-  } catch (err) {
-    logAppError('ERR_TCK_001', 'Failed to fetch Support Desk tickets.');
-  }
-}
 
-async function deleteTicket(id) {
-  if (!isFullAccessUser()) return alert('Only an administrator can delete support tickets.');
-  if (!confirm('Are you sure you want to delete this support ticket?')) return;
-  const response = await fetch(`/api/tickets/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
-  if (!response.ok) return alert('Unable to delete this ticket.');
-  loadTickets();
-}
 
-function toggleMeetingTicketFields() {
-  const isMeeting = document.getElementById('ticketType')?.value === 'Meeting request';
-  const fields = document.getElementById('meetingTicketFields');
-  fields?.classList.toggle('hidden', !isMeeting);
-  ['ticketMeetingDate','ticketMeetingTime'].forEach(id => {
-    const input = document.getElementById(id);
-    if (input) input.required = isMeeting;
-  });
-}
+
+
+
+
+
 
 const ticketForm = document.getElementById('ticketForm');
 if (ticketForm) {
@@ -3848,2027 +1249,258 @@ if (ticketForm) {
   });
 }
 
-function editTicketModal(encodedId, encodedStatus, encodedFeedback, encodedAssignee) {
-  const id = decodeURIComponent(encodedId || '');
-  const currentStatus = decodeURIComponent(encodedStatus || 'Open');
-  const currentFeedback = decodeURIComponent(encodedFeedback || '');
-  const currentAssignee = decodeURIComponent(encodedAssignee || '');
-  const html = `
-    <form id="editTicketForm">
-      <div>
-        <label for="editFeedback">Admin Feedback & Notes</label>
-        <textarea id="editFeedback" rows="3" required>${escapeWorkspaceText(currentFeedback || '')}</textarea>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-        <input type="checkbox" id="editCompleted" ${currentStatus === 'Completed' ? 'checked' : ''} style="width:auto; margin-bottom:0;">
-        <label for="editCompleted" style="margin-bottom:0;">Mark Ticket as Completed</label>
-      </div>
-      ${canManageTicketQueue() ? '<div><label for="editTicketAssigneeSearch">Find an account</label><input id="editTicketAssigneeSearch" type="search" placeholder="Search a school user or company employee" oninput="filterTicketAssignees(\'editTicketAssigneeSearch\', \'editTicketAssignee\')"><label for="editTicketAssignee">Assign to account</label><select id="editTicketAssignee"><option value="">Unassigned</option></select></div>' : ''}
-      <button type="submit" class="submit-btn">Save Ticket Resolution</button>
-    </form>`;
-  openModal('Edit Support Ticket', html);
-  if (canManageTicketQueue()) loadTicketAssignees().then(() => renderTicketAssigneeOptions('editTicketAssignee', '', currentAssignee));
 
-  document.getElementById('editTicketForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const feedback = document.getElementById('editFeedback').value;
-    const status = document.getElementById('editCompleted').checked ? 'Completed' : 'Open';
-    const response = await fetch('/api/tickets/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status, feedback, updatedBy: currentUser ? currentUser.username : 'Admin', assignedTo: canManageTicketQueue() ? document.getElementById('editTicketAssignee')?.value : undefined })
-    });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to update this ticket.');
-    closeModal();
-    loadTickets();
-    playDingSound();
-  });
-}
 
-async function requestOwnAccountDeletion() {
-  if (!currentUser || isFullAccessUser()) return alert('Administrators can manage accounts directly from Account Management.');
-  if (!confirm('Are you sure you want to request deletion of your account? Your account will stay active until an administrator reviews the request.')) return;
-  try {
-    const response = await fetch('/api/account-deletion-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to submit the account deletion request.');
-    alert('Account deletion request sent to your administrator as a support ticket.');
-    if (typeof loadTickets === 'function') loadTickets();
-  } catch {
-    alert('Unable to reach the account deletion service. Please try again.');
-  }
-}
 
-async function requestSchoolDeletion() {
-  if (!currentUser || currentUser.role !== 'principal') return alert('Only the school principal can request deletion of the entire school workspace.');
-  if (!confirm('Are you sure you want to request deletion of the ENTIRE school workspace? This includes all school accounts and all data linked to this school.')) return;
-  try {
-    const response = await fetch('/api/school-deletion-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to submit the school deletion request.');
-    alert('Full school deletion request sent to the administrator as a high-priority support ticket.');
-    if (typeof loadTickets === 'function') loadTickets();
-  } catch {
-    alert('Unable to reach the school deletion service. Please try again.');
-  }
-}
 
-async function executeSchoolDeletion(ticketId) {
-  if (!isFullAccessUser()) return alert('Administrator access is required.');
-  const confirmation = prompt('This permanently deletes every account and all data linked to this school. Type DELETE SCHOOL exactly to continue.');
-  if (confirmation === null) return;
-  if (confirmation.trim() !== 'DELETE SCHOOL') return alert('School deletion cancelled. The confirmation text did not match.');
-  const response = await fetch('/api/school-deletion/execute', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ticketId, confirmation: confirmation.trim() })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to delete the school workspace.');
-  alert(`School workspace deleted: ${result.deletedSchoolName || result.deletedSchoolId}. You will now be signed out.`);
-  window.location.reload();
-}
+
+
+
 
 // Emergency Broadcasts
-async function loadBroadcasts() {
-  if (isInternalCompanyRole(currentUser?.role)) return;
-  try {
-    const userPosition = getCachedAlertPosition();
-    const locationQuery = userPosition ? `?lat=${encodeURIComponent(userPosition.latitude)}&lng=${encodeURIComponent(userPosition.longitude)}` : '';
-    const res = await fetch(`/api/broadcasts${locationQuery}`);
-    const broadcasts = await res.json();
-    const listEl = document.getElementById('broadcastList');
-    if (!listEl) return;
 
-    if (!res.ok) throw new Error(broadcasts.message || 'Unable to load safety alerts.');
-    const visibleBroadcasts = broadcasts;
 
-    const knownAlertIds = new Set(JSON.parse(localStorage.getItem('lf_known_alert_ids') || '[]'));
-    const newApplicableAlerts = visibleBroadcasts.filter(alert => !knownAlertIds.has(alert.id));
-    if (broadcastsLoaded && newApplicableAlerts.length) playDingSound();
-    visibleBroadcasts.forEach(alert => knownAlertIds.add(alert.id));
-    localStorage.setItem('lf_known_alert_ids', JSON.stringify([...knownAlertIds].slice(-100)));
-    broadcastsLoaded = true;
 
-    updateAlertLocationFilterStatus();
-    listEl.innerHTML = visibleBroadcasts.length
-      ? visibleBroadcasts.map(b => `
-          <div class="item-row" style="border-left-color: #dc2626; flex-direction: column; align-items: flex-start;">
-            <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-              <span class="badge-tag urgent">${escapeWorkspaceText(b.bcPriority || 'Urgent Notice')}</span>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="meta">${escapeWorkspaceText(b.timestamp || 'Recent')}${b.radiusKm ? ` · ${escapeWorkspaceText(b.radiusKm)}km area` : ''}</span>${(isFullAccessUser() || currentUser?.role === 'principal') ? `<button type="button" onclick="deleteBroadcast('${encodeInlineIdentifier(b.id)}')" class="action-btn btn-red" style="margin:0;padding:4px 8px;">Delete</button>` : ''}</div>
-            </div>
-            <p style="margin-top:6px; font-size:0.92rem; color:var(--text-dark);">${escapeWorkspaceText(b.bcMessage)}</p>
-            <div style="margin-top:7px;"><button type="button" onclick="markBroadcastRead('${encodeInlineIdentifier(b.id)}')" class="action-btn btn-blue" style="padding:4px 8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'none' : 'inline-block'};">Mark as read</button><span class="meta" style="margin-left:8px;display:${(isFullAccessUser() || currentUser?.role === 'principal') ? 'inline' : 'none'};">${b.readBy?.length || 0} recipient acknowledgement(s)</span></div>
-          </div>
-        `).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No alerts apply to your current location.</p>';
-  } catch (e) {
-    logAppError('ERR_BC_001', 'Unable to fetch campus broadcast alerts.');
-  }
-}
 
-async function loadSafetyNetwork() {
-  const summary = document.getElementById('safetyNetworkSummary');
-  const visitorList = document.getElementById('safetyNetworkVisitors');
-  if (!summary || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
-  try {
-    const response = await fetch('/api/safety-network');
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load campus safety status.');
-    summary.innerHTML = [["Learners marked present", data.presentLearners], ["Visitors on campus", data.visitorsOnCampus], ["Active broadcasts", data.activeBroadcasts], ["Alert acknowledgements", data.acknowledgements]].map(([label, value]) => `<div class="workspace-card"><h3>${value}</h3><p>${label}</p></div>`).join('');
-    visitorList.innerHTML = data.visitors.length ? `<h3 class="workspace-heading">Currently on campus</h3>${data.visitors.map(visitor => `<div class="item-row"><div><strong>${escapeWorkspaceText(visitor.visitorName)}</strong><p style="margin-top:4px;">Host: ${escapeWorkspaceText(visitor.host || 'School office')} · ${escapeWorkspaceText(visitor.purpose)}</p><span class="meta">Checked in ${new Date(visitor.checkedInAt).toLocaleString()}</span></div><button type="button" class="action-btn btn-blue" onclick="checkOutCampusVisitor('${visitor.id}')">Check out</button></div>`).join('')}` : '<p class="meta">No approved visitors are currently checked in.</p>';
-  } catch (error) { summary.innerHTML = `<p class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load this information.'))}</p>`; }
-}
 
-async function loadVisitorMeetingRecipients() {
-  const select = document.getElementById('visitorMeetingHost');
-  if (!select || currentUser?.role !== 'parent') return;
-  try {
-    const response = await fetch('/api/visitor-meetings/recipients');
-    const people = await response.json();
-    if (!response.ok) throw new Error(people.message || 'Unable to load meeting recipients.');
-    select.innerHTML = '<option value="">Choose teacher or principal</option>' + people.map(person => `<option value="${escapeWorkspaceText(person.username)}">${escapeWorkspaceText(person.name || person.username)} · ${escapeWorkspaceText(person.role)}</option>`).join('');
-  } catch { select.innerHTML = '<option value="">No authorised staff available</option>'; }
-}
 
-async function loadVisitorMeetings() {
-  const list = document.getElementById('visitorMeetingList');
-  if (!list || !(isFullAccessUser() || ['parent','teacher','principal'].includes(currentUser?.role))) return;
-  try {
-    const response = await fetch('/api/visitor-meetings');
-    const meetings = await response.json();
-    if (!response.ok) throw new Error(meetings.message || 'Unable to load meeting requests.');
-    list.innerHTML = meetings.length ? meetings.map(meeting => {
-      const status = String(meeting.status || '').replaceAll('-', ' ');
-      let actions = '';
-      if (currentUser.role === 'teacher' && meeting.status === 'awaiting-teacher-response') actions = `<button type="button" class="action-btn btn-green" onclick="respondVisitorMeeting('${meeting.id}','accept')">Accept time</button><button type="button" class="action-btn btn-blue" onclick="respondVisitorMeeting('${meeting.id}','counter')">Counter-offer</button>`;
-      if (currentUser.role === 'parent' && meeting.status === 'awaiting-parent-confirmation') actions = `<button type="button" class="action-btn btn-green" onclick="confirmVisitorMeeting('${meeting.id}')">Confirm agreed time</button>`;
-      if ((isFullAccessUser() || currentUser.role === 'principal') && meeting.status === 'awaiting-principal-approval') actions = `<button type="button" class="action-btn btn-green" onclick="approveVisitorMeeting('${meeting.id}')">Approve & issue QR pass</button>`;
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(meeting.parentName)} → ${escapeWorkspaceText(meeting.hostName)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(meeting.purpose)}<br>Meeting: ${escapeWorkspaceText(meeting.agreedAt || meeting.proposedAt)}</p><span class="meta">Status: ${escapeWorkspaceText(status)}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}</div></div>`;
-    }).join('') : '<p class="meta">No meeting requests are waiting for your action.</p>';
-  } catch (error) { list.textContent = safeUserFacingError(error, 'Unable to load meeting requests.'); }
-}
 
-async function respondVisitorMeeting(id, action) {
-  let agreedAt = '';
-  if (action === 'counter') { agreedAt = prompt('Enter the alternative meeting date and time (for example 2026-09-05 14:30):') || ''; if (!agreedAt) return; }
-  const response = await fetch(`/api/visitor-meetings/${encodeURIComponent(id)}/respond`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action, agreedAt }) });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to update this meeting.');
-  playDingSound(); loadVisitorMeetings();
-}
 
-async function confirmVisitorMeeting(id) {
-  const response = await fetch(`/api/visitor-meetings/${encodeURIComponent(id)}/confirm`, { method:'POST' });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to confirm this meeting.');
-  playDingSound(); loadVisitorMeetings();
-}
 
-async function approveVisitorMeeting(id) {
-  const response = await fetch(`/api/visitor-meetings/${encodeURIComponent(id)}/approve-visitor`, { method:'POST' });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to approve visitor entry.');
-  playDingSound(); loadVisitorMeetings(); loadSafetyNetwork(); printVisitorPass(result.visitor, result.passCode);
-}
 
-async function checkInCampusVisitor() {
-  const field = document.getElementById('visitorPassCode');
-  const response = await fetch('/api/campus-visitors/check-in', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ passCode: field?.value || '' }) });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Visitor entry could not be validated.');
-  if (field) field.value = ''; playDingSound(); loadSafetyNetwork(); alert(`${result.visitor.visitorName} is checked in.`);
-}
 
-async function checkOutCampusVisitor(id) {
-  const response = await fetch(`/api/campus-visitors/${encodeURIComponent(id)}/check-out`, { method:'POST' });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Visitor check-out failed.');
-  loadSafetyNetwork();
-}
 
-async function printVisitorPass(visitor, passCode) {
-  const safe = escapeWorkspaceText;
-  let qrImage = '';
-  if (window.QRCode) {
-    const holder = document.createElement('div');
-    new window.QRCode(holder, { text: passCode, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M });
-    await new Promise(resolve => setTimeout(resolve, 80));
-    qrImage = holder.querySelector('canvas')?.toDataURL('image/png') || holder.querySelector('img')?.src || '';
-  }
-  const popup = window.open('', '_blank', 'width=760,height=900');
-  if (!popup) return alert('Allow pop-ups for Little Feet to print the visitor ticket.');
-  popup.document.write(`<!doctype html><title>Little Feet Visitor Pass</title><style>body{font-family:Arial;padding:36px;color:#102a43}.pass{max-width:620px;border:3px solid #0d9488;border-radius:18px;padding:30px}.code{font-size:28px;letter-spacing:3px;font-weight:bold;color:#0f766e;padding:18px 0;border-top:1px dashed #0d9488;border-bottom:1px dashed #0d9488}.qr{width:180px;height:180px;display:block;margin:20px auto}.meta{color:#526d82;line-height:1.6}@media print{body{padding:0}}</style><main class="pass"><p> LITTLE FEET · AUTHORISED VISITOR</p><h1>Campus visitor ticket</h1><p><strong>${safe(visitor.visitorName)}</strong><br>${safe(visitor.purpose)}<br>Host: ${safe(visitor.host || 'School office')}<br>Meeting: ${safe(visitor.expectedDate)}</p>${qrImage ? `<img class="qr" src="${qrImage}" alt="QR visitor pass">` : ''}<div class="code">${safe(passCode)}</div><p class="meta">Present this QR ticket at the gate. Security validates it with Little Feet before admitting the visitor. It is single-use and becomes invalid once checked in.</p></main><script>window.onload=()=>window.print();<\/script>`); popup.document.close();
-}
 
-function stopVisitorQrScan() {
-  visitorScannerStream?.getTracks().forEach(track => track.stop());
-  visitorScannerStream = null;
-  closeModal();
-}
 
-async function scanVisitorPassCode() {
-  if (!window.BarcodeDetector || !navigator.mediaDevices?.getUserMedia) return alert('This device does not support camera QR scanning. Enter the visitor pass code shown beneath the QR image instead.');
-  try {
-    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-    openModal('Scan visitor QR ticket', '<p class="meta" style="margin:0 0 10px;">Hold the school-issued QR ticket inside the frame. The server will still validate it before entry is recorded.</p><video id="visitorScannerVideo" autoplay playsinline style="width:100%;border-radius:10px;background:#07111e;"></video><button type="button" class="action-btn btn-blue" style="margin-top:12px;" onclick="stopVisitorQrScan()">Cancel scan</button>');
-    visitorScannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
-    const video = document.getElementById('visitorScannerVideo');
-    if (!video) return stopVisitorQrScan();
-    video.srcObject = visitorScannerStream;
-    const scanFrame = async () => {
-      if (!visitorScannerStream || !video.videoWidth) return visitorScannerStream && requestAnimationFrame(scanFrame);
-      try {
-        const codes = await detector.detect(video);
-        if (codes[0]?.rawValue) {
-          const field = document.getElementById('visitorPassCode');
-          if (field) field.value = codes[0].rawValue.trim().toUpperCase();
-          stopVisitorQrScan();
-          return;
-        }
-      } catch { /* Continue scanning while the camera frame settles. */ }
-      if (visitorScannerStream) requestAnimationFrame(scanFrame);
-    };
-    video.onloadedmetadata = () => requestAnimationFrame(scanFrame);
-  } catch {
-    stopVisitorQrScan();
-    alert('Camera access was unavailable. Enter the visitor pass code manually.');
-  }
-}
+
+
+
+
+
+
+
+
+
 
 // Chat System Operations
-function switchChatMode(mode) {
-  if (currentUser?.role === 'parent' && mode === 'group') mode = 'direct';
-  const groupSec = document.getElementById('groupChatSection');
-  const directSec = document.getElementById('directChatSection');
-  const btnGroup = document.getElementById('btnGroupChatMode');
-  const btnDirect = document.getElementById('btnDirectChatMode');
 
-  if (mode === 'group') {
-    groupSec.classList.remove('hidden');
-    directSec.classList.add('hidden');
-    btnGroup.style.opacity = '1';
-    btnDirect.style.opacity = '0.65';
-  } else {
-    groupSec.classList.add('hidden');
-    directSec.classList.remove('hidden');
-    btnGroup.style.opacity = '0.65';
-    btnDirect.style.opacity = '1';
-    loadDirectChatUsers();
-  }
-}
 
-function safeChatColor(value) {
-  return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#2dd4bf';
-}
 
-async function loadChatGroups() {
-  try {
-    const res = await fetch('/api/chat/groups');
-    const groups = await res.json();
-    const select = document.getElementById('chatGroupSelect');
-    if (!select) return;
 
-    select.innerHTML = groups.length
-      ? groups.map(g => `<option value="${escapeWorkspaceText(g.id)}">${escapeWorkspaceText(g.groupName)}</option>`).join('')
-      : '<option value="" selected>No group channels yet</option>';
-    select.disabled = !groups.length;
-    
-    const delBtn = document.getElementById('btnDeleteGroup');
-    if (delBtn && currentUser && isFullAccessUser()) {
-      if (!select.value || select.value === 'general') {
-        delBtn.classList.add('hidden');
-      } else {
-        delBtn.classList.remove('hidden');
-      }
-    }
-  } catch (e) {
-    logAppError('ERR_CHAT_GRP', 'Failed to retrieve staff chat groups.');
-  }
-}
 
-async function loadGroupChatMessages() {
-  const select = document.getElementById('chatGroupSelect');
-  if (!select) return;
-  const groupId = select.value;
-  const chatBox = document.getElementById('chatMessages');
-  if (!groupId) {
-    if (chatBox) chatBox.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">No group channels have been created yet.</p>';
-    return;
-  }
 
-  const delBtn = document.getElementById('btnDeleteGroup');
-  if (delBtn && currentUser && isFullAccessUser()) {
-    if (groupId === 'general') {
-      delBtn.classList.add('hidden');
-    } else {
-      delBtn.classList.remove('hidden');
-    }
-  }
 
-  try {
-    const res = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}`);
-    const msgs = await res.json();
-    if (res.status === 404) {
-      if (chatBox) chatBox.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">This channel is no longer available. Refreshing the channel list…</p>';
-      await loadChatGroups();
-      return;
-    }
-    if (!res.ok || !Array.isArray(msgs)) throw new Error(msgs.message || 'Group channel unavailable.');
 
-    chatBox.innerHTML = msgs.length
-      ? msgs.map(m => {
-          const isMe = currentUser && m.sender === currentUser.username;
-          const moderation = isFullAccessUser() && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteGroupChatMessage('${encodeInlineIdentifier(groupId)}','${encodeInlineIdentifier(m.id)}')">Delete</button>` : '';
-          return `
-            <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
-              <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
-            </div>`;
-        }).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No messages in this channel yet.</p>';
-    
-    chatBox.scrollTop = chatBox.scrollHeight;
-  } catch (e) {
-    logAppError('ERR_CHAT_MSG', 'Unable to fetch group messages.');
-  }
-}
 
-async function deleteGroupChatMessage(encodedGroupId, encodedMessageId) {
-  if (!currentUser || !isFullAccessUser() || !confirm('Delete this chat message?')) return;
-  const groupId = decodeURIComponent(String(encodedGroupId || ''));
-  const messageId = decodeURIComponent(String(encodedMessageId || ''));
-  const response = await fetch(`/api/chat/messages/${encodeURIComponent(groupId)}/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to delete this message.');
-  loadGroupChatMessages();
-}
 
-function createNewGroupModal() {
-  const html = `
-    <form id="newGroupForm">
-      <div>
-        <label for="newGroupNameInput">Group Channel Name <span class="req">*</span></label>
-        <input type="text" id="newGroupNameInput" placeholder="e.g. Primary Educators Lounge" required>
-      </div>
-      <button type="submit" class="submit-btn">Create Group</button>
-    </form>`;
-  openModal('Create New Chat Group', html);
 
-  document.getElementById('newGroupForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const groupName = document.getElementById('newGroupNameInput').value.trim();
-    if (!groupName) return;
 
-    await fetch('/api/chat/groups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groupName })
-    });
 
-    closeModal();
-    await loadChatGroups();
-    loadGroupChatMessages();
-    playDingSound();
-  });
-}
 
-async function deleteCurrentGroup() {
-  const select = document.getElementById('chatGroupSelect');
-  if (!select) return;
-  const groupId = select.value;
-  if (groupId === 'general') return alert('Cannot delete General group.');
 
-  if (!confirm('Are you sure you want to delete this group channel?')) return;
 
-  await fetch(`/api/chat/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
-  await loadChatGroups();
-  loadGroupChatMessages();
-}
 
-async function loadDirectChatUsers() {
-  try {
-    if (!currentUser) return;
-    const res = await fetch(`/api/chat/direct/users?username=${encodeURIComponent(currentUser.username)}`);
-    const users = await res.json();
-    const select = document.getElementById('directRecipientSelect');
-    if (!select) return;
 
-    if (!res.ok) throw new Error(users.message || 'Unable to load approved contacts.');
-    const filtered = users.filter(u => u.username !== currentUser.username);
-    const prompt = currentUser.role === 'parent' ? 'Select your child\'s teacher or principal...' : 'Select approved school contact...';
-    select.innerHTML = `<option value="">${prompt}</option>` +
-      filtered.map(u => `<option value="${escapeWorkspaceText(u.username)}">${escapeWorkspaceText(u.name || u.username)} (${escapeWorkspaceText(String(u.role || '').toUpperCase())})</option>`).join('');
-  } catch (e) {
-    logAppError('ERR_DIRECT_USERS', 'Failed to retrieve direct messaging contacts.');
-  }
-}
 
-async function loadDirectChatMessages() {
-  const select = document.getElementById('directRecipientSelect');
-  if (!select || !select.value || !currentUser) {
-    document.getElementById('directChatMessages').innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">Please select a target user from the dropdown menu to load direct messages.</p>';
-    return;
-  }
-
-  const recipient = select.value;
-  try {
-    const res = await fetch(`/api/chat/direct/${encodeURIComponent(currentUser.username)}/${encodeURIComponent(recipient)}`);
-    const msgs = await res.json();
-    const box = document.getElementById('directChatMessages');
-
-    box.innerHTML = msgs.length
-      ? msgs.map(m => {
-          const isMe = m.sender === currentUser.username;
-          const moderation = isFullAccessUser() && m.id
-            ? `<button type="button" class="chat-delete-btn" onclick="deleteDirectChatMessage('${encodeInlineIdentifier(m.id)}')">Delete</button>` : '';
-          return `
-            <div class="msg ${isMe ? 'sent' : 'received'}">
-              <strong style="color:${safeChatColor(m.textColor)};">${escapeWorkspaceText(m.sender)}:</strong> ${escapeWorkspaceText(m.message)}
-              <span class="msg-timestamp">${escapeWorkspaceText(m.timestamp || '')}</span>${moderation}
-            </div>`;
-        }).join('')
-      : '<p style="font-size:0.85rem; color:var(--text-muted);">No private messages exchange recorded yet.</p>';
-
-    box.scrollTop = box.scrollHeight;
-  } catch (e) {
-    logAppError('ERR_DIRECT_MSG', 'Unable to fetch private messages.');
-  }
-}
-
-async function deleteDirectChatMessage(encodedMessageId) {
-  if (!currentUser || !isFullAccessUser() || !confirm('Delete this private message?')) return;
-  const messageId = decodeURIComponent(String(encodedMessageId || ''));
-  const response = await fetch(`/api/chat/direct/${encodeURIComponent(messageId)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username }) });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to delete this message.');
-  loadDirectChatMessages();
-}
 
 // Global Form Submissions Router
-function setupFormListeners() {
-  const signingPinForm = document.getElementById('signingPinForm');
-  if (signingPinForm) signingPinForm.addEventListener('submit', async event => {
-    event.preventDefault();
-    const response = await fetch('/api/report-signing-pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser?.username, pin: document.getElementById('reportSigningPin').value }) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to save signing PIN.');
-    signingPinForm.reset(); alert('Signing PIN saved.');
-  });
-
-  const reportPublishForm = document.getElementById('reportPublishForm');
-  if (reportPublishForm) reportPublishForm.addEventListener('submit', async event => {
-    event.preventDefault();
-    const signature = reportSignaturePads.teacherSignaturePad;
-    if (!signature?.hasStroke()) return alert('Add the teacher signature before publishing.');
-    const response = await fetch('/api/report-reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentName: document.getElementById('reportStudent').value.trim(), reportTitle: document.getElementById('reportTitle').value.trim(), period: document.getElementById('reportPeriod').value.trim(), parentUsername: document.getElementById('reportParentUsername').value.trim(), teacherUsername: currentUser?.username, signingPin: document.getElementById('reportTeacherPin').value, signatureData: signature.canvas.toDataURL('image/png') }) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to publish report.');
-    reportPublishForm.reset(); clearSignature('teacherSignaturePad'); loadReportReviews(); playDingSound();
-  });
-
-  const accountForm = document.getElementById('accountForm');
-  if (accountForm) {
-    accountForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const originalUsername = document.getElementById('accountOriginalUsername').value;
-      const body = {
-        name: document.getElementById('accountName').value.trim(),
-        username: document.getElementById('accountUsername').value.trim(),
-        pin: document.getElementById('accountPin').value,
-        role: document.getElementById('accountRole').value,
-        schoolName: document.getElementById('accountSchoolName').value.trim(),
-        schoolStoreUrl: document.getElementById('accountStoreUrl').value.trim(),
-        assignedClasses: document.getElementById('accountAssignedClasses').value.trim(),
-        linkedLearners: document.getElementById('accountLinkedLearners').value.trim(),
-        schoolPosition: isInternalCompanyRole(document.getElementById('accountRole').value) ? '' : document.getElementById('accountPosition')?.value,
-        schoolSector: isInternalCompanyRole(document.getElementById('accountRole').value) ? '' : document.getElementById('accountSector')?.value,
-        actorUsername: currentUser?.username
-      };
-      if (!originalUsername && !body.pin) return alert('Set a password or PIN for the new account.');
-      if (!isInternalCompanyRole(body.role) && !body.schoolName) return alert('Choose a linked school for this school-facing account.');
-      const response = await fetch(originalUsername ? `/api/accounts/${encodeURIComponent(originalUsername)}` : '/api/accounts', { method: originalUsername ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const result = await response.json();
-      if (!response.ok) return alert(result.message || 'Unable to save account.');
-      resetAccountForm();
-      loadAccounts();
-      playDingSound();
-    });
-  }
-
-  const registryForm = document.getElementById('registryForm');
-  if (registryForm) {
-    registryForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const values = Object.fromEntries(new FormData(registryForm).entries());
-      const response = await fetch('/api/registry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
-      const result = await response.json();
-      if (!response.ok) return alert(result.message || 'Unable to save learner registry record.');
-      registryForm.reset();
-      await loadRegistry();
-      playDingSound();
-    });
-  }
-
-  const parentContactEditForm = document.getElementById('parentContactEditForm');
-  if (parentContactEditForm) {
-    parentContactEditForm.addEventListener('submit', async event => {
-      event.preventDefault();
-      const recordId = document.getElementById('parentContactEditId').value;
-      if (!recordId) return alert('Choose a parent contact to edit.');
-      const body = {
-        guardianName: document.getElementById('parentContactEditGuardianName').value.trim(),
-        guardianPhone: document.getElementById('parentContactEditGuardianPhone').value.trim(),
-        guardianEmail: document.getElementById('parentContactEditGuardianEmail').value.trim(),
-        emergencyContact: document.getElementById('parentContactEditEmergency').value.trim()
-      };
-      const response = await fetch(`/api/registry/${encodeURIComponent(recordId)}/contact`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const result = await response.json();
-      if (!response.ok) return alert(result.message || 'Unable to update the parent contact.');
-      closeParentContactEditor();
-      await Promise.allSettled([loadParentContacts(), loadRegistry()]);
-      showParentContactNotice('Contact details updated.');
-      playDingSound();
-    });
-  }
-
-    const consentForm = document.getElementById('consentForm');
-  if (consentForm) consentForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const response = await fetch('/api/consents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ learnerName: document.getElementById('consentLearner').value.trim(), guardianName: document.getElementById('consentGuardian').value.trim(), internalUpdates: document.getElementById('consentInternal').checked, marketingPhotos: document.getElementById('consentMarketing').checked }) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to record consent.');
-    consentForm.reset(); loadConsentRecords(); playDingSound();
-  });
-
-  const pickupForm = document.getElementById('pickupForm');
-  if (pickupForm) pickupForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const response = await fetch('/api/pickups/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ learnerName: document.getElementById('pickupLearner').value.trim(), pickupAdult: document.getElementById('pickupAdult').value.trim(), verificationCode: document.getElementById('pickupCode').value, action: document.getElementById('pickupAction').value, recordedBy: currentUser?.name || currentUser?.username }) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to create the audit record.');
-    pickupForm.reset(); loadPickupRecords(); playDingSound();
-  });
-
-  const chatForm = document.getElementById('chatForm');
-  if (chatForm) {
-    chatForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const groupId = document.getElementById('chatGroupSelect').value;
-      const message = document.getElementById('chatInput').value;
-      const textColor = document.getElementById('chatColorPicker').value;
-
-      if (!groupId) return alert('Create or select a staff group channel first.');
-      if (!message.trim() || !currentUser) return;
-
-      await fetch('/api/chat/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId, sender: currentUser.username, message, textColor })
-      });
-
-      document.getElementById('chatInput').value = '';
-      loadGroupChatMessages();
-      playDingSound();
-    });
-  }
-
-  const directForm = document.getElementById('directChatForm');
-  if (directForm) {
-    directForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const recipient = document.getElementById('directRecipientSelect').value;
-      const message = document.getElementById('directChatInput').value;
-      const textColor = document.getElementById('directChatColorPicker').value;
-
-      if (!recipient) return alert('Select a chat recipient first.');
-      if (!message.trim() || !currentUser) return;
-
-      await fetch('/api/chat/direct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: currentUser.username, recipient, message, textColor })
-      });
-
-      document.getElementById('directChatInput').value = '';
-      loadDirectChatMessages();
-      playDingSound();
-    });
-  }
-
-  const bcForm = document.getElementById('broadcastForm');
-  if (bcForm) {
-    bcForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const body = {
-        bcPriority: document.getElementById('bcPriority').value,
-        bcMessage: document.getElementById('bcMessage').value,
-        radiusKm: Number(document.getElementById('bcRadius').value) || 5,
-        location: alertLocation
-      };
-
-      if (!alertLocation) return alert('Use your current location before dispatching an area-based alert.');
-
-      await fetch('/api/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      bcForm.reset();
-      alertLocation = null;
-      document.getElementById('bcLocation').value = '';
-      loadBroadcasts();
-      playDingSound();
-    });
-  }
-
-  const visitorMeetingForm = document.getElementById('visitorMeetingRequestForm');
-  if (visitorMeetingForm) visitorMeetingForm.addEventListener('submit', async event => {
-    event.preventDefault();
-    const response = await fetch('/api/visitor-meetings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ hostUsername: document.getElementById('visitorMeetingHost').value, proposedAt: document.getElementById('visitorMeetingTime').value, purpose: document.getElementById('visitorMeetingPurpose').value.trim() }) });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to submit the meeting request.');
-    visitorMeetingForm.reset();
-    playDingSound();
-    loadVisitorMeetings();
-  });
-
-  const lookupForm = document.getElementById('studentLookupForm');
-  if (lookupForm) {
-    lookupForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const className = document.getElementById('lookupClass').value;
-      const childName = document.getElementById('lookupChild').value;
-
-      try {
-        const res = await fetch(`/api/students/search?className=${encodeURIComponent(className)}&childName=${encodeURIComponent(childName)}&username=${encodeURIComponent(currentUser?.username || '')}`);
-        const results = await res.json();
-        const box = document.getElementById('lookupResults');
-
-        box.innerHTML = results.length
-          ? results.map(s => `
-              <div class="item-row" style="flex-direction: column; align-items: flex-start;">
-                <strong>${escapeWorkspaceText(s.studentName)}</strong> <span class="badge-tag info">${s.className}</span>
-                <div style="font-size:0.85rem; margin-top:4px;">
-                  <p>Guardian: <strong>${escapeWorkspaceText(s.parentName)}</strong> (${escapeWorkspaceText(s.contactEmail)})</p>
-                  <p style="color:#ef4444; margin-top:2px;"><strong>⚕ Medical / allergy card:</strong> ${escapeWorkspaceText(s.medicalNotes)}</p>
-                  <p style="margin-top:2px;"><strong>Emergency:</strong> ${escapeWorkspaceText(s.emergencyContact || 'Not recorded')}<br><strong>Authorised pickup:</strong> ${escapeWorkspaceText(s.authorisedPickups || 'Not recorded')}</p>
-                </div>
-              </div>
-            `).join('')
-          : '<p style="font-size:0.85rem; color:var(--text-muted);">No student records matched your query parameters.</p>';
-      } catch (err) {
-        logAppError('ERR_LOOKUP_500', 'Failed to perform student information query.');
-      }
-    });
-  }
-}
-
-function paymentDestinationMarkup(payment, linkLabel = 'Pay securely now') {
-  const effectiveLabel = payment?.provider === 'payfast' ? 'Pay securely with PayFast' : linkLabel;
-  const primary = payment.paymentLink
-    ? `<a class="submit-btn" style="display:inline-block;text-decoration:none;text-align:center;" href="${escapeWorkspaceText(payment.paymentLink)}" target="_blank" rel="noopener">${escapeWorkspaceText(effectiveLabel)}</a>${payment?.automaticConfirmation ? '<p class="meta" style="margin:8px 0 0;">Payment is confirmed automatically by PayFast. Little Feet activates the subscription only after the verified payment notification is received.</p>' : ''}`
-    : `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><strong>${escapeWorkspaceText(payment.bankName)}</strong><br>Account name: ${escapeWorkspaceText(payment.accountName)}<br>Account number: ${escapeWorkspaceText(payment.accountNumber)}${payment.branchCode ? `<br>Branch code: ${escapeWorkspaceText(payment.branchCode)}` : ''}</div>`;
-  const capitec = payment.capitecPayMePayload
-    ? `<div style="margin-top:12px;padding:12px;border:1px solid #2dd4bf;border-radius:8px;text-align:center;background:rgba(45,212,191,.08);"><strong>Pay with the Capitec app</strong><div id="capitecPayMeQr" style="width:190px;min-height:190px;margin:10px auto;background:#fff;padding:5px;"></div><span class="meta">Capitec customers can scan this Pay Me code. Other banks can use the EFT details above.</span></div>`
-    : '';
-  return `${primary}${capitec}`;
-}
-
-function renderCapitecPayMeQr(payment) {
-  const holder = document.getElementById('capitecPayMeQr');
-  if (!holder || !payment?.capitecPayMePayload || !window.QRCode) return;
-  new window.QRCode(holder, { text: payment.capitecPayMePayload, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M });
-}
-
-async function openDonationModal() {
-  let status;
-  try {
-    const response = await fetch('/api/donations/payment');
-    status = await response.json();
-    if (!response.ok) throw new Error(status.message || 'Unable to open donations.');
-  } catch (error) { return alert(safeUserFacingError(error, 'Unable to open donations.')); }
-  if (!status.configured) {
-    if (isFullAccessUser()) {
-      return openModal('Set up donations', `<p style="font-size:.9rem;line-height:1.6;">No donation payment destination has been saved yet. Add a secure payment link or bank-transfer account once, then the Donate button will accept real donation requests.</p><button type="button" class="submit-btn" onclick="closeModal(); openSubscriptionBillingAdmin();">Add payment destination</button>`);
-    }
-    return openModal('Donations temporarily unavailable', `<p style="font-size:.9rem;line-height:1.6;">Little Feet has not published its secure donation destination yet. Please check back soon.</p>`);
-  }
-  openModal('Donate to Little Feet', `<form onsubmit="createDonationIntent(event)" style="display:grid;gap:12px;font-size:.9rem;"><p style="margin:0;color:var(--text-muted);line-height:1.55;">Your contribution supports accessible tools and continued improvements for early-learning communities.</p><label>Donation amount (R)<input name="amount" type="number" min="1" step="0.01" required placeholder="e.g. 50"></label><label>Your name <span style="color:var(--text-muted);">(optional)</span><input name="donorName" maxlength="120" autocomplete="name"></label><label>Email for acknowledgement <span style="color:var(--text-muted);">(optional)</span><input name="donorEmail" type="email" maxlength="160" autocomplete="email"></label><button class="submit-btn">Continue to donate</button></form>`);
-}
-
-async function createDonationIntent(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/donations/intents', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ amount: form.elements.amount.value, donorName: form.elements.donorName.value, donorEmail: form.elements.donorEmail.value }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to prepare the donation.');
-    const payment = result.payment;    const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
-    openModal('Donation ready', `<p style="margin:0 0 10px;">Thank you for supporting Little Feet.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Donation: ${formatSubscriptionMoney(result.donation.amount)}</strong><br>Reference: <strong>${escapeWorkspaceText(result.donation.reference)}</strong></div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the contribution can be matched correctly.</p>`);
-    renderCapitecPayMeQr(payment);
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to prepare the donation.')); }
-}
-
-function formatSubscriptionMoney(value) {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(Number(value || 0));
-}
-
-async function loadSubscriptionBillingOverview() {
-  const container = document.getElementById('subscriptionBillingOverview');
-  if (!container || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
-  try {
-    const response = await fetch('/api/subscription-billing');
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load subscription information.');
-    const isAdmin = isFullAccessUser();
-    const bundles = data.pricing.bundles || [];
-    const awaiting = (data.orders || []).filter(order => ['awaiting_payment', 'awaiting payment'].includes(String(order.paymentStatus || order.status || '').toLowerCase()));
-    const requestedMonthly = awaiting.reduce((total, order) => total + Number(order.monthlyTotal || 0), 0);
-    const potentialMargin = awaiting.reduce((total, order) => total + Number(order.profitMargin || 0), 0);
-    const rows = bundles.map(bundle => {
-      const margin = Number(bundle.sellingPrice || 0) - Number(bundle.costPrice || 0);
-      return `<tr><td style="padding:9px 10px;"><strong>+${bundle.capacity} children</strong></td>${isAdmin ? `<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.costPrice)}</td>` : ''}<td style="padding:9px 10px;">${formatSubscriptionMoney(bundle.sellingPrice)}</td>${isAdmin ? `<td style="padding:9px 10px;color:#2dd4bf;font-weight:700;">${formatSubscriptionMoney(margin)}</td>` : ''}</tr>`;
-    }).join('');
-    const orders = (data.orders || []).slice(0, 6).map(order => {
-      const paymentStatus = String(order.paymentStatus || order.status || '').replaceAll('_', ' ');
-      const reconcile = isAdmin && !['paid', 'refunded'].includes(String(order.paymentStatus || order.status || '').toLowerCase())
-        ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeInlineIdentifier(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
-        : '';
-      return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(paymentStatus)}${reconcile}</li>`;
-    }).join('') || '<li>No payment requests yet.</li>';
-    const accessState = String(data.subscription?.status || 'trial');
-    const trialEndLabel = accessState === 'trial' && data.subscription?.trialEndsAt ? ` UNTIL ${escapeWorkspaceText(new Date(data.subscription.trialEndsAt).toLocaleDateString('en-ZA'))}` : '';
-    const access = data.subscription?.active ? `ACTIVE${data.subscription.activeUntil ? ` UNTIL ${escapeWorkspaceText(data.subscription.activeUntil)}` : ''}` : `${escapeWorkspaceText(accessState.replaceAll('_', ' ').toUpperCase())}${trialEndLabel}`;
-    container.innerHTML = `<div class="card-header-bar"><h3>${isAdmin ? 'Subscription pricing & operating overview' : 'Your school subscription'}</h3><span class="badge-tag ${data.subscription?.active ? 'info' : ''}">${access}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0;"><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Base school subscription</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(data.pricing.baseMonthly)} / month</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Late-payment term</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${data.pricing.lateFeeEnabled ? formatSubscriptionMoney(data.pricing.lateFee) : 'Not enabled'}</strong></div><div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Awaiting requests</span><strong style="display:block;margin-top:3px;font-size:1.1rem;">${formatSubscriptionMoney(requestedMonthly)}</strong></div>${isAdmin ? `<div style="padding:12px;border:1px solid var(--border-color);border-radius:8px;background:var(--input-bg);"><span class="meta">Potential add-on margin</span><strong style="display:block;margin-top:3px;font-size:1.1rem;color:#2dd4bf;">${formatSubscriptionMoney(potentialMargin)}</strong></div>` : ''}</div><div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:460px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px 10px;">Learner add-on</th>${isAdmin ? '<th style="padding:9px 10px;">Your cost</th>' : ''}<th style="padding:9px 10px;">School price</th>${isAdmin ? '<th style="padding:9px 10px;">Your profit</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px;"><h4 style="margin:0 0 7px;">Recent payment requests</h4><ul style="margin:0;padding-left:19px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></div><button type="button" class="action-btn btn-blue" style="margin-top:14px;" onclick="${isAdmin ? 'openSubscriptionBillingAdmin()' : 'openSubscriptionCheckout()'}">${isAdmin ? 'Edit prices & payment destination' : 'Choose plan & create payment request'}</button>`;
-  } catch (error) {
-    container.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load subscription information.'))}</p><button type="button" class="action-btn btn-blue" style="margin-top:10px;" onclick="loadSubscriptionBillingOverview()">Try again</button>`;
-  }
-}
-
-async function openSubscriptionBillingAdmin() {
-  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can manage subscription pricing and payment details.');
-  let data;
-  try {
-    const response = await fetch('/api/subscription-billing');
-    data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load subscription billing.');
-  } catch (error) { return alert(safeUserFacingError(error, 'Unable to load subscription billing.')); }
-  const bundle = (capacity, field) => data.pricing.bundles.find(item => item.capacity === capacity)?.[field] || 0;
-  const payment = data.payment || {};
-  const orders = (data.orders || []).slice(0, 8).map(order => {
-    const reconcile = !['paid', 'refunded'].includes(String(order.paymentStatus || order.status || '').toLowerCase())
-      ? `<button type="button" class="action-btn btn-green" style="margin-left:8px;" onclick="openSubscriptionPaymentReconcile('${encodeInlineIdentifier(order.reference)}',${Number(order.monthlyTotal || 0)})">Record payment</button>`
-      : '';
-    return `<li><strong>${escapeWorkspaceText(order.reference)}</strong> · ${escapeWorkspaceText(order.schoolName)} · ${formatSubscriptionMoney(order.monthlyTotal)}/month · ${escapeWorkspaceText(String(order.paymentStatus || order.status || '').replaceAll('_', ' '))}${reconcile}</li>`;
-  }).join('') || '<li>No subscription payment requests yet.</li>';
-  openModal('Subscription pricing & payment account', `
-    <form id="subscriptionBillingForm" onsubmit="saveSubscriptionBillingConfig(event)" style="display:grid;gap:14px;">
-      <p style="margin:0;color:var(--text-muted);">Set what schools pay and your underlying cost. The portal calculates the margin on each learner add-on privately for administrators.</p>
-      <div class="workspace-grid"><label>Base monthly school price<input name="baseMonthly" type="number" min="0" step="0.01" value="${data.pricing.baseMonthly}"></label><label>Late-payment fee<input name="lateFee" type="number" min="0" step="0.01" value="${data.pricing.lateFee}"></label></div>
-      <label style="display:flex;align-items:center;gap:8px;"><input name="lateFeeEnabled" type="checkbox" ${data.pricing.lateFeeEnabled ? 'checked' : ''}> Apply the late-payment fee only when the school accepts this term.</label>
-      <div style="overflow-x:auto;border:1px solid var(--border-color);border-radius:8px;"><table style="width:100%;min-width:540px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:9px;">Extra learners</th><th style="padding:9px;">Your cost</th><th style="padding:9px;">School price</th><th style="padding:9px;">Your margin</th></tr></thead><tbody>${[5,20,100].map(capacity => `<tr><td style="padding:9px;"><strong>+${capacity} children</strong></td><td style="padding:9px;"><input name="cost${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'costPrice')}"></td><td style="padding:9px;"><input name="price${capacity}" type="number" min="0" step="0.01" value="${bundle(capacity,'sellingPrice')}"></td><td style="padding:9px;color:#2dd4bf;">Calculated after saving</td></tr>`).join('')}</tbody></table></div>
-      <fieldset style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><legend style="padding:0 5px;font-weight:700;">Where schools pay</legend><label>Payment method<select name="paymentMethod" onchange="toggleSubscriptionPaymentFields(this.value)">${data.payfastAvailable ? `<option value="payfast" ${payment.method === 'payfast' ? 'selected' : ''}>PayFast · automatic confirmation</option>` : ''}<option value="payment_link" ${payment.method === 'payment_link' ? 'selected' : ''}>Secure payment link</option><option value="bank_transfer" ${payment.method === 'bank_transfer' ? 'selected' : ''}>Bank transfer</option></select></label>${data.payfastAvailable ? '<p class="meta" style="margin:8px 0 0;">PayFast uses the live server credentials and verified ITN notifications. Merchant secrets never enter the browser.</p>' : '<p class="meta" style="margin:8px 0 0;">PayFast automatic confirmation becomes available after the live merchant credentials are configured on the server.</p>'}<div id="subscriptionPaymentLinkFields" style="margin-top:10px;"><label>HTTPS payment link<input name="paymentLink" type="url" placeholder="https://..." value="${escapeWorkspaceText(payment.paymentLink || '')}"></label></div><div id="subscriptionBankFields" style="display:none;margin-top:10px;" class="workspace-grid"><label>Account name<input name="accountName" value="${escapeWorkspaceText(payment.accountName || '')}"></label><label>Bank name<input name="bankName" value="${escapeWorkspaceText(payment.bankName || '')}"></label><label>Account number<input name="accountNumber" inputmode="numeric" value="${escapeWorkspaceText(payment.accountNumber || '')}"></label><label>Branch code<input name="branchCode" inputmode="numeric" value="${escapeWorkspaceText(payment.branchCode || '')}"></label></div><label style="margin-top:10px;display:block;">Capitec Pay Me QR text <span class="meta">(optional)</span><input name="capitecPayMePayload" maxlength="512" placeholder="${payment.capitecPayMeConfigured ? 'Pay Me code is saved — leave blank to keep it' : 'Paste the decoded Capitec Pay Me QR text'}"></label><label style="margin-top:10px;display:block;">Payment reference prefix<input name="referencePrefix" maxlength="16" value="${escapeWorkspaceText(payment.referencePrefix || 'LF')}"></label></fieldset>
-      <button class="submit-btn">Save subscription billing</button>
-    </form>
-    <section style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:12px;"><h3 style="margin:0 0 8px;">Recent payment requests</h3><ul style="margin:0;padding-left:20px;display:grid;gap:5px;font-size:.84rem;">${orders}</ul></section>`);
-  toggleSubscriptionPaymentFields(payment.method || 'payment_link');
-}
-
-function toggleSubscriptionPaymentFields(method) {
-  const link = document.getElementById('subscriptionPaymentLinkFields');
-  const bank = document.getElementById('subscriptionBankFields');
-  if (link) link.style.display = method === 'payment_link' ? 'block' : 'none';
-  if (bank) bank.style.display = method === 'bank_transfer' ? 'grid' : 'none';
-}
-
-async function saveSubscriptionBillingConfig(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const value = name => form.elements[name]?.value || '';
-  const payload = { baseMonthly: value('baseMonthly'), lateFee: value('lateFee'), lateFeeEnabled: form.elements.lateFeeEnabled.checked, bundles: {}, payment: { method: value('paymentMethod'), paymentLink: value('paymentLink'), accountName: value('accountName'), bankName: value('bankName'), accountNumber: value('accountNumber'), branchCode: value('branchCode'), referencePrefix: value('referencePrefix') } };
-  if (value('capitecPayMePayload').trim()) payload.payment.capitecPayMePayload = value('capitecPayMePayload').trim();
-  [5,20,100].forEach(capacity => { payload.bundles[capacity] = { costPrice: value(`cost${capacity}`), sellingPrice: value(`price${capacity}`) }; });
-  try {
-    const response = await fetch('/api/subscription-billing', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to save subscription billing.');
-    alert('Subscription pricing and payment details saved.');
-    loadSubscriptionBillingOverview();
-    openSubscriptionBillingAdmin();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to save subscription billing.')); }
-}
-
-async function openSubscriptionCheckout() {
-  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can create a subscription payment request.');
-  let data;
-  try {
-    const response = await fetch('/api/subscription-billing');
-    data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load subscription pricing.');
-  } catch (error) { return alert(safeUserFacingError(error, 'Unable to load subscription pricing.')); }
-  if (!data.paymentConfigured) return alert('An administrator still needs to configure the payment destination.');
-  const plans = Array.isArray(data.plans) ? data.plans : [];
-  if (!plans.length) return alert('The published school plans are temporarily unavailable.');
-  const options = plans.map(plan => {
-    const overage = Number(plan.overagePerLearner || 0) > 0 ? ` · +${formatSubscriptionMoney(plan.overagePerLearner)} per learner above ${Number(plan.maxLearners).toLocaleString('en-ZA')}` : '';
-    const hardMax = Number(plan.hardMaxLearners || plan.maxLearners);
-    return `<option value="${escapeWorkspaceText(plan.code)}">${escapeWorkspaceText(plan.name)} — ${Number(plan.maxLearners).toLocaleString('en-ZA')} included · max ${hardMax.toLocaleString('en-ZA')} — ${formatSubscriptionMoney(plan.monthlyPrice)}/month${overage}</option>`;
-  }).join('');
-  openModal('Choose subscription & pay', `<form onsubmit="createSubscriptionOrder(event)" style="display:grid;gap:14px;"><p style="margin:0;color:var(--text-muted);">Choose the published plan that matches your school size. Little Feet will create a unique Capitec payment reference.</p><label>School plan<select name="planCode">${options}</select></label>${data.pricing.lateFeeEnabled ? `<label style="display:flex;align-items:flex-start;gap:8px;"><input type="checkbox" name="lateFeeAccepted"> I accept the late-payment fee of ${formatSubscriptionMoney(data.pricing.lateFee)} if this invoice becomes overdue.</label>` : ''}<button class="submit-btn">Create payment request</button></form>`);
-}
-
-async function createSubscriptionOrder(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/subscription-billing/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ planCode: form.elements.planCode?.value || '', bundleCapacity: form.elements.bundleCapacity?.value || 0, lateFeeAccepted: Boolean(form.elements.lateFeeAccepted?.checked) }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to create payment request.');
-    const payment = result.payment;
-    const destination = paymentDestinationMarkup(payment);
-    const overageLine = Number(result.order.overageLearners || 0) > 0 ? `<br><span style="color:var(--text-muted);">${Number(result.order.learnerCount).toLocaleString('en-ZA')} learners · ${Number(result.order.overageLearners).toLocaleString('en-ZA')} over included capacity × ${formatSubscriptionMoney(result.order.overageRate)}</span>` : '';
-    openModal('Payment request ready', `<p style="margin:0 0 10px;">Your payment request is awaiting payment.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Monthly total: ${formatSubscriptionMoney(result.order.monthlyTotal)}</strong>${overageLine}<br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.order.lateFee ? `<br><span style="color:var(--text-muted);">Late-payment fee if overdue: ${formatSubscriptionMoney(result.order.lateFee)}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the payment can be matched to your school.</p>`);
-    renderCapitecPayMeQr(payment);
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to create payment request.')); }
-}
-
-function openSubscriptionPaymentReconcile(encodedReference, expectedAmount) {
-  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can reconcile a subscription payment.');
-  const reference = decodeURIComponent(encodedReference);
-  openModal('Record subscription payment', `<form onsubmit="reconcileSubscriptionPayment(event,'${encodeInlineIdentifier(reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">Payment reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Confirm the bank or provider transaction only after the funds have cleared. The school subscription activates immediately after this record is accepted.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(expectedAmount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
-}
-
-async function reconcileSubscriptionPayment(event, encodedReference) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/payments/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: `subscription-${Date.now()}-${Math.random().toString(16).slice(2)}`, reference: decodeURIComponent(encodedReference), status: 'paid', amount: form.elements.amount.value, bankReference: form.elements.bankReference.value }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to record the subscription payment.');
-    closeModal();
-    await loadSubscriptionBillingOverview();
-    alert('Payment recorded. The school subscription is active.');
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to record the subscription payment.')); }
-}
-
-async function refreshCurrentUserAccess() {
-  const response = await fetch('/api/auth/session');
-  const session = await response.json();
-  if (!response.ok || !session.authenticated || !session.user) return;
-  const previousSubscription = currentUser?.subscription;
-  currentUser = session.user;
-  if (currentUser.subscription !== previousSubscription) applyRolePermissions(currentUser.role);
-}
-
-async function loadParentSubscription() {
-  const panel = document.getElementById('parentSubscriptionPanel');
-  if (!panel || currentUser?.role !== 'parent') return;
-  try {
-    const response = await fetch('/api/parent-subscription');
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load subscription access.');
-    if (data.active) await refreshCurrentUserAccess();
-    const status = data.active ? '<span class="badge-tag info">ACTIVE</span>' : '<span class="badge-tag urgent">BASIC ACCESS</span>';
-    const latest = data.latest
-      ? `<p class="meta">Latest request: <strong>${escapeWorkspaceText(data.latest.reference)}</strong> · ${escapeWorkspaceText(String(data.latest.status || '').replaceAll('_', ' '))}</p>`
-      : '<p class="meta">No subscription payment request has been created yet.</p>';
-    panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2>${status}</div><p>Unlock Progress Insights for your linked learners. The plan is R${Number(data.pricePerChild || 29).toFixed(0)} per child for 30 days and activates automatically when payment is confirmed.</p>${latest}<button type="button" class="action-btn btn-green" onclick="openParentSubscriptionCheckout()" ${data.paymentConfigured ? '' : 'disabled'}>${data.active ? 'Renew Plus access' : 'Get Plus access'}</button>${data.paymentConfigured ? '' : '<p class="meta">The payment destination has not been configured yet.</p>'}`;
-  } catch (error) {
-    panel.innerHTML = `<div class="card-header-bar"><h2>LittleSteps Plus</h2><span class="badge-tag urgent">UNAVAILABLE</span></div><p class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load subscription access.'))}</p><button type="button" class="action-btn btn-blue" onclick="loadParentSubscription()">Try again</button>`;
-  }
-}
-
-async function openParentSubscriptionCheckout() {
-  if (currentUser?.role !== 'parent') return alert('Parent subscription access is available to parent accounts.');
-  try {
-    const response = await fetch('/api/parent-subscription/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to create the subscription payment request.');
-    const destination = paymentDestinationMarkup(result.payment);
-    openModal('Activate LittleSteps Plus', `<p style="margin:0 0 10px;">Your access activates automatically after the payment is confirmed.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>Total: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong><br><span class="meta">30 days of Plus access</span></div>${destination}<p class="meta">Use this exact reference so the payment can be matched to your account.</p>`);
-    renderCapitecPayMeQr(result.payment);
-    await loadParentSubscription();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to create the subscription payment request.')); }
-}
-
-function parentPaymentStatusLabel(payment) {
-  if (payment.status === 'paid') return '<span class="badge-tag info">PAID</span>';
-  if (payment.status === 'in_arrears') return '<span class="badge-tag urgent">IN ARREARS</span>';
-  if (payment.status === 'partially_paid') return '<span class="badge-tag urgent">PARTLY PAID</span>';
-  return '<span class="badge-tag">AWAITING PAYMENT</span>';
-}
-
-async function loadParentPayments() {
-  const summaryBox = document.getElementById('parentPaymentsSummary');
-  const list = document.getElementById('parentPaymentsList');
-  if (!summaryBox || !list || !currentUser || !(isFinanceUser() || ['parent', 'principal'].includes(currentUser.role))) return;
-  try {
-    const response = await fetch('/api/parent-payments');
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load parent payments.');
-    parentPaymentData = data;
-    const summary = data.summary || {};
-    const ageing = data.ageing || {};
-    const ageingMarkup = (isFinanceUser() || currentUser.role === 'principal')
-      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color);"><span class="meta" style="display:block;margin-bottom:7px;">Debtor ageing · open balance by days overdue</span><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;"><div><span class="meta">Current</span><strong style="display:block;">${formatSubscriptionMoney(ageing.current)}</strong></div><div><span class="meta">1–30 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days1to30)}</strong></div><div><span class="meta">31–60 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days31to60)}</strong></div><div><span class="meta">61–90 days</span><strong style="display:block;">${formatSubscriptionMoney(ageing.days61to90)}</strong></div><div><span class="meta">90+ days</span><strong style="display:block;color:${Number(ageing.days90plus || 0) > 0 ? '#fca5a5' : 'inherit'};">${formatSubscriptionMoney(ageing.days90plus)}</strong></div></div></div>`
-      : '';
-    summaryBox.innerHTML = `<div class="card-header-bar"><h3>${currentUser.role === 'parent' ? 'Your live account balance' : 'School parent-payment overview'}</h3><span class="badge-tag ${Number(summary.arrears || 0) > 0 ? 'urgent' : 'info'}">${Number(summary.arrears || 0) > 0 ? 'ACTION NEEDED' : 'UP TO DATE'}</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div><span class="meta">Current arrears</span><strong style="display:block;font-size:1.15rem;color:${Number(summary.arrears || 0) > 0 ? '#fca5a5' : '#2dd4bf'};">${formatSubscriptionMoney(summary.arrears)}</strong></div><div><span class="meta">Open balance</span><strong style="display:block;font-size:1.15rem;">${formatSubscriptionMoney(summary.balance)}</strong></div><div><span class="meta">Invoices</span><strong style="display:block;font-size:1.15rem;">${Number(summary.count || 0)}</strong></div><div><span class="meta">Recalculated</span><strong style="display:block;font-size:.86rem;">${data.recalculatedAt ? new Date(data.recalculatedAt).toLocaleString() : 'now'}</strong></div></div>${ageingMarkup}`;
-    const admin = isFinanceUser() || currentUser.role === 'principal';
-    list.innerHTML = data.payments?.length ? data.payments.map(payment => {
-      const arrangement = payment.arrangementActive ? `<p style="margin:4px 0;color:#99f6e4;">Approved arrangement: ${formatSubscriptionMoney(payment.arrangementAmount)} due ${escapeWorkspaceText(payment.effectiveDueDate)}${payment.arrangementNote ? ` · ${escapeWorkspaceText(payment.arrangementNote)}` : ''}</p>` : '';
-      const destination = payment.payment?.paymentLink ? `<a class="action-btn btn-green" style="display:inline-block;text-decoration:none;" target="_blank" rel="noopener" href="${escapeWorkspaceText(payment.payment.paymentLink)}">Pay securely</a>` : payment.payment?.accountNumber ? `<span class="meta">Pay by bank transfer to ${escapeWorkspaceText(payment.payment.bankName)} · ${escapeWorkspaceText(payment.payment.accountNumber)} · Ref ${escapeWorkspaceText(payment.reference)}</span>` : '<span class="meta">Payment destination not configured.</span>';
-      const actions = admin && payment.balance > 0 ? `<button type="button" class="action-btn btn-blue" onclick="openParentPaymentReconcile('${encodeInlineIdentifier(payment.id)}')">Record payment</button>` : '';
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? ` · ${escapeWorkspaceText(payment.learnerName)}` : ''}</strong> ${parentPaymentStatusLabel(payment)}<p style="margin:4px 0;">${escapeWorkspaceText(payment.description)} · Due ${escapeWorkspaceText(payment.effectiveDueDate)} · Ref <strong>${escapeWorkspaceText(payment.reference)}</strong></p>${arrangement}<p class="meta">Due ${formatSubscriptionMoney(payment.amountDue)}${Number(payment.creditTotal || 0) > 0 ? ` · Credits ${formatSubscriptionMoney(payment.creditTotal)}` : ''} · Paid ${formatSubscriptionMoney(payment.paidAmount)} · Balance ${formatSubscriptionMoney(payment.balance)}${payment.arrears > 0 ? ` · Arrears ${formatSubscriptionMoney(payment.arrears)}` : ''}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${destination}${actions}${currentUser.role === 'parent' && !payment.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signParentPayment('${encodeInlineIdentifier(payment.id)}')">Confirm account</button>` : ''}</div></div>`;
-    }).join('') : '<p class="meta">No parent payment requests have been created.</p>';
-  } catch (error) {
-    summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load parent payments.'))}</p>`;
-    list.innerHTML = '';
-  }
-}
-
-async function openParentPaymentAdmin() {
-  if (!(isFinanceUser() || currentUser?.role === 'principal')) return alert('Only a principal, administrator, or Accounts user can create parent payment requests.');
-  let parents;
-  try {
-    const response = await fetch('/api/parent-payments/parents');
-    parents = await response.json();
-    if (!response.ok) throw new Error(parents.message || 'Unable to load parent accounts.');
-  } catch (error) { return alert(safeUserFacingError(error, 'Unable to load parent accounts.')); }
-  if (!parents.length) return alert('Create or approve a parent account first.');
-  const options = parents.map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name)} · ${escapeWorkspaceText(parent.username)}</option>`).join('');
-  const today = new Date().toISOString().slice(0, 10);
-  openModal('Create parent school payment', `<form onsubmit="createParentPayment(event)" style="display:grid;gap:12px;"><p class="meta" style="margin:0;">Record the original amount and due date. If the school approves a later date or a different amount, add it below; arrears will use the approved arrangement automatically.</p><label>Parent account<select name="parentUsername" required>${options}</select></label><div class="workspace-grid"><label>Learner (optional)<input name="learnerName" maxlength="160" placeholder="e.g. Sam Smith"></label><label>Amount due (R)<input name="amountDue" type="number" min="0.01" step="0.01" required></label></div><label>Description<input name="description" maxlength="240" required placeholder="e.g. September school fees"></label><div class="workspace-grid"><label>Original due date<input name="dueDate" type="date" value="${today}" required></label><label>Approved later date (optional)<input name="arrangementDueDate" type="date"></label></div><div class="workspace-grid"><label>Approved arrangement amount (optional)<input name="arrangementAmount" type="number" min="0.01" step="0.01" placeholder="Leave blank to keep original"></label><label>Agreement note (optional)<input name="arrangementNote" maxlength="500" placeholder="e.g. Principal approved payment on 30 Sep"></label></div><button class="submit-btn">Save parent payment</button></form>`);
-}
-
-async function createParentPayment(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const payload = Object.fromEntries(new FormData(form).entries());
-  try {
-    const response = await fetch('/api/parent-payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to create parent payment.');
-    closeModal();
-    await loadParentPayments();
-    alert(`Parent payment created. Reference: ${result.payment.reference}`);
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to create parent payment.')); }
-}
-
-function openParentPaymentReconcile(encodedId) {
-  const payment = parentPaymentData?.payments?.find(item => item.id === decodeURIComponent(encodedId));
-  if (!payment) return;
-  openModal('Record parent payment', `<form onsubmit="reconcileParentPayment(event,'${encodeInlineIdentifier(payment.reference)}')" style="display:grid;gap:12px;"><p style="margin:0;">${escapeWorkspaceText(payment.parentName)} · ${escapeWorkspaceText(payment.description)}</p><p class="meta" style="margin:0;">Remaining balance: ${formatSubscriptionMoney(payment.balance)}. Part-payments are accepted and the arrears label will recalculate immediately.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" max="${payment.balance}" step="0.01" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160"></label><button class="submit-btn">Record payment</button></form>`);
-}
-
-async function reconcileParentPayment(event, encodedReference) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/payments/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: `parent-${Date.now()}-${Math.random().toString(16).slice(2)}`, reference: decodeURIComponent(encodedReference), status: 'paid', amount: form.elements.amount.value, bankReference: form.elements.bankReference.value }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to record payment.');
-    closeModal();
-    await loadParentPayments();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to record payment.')); }
-}
-
-function openParentPaymentReport() {
-  if (!parentPaymentData) return loadParentPayments();
-  const summary = parentPaymentData.summary || {};
-  const ageing = parentPaymentData.ageing || {};
-  const rows = (parentPaymentData.payments || []).map(payment => `<tr><td style="padding:8px;">${escapeWorkspaceText(payment.parentName || '')}${payment.learnerName ? `<br><span class="meta">${escapeWorkspaceText(payment.learnerName)}</span>` : ''}</td><td style="padding:8px;">${escapeWorkspaceText(payment.description)}</td><td style="padding:8px;">${escapeWorkspaceText(payment.effectiveDueDate)}${payment.daysPastDue ? `<br><span style="color:#fca5a5;">${Number(payment.daysPastDue)} days overdue</span>` : '<br><span class="meta">Current</span>'}${payment.arrangementActive ? `<br><span class="meta">${escapeWorkspaceText(payment.arrangementNote || 'Approved arrangement')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.amountDue)}${Number(payment.creditTotal || 0) > 0 ? `<br><span class="meta">Credits ${formatSubscriptionMoney(payment.creditTotal)}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.paidAmount)}${payment.paymentHistory?.length ? `<br><span class="meta">${payment.paymentHistory.map(item => `${formatSubscriptionMoney(item.amount)} ${escapeWorkspaceText(item.status)} · ${new Date(item.receivedAt).toLocaleDateString()}`).join('<br>')}</span>` : ''}</td><td style="padding:8px;">${formatSubscriptionMoney(payment.balance)}${payment.arrears ? `<br><span style="color:#fca5a5;">Arrears ${formatSubscriptionMoney(payment.arrears)}</span>` : ''}</td></tr>`).join('');
-  const ageingSummary = (isFullAccessUser() || currentUser?.role === 'principal')
-    ? `<div class="workspace-card" style="margin-top:10px;"><strong>Debtor ageing</strong><p class="meta" style="margin:6px 0 0;">Current ${formatSubscriptionMoney(ageing.current)} · 1–30 ${formatSubscriptionMoney(ageing.days1to30)} · 31–60 ${formatSubscriptionMoney(ageing.days31to60)} · 61–90 ${formatSubscriptionMoney(ageing.days61to90)} · 90+ ${formatSubscriptionMoney(ageing.days90plus)}</p></div>`
-    : '';
-  openModal('Full parent payment report', `<p class="meta">Generated ${parentPaymentData.recalculatedAt ? new Date(parentPaymentData.recalculatedAt).toLocaleString() : 'now'}. Paid history, approved arrangements and live ageing are calculated from the current ledger.</p><div class="workspace-card" style="display:flex;gap:18px;flex-wrap:wrap;"><strong>Due: ${formatSubscriptionMoney(summary.amountDue)}</strong><strong>Paid: ${formatSubscriptionMoney(summary.paidAmount)}</strong><strong>Open: ${formatSubscriptionMoney(summary.balance)}</strong><strong>Arrears: ${formatSubscriptionMoney(summary.arrears)}</strong></div>${ageingSummary}<div style="overflow:auto;margin-top:12px;"><table style="width:100%;min-width:760px;border-collapse:collapse;text-align:left;"><thead><tr><th style="padding:8px;">Account</th><th style="padding:8px;">Description</th><th style="padding:8px;">Due / ageing</th><th style="padding:8px;">Due</th><th style="padding:8px;">Paid / history</th><th style="padding:8px;">Balance</th></tr></thead><tbody>${rows || '<tr><td colspan="6" style="padding:12px;">No payment records.</td></tr>'}</tbody></table></div>`);
-}
-
-function exportParentPaymentReport() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
-  const rows = (parentPaymentData?.payments || []).map(payment => ({ Parent: payment.parentName, 'Parent Username': payment.parentUsername, Learner: payment.learnerName, Description: payment.description, 'Original Due Date': payment.dueDate, 'Effective Due Date': payment.effectiveDueDate, 'Days Past Due': payment.daysPastDue || 0, 'Approved Arrangement Amount': payment.arrangementAmount || '', 'Approved Arrangement Note': payment.arrangementNote || '', 'Amount Due': payment.amountDue, 'Credit Total': payment.creditTotal || 0, 'Paid Amount': payment.paidAmount, 'Payment History': (payment.paymentHistory || []).map(item => `${item.amount} ${item.status} ${item.receivedAt}`).join(' | '), Balance: payment.balance, Arrears: payment.arrears, Status: payment.status, Reference: payment.reference }));
-  const ageing = parentPaymentData?.ageing || {};
-  const ageingRows = [
-    { 'Ageing Bucket': 'Current', Amount: ageing.current || 0 },
-    { 'Ageing Bucket': '1–30 days', Amount: ageing.days1to30 || 0 },
-    { 'Ageing Bucket': '31–60 days', Amount: ageing.days31to60 || 0 },
-    { 'Ageing Bucket': '61–90 days', Amount: ageing.days61to90 || 0 },
-    { 'Ageing Bucket': '90+ days', Amount: ageing.days90plus || 0 },
-    { 'Ageing Bucket': 'Total open', Amount: ageing.totalOpen || 0 }
-  ];
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Payment report');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(ageingRows), 'Debtor ageing');
-  XLSX.writeFile(workbook, `LittleFeet_Parent_Payment_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-}
-
-function signParentPayment(encodedId) {
-  const payment = parentPaymentData?.payments?.find(item => item.id === decodeURIComponent(encodedId));
-  if (!payment) return;
-  openModal('Confirm parent payment account', `<form onsubmit="submitParentPaymentSignature(event,'${encodeInlineIdentifier(payment.id)}')" style="display:grid;gap:12px;"><p class="meta">Type your name to confirm that you have received and reviewed this payment request.</p><label>Your signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm</button></form>`);
-}
-
-async function submitParentPaymentSignature(event, encodedId) {
-  event.preventDefault();
-  const signature = event.currentTarget.elements.signature.value;
-  try { const response = await fetch(`/api/parent-payments/${encodeURIComponent(decodeURIComponent(encodedId))}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save confirmation.'); closeModal(); await loadParentPayments(); } catch (error) { alert(safeUserFacingError(error, 'Unable to save confirmation.')); }
-}
-
-function bookStatusLabel(record) {
-  if (record.status === 'returned') return record.returnStatus === 'lost' ? '<span class="badge-tag urgent">LOST</span>' : record.returnStatus === 'damaged' ? '<span class="badge-tag urgent">DAMAGED</span>' : '<span class="badge-tag info">RETURNED</span>';
-  if (!record.parentSignature) return '<span class="badge-tag">AWAITING PARENT SIGNATURE</span>';
-  return '<span class="badge-tag info">ISSUED</span>';
-}
-
-async function loadBookRegister() {
-  const summaryBox = document.getElementById('bookRegisterSummary');
-  const list = document.getElementById('bookRegisterRecords');
-  if (!summaryBox || !list || !currentUser || !(isFullAccessUser() || ['parent', 'teacher', 'principal'].includes(currentUser.role))) return;
-  try {
-    const response = await fetch('/api/book-register');
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Unable to load the book checklist.');
-    bookRegisterData = data;
-    summaryBox.innerHTML = `<div class="card-header-bar"><h3>Current checklist</h3><span class="badge-tag ${data.summary.outstanding ? 'urgent' : 'info'}">${data.summary.outstanding ? `${data.summary.outstanding} OUTSTANDING` : 'ALL RETURNED'}</span></div><div style="display:flex;gap:18px;flex-wrap:wrap;"><span><strong>${data.summary.total}</strong> books</span><span><strong>${data.summary.returned}</strong> returned</span><span><strong>${data.summary.unsignedParents}</strong> parent signatures missing</span><span><strong>${formatSubscriptionMoney(data.summary.penalties)}</strong> damage/loss penalties</span></div>`;
-    list.innerHTML = data.records?.length ? data.records.map(record => {
-      const returnDetails = record.status === 'returned' ? `<p class="meta">Returned ${record.returnedAt ? new Date(record.returnedAt).toLocaleString() : ''} · ${escapeWorkspaceText(record.returnCondition)} · ${escapeWorkspaceText(record.returnStatus)}${record.penaltyAmount ? ` · Penalty ${formatSubscriptionMoney(record.penaltyAmount)}` : ''}</p>` : '';
-      const signatures = `<p class="meta">Admin signed: ${escapeWorkspaceText(record.adminSignature || '—')} ${record.adminSignedAt ? `(${new Date(record.adminSignedAt).toLocaleString()})` : ''} · Parent signed: ${escapeWorkspaceText(record.parentSignature || '—')} ${record.parentSignedAt ? `(${new Date(record.parentSignedAt).toLocaleString()})` : ''}</p>`;
-      const parentActions = currentUser.role === 'parent' ? `${!record.parentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeInlineIdentifier(record.id)}','received')">Sign received</button>` : ''}${record.status === 'returned' && !record.returnParentSignature ? `<button type="button" class="action-btn btn-blue" onclick="signBookRecord('${encodeInlineIdentifier(record.id)}','returned')">Sign returned</button>` : ''}` : '';
-      const staffActions = (isFullAccessUser() || currentUser.role === 'principal') && record.status !== 'returned' ? `<button type="button" class="action-btn btn-green" onclick="openBookReturnModal('${encodeInlineIdentifier(record.id)}')">Record return</button>` : '';
-      return `<div class="item-row"><div><strong>${escapeWorkspaceText(record.bookTitle)}${record.bookCode ? ` · ${escapeWorkspaceText(record.bookCode)}` : ''}</strong> ${bookStatusLabel(record)}<p style="margin:4px 0;">Learner: ${escapeWorkspaceText(record.learnerName)} · Class: ${escapeWorkspaceText(record.className || 'Not recorded')} · Parent: ${escapeWorkspaceText(record.parentName)}</p><p class="meta">Handover condition: ${escapeWorkspaceText(record.issueCondition)} · Replacement price: ${formatSubscriptionMoney(record.bookPrice)}</p>${returnDetails}${signatures}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${parentActions}${staffActions}</div></div>`;
-    }).join('') : '<p class="meta">No books have been added to the school checklist yet.</p>';
-  } catch (error) { summaryBox.innerHTML = `<p style="margin:0;color:#fca5a5;">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load book checklist.'))}</p>`; list.innerHTML = ''; }
-}
-
-async function openBookIssueModal() {
-  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only a principal or administrator can add book checklists.');
-  let parents;
-  try { const response = await fetch('/api/book-register/parents'); parents = await response.json(); if (!response.ok) throw new Error(parents.message || 'Unable to load parents.'); } catch (error) { return alert(safeUserFacingError(error, 'Unable to load parents.')); }
-  if (!parents.length) return alert('Create or approve a parent account first.');
-  const options = parents.map(parent => `<option value="${escapeWorkspaceText(parent.username)}">${escapeWorkspaceText(parent.name)} · ${escapeWorkspaceText(parent.username)}</option>`).join('');
-  openModal('Add book to checklist', `<form onsubmit="createBookRecord(event)" style="display:grid;gap:12px;"><p class="meta" style="margin:0;">The admin signature and time are saved automatically. The parent can sign after reviewing the handover.</p><div class="workspace-grid"><label>Book title<input name="bookTitle" required maxlength="200" placeholder="e.g. Grade 4 Mathematics"></label><label>Book code (optional)<input name="bookCode" maxlength="80"></label></div><div class="workspace-grid"><label>Learner name<input name="learnerName" required maxlength="160"></label><label>Class<input name="className" maxlength="120" placeholder="e.g. Grade 4A"></label></div><label>Parent account<select name="parentUsername" required>${options}</select></label><div class="workspace-grid"><label>Replacement price (R)<input name="bookPrice" type="number" min="0" step="0.01" required></label><label>Condition before handover<input name="issueCondition" required maxlength="500" placeholder="e.g. New, no markings"></label></div><label>Notes (optional)<input name="notes" maxlength="500"></label><button class="submit-btn">Save book checklist</button></form>`);
-}
-
-async function createBookRecord(event) {
-  event.preventDefault();
-  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  try { const response = await fetch('/api/book-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save book checklist.'); closeModal(); await loadBookRegister(); } catch (error) { alert(safeUserFacingError(error, 'Unable to save book checklist.')); }
-}
-
-function openBookReturnModal(encodedId) {
-  const record = bookRegisterData?.records?.find(item => item.id === decodeURIComponent(encodedId));
-  if (!record) return;
-  openModal('Record returned book', `<form onsubmit="recordBookReturn(event,'${encodeInlineIdentifier(record.id)}')" style="display:grid;gap:12px;"><p style="margin:0;"><strong>${escapeWorkspaceText(record.bookTitle)}</strong> · ${escapeWorkspaceText(record.learnerName)} · Replacement price ${formatSubscriptionMoney(record.bookPrice)}</p><label>Return result<select name="returnStatus" required><option value="returned_good">Returned in acceptable condition</option><option value="damaged">Damaged — charge replacement price</option><option value="lost">Lost — charge replacement price</option></select></label><label>Condition at return<textarea name="returnCondition" rows="3" required placeholder="Describe the final condition or loss."></textarea></label><label>Admin signature<input name="returnAdminSignature" value="${escapeWorkspaceText(currentUser.name || '')}" required maxlength="160"></label><button class="submit-btn">Save return</button></form>`);
-}
-
-async function recordBookReturn(event, encodedId) {
-  event.preventDefault();
-  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/return`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to record return.'); closeModal(); await loadBookRegister(); } catch (error) { alert(safeUserFacingError(error, 'Unable to record return.')); }
-}
-
-function signBookRecord(encodedId, action) {
-  const record = bookRegisterData?.records?.find(item => item.id === decodeURIComponent(encodedId));
-  if (!record) return;
-  openModal(action === 'returned' ? 'Confirm returned book' : 'Confirm book received', `<form onsubmit="submitBookSignature(event,'${encodeInlineIdentifier(record.id)}','${action}')" style="display:grid;gap:12px;"><p class="meta">Type your name to save your signature and the current date and time.</p><label>Parent signature<input name="signature" required maxlength="160" autocomplete="name" value="${escapeWorkspaceText(currentUser.name || '')}"></label><button class="submit-btn">Confirm signature</button></form>`);
-}
-
-async function submitBookSignature(event, encodedId, action) {
-  event.preventDefault();
-  const signature = event.currentTarget.elements.signature.value;
-  try { const response = await fetch(`/api/book-register/${encodeURIComponent(decodeURIComponent(encodedId))}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, signature }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to save signature.'); closeModal(); await loadBookRegister(); } catch (error) { alert(safeUserFacingError(error, 'Unable to save signature.')); }
-}
-
-function downloadBookRegisterTemplate() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
-  const rows = [{ 'Book Title': 'Example Mathematics', 'Book Code': 'BOOK-001', 'Learner Name': 'Example Learner', Class: 'Grade 4A', 'Parent Username': 'parent@example.com', 'Book replacement price': 250, 'Condition at handover': 'New, no markings', Notes: '' }];
-  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Book register'); XLSX.writeFile(workbook, 'LittleFeet_Book_Register_Template.xlsx');
-}
-
-function importBookRegisterExcel() {
-  const input = document.getElementById('bookRegisterImportFile');
-  if (!input) return;
-  input.value = ''; input.onchange = event => {
-    const file = event.target.files?.[0]; if (!file) return;
-    const fileError = validateSpreadsheetFile(file); if (fileError) return alert(fileError);
-    const reader = new FileReader(); reader.onload = async () => {
-      try { const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }); if (rows.length > 2000) throw new Error('Book-register imports are limited to 2,000 records per file.'); const response = await fetch('/api/book-register/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) }); const result = await response.json(); if (!response.ok) throw new Error(result.message || 'Unable to import checklist.'); await loadBookRegister(); alert(`Imported ${result.imported} row(s).${result.rejected?.length ? ` Rejected ${result.rejected.length} row(s).` : ''}`); } catch (error) { alert(safeUserFacingError(error, 'Unable to import checklist.')); }
-    }; reader.readAsArrayBuffer(file);
-  }; input.click();
-}
-
-function exportBookRegister() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading.');
-  const rows = (bookRegisterData?.records || []).map(record => ({ 'Book Title': record.bookTitle, 'Book Code': record.bookCode, 'Learner Name': record.learnerName, Class: record.className, 'Parent Name': record.parentName, 'Parent Username': record.parentUsername, 'Replacement Price': record.bookPrice, 'Condition at Handover': record.issueCondition, 'Admin Signed At': record.adminSignedAt, 'Admin Signature': record.adminSignature, 'Parent Signed At': record.parentSignedAt, 'Parent Signature': record.parentSignature, Status: record.status, 'Return Condition': record.returnCondition, 'Return Result': record.returnStatus, 'Returned At': record.returnedAt, Penalty: record.penaltyAmount, 'Return Admin Signature': record.returnAdminSignature, 'Return Parent Signature': record.returnParentSignature }));
-  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Book register'); XLSX.writeFile(workbook, 'LittleFeet_Book_Register.xlsx');
-}
-
-function openBookClassReport() {
-  const classes = [...new Set((bookRegisterData?.records || []).map(record => record.className).filter(Boolean))].sort();
-  if (!classes.length) return alert('Add books with class names first.');
-  const options = classes.map(className => `<option value="${escapeWorkspaceText(className)}">${escapeWorkspaceText(className)}</option>`).join('');
-  openModal('Class book return report', `<label>Class<select id="bookReportClass" onchange="renderBookClassReport()">${options}</select></label><div id="bookClassReport" style="margin-top:14px;"></div><button type="button" class="action-btn btn-blue" style="margin-top:12px;" onclick="exportBookClassReport()">Export this class</button>`);
-  renderBookClassReport();
-}
-
-function renderBookClassReport() {
-  const className = document.getElementById('bookReportClass')?.value; const box = document.getElementById('bookClassReport'); if (!box) return;
-  const records = (bookRegisterData?.records || []).filter(record => record.className === className); const returned = records.filter(record => record.status === 'returned').length; const penalties = records.reduce((sum, record) => sum + Number(record.penaltyAmount || 0), 0);
-  box.innerHTML = `<div class="workspace-card"><strong>${escapeWorkspaceText(className)}</strong><p class="meta">${returned}/${records.length} books returned · ${formatSubscriptionMoney(penalties)} in damage/loss penalties</p>${records.map(record => `<div style="padding:8px 0;border-top:1px solid var(--border-color);"><strong>${escapeWorkspaceText(record.learnerName)}</strong> · ${escapeWorkspaceText(record.bookTitle)} · ${bookStatusLabel(record)}<br><span class="meta">Handover: ${escapeWorkspaceText(record.issueCondition)} · Return: ${escapeWorkspaceText(record.returnCondition || 'Not returned')}</span></div>`).join('')}</div>`;
-}
-
-function exportBookClassReport() {
-  const className = document.getElementById('bookReportClass')?.value; if (!className || typeof XLSX === 'undefined') return;
-  const rows = (bookRegisterData?.records || []).filter(record => record.className === className).map(record => ({ Learner: record.learnerName, Book: record.bookTitle, Status: record.status, 'Handover condition': record.issueCondition, 'Return condition': record.returnCondition || 'Not returned', Penalty: record.penaltyAmount || 0, 'Parent signature': record.parentSignature || 'Missing' }));
-  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Class report'); XLSX.writeFile(workbook, `LittleFeet_${className.replace(/[^a-z0-9]+/gi, '_')}_Book_Returns.xlsx`);
-}
-
-function downloadAttendanceTemplate() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet([
-    { 'Learner Name': 'Example Learner', Status: 'Present' },
-    { 'Learner Name': 'Example Learner 2', Status: 'Absent' }
-  ]);
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance import');
-  XLSX.writeFile(workbook, 'LittleFeet_Attendance_Import_Template.xlsx');
-}
-
-function downloadScheduleTemplate() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
-  const rows = [
-    { 'ID (optional)': '', 'Student Name': 'Example Learner', 'Day of Week': 'Monday', 'Time Slot Block': '08:00 - 09:00', 'Activity Module': 'Morning circle and literacy' },
-    { 'ID (optional)': '', 'Student Name': 'Example Learner', 'Day of Week': 'Monday', 'Time Slot Block': '09:00 - 10:00', 'Activity Module': 'Outdoor play' }
-  ];
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Schedule import');
-  XLSX.writeFile(workbook, 'LittleFeet_Schedule_Import_Template.xlsx');
-}
-
-async function loadAccounts() {
-  const list = document.getElementById('accountsList');
-  if (!list || !canManageSchoolAccounts()) return;
-  const session = accountSessionGeneration + ":" + workspaceSessionKey();
-  try {
-    const response = await fetch(`/api/accounts?actorUsername=${encodeURIComponent(currentUser.username)}`);
-    const accounts = await response.json();
-    if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
-    if (!response.ok) throw new Error(accounts?.message || 'Unable to load account records.');
-    if (!Array.isArray(accounts)) throw new Error('Account records returned an invalid response.');
-    if (!accountRoleCatalog) {
-      const catalogResponse = await fetch('/api/accounts/catalog');
-      const catalog = await catalogResponse.json();
-      if (session !== accountSessionGeneration + ':' + workspaceSessionKey()) return;
-      if (!catalogResponse.ok) throw new Error(catalog.message || 'Unable to load positions.');
-      accountRoleCatalog = catalog;
-    }
-    updateAccountRoleFields();
-    accountsCache = accounts;
-    const accountSelector = document.getElementById('accountEditSelect');
-    if (accountSelector) {
-      const previousSelection = accountSelector.value;
-      accountSelector.innerHTML = `<option value="">Create a new account / select an existing account</option>${accounts.map(account => `<option value="${encodeURIComponent(account.username)}">${escapeWorkspaceText(account.name || account.username)} · ${escapeWorkspaceText(account.username)} · ${escapeWorkspaceText(displayRoleName(account))}</option>`).join('')}`;
-      if (previousSelection && [...accountSelector.options].some(option => option.value === previousSelection)) accountSelector.value = previousSelection;
-    }
-    list.innerHTML = accounts.map(account => `<div class="item-row"><div><strong>${escapeWorkspaceText(account.name)}</strong> <span class="badge-tag info">${escapeWorkspaceText(displayRoleName(account))}</span><p style="margin-top:4px;">${escapeWorkspaceText(account.username)}<br><span style="color:var(--text-muted);">Linked school: ${escapeWorkspaceText(account.schoolName || 'Not linked · Little Feet company account')}${account.schoolSector ? `<br>Sector: ${escapeWorkspaceText(account.schoolSector)}` : ''}${account.schoolStoreUrl ? ' · Web store linked' : ' · No web store linked'}${account.role === 'parent' ? `<br>Requested learners: ${escapeWorkspaceText((account.requestedLearnerLinks || []).join(', ') || 'None')}<br>Approved learners: ${escapeWorkspaceText((account.linkedLearners || []).join(', ') || 'None yet')}<br>Relationship: ${escapeWorkspaceText(account.parentRelationshipStatus || 'Pending administrator approval')}</span>` : '</span>'}${account.verificationStatus ? `<br><span class="meta">Account status: ${escapeWorkspaceText(account.verificationStatus)}</span>` : ''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${account.canManage !== false && String(account.verificationStatus || '').toLowerCase().includes('pending') ? `<button type="button" class="action-btn btn-green" onclick="approveAccount('${encodeInlineIdentifier(account.username)}')">Approve account</button>` : ''}${account.canManage !== false && account.role === 'parent' && account.requestedLearnerLinks?.length ? `<button type="button" class="action-btn btn-green" onclick="approveRequestedLearnerLinks('${encodeInlineIdentifier(account.username)}')">Approve learner request</button>` : ''}${account.canManage === false ? '<span class="meta">Protected company owner</span>' : `<button type="button" class="action-btn btn-blue" onclick="editAccountByUsername('${encodeInlineIdentifier(account.username)}')">Edit</button>`}${account.canDelete !== false ? `<button type="button" class="action-btn btn-red" onclick="deleteAccount('${encodeInlineIdentifier(account.username)}')">Delete</button>` : ''}</div></div>`).join('');
-  } catch (error) {
-    if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
-    accountsCache = [];
-    const accountSelector = document.getElementById('accountEditSelect');
-    if (accountSelector) accountSelector.innerHTML = '<option value="">Unable to load accounts — try again</option>';
-    list.textContent = error?.message || 'Unable to load account records.';
-  }
-}
-
-function renderLearnerCodeNameOptions() {
-  const list = document.getElementById('learnerCodeNameOptions');
-  if (!list) return;
-  list.innerHTML = learnerAccessCodeRecords.map(record =>
-    `<option value="${escapeWorkspaceText(record.learnerName || '')}" label="${escapeWorkspaceText(record.className || 'Class not recorded')}"></option>`
-  ).join('');
-}
-
-function learnerCodeResultLabel(status) {
-  return ({
-    generated: 'New code generated',
-    existing: 'Existing active code reused',
-    not_found: 'Learner not found',
-    ambiguous: 'Multiple learners match — add Grade / Class',
-    invalid: 'Learner name required'
-  })[status] || 'Unable to generate code';
-}
-
-function stageLearnerCodeResults(results) {
-  (Array.isArray(results) ? results : []).forEach(result => {
-    if (!['generated', 'existing'].includes(result.status) || !result.accessCode || !result.learnerKey) return;
-    const row = {
-      learnerKey: result.learnerKey,
-      learnerName: result.learnerName || result.inputName || '',
-      accessCode: result.accessCode,
-      className: result.className || '',
-      parentName: result.parentName || '',
-      status: learnerCodeResultLabel(result.status),
-      issuedAt: result.issuedAt || ''
-    };
-    const existingIndex = learnerCodeExportRows.findIndex(item => item.learnerKey === row.learnerKey);
-    if (existingIndex >= 0) learnerCodeExportRows[existingIndex] = row;
-    else learnerCodeExportRows.push(row);
-  });
-  renderLearnerCodeExportPreview();
-}
-
-function renderLearnerCodeExportPreview() {
-  const preview = document.getElementById('learnerCodeExportPreview');
-  if (!preview) return;
-  if (!learnerCodeExportRows.length) {
-    preview.innerHTML = '<p class="meta">No learner codes are staged for export yet.</p>';
-    return;
-  }
-  preview.innerHTML = `<div class="item-row" style="display:block;"><strong>${learnerCodeExportRows.length} learner code${learnerCodeExportRows.length === 1 ? '' : 's'} staged for export</strong><div style="overflow:auto;margin-top:8px;"><table><thead><tr><th>Learner</th><th>Code</th><th>Class</th><th>Status</th></tr></thead><tbody>${learnerCodeExportRows.slice(-20).map(row => `<tr><td>${escapeWorkspaceText(row.learnerName)}</td><td><strong style="letter-spacing:.06em;">${escapeWorkspaceText(row.accessCode)}</strong></td><td>${escapeWorkspaceText(row.className || 'Not recorded')}</td><td>${escapeWorkspaceText(row.status)}</td></tr>`).join('')}</tbody></table></div>${learnerCodeExportRows.length > 20 ? '<p class="meta">Showing the latest 20 staged rows. The download contains the full staged list.</p>' : ''}</div>`;
-}
-
-async function requestLearnerCodeGeneration(rows) {
-  if (!isFullAccessUser()) throw new Error('Only an administrator can generate learner access codes.');
-  const requested = Array.isArray(rows) ? rows : [];
-  if (!requested.length) return [];
-  const results = [];
-  const chunkSize = 500;
-  for (let offset = 0; offset < requested.length; offset += chunkSize) {
-    const response = await fetch('/api/learner-access-codes/generate-batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ learners: requested.slice(offset, offset + chunkSize) })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || 'Unable to generate learner access codes.');
-    results.push(...(Array.isArray(payload.results) ? payload.results : []));
-  }
-  return results;
-}
-
-async function generateSingleLearnerCode() {
-  if (!isFullAccessUser()) return alert('Only an administrator can generate learner access codes.');
-  const nameField = document.getElementById('learnerCodeGenerateName');
-  const classField = document.getElementById('learnerCodeGenerateClass');
-  const resultBox = document.getElementById('learnerCodeGenerateResult');
-  const learnerName = String(nameField?.value || '').trim();
-  const className = String(classField?.value || '').trim();
-  if (!learnerName) return alert('Enter the learner name first.');
-
-  try {
-    if (resultBox) resultBox.textContent = 'Matching the learner and generating the secure code…';
-    const [result] = await requestLearnerCodeGeneration([{ learnerName, className }]);
-    if (!result) throw new Error('No learner-code result was returned.');
-    if (!['generated', 'existing'].includes(result.status)) {
-      if (resultBox) resultBox.innerHTML = `<strong>${escapeWorkspaceText(learnerCodeResultLabel(result.status))}</strong> · ${escapeWorkspaceText(result.message || 'Check the learner name and class.')}`;
-      return;
-    }
-    stageLearnerCodeResults([result]);
-    if (resultBox) resultBox.innerHTML = `<strong>${escapeWorkspaceText(result.learnerName)}</strong> · <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(result.accessCode)}</strong> · ${escapeWorkspaceText(learnerCodeResultLabel(result.status))}`;
-    if (nameField) nameField.value = '';
-    if (classField) classField.value = '';
-    await loadLearnerAccessCodes();
-    playDingSound();
-  } catch (error) {
-    if (resultBox) resultBox.textContent = safeUserFacingError(error, 'Unable to generate this learner code.');
-  }
-}
-
-function learnerCodeSheetRows(rows = learnerCodeExportRows) {
-  return rows.map(row => ({
-    'Learner Name': row.learnerName || '',
-    'Learner Access Code': row.accessCode || '',
-    'Grade / Class': row.className || '',
-    'Parent / Guardian': row.parentName || '',
-    'Code Status': row.status || '',
-    'Issued At': row.issuedAt || ''
-  }));
-}
-
-function downloadLearnerCodeRows(rows, format, filenameBase) {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
-  if (!rows.length) return alert('There are no learner codes to export yet.');
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  if (format === 'csv') {
-    const csv = XLSX.utils.sheet_to_csv(worksheet);
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    link.download = `${filenameBase}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    return;
-  }
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Learner codes');
-  XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
-}
-
-function downloadStagedLearnerCodes(format = 'xlsx') {
-  downloadLearnerCodeRows(
-    learnerCodeSheetRows(),
-    format,
-    `LittleFeet_Learner_Codes_${new Date().toISOString().slice(0, 10)}`
-  );
-}
-
-function clearStagedLearnerCodes() {
-  learnerCodeExportRows = [];
-  renderLearnerCodeExportPreview();
-  const resultBox = document.getElementById('learnerCodeGenerateResult');
-  if (resultBox) resultBox.textContent = 'No code generated in this browser session yet.';
-}
-
-function downloadLearnerCodeGeneratorTemplate() {
-  if (typeof XLSX === 'undefined') return alert('The spreadsheet tool is still loading. Please try again in a moment.');
-  const worksheet = XLSX.utils.aoa_to_sheet([['Learner Name', 'Grade / Class']]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Learner names');
-  XLSX.writeFile(workbook, 'LittleFeet_Learner_Code_Generator_Template.xlsx');
-}
-
-function readLearnerCodeSpreadsheet(file) {
-  return new Promise((resolve, reject) => {
-    const fileError = validateSpreadsheetFile(file, STANDARD_SPREADSHEET_MAX_BYTES);
-    if (fileError) return reject(new Error(fileError));
-    if (typeof XLSX === 'undefined') return reject(new Error('The spreadsheet tool is still loading. Please try again in a moment.'));
-    const reader = new FileReader();
-    reader.onload = event => {
-      try {
-        const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const sourceRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }).filter(row =>
-          Object.values(row || {}).some(value => String(value || '').trim())
-        );
-        if (!sourceRows.length) throw new Error('The spreadsheet does not contain any learner rows.');
-        if (sourceRows.length > 100000) throw new Error('This spreadsheet contains more than 100,000 rows. Split it into smaller school-approved files.');
-        resolve(sourceRows);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    reader.onerror = () => reject(new Error('The spreadsheet could not be read.'));
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-function normalizedSpreadsheetHeader(value) {
-  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function learnerCodeSpreadsheetHeaders(rows) {
-  const reserved = new Set(['learneraccesscode', 'codestatus']);
-  const headers = [];
-  rows.forEach(row => Object.keys(row || {}).forEach(key => {
-    if (reserved.has(normalizedSpreadsheetHeader(key))) return;
-    if (!headers.includes(key)) headers.push(key);
-  }));
-  const learnerAliases = new Set(['learnername', 'studentname', 'childname', 'name']);
-  const nameHeader = headers.find(header => learnerAliases.has(normalizedSpreadsheetHeader(header))) || null;
-  const outputHeaders = [];
-  headers.forEach(header => {
-    outputHeaders.push(header);
-    if (header === nameHeader) outputHeaders.push('Learner Access Code', 'Code Status');
-  });
-  if (!nameHeader) outputHeaders.push('Learner Access Code', 'Code Status');
-  return { headers, outputHeaders };
-}
-
-async function generateLearnerCodesFromSpreadsheet(format = 'xlsx') {
-  if (!isFullAccessUser()) return alert('Only an administrator can generate learner access codes.');
-  const input = document.getElementById('learnerCodeBulkFile');
-  const status = document.getElementById('learnerCodeBulkStatus');
-  const file = input?.files?.[0];
-  if (!file) return alert('Choose an Excel or CSV learner-name file first.');
-
-  try {
-    if (status) status.textContent = 'Reading learner names…';
-    const sourceRows = await readLearnerCodeSpreadsheet(file);
-    const requests = sourceRows.map(row => ({
-      learnerName: importValue(row, ['learnername', 'studentname', 'childname', 'name']),
-      className: importValue(row, ['gradeclass', 'classname', 'class', 'grade'])
-    }));
-    if (status) status.textContent = `Matching ${requests.length} learner row${requests.length === 1 ? '' : 's'} to the real school register…`;
-    const results = await requestLearnerCodeGeneration(requests);
-    const { outputHeaders } = learnerCodeSpreadsheetHeaders(sourceRows);
-    const enrichedRows = sourceRows.map((row, index) => {
-      const result = results[index] || { status: 'invalid', message: 'No result returned.' };
-      return {
-        ...row,
-        'Learner Access Code': result.accessCode || '',
-        'Code Status': learnerCodeResultLabel(result.status)
-      };
-    });
-    stageLearnerCodeResults(results);
-
-    const worksheet = XLSX.utils.json_to_sheet(enrichedRows, { header: outputHeaders });
-    const generated = results.filter(result => result.status === 'generated').length;
-    const existing = results.filter(result => result.status === 'existing').length;
-    const unmatched = results.length - generated - existing;
-    const filenameBase = `LittleFeet_Learner_Codes_${new Date().toISOString().slice(0, 10)}`;
-
-    if (format === 'csv') {
-      const csv = XLSX.utils.sheet_to_csv(worksheet);
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-      link.download = `${filenameBase}.csv`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    } else {
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Learner codes');
-      XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
-    }
-
-    if (status) status.innerHTML = `<strong>${generated + existing} matched</strong> · ${generated} new code${generated === 1 ? '' : 's'} generated · ${existing} existing code${existing === 1 ? '' : 's'} reused · ${unmatched} row${unmatched === 1 ? '' : 's'} need attention. The downloaded file keeps every source row and places <strong>Learner Access Code</strong> immediately after the learner-name column.`;
-    await loadLearnerAccessCodes();
-    playDingSound();
-  } catch (error) {
-    if (status) status.textContent = safeUserFacingError(error, 'Unable to generate learner codes from this spreadsheet.');
-  }
-}
-
-async function loadLearnerAccessCodes() {
-  const list = document.getElementById('learnerCodeList');
-  if (!list || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
-  try {
-    const response = await fetch(`/api/learner-access-codes?actorUsername=${encodeURIComponent(currentUser.username)}`);
-    const records = await response.json();
-    if (!response.ok) throw new Error(records.message || 'Unable to load learner code forms.');
-    learnerAccessCodeRecords = records;
-    renderLearnerCodeNameOptions();
-    renderLearnerCodeExportPreview();
-    if (!records.length) {
-      list.innerHTML = '<p style="font-size:.84rem;color:var(--text-muted);">No learners are available yet. Import or register learners first.</p>';
-      return;
-    }
-    renderLearnerAccessCodes();
-  } catch (error) {
-    list.textContent = safeUserFacingError(error, 'Unable to load learner code forms.');
-  }
-}
-
-function renderLearnerAccessCodes() {
-  const list = document.getElementById('learnerCodeList');
-  if (!list || !(isFullAccessUser() || currentUser?.role === 'principal')) return;
-  const canManage = isFullAccessUser();
-  const query = String(document.getElementById('learnerCodeSearch')?.value || '').trim().toLowerCase();
-  const records = learnerAccessCodeRecords.filter(record => !query || [record.learnerName, record.className, record.parentName, record.accessCode].some(value => String(value || '').toLowerCase().includes(query)));
-  if (!records.length) {
-    list.innerHTML = '<p class="meta">No learners match that search.</p>';
-    return;
-  }
-  list.innerHTML = records.map(record => {
-    const encodedKey = encodeInlineIdentifier(record.learnerKey);
-    const encodedSchool = encodeInlineIdentifier(record.schoolId || "");
-    const details = `${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}`;
-    const status = record.accessCode ? `<p style="margin-top:5px;">Current code: <strong style="letter-spacing:.08em;color:var(--primary-color);">${escapeWorkspaceText(record.accessCode)}</strong></p>` : record.hasPrintableForm ? '<p class="meta" style="margin-top:5px;">Prepared for printing. The code is not displayed to this role.</p>' : '<p class="meta" style="margin-top:5px;">No active learner code issued.</p>';
-    const history = canManage && record.codeHistory?.length ? `<details style="margin-top:8px;"><summary class="meta">${record.codeHistory.length} code record${record.codeHistory.length === 1 ? '' : 's'} in history</summary><div class="meta" style="margin:7px 0 0;line-height:1.55;">${record.codeHistory.map(entry => `${escapeWorkspaceText(entry.status)} · issued ${entry.issuedAt ? new Date(entry.issuedAt).toLocaleDateString() : 'date unknown'}${entry.changedAt ? ` · updated ${new Date(entry.changedAt).toLocaleDateString()}` : ''}`).join('<br>')}</div></details>` : '';
-    const actions = record.hasPrintableForm ? `<button type="button" class="action-btn btn-blue" onclick="printLearnerCodeForm('${encodedKey}', '${encodedSchool}')">🖨️ Print form</button>` : '';
-    const management = canManage ? (record.accessCode ? `<button type="button" class="action-btn btn-green" onclick="replaceLearnerAccessCode('${record.codeRecordId}')">♻️ New random code</button><button type="button" class="action-btn btn-red" onclick="revokeLearnerAccessCode('${record.codeRecordId}')">Scrap code</button>` : `<button type="button" class="action-btn btn-green" onclick="openLearnerCodeIssue('${encodedKey}', '${encodedSchool}')">Generate code</button>`) : '';
-    return `<div class="item-row"><div><strong>${details}</strong>${status}<span class="meta">${record.issuedAt ? `Issued ${new Date(record.issuedAt).toLocaleString()} by ${escapeWorkspaceText(record.issuedBy || 'school administrator')}` : 'Awaiting administrator issue'}${record.parentName ? ` · Parent: ${escapeWorkspaceText(record.parentName)}` : ''}</span>${history}</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${actions}${management}</div></div>`;
-  }).join('');
-}
-
-async function toggleLearnerCodeTeacherPreview() {
-  if (!isFullAccessUser()) return;
-  const panel = document.getElementById('learnerCodeTeacherPreview');
-  if (!panel) return;
-  if (!panel.classList.contains('hidden')) {
-    panel.classList.add('hidden');
-    panel.innerHTML = '';
-    return;
-  }
-  panel.innerHTML = '<p class="meta">Loading the teacher-safe view…</p>';
-  panel.classList.remove('hidden');
-  try {
-    const response = await fetch('/api/learner-access-codes/teacher-preview');
-    const records = await response.json();
-    if (!response.ok) throw new Error(records.message || 'Unable to load the teacher view.');
-    panel.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)} · ${escapeWorkspaceText(record.className || 'Class not recorded')}</strong><p class="meta" style="margin:4px 0 0;">${record.parentName ? `Parent: ${escapeWorkspaceText(record.parentName)} · ` : ''}${record.codeIssued ? 'School code issued' : 'No school code issued'}</p></div><span class="badge-tag info">NO CODE SHOWN</span></div>`).join('') : '<p class="meta">No learner records are available.</p>';
-  } catch (error) {
-    panel.innerHTML = `<p class="meta">${escapeWorkspaceText(safeUserFacingError(error, 'Unable to load the teacher view.'))}</p>`;
-  }
-}
-
-function learnerCodeRecord(encodedKey, encodedSchool = "") {
-  return learnerAccessCodeRecords.find(record => record.learnerKey === decodeURIComponent(encodedKey) && (!encodedSchool || record.schoolId === decodeURIComponent(encodedSchool)));
-}
-
-function openLearnerCodeIssue(encodedKey, encodedSchool = "") {
-  if (!isFullAccessUser()) return alert('Only an administrator can issue a learner access code.');
-  const record = learnerCodeRecord(encodedKey, encodedSchool);
-  if (!record) return alert('Learner record not found. Refresh the code list and try again.');
-  openModal('Issue learner access code', `<p style="margin:0 0 12px;color:var(--text-muted);">Issue a physical code for <strong>${escapeWorkspaceText(record.learnerName)}</strong>. Little Feet will generate a secure, random code for this learner.</p><p class="meta" style="margin-top:7px;">Only the administrator can create, replace, or invalidate a code. A principal may print the completed form.</p><button type="button" class="submit-btn" style="margin-top:14px;" onclick="issueLearnerAccessCode('${encodedKey}', '${encodedSchool}')">Issue code</button>`);
-}
-
-async function issueLearnerAccessCode(encodedKey, encodedSchool = "") {
-  const response = await fetch('/api/learner-access-codes', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actorUsername: currentUser?.username, learnerKey: decodeURIComponent(encodedKey), schoolId: decodeURIComponent(encodedSchool) })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to issue this learner code.');
-  closeModal();
-  playDingSound();
-  await loadLearnerAccessCodes();
-}
-
-async function replaceLearnerAccessCode(id) {
-  if (!isFullAccessUser() || !confirm('Replace this code? The existing physical copy will stop working immediately.')) return;
-  const response = await fetch(`/api/learner-access-codes/${encodeURIComponent(id)}/replace`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to replace this learner code.');
-  playDingSound();
-  await loadLearnerAccessCodes();
-}
-
-async function revokeLearnerAccessCode(id) {
-  if (!isFullAccessUser() || !confirm('Invalidate this code? Its printed copy will no longer work.')) return;
-  const response = await fetch(`/api/learner-access-codes/${encodeURIComponent(id)}/revoke`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser.username })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to invalidate this learner code.');
-  await loadLearnerAccessCodes();
-}
-
-async function printLearnerCodeForm(encodedKey, encodedSchool = "") {
-  if (!(isFullAccessUser() || currentUser?.role === 'principal')) return alert('Only an administrator or principal can print this learner form.');
-  const response = await fetch(`/api/learner-access-codes/${encodedKey}/printable?schoolId=${encodedSchool}`);
-  const record = await response.json();
-  if (!response.ok) return alert(record.message || 'An active learner code is required before this form can be printed.');
-  const printWindow = window.open('', '_blank', 'width=820,height=980');
-  if (!printWindow) return alert('Allow pop-ups for Little Feet to print this learner form.');
-  const safe = escapeWorkspaceText;
-  printWindow.document.write(`<!doctype html><html><head><title>Learner Access Code</title><style>body{font-family:Arial,sans-serif;color:#102a43;margin:0;padding:34px;background:#f6fbfb}.sheet{max-width:720px;margin:auto;background:#fff;border:2px solid #0d9488;border-radius:18px;padding:34px}.brand{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d8f3ef;padding-bottom:18px}.brand h1{margin:0;font-size:28px;color:#0f766e}.tag{font-size:12px;letter-spacing:1.4px;font-weight:bold;color:#0f766e}.code{margin:28px 0;padding:24px;text-align:center;border-radius:14px;background:#e6fffb;border:2px dashed #0d9488;font-size:30px;font-weight:bold;letter-spacing:4px;color:#0f766e}.details{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:22px 0}.field{padding:12px;border:1px solid #d8e5ea;border-radius:10px}.field span{display:block;color:#627d98;font-size:12px;margin-bottom:4px}.notice{font-size:13px;line-height:1.5;padding:14px;background:#fff7df;border-radius:10px}.sign{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:38px}.line{border-top:1px solid #526d82;padding-top:8px;font-size:12px;color:#526d82}@media print{body{padding:0;background:#fff}.sheet{border:none;border-radius:0;max-width:none}}</style></head><body><main class="sheet"><div class="brand"><div><div class="tag">LITTLE FEET · SCHOOL-ISSUED FORM</div><h1>Learner Access Code</h1></div></div><p>This handout is tied to one learner. Keep it with the approved family record.</p><div class="code">${safe(record.accessCode)}</div><div class="details"><div class="field"><span>Learner</span><strong>${safe(record.learnerName)}</strong></div><div class="field"><span>Class / grade</span><strong>${safe(record.className || 'Not recorded')}</strong></div><div class="field"><span>Parent / guardian</span><strong>${safe(record.parentName || 'To be completed by school')}</strong></div><div class="field"><span>Issued</span><strong>${safe(new Date(record.issuedAt).toLocaleDateString())}</strong></div></div><div class="notice"><strong>For the family:</strong> This code was issued by the school for the learner shown above. Do not share it publicly. If it is lost or needs to be replaced, contact the school administrator; the old code will be invalidated.</div><div class="sign"><div class="line">School representative</div><div class="line">Parent / guardian acknowledgement</div></div></main><script>window.onload=()=>window.print();<\/script></body></html>`);
-  printWindow.document.close();
-}
-
-async function redeemLearnerAccessCode() {
-  if (currentUser?.role !== 'parent') return alert('Only a parent or guardian can use a learner access code.');
-  const field = document.getElementById('parentLearnerAccessCode');
-  const accessCode = field?.value?.trim();
-  if (!accessCode) return alert('Enter the learner access code from the school form.');
-  const response = await fetch('/api/learner-access-codes/redeem', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessCode })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to use this learner access code.');
-  if (field) field.value = '';
-  alert(result.message || `A link request for ${result.learnerName} has been sent to the school administrator.`);
-  playDingSound();
-}
-
-function hideAccountSchoolSearchResults() {
-  const box = document.getElementById('accountSchoolSearchResults');
-  if (!box) return;
-  box.style.display = 'none';
-  box.innerHTML = '';
-}
-
-function selectAccountSchool(encodedName) {
-  const name = decodeURIComponent(String(encodedName || ''));
-  const linkedSchool = document.getElementById('accountSchoolName');
-  const search = document.getElementById('accountSchoolSearch');
-  if (linkedSchool) linkedSchool.value = name;
-  if (search) search.value = name;
-  hideAccountSchoolSearchResults();
-  linkedSchool?.dispatchEvent(new Event('change', { bubbles:true }));
-}
-
-async function searchAccountSchools(query, token) {
-  const box = document.getElementById('accountSchoolSearchResults');
-  if (!box) return;
-  box.style.display = 'block';
-  box.innerHTML = '<div class="meta" style="padding:9px 10px;">Searching schools…</div>';
-  try {
-    const response = await fetch(`/api/schools/search?q=${encodeURIComponent(query)}`, { cache:'no-store' });
-    const data = await response.json();
-    if (token !== accountSchoolSearchToken) return;
-    if (!response.ok) throw new Error(data.message || 'Unable to search schools.');
-    const results = Array.isArray(data.results) ? data.results : [];
-    if (!results.length) {
-      box.innerHTML = `<div class="meta" style="padding:9px 10px;">No school matched “${escapeWorkspaceText(query)}”. ${currentUser?.role === 'crm' ? 'Choose a registered client school.' : 'You can still type the linked school name manually.'}</div>`;
-      return;
-    }
-    box.innerHTML = results.map(result => {
-      const encodedName = escapeWorkspaceText(encodeURIComponent(result.name || ''));
-      const locality = result.locality ? ` · ${escapeWorkspaceText(result.locality)}` : '';
-      const source = escapeWorkspaceText(result.source || 'School search');
-      return `<button type="button" data-account-school-choice="${encodedName}" style="display:block;width:100%;padding:10px 11px;border:0;border-bottom:1px solid var(--border-color);background:transparent;color:var(--text-dark);text-align:left;cursor:pointer;"><strong>${escapeWorkspaceText(result.name || '')}</strong><br><span class="meta">${source}${locality}</span></button>`;
-    }).join('');
-    box.querySelectorAll('[data-account-school-choice]').forEach(button => {
-      button.addEventListener('click', () => selectAccountSchool(button.dataset.accountSchoolChoice));
-    });
-  } catch (error) {
-    if (token !== accountSchoolSearchToken) return;
-    box.innerHTML = `<div class="meta" style="padding:9px 10px;">${escapeWorkspaceText(safeUserFacingError(error, 'School search is temporarily unavailable.'))} You can still enter the linked school manually.</div>`;
-  }
-}
-
-function queueAccountSchoolSearch(force = false) {
-  const field = document.getElementById('accountSchoolSearch');
-  const box = document.getElementById('accountSchoolSearchResults');
-  if (!field || !box) return;
-  const query = field.value.trim();
-  window.clearTimeout(accountSchoolSearchTimer);
-  if (query.length < 2) {
-    accountSchoolSearchToken += 1;
-    if (force && query.length) {
-      box.style.display = 'block';
-      box.innerHTML = '<div class="meta" style="padding:9px 10px;">Type at least 2 characters to search.</div>';
-    } else hideAccountSchoolSearchResults();
-    return;
-  }
-  const token = ++accountSchoolSearchToken;
-  accountSchoolSearchTimer = window.setTimeout(() => searchAccountSchools(query, token), force ? 0 : 280);
-}
-
-function resetAccountForm() {
-  const form = document.getElementById('accountForm');
-  if (!form) return;
-  form.reset();
-  const accountSelector = document.getElementById('accountEditSelect');
-  if (accountSelector) accountSelector.value = '';
-  const schoolSearch = document.getElementById('accountSchoolSearch');
-  if (schoolSearch) schoolSearch.value = '';
-  hideAccountSchoolSearchResults();
-  document.getElementById('accountOriginalUsername').value = '';
-  document.getElementById('accountSaveButton').textContent = 'Create account';
-  const deleteButton = document.getElementById('accountDeleteButton');
-  if (deleteButton) deleteButton.style.display = 'none';
-  const resetLoginButton = document.getElementById('accountResetLoginWaitButton');
-  if (resetLoginButton) resetLoginButton.style.display = 'none';
-  document.getElementById('accountPinHint').textContent = '*';
-  document.getElementById('accountPin').placeholder = 'Required for a new account';
-  updateAccountRoleFields();
-}
-
-function updateAccountRoleFields() {
-  const roleSelect = document.getElementById('accountRole');
-  const companyAccess = Boolean(currentUser && (currentUser.role === 'admin' && currentUser.platformAccess === true));
-  roleSelect?.querySelectorAll('option').forEach(option => { const denied = isInternalCompanyRole(option.value) && !companyAccess; option.disabled = denied; option.hidden = denied; });
-  const companyGroup = roleSelect?.querySelector('optgroup[data-company-roles]');
-  if (companyGroup) companyGroup.hidden = !companyAccess;
-  if (roleSelect?.selectedOptions[0]?.disabled) roleSelect.value = 'parent';
-  const role = roleSelect?.value || 'parent';
-  const schoolField = document.getElementById('accountSchoolName');
-  const schoolRequired = document.getElementById('accountSchoolRequired');
-  const schoolHelp = document.getElementById('accountSchoolHelp');
-  const internalRole = isInternalCompanyRole(role);
-  const positionField = document.getElementById('accountPosition');
-  const sectorField = document.getElementById('accountSector');
-  for (const field of [positionField, sectorField]) { field?.closest('.school-position-field')?.classList.toggle('hidden', internalRole); if (field) field.disabled = internalRole; }
-  if (positionField && accountRoleCatalog) { const value=positionField.value; positionField.replaceChildren(...(accountRoleCatalog.positions[role] || []).map(name => new Option(name,name))); if ([...positionField.options].some(option => option.value===value)) positionField.value=value; }
-  if (sectorField && accountRoleCatalog && !sectorField.options.length) sectorField.replaceChildren(...accountRoleCatalog.sectors.map(name => new Option(name,name)));
-  document.getElementById('accountAssignedClasses')?.closest('div')?.classList.toggle('hidden', role !== 'teacher');
-  document.getElementById('accountLinkedLearners')?.closest('div[style*="grid-column"]')?.classList.toggle('hidden', role !== 'parent');
-  document.getElementById('accountStoreUrl')?.closest('div')?.classList.toggle('hidden', internalRole);
-  const descriptions = { school_hr:'Manage staff tasks, leave, qualifications and performance reviews for the linked school.', school_staff:'Assigned school work, leave, qualifications and communication. No learner grades, medical files, finance or user administration.', parent:'Access to approved linked children and family payments.', teacher:'Assigned classrooms, learner records and teaching tools.', principal:'School leadership, operations and staff management.', district:'School oversight and permitted reports.', admin:'Manage users and administration for the linked school.', school_accounts:'Finance and payment records for the linked school.', staff:'Personal company tasks, leave, training and communication.', crm:'Client follow-ups and school user management for registered clients.', accounts:'Little Feet subscription invoices and confirmed payment records.', support:'Client support tickets, assignments and service communication.' };
-  const hint = document.getElementById('accountRoleDescription');
-  if (hint) hint.textContent = descriptions[role] || '';
-
-  if (schoolField) {
-    schoolField.required = !internalRole;
-    schoolField.placeholder = internalRole ? 'Optional · link to a school only if needed' : 'e.g. Little Feet ECD Portal';
-  }
-  if (schoolRequired) schoolRequired.textContent = internalRole ? '(optional)' : '*';
-  if (schoolHelp) schoolHelp.textContent = internalRole
-    ? 'Little Feet company staff can work without a school link. A school link is an association; company-role permissions still apply.'
-    : 'Required for school-facing accounts.';
-}
-
-function editAccount(account) {
-  if (account.canManage === false) return alert('Only the company owner can change this protected owner account.');
-  const accountSelector = document.getElementById('accountEditSelect');
-  if (accountSelector) accountSelector.value = encodeInlineIdentifier(account.username);
-  document.getElementById('accountOriginalUsername').value = account.username;
-  document.getElementById('accountName').value = account.name || '';
-  document.getElementById('accountUsername').value = account.username || '';
-  document.getElementById('accountRole').value = account.role || 'parent';
-  document.getElementById('accountSchoolName').value = account.schoolName || '';
-  const schoolSearch = document.getElementById('accountSchoolSearch');
-  if (schoolSearch) schoolSearch.value = account.schoolName || '';
-  hideAccountSchoolSearchResults();
-  updateAccountRoleFields();
-  if (document.getElementById('accountPosition') && account.schoolPosition) document.getElementById('accountPosition').value = account.schoolPosition;
-  if (document.getElementById('accountSector') && account.schoolSector) document.getElementById('accountSector').value = account.schoolSector;
-  document.getElementById('accountStoreUrl').value = account.schoolStoreUrl || '';
-  document.getElementById('accountAssignedClasses').value = (account.assignedClasses || []).join(', ');
-  document.getElementById('accountLinkedLearners').value = (account.linkedLearners || []).join(', ');
-  document.getElementById('accountPin').value = '';
-  document.getElementById('accountPinHint').textContent = '(leave empty to keep password)';
-  document.getElementById('accountPin').placeholder = 'Enter only to reset password';
-  document.getElementById('accountSaveButton').textContent = 'Save account changes';
-  const deleteButton = document.getElementById('accountDeleteButton');
-  if (deleteButton) deleteButton.style.display = account.canDelete === false ? 'none' : 'inline-flex';
-  const resetLoginButton = document.getElementById('accountResetLoginWaitButton');
-  if (resetLoginButton) resetLoginButton.style.display = 'inline-flex';
-  document.getElementById('accountsTab').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function editAccountByUsername(encodedUsername) {
-  const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
-  if (account) editAccount(account);
-}
-
-function selectAccountForEditing(encodedUsername) {
-  if (!encodedUsername) {
-    resetAccountForm();
-    return;
-  }
-  const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
-  if (!account) {
-    resetAccountForm();
-    return alert('That account is no longer available. Refresh the account list and try again.');
-  }
-  editAccount(account);
-}
-
-async function openLearnerLinkPicker() {
-  const role = document.getElementById('accountRole')?.value;
-  if (role !== 'parent') return alert('Linked learners can only be assigned to a parent account. Choose the Parent role first.');
-  const schoolName = document.getElementById('accountSchoolName')?.value.trim();
-  if (currentUser?.role === 'crm' && !schoolName) return alert('Choose the client school first.');
-  const session = accountSessionGeneration + ":" + workspaceSessionKey();
-  try {
-    const response = await fetch(currentUser?.role === 'crm' ? `/api/accounts/learner-options?schoolName=${encodeURIComponent(schoolName)}` : `/api/students/search?username=${encodeURIComponent(currentUser?.username || '')}`);
-    const learners = await response.json();
-    if (session !== accountSessionGeneration + ":" + workspaceSessionKey()) return;
-    if (!response.ok) return alert(learners.message || 'Unable to load learner records.');
-    if (!learners.length) return alert('No learner records are available to link yet. Add or import learners first.');
-    const field = document.getElementById('accountLinkedLearners');
-    const selected = new Set((field?.value || '').split(',').map(value => value.trim().toLocaleLowerCase()).filter(Boolean));
-    const options = learners.map(learner => {
-      const name = String(learner.studentName || '');
-      return `<label style="display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--border-color);border-radius:8px;cursor:pointer;"><input type="checkbox" name="linkedLearners" class="learner-link-choice" value="${escapeWorkspaceText(name)}" ${selected.has(name.toLocaleLowerCase()) ? 'checked' : ''}><span><strong>${escapeWorkspaceText(name)}</strong><br><span class="meta">${escapeWorkspaceText(learner.className || 'Class not recorded')}</span></span></label>`;
-    }).join('');
-    openModal('Choose linked learners', `<p style="margin:0 0 12px;color:var(--text-muted);">Select up to four children for this parent account.</p><div id="learnerLinkChoices" style="display:grid;gap:8px;max-height:46vh;overflow:auto;">${options}</div><button type="button" class="submit-btn" style="margin-top:14px;" onclick="saveLearnerLinks()">Save linked learners</button>`);
-  } catch {    alert('Unable to load learner records. Please try again.');
-  }
-}
-
-function saveLearnerLinks() {
-  const choices = [...document.querySelectorAll('.learner-link-choice:checked')];
-  if (choices.length > 4) return alert('A parent account can be linked to a maximum of four learners.');
-  const field = document.getElementById('accountLinkedLearners');
-  if (field) field.value = choices.map(choice => choice.value).join(', ');
-  closeModal();
-}
-
-async function deleteAccount(encodedUsername) {
-  if (!confirm('Are you sure you want to delete this user/account? This cannot be undone.')) return;
-  const response = await fetch(`/api/accounts/${encodedUsername}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser?.username }) });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to delete account.');
-  loadAccounts();
-}
-
-async function deleteSelectedAccount() {
-  const originalUsername = document.getElementById('accountOriginalUsername')?.value;
-  if (!originalUsername) return alert('Choose an account to edit before deleting it.');
-  await deleteAccount(encodeURIComponent(originalUsername));
-  resetAccountForm();
-}
-
-async function resetSelectedAccountLoginWait() {
-  const originalUsername = document.getElementById('accountOriginalUsername')?.value;
-  if (!originalUsername) return alert('Choose an account first.');
-  const account = accountsCache.find(entry => entry.username === originalUsername);
-  const label = account?.name || originalUsername;
-  if (!confirm(`Clear the 10-minute sign-in wait for ${label}? This does not change the password.`)) return;
-  try {
-    const response = await fetch(`/api/accounts/${encodeURIComponent(originalUsername)}/reset-login-lockout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}'
-    });
-    const result = await response.json();
-    if (!response.ok) return alert(result.message || 'Unable to reset the sign-in wait.');
-    alert(result.message || 'The sign-in wait has been cleared.');
-    playDingSound();
-  } catch {
-    alert('Unable to reset the sign-in wait. Please try again.');
-  }
-}
-
-async function approveAccount(encodedUsername) {
-  const response = await fetch(`/api/accounts/${encodedUsername}/approve`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actorUsername: currentUser?.username })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to approve this account.');
-  loadAccounts();
-  playDingSound();
-}
-
-async function approveRequestedLearnerLinks(encodedUsername) {
-  if (!canManageSchoolAccounts()) return alert('Account management access is required to approve learner relationships.');
-  const account = accountsCache.find(entry => entry.username === decodeURIComponent(encodedUsername));
-  if (!account?.requestedLearnerLinks?.length) return alert('There are no pending learner requests for this account.');
-  const requested = account.requestedLearnerLinks.join(', ');
-  if (!confirm(`Approve ${requested} for ${account.name || account.username}?`)) return;
-  const response = await fetch(`/api/accounts/${encodeURIComponent(account.username)}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: account.username, name: account.name, role: account.role, schoolName: account.schoolName, schoolStoreUrl: account.schoolStoreUrl, assignedClasses: (account.assignedClasses || []).join(', '), linkedLearners: requested })
-  });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to approve the learner relationship.');
-  await loadAccounts();
-  playDingSound();
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 let parentContactRecords = [];
 
-function parentContactSearchText(record) {
-  return [
-    record?.learnerName,
-    record?.className,
-    record?.guardianName,
-    record?.guardianPhone,
-    record?.guardianEmail,
-    record?.emergencyContact
-  ].map(value => String(value || '').toLowerCase()).join(' ');
-}
 
-function parentContactTelHref(value) {
-  const phone = String(value || '').trim();
-  if (!phone) return '';
-  const cleaned = phone.replace(/[^0-9+*#,;]/g, '');
-  return cleaned ? `tel:${cleaned}` : '';
-}
 
-function showParentContactNotice(message) {
-  const notice = document.createElement('div');
-  notice.className = 'ticket-toast';
-  notice.setAttribute('role', 'status');
-  notice.innerHTML = `<strong>Parent Contacts</strong><span>${escapeWorkspaceText(message)}</span>`;
-  document.body.appendChild(notice);
-  window.setTimeout(() => notice.remove(), 2800);
-}
 
-async function copyParentContactText(text) {
-  const value = String(text || '');
-  if (!value) return false;
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {}
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.setAttribute('readonly', '');
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  let copied = false;
-  try { copied = document.execCommand('copy'); } catch {}
-  textarea.remove();
-  return copied;
-}
 
-function parentContactRecordById(encodedId) {
-  let id = '';
-  try { id = decodeURIComponent(String(encodedId || '')); } catch { return null; }
-  return parentContactRecords.find(record => String(record.id) === id) || null;
-}
 
-async function copyParentContactField(encodedId, field) {
-  const record = parentContactRecordById(encodedId);
-  const allowed = new Set(['guardianName', 'guardianPhone', 'guardianEmail', 'emergencyContact', 'learnerName', 'className']);
-  if (!record || !allowed.has(field)) return;
-  const value = String(record[field] || '').trim();
-  if (!value) return showParentContactNotice('No value has been recorded for that field.');
-  const copied = await copyParentContactText(value);
-  showParentContactNotice(copied ? 'Copied to clipboard.' : 'Copy failed. Select and copy the value manually.');
-}
 
-async function copyParentContactSummary(encodedId) {
-  const record = parentContactRecordById(encodedId);
-  if (!record) return;
-  const summary = [
-    `Learner: ${record.learnerName || 'Not supplied'}`,
-    `Class: ${record.className || 'Not supplied'}`,
-    `Parent / guardian: ${record.guardianName || 'Not supplied'}`,
-    `Guardian phone: ${record.guardianPhone || 'Not supplied'}`,
-    `Guardian email: ${record.guardianEmail || 'Not supplied'}`,
-    `Emergency contact: ${record.emergencyContact || 'Not supplied'}`
-  ].join('\n');
-  const copied = await copyParentContactText(summary);
-  showParentContactNotice(copied ? 'Full contact details copied.' : 'Copy failed. Select and copy the details manually.');
-}
 
-function openRegistryForNewContact() {
-  closeParentContactEditor();
-  const form = document.getElementById('registryForm');
-  form?.reset();
-  switchTab('registryTab', null);
-  window.setTimeout(() => {
-    document.getElementById('registryLearnerName')?.focus();
-    document.getElementById('registryTab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 80);
-}
 
-function openParentContactEditor(encodedId) {
-  const record = parentContactRecordById(encodedId);
-  const editor = document.getElementById('parentContactEditor');
-  if (!record || !editor) return;
-  document.getElementById('parentContactEditId').value = String(record.id || '');
-  document.getElementById('parentContactEditGuardianName').value = record.guardianName || '';
-  document.getElementById('parentContactEditGuardianPhone').value = record.guardianPhone || '';
-  document.getElementById('parentContactEditGuardianEmail').value = record.guardianEmail || '';
-  document.getElementById('parentContactEditEmergency').value = record.emergencyContact || '';
-  const learner = document.getElementById('parentContactEditLearner');
-  if (learner) learner.textContent = [record.learnerName || 'Unnamed learner', record.className || 'Class pending'].join(' · ');
-  editor.classList.remove('hidden');
-  window.setTimeout(() => editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 20);
-}
 
-function closeParentContactEditor() {
-  const editor = document.getElementById('parentContactEditor');
-  const form = document.getElementById('parentContactEditForm');
-  form?.reset();
-  if (editor) editor.classList.add('hidden');
-  const id = document.getElementById('parentContactEditId');
-  if (id) id.value = '';
-  const learner = document.getElementById('parentContactEditLearner');
-  if (learner) learner.textContent = '';
-}
 
-function renderParentContacts(records) {
-  const list = document.getElementById('parentContactList');
-  const count = document.getElementById('parentContactCount');
-  if (!list) return;
-  const visible = Array.isArray(records) ? records : [];
-  if (count) count.textContent = `${visible.length} CONTACT${visible.length === 1 ? '' : 'S'}`;
-  if (!visible.length) {
-    list.innerHTML = '<p style="font-size:.84rem;color:var(--text-muted);">No matching parent or guardian contacts were found.</p>';
-    return;
-  }
-  list.innerHTML = visible.map(record => {
-    const encodedId = encodeInlineIdentifier(String(record.id || ''));
-    const phone = String(record.guardianPhone || '').trim();
-    const email = String(record.guardianEmail || '').trim();
-    const emergency = String(record.emergencyContact || '').trim();
-    const telHref = parentContactTelHref(phone);
-    return `<article class="parent-contact-card">
-      <div>
-        <h3>${escapeWorkspaceText(record.learnerName || 'Unnamed learner')} <span class="badge-tag info parent-contact-class">${escapeWorkspaceText(record.className || 'Class pending')}</span></h3>
-        <div class="parent-contact-details">
-          <div class="parent-contact-field"><span>Parent / guardian</span><strong>${escapeWorkspaceText(record.guardianName || 'Not supplied')}</strong></div>
-          <div class="parent-contact-field"><span>Guardian phone</span><strong>${escapeWorkspaceText(phone || 'Not supplied')}</strong></div>
-          <div class="parent-contact-field"><span>Guardian email</span><strong>${escapeWorkspaceText(email || 'Not supplied')}</strong></div>
-          <div class="parent-contact-field"><span>Emergency contact</span><strong>${escapeWorkspaceText(emergency || 'Not supplied')}</strong></div>
-        </div>
-      </div>
-      <div class="parent-contact-actions">
-        ${telHref ? `<a class="action-btn btn-green" href="${escapeWorkspaceText(telHref)}">Call guardian</a>` : '<button type="button" class="action-btn" disabled>No phone saved</button>'}
-        <button type="button" class="action-btn btn-blue" onclick="copyParentContactField('${encodedId}','guardianPhone')" ${phone ? '' : 'disabled'}>Copy phone</button>
-        <button type="button" class="action-btn btn-blue" onclick="copyParentContactField('${encodedId}','guardianEmail')" ${email ? '' : 'disabled'}>Copy email</button>
-        <button type="button" class="action-btn btn-blue" onclick="copyParentContactField('${encodedId}','emergencyContact')" ${emergency ? '' : 'disabled'}>Copy emergency</button>
-        <button type="button" class="action-btn btn-blue" onclick="copyParentContactSummary('${encodedId}')">Copy all details</button>
-        <button type="button" class="action-btn" onclick="openParentContactEditor('${encodedId}')">Edit contact</button>
-      </div>
-    </article>`;
-  }).join('');
-}
 
-function filterParentContacts() {
-  const query = String(document.getElementById('parentContactSearch')?.value || '').trim().toLowerCase();
-  const filtered = query ? parentContactRecords.filter(record => parentContactSearchText(record).includes(query)) : parentContactRecords;
-  renderParentContacts(filtered);
-}
 
-async function loadParentContacts() {
-  const list = document.getElementById('parentContactList');
-  if (!list) return;
-  list.innerHTML = '<p style="font-size:.84rem;color:var(--text-muted);">Loading parent contacts…</p>';
-  try {
-    const response = await fetch('/api/parent-contacts');
-    const records = await response.json();
-    if (!response.ok) throw new Error(records?.message || 'Unable to load parent contacts.');
-    parentContactRecords = Array.isArray(records) ? records : [];
-    filterParentContacts();
-  } catch (error) {
-    parentContactRecords = [];
-    const count = document.getElementById('parentContactCount');
-    if (count) count.textContent = '0 CONTACTS';
-    list.textContent = safeUserFacingError(error, 'Unable to load parent contacts.');
-  }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 window.loadParentContacts = loadParentContacts;
 window.filterParentContacts = filterParentContacts;
@@ -5878,548 +1510,114 @@ window.openParentContactEditor = openParentContactEditor;
 window.closeParentContactEditor = closeParentContactEditor;
 window.openRegistryForNewContact = openRegistryForNewContact;
 
-async function loadRegistry() {
-  const list = document.getElementById('registryList');
-  if (!list) return;
-  try {
-    const response = await fetch('/api/registry');
-    const records = await response.json();
-    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)}</strong> <span class="badge-tag info">${escapeWorkspaceText(record.className || 'Class pending')}</span><p style="margin-top:4px;">Guardian: ${escapeWorkspaceText(record.guardianName)} · ${escapeWorkspaceText(record.guardianPhone)}<br>Medical notes: ${escapeWorkspaceText(record.medicalNotes || 'None recorded')}</p><span class="meta">Registered ${escapeWorkspaceText(record.createdAt)}</span></div></div>`).join('') : '<p style="font-size:.84rem;color:var(--text-muted);">No learner registry records saved yet.</p>';
-  } catch { list.textContent = 'Unable to load learner registry.'; }
-}
+
 
 const ALERT_LOCATION_SESSION_KEY = 'lf_alert_location';
 
-function getCachedAlertPosition() {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(ALERT_LOCATION_SESSION_KEY) || 'null');
-    if (!cached || !Number.isFinite(Number(cached.latitude)) || !Number.isFinite(Number(cached.longitude))) return null;
-    return { latitude: Number(cached.latitude), longitude: Number(cached.longitude), capturedAt: cached.capturedAt || null };
-  } catch {
-    return null;
-  }
-}
 
-function cacheAlertPosition(position) {
-  const cached = {
-    latitude: Number(Number(position.latitude).toFixed(5)),
-    longitude: Number(Number(position.longitude).toFixed(5)),
-    capturedAt: new Date().toISOString()
-  };
-  sessionStorage.setItem(ALERT_LOCATION_SESSION_KEY, JSON.stringify(cached));
-  return cached;
-}
 
-function updateAlertLocationFilterStatus() {
-  const status = document.getElementById('alertLocationFilterStatus');
-  if (!status) return;
-  const cached = getCachedAlertPosition();
-  status.textContent = cached
-    ? `Location filtering enabled for this browser tab · last refreshed ${new Date(cached.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : 'Location filtering is off until you choose to enable it.';
-}
 
-function requestCurrentPositionFromUserGesture() {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      position => resolve(position.coords),
-      () => resolve(null),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
-    );
-  });
-}
 
-async function enableAlertLocationFiltering() {
-  const position = await requestCurrentPositionFromUserGesture();
-  if (!position) return alert('Location access was not available. Little Feet will continue without location-based filtering.');
-  cacheAlertPosition(position);
-  updateAlertLocationFilterStatus();
-  loadBroadcasts();
-}
 
-async function setAlertLocation() {
-  const position = await requestCurrentPositionFromUserGesture();
-  if (!position) return alert('Location access is required to create an area-based alert.');
-  cacheAlertPosition(position);
-  alertLocation = { lat: position.latitude, lng: position.longitude };
-  document.getElementById('bcLocation').value = `${position.latitude.toFixed(5)}, ${position.longitude.toFixed(5)}`;
-  updateAlertLocationFilterStatus();
-}
 
-async function deleteBroadcast(id) {
-  if (!confirm('Delete this emergency alert?')) return;
-  await fetch(`/api/broadcasts/${id}`, { method: 'DELETE' });
-  loadBroadcasts();
-}
 
-async function markBroadcastRead(id) {
-  if (!currentUser) return;
-  await fetch(`/api/broadcasts/${id}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username }) });
-  loadBroadcasts();
-}
 
-function storeOrderStatusClass(order) {
-  const payment = String(order?.paymentStatus || '').toLowerCase();
-  const fulfilment = String(order?.fulfilmentStatus || '').toLowerCase();
-  if (payment === 'paid' && ['ready_to_prepare','preparing','ready_for_collection','collected'].includes(fulfilment)) return 'info';
-  if (['refunded','cancelled'].includes(fulfilment) || payment === 'refunded') return 'urgent';
-  if (['payment_failed','payment_expired','stock_review_required'].includes(fulfilment) || payment === 'failed') return 'urgent';
-  return '';
-}
 
-function storeOrderStatusLabel(order) {
-  const fulfilment = String(order?.fulfilmentStatus || '').trim();
-  const payment = String(order?.paymentStatus || 'awaiting_payment').trim();
-  return (fulfilment || payment).replaceAll('_', ' ').toUpperCase();
-}
 
-function storeOrderActions(order, canManage) {
-  const payment = String(order?.paymentStatus || '').toLowerCase();
-  const fulfilment = String(order?.fulfilmentStatus || '').toLowerCase();
-  const actions = [];
-  if (payment !== 'paid' && !['refunded','cancelled','payment_failed','payment_expired'].includes(fulfilment)) {
-    if (currentUser?.role === 'parent' || canManage) actions.push(`<button type="button" class="action-btn btn-red" onclick="cancelStoreOrder('${escapeWorkspaceText(order.id)}')">Cancel order</button>`);
-    if (canManage) actions.push(`<button type="button" class="action-btn btn-green" onclick="recordStorePayment('${escapeWorkspaceText(order.id)}','${escapeWorkspaceText(order.reference)}',${Number(order.amount || 0)})">Record cleared payment</button>`);
-  }
-  if (canManage && payment === 'paid' && fulfilment !== 'refunded') {
-    if (!['preparing','ready_for_collection','collected'].includes(fulfilment)) actions.push(`<button type="button" class="action-btn btn-blue" onclick="updateStoreFulfilment('${escapeWorkspaceText(order.id)}','preparing')">Start preparing</button>`);
-    if (!['ready_for_collection','collected'].includes(fulfilment)) actions.push(`<button type="button" class="action-btn btn-green" onclick="updateStoreFulfilment('${escapeWorkspaceText(order.id)}','ready_for_collection')">Ready for collection</button>`);
-    if (fulfilment !== 'collected') actions.push(`<button type="button" class="action-btn btn-green" onclick="updateStoreFulfilment('${escapeWorkspaceText(order.id)}','collected')">Collected</button>`);
-    actions.push(`<button type="button" class="action-btn btn-red" onclick="recordStoreRefund('${escapeWorkspaceText(order.id)}','${escapeWorkspaceText(order.reference)}',${Number(order.amount || 0)})">Record confirmed refund</button>`);
-  }
-  return actions.length ? `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;">${actions.join('')}</div>` : '';
-}
 
-async function loadStoreItems() {
-  const box = document.getElementById('storeItems');
-  if (!box || !currentUser) return;
-  try {
-    const [storeResponse, ordersResponse] = await Promise.all([fetch('/api/store'), fetch('/api/store/orders')]);
-    const store = await storeResponse.json();
-    const orders = ordersResponse.ok ? await ordersResponse.json() : [];
-    if (!storeResponse.ok) throw new Error(store.message);
-    document.getElementById('storeWelcome').textContent = `${store.schoolName} store`;
-    window.schoolStoreProducts = store.products || [];
-    window.schoolStoreOrders = Array.isArray(orders) ? orders : [];
-    const productCards = store.products?.length ? store.products.map(product => {
-      const reserved = store.canManage && Number(product.reservedQuantity || 0) > 0 ? `<p class="meta" style="margin:5px 0 0;">Physical stock: ${Number(product.physicalStockQuantity || 0)} · Reserved awaiting payment: ${Number(product.reservedQuantity || 0)}</p>` : '';
-      return `<article class="store-item"><span class="badge-tag info">AVAILABLE: ${product.stockQuantity}</span><h3 style="margin:10px 0 6px;">${escapeWorkspaceText(product.name)}</h3><strong style="font-size:1.2rem;color:#2dd4bf;">${formatSubscriptionMoney(product.price)}</strong>${reserved}<p style="margin:8px 0 12px;color:var(--text-muted);font-size:.82rem;">Payment reference and confirmed total are shown before you continue to payment.</p>${currentUser.role === 'parent' ? `<button type="button" class="submit-btn" onclick="openStoreCheckout('${product.id}')" ${product.stockQuantity < 1 ? 'disabled' : ''}>${product.stockQuantity < 1 ? 'Out of stock' : 'Buy item'}</button>` : ''}${store.canManage ? `<button type="button" class="action-btn btn-red" style="margin-top:8px;" onclick="removeStoreProduct('${product.id}')">Remove item</button>` : ''}</article>`;
-    }).join('') : `<article class="store-item" style="grid-column:1/-1;text-align:center;"><div style="font-size:2.2rem;margin-bottom:10px;">🛍️</div><h3 style="margin-bottom:8px;">No store items yet</h3><p style="color:var(--text-muted);margin:0;">An administrator can add uniforms, stationery, activity packs or other school items here.</p></article>`;
-    const safeStoreUrl = typeof store.webStoreUrl === 'string' && /^https:\/\//i.test(store.webStoreUrl) ? store.webStoreUrl : '';
-    const externalStore = safeStoreUrl ? `<article class="store-item" style="grid-column:1/-1;"><span class="badge-tag info">OFFICIAL EXTERNAL SCHOOL STORE</span><h3 style="margin:10px 0 5px;">${escapeWorkspaceText(store.schoolName)} web store</h3><p style="margin:0 0 12px;color:var(--text-muted);">Browse items managed by the school’s linked web-store provider.</p><a class="action-btn btn-blue" style="display:inline-block;text-decoration:none;" href="${safeStoreUrl}" target="_blank" rel="noopener noreferrer">Visit official web store</a></article>` : '';
-    const manager = store.canManage ? `<article class="store-item" style="grid-column:1/-1;"><h3 style="margin-bottom:7px;">Add school-store item</h3><form onsubmit="addStoreProduct(event)" style="display:grid;grid-template-columns:minmax(180px,1fr) 130px 130px auto;gap:8px;align-items:end;"><label>Item name<input name="name" required placeholder="e.g. School jersey"></label><label>Price (R)<input name="price" type="number" min="0.01" step="0.01" required></label><label>Stock quantity<input name="stockQuantity" type="number" min="0" step="1" required></label><button class="submit-btn">Add item</button></form></article>` : '';
-    const orderTitle = currentUser.role === 'parent' ? 'Your recent orders' : 'Store orders';
-    const orderList = window.schoolStoreOrders.length
-      ? window.schoolStoreOrders.slice(0, 30).map(order => `<div class="item-row" style="align-items:flex-start;"><div><strong>${escapeWorkspaceText(order.productName)} × ${Number(order.quantity || 0)}</strong> <span class="badge-tag ${storeOrderStatusClass(order)}">${escapeWorkspaceText(storeOrderStatusLabel(order))}</span><p style="margin:5px 0;">${formatSubscriptionMoney(order.amount)} · Ref <strong>${escapeWorkspaceText(order.reference)}</strong></p><p class="meta">Created ${escapeWorkspaceText(new Date(order.createdAt).toLocaleString())}${order.paidAt ? ` · Paid ${escapeWorkspaceText(new Date(order.paidAt).toLocaleString())}` : ''}</p>${storeOrderActions(order, store.canManage)}</div></div>`).join('')
-      : '<p class="meta">No store orders yet.</p>';
-    const orderPanel = `<article class="store-item" style="grid-column:1/-1;"><h3 style="margin-bottom:10px;">${orderTitle}</h3>${orderList}</article>`;
-    box.innerHTML = productCards + externalStore + manager + orderPanel;
-  } catch { box.textContent = 'Unable to load school store items.'; }
-}
 
-function openStoreCheckout(productId) {
-  const product = (window.schoolStoreProducts || []).find(entry => entry.id === productId);
-  if (!product || currentUser?.role !== 'parent') return alert('This school-store item is no longer available.');
-  window.storeCheckoutProduct = product;
-  openModal('Confirm school-store purchase', `<div style="display:grid;gap:12px;"><p style="margin:0;color:var(--text-muted);">You are about to order <strong>${escapeWorkspaceText(product.name)}</strong>. Check the total before continuing to payment.</p><label>Quantity<input id="storeOrderQuantity" type="number" min="1" max="${product.stockQuantity}" value="1" oninput="updateStoreCheckoutTotal()"></label><div style="padding:12px;border-left:4px solid #2dd4bf;border-radius:0 8px 8px 0;background:rgba(45,212,191,.1);"><span style="color:var(--text-muted);">Item price: ${formatSubscriptionMoney(product.price)}</span><br><strong id="storeCheckoutTotal">Total: ${formatSubscriptionMoney(product.price)}</strong></div><p style="margin:0;font-size:.84rem;color:var(--text-muted);">Are you sure you want to continue? A payment reference will be created and the stock room will be notified to prepare your order.</p><button type="button" class="submit-btn" onclick="confirmStoreCheckout()">Yes, continue to payment</button></div>`);
-}
 
-function updateStoreCheckoutTotal() {
-  const product = window.storeCheckoutProduct;
-  const quantity = Math.max(1, Math.min(Number(document.getElementById('storeOrderQuantity')?.value) || 1, product?.stockQuantity || 1));
-  const field = document.getElementById('storeOrderQuantity');
-  if (field) field.value = quantity;
-  const total = document.getElementById('storeCheckoutTotal');
-  if (total && product) total.textContent = `Total: ${formatSubscriptionMoney(product.price * quantity)}`;
-}
 
-async function confirmStoreCheckout() {
-  const product = window.storeCheckoutProduct;
-  const quantity = Number(document.getElementById('storeOrderQuantity')?.value);
-  if (!product || !quantity) return alert('Choose a valid quantity.');
-  try {
-    const response = await fetch('/api/store/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ productId: product.id, quantity }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to create the order.');
-    const payment = result.payment;
-    const destination = paymentDestinationMarkup(payment, 'Continue to secure payment');
-    openModal('Order ready for payment', `<p style="margin:0 0 10px;">Your items are reserved while you complete payment. The stock room starts preparation only after payment is confirmed.</p><div style="padding:12px;border-left:4px solid #2dd4bf;background:rgba(45,212,191,.1);margin-bottom:12px;"><strong>${escapeWorkspaceText(result.order.productName)} × ${result.order.quantity}: ${formatSubscriptionMoney(result.order.amount)}</strong><br>Payment reference: <strong>${escapeWorkspaceText(result.order.reference)}</strong>${result.reservationExpiresAt ? `<br><span class="meta">Reservation holds until ${escapeWorkspaceText(new Date(result.reservationExpiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))}</span>` : ''}</div>${destination}<p style="margin:12px 0 0;color:var(--text-muted);font-size:.82rem;">Use the reference exactly as shown so the order and payment can be matched.</p>`);
-    renderCapitecPayMeQr(payment);
-    loadStoreItems();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to create the order.')); }
-}
 
-async function cancelStoreOrder(orderId) {
-  if (!confirm('Cancel this unpaid store order and release the reserved stock?')) return;
-  try {
-    const response = await fetch(`/api/store/orders/${encodeURIComponent(orderId)}/cancel`, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to cancel the store order.');
-    await loadStoreItems();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to cancel the store order.')); }
-}
 
-function recordStorePayment(orderId, reference, amount) {
-  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can record a cleared store payment.');
-  openModal('Record cleared store payment', `<form onsubmit="submitStorePayment(event,'${encodeInlineIdentifier(orderId)}','${encodeInlineIdentifier(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">Use this only after the money has actually cleared.</p><label>Amount received (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Bank/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Confirm cleared payment</button></form>`);
-}
 
-async function submitStorePayment(event, encodedOrderId, encodedReference, expectedAmount) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/payments/reconcile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-      eventId: `store-paid-${decodeURIComponent(encodedOrderId)}-${Date.now()}`,
-      reference: decodeURIComponent(encodedReference), status:'paid', amount: form.elements.amount.value,
-      bankReference: form.elements.bankReference.value
-    }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to record the store payment.');
-    closeModal();
-    await loadStoreItems();
-    alert('Payment confirmed. The order is ready for the stock room.');
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to record the store payment.')); }
-}
 
-async function updateStoreFulfilment(orderId, status) {
-  try {
-    const response = await fetch(`/api/store/orders/${encodeURIComponent(orderId)}/fulfilment`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to update the store order.');
-    await loadStoreItems();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to update the store order.')); }
-}
 
-function recordStoreRefund(orderId, reference, amount) {
-  if (!isFinanceUser()) return alert('Only an administrator or Accounts user can record a confirmed refund.');
-  openModal('Record confirmed store refund', `<form onsubmit="submitStoreRefund(event,'${encodeInlineIdentifier(orderId)}','${encodeInlineIdentifier(reference)}',${Number(amount || 0)})" style="display:grid;gap:12px;"><p style="margin:0;">Reference: <strong>${escapeWorkspaceText(reference)}</strong></p><p class="meta" style="margin:0;">This does not send money. Use it only after PayFast or the bank has actually confirmed the refund. Little Feet will then return the item quantity to stock.</p><label>Refunded amount (R)<input name="amount" type="number" min="0.01" step="0.01" value="${Number(amount || 0).toFixed(2)}" required></label><label>Refund/provider reference<input name="bankReference" maxlength="160" required></label><button class="submit-btn">Record confirmed refund</button></form>`);
-}
 
-async function submitStoreRefund(event, encodedOrderId, encodedReference, expectedAmount) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/payments/reconcile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-      eventId: `store-refund-${decodeURIComponent(encodedOrderId)}-${Date.now()}`,
-      reference: decodeURIComponent(encodedReference), status:'refunded', amount: form.elements.amount.value,
-      bankReference: form.elements.bankReference.value
-    }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to record the store refund.');
-    closeModal();
-    await loadStoreItems();
-    alert('Refund recorded and the item quantity was returned to stock.');
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to record the store refund.')); }
-}
 
-async function addStoreProduct(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  try {
-    const response = await fetch('/api/store/products', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name: form.elements.name.value, price: form.elements.price.value, stockQuantity: form.elements.stockQuantity.value }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Unable to add the store item.');
-    form.reset(); loadStoreItems();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to add the store item.')); }
-}
 
-async function removeStoreProduct(productId) {
-  if (!confirm('Remove this school-store item?')) return;
-  const response = await fetch(`/api/store/products/${encodeURIComponent(productId)}`, { method:'DELETE' });
-  if (!response.ok) return alert('Unable to remove the store item.');
-  loadStoreItems();
-}
 
-async function loadReportReviews() {
-  const list = document.getElementById('reportReviewList');
-  if (!list || !currentUser) return;
-  const parentSigner = document.getElementById('parentReportSigner');
-  if (parentSigner) parentSigner.classList.toggle('hidden', currentUser.role !== 'parent');
-  try {
-    const response = await fetch(`/api/report-reviews?username=${encodeURIComponent(currentUser.username)}`);
-    const reports = await response.json();
-    const grouped = reports.reduce((groups, report) => {
-      const month = report.period || new Date(report.createdAt).toLocaleString(undefined, { month: 'long', year: 'numeric' });
-      (groups[month] ||= []).push(report); return groups;
-    }, {});
-    window.reportReviewCache = Object.fromEntries(reports.map(report => [report.id, report]));
-    list.innerHTML = Object.keys(grouped).length ? Object.entries(grouped).map(([month, entries]) => `<h3 class="workspace-heading">${escapeWorkspaceText(month)}</h3>${entries.map(report => `<div class="item-row"><div><strong>${escapeWorkspaceText(report.studentName)} · ${escapeWorkspaceText(report.reportTitle)}</strong><p style="margin-top:4px;">${escapeWorkspaceText(report.period)} · <span class="badge-tag ${report.status.startsWith('Complete') ? 'info' : 'urgent'}">${escapeWorkspaceText(report.status)}</span></p><span class="meta">Teacher signed: ${new Date(report.teacherSignedAt).toLocaleString()}${report.parentSignedAt ? ` · Parent signed: ${new Date(report.parentSignedAt).toLocaleString()}` : ''}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="action-btn btn-blue" onclick="viewParentReport('${report.id}')">View report</button>${currentUser.role === 'parent' && !report.parentSignature ? `<button type="button" class="action-btn btn-green" onclick="signParentReport('${report.id}')">Sign report</button>` : ''}</div></div>`).join('')}`).join('') : '<p class="meta">No reports are available for this account.</p>';
-  } catch { list.textContent = 'Unable to load report reviews.'; }
-}
 
-function viewParentReport(id) {
-  const report = window.reportReviewCache?.[id];
-  if (!report) return alert('The report is no longer available. Refresh and try again.');
-  const safe = escapeWorkspaceText;
-  const teacherSignature = typeof report.teacherSignature === 'string' && report.teacherSignature.startsWith('data:image/')
-    ? `<img src="${report.teacherSignature}" alt="Teacher signature" style="width:100%;max-width:500px;border:1px solid var(--border-color);border-radius:8px;background:#fff;">`
-    : '<p class="meta">Teacher signature unavailable.</p>';
-  const parentSignature = typeof report.parentSignature === 'string' && report.parentSignature.startsWith('data:image/')
-    ? `<img src="${report.parentSignature}" alt="Parent signature" style="width:100%;max-width:500px;border:1px solid var(--border-color);border-radius:8px;background:#fff;">`
-    : '<p class="meta">Awaiting parent signature.</p>';
-  openModal(`Report: ${safe(report.reportTitle)}`, `<div style="display:grid;gap:14px;line-height:1.55;"><div><strong>Learner:</strong> ${safe(report.studentName)}<br><strong>Period:</strong> ${safe(report.period)}<br><strong>Status:</strong> ${safe(report.status)}</div><div><strong>Teacher acknowledgement</strong><br><span class="meta">Signed ${new Date(report.teacherSignedAt).toLocaleString()}</span>${teacherSignature}</div><div><strong>Parent acknowledgement</strong><br><span class="meta">${report.parentSignedAt ? `Signed ${new Date(report.parentSignedAt).toLocaleString()}` : 'Use the parent signature panel to complete this report.'}</span>${parentSignature}</div></div>`);
-}
 
-async function signParentReport(id) {
-  const signature = reportSignaturePads.parentSignaturePad;
-  const pin = document.getElementById('parentReportPin')?.value;
-  if (!signature?.hasStroke()) return alert('Add the parent signature first.');
-  if (!pin) return alert('Enter your signing PIN.');
-  const response = await fetch(`/api/report-reviews/${id}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser?.username, signingPin: pin, signatureData: signature.canvas.toDataURL('image/png') }) });
-  const result = await response.json();
-  if (!response.ok) return alert(result.message || 'Unable to sign report.');
-  document.getElementById('parentReportPin').value = ''; clearSignature('parentSignaturePad'); loadReportReviews(); playDingSound();
-}
 
-function escapeWorkspaceText(value) {
-  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
 
-function showProviderSetup(providerName) {
-  openModal(`${providerName} connection required`, `<div style="font-size:.9rem;line-height:1.6;"><p>This feature needs an approved school-owned ${providerName} account before it can operate.</p><p style="margin-top:10px;"><strong>Next steps:</strong></p><ol style="margin:6px 0 0 20px;"><li>Choose and contract an approved provider.</li><li>Obtain the provider credentials and consent documentation.</li><li>Ask an administrator to configure the connection securely.</li></ol><p style="margin-top:10px;color:var(--text-muted);">No payment, payroll, SMS, or push messages are sent until a provider is connected.</p></div>`);
-}
 
-function quickCareLog(activity) {
-  const learner = prompt(`Who is this ${activity.toLowerCase()} for? Enter learner or class name.`);
-  if (!learner || !learner.trim()) return;
-  saveWorkspaceRecord(null, 'dailyCare', `${activity}: ${learner.trim()}`);
-}
 
-async function loadConsentRecords() {
-  const list = document.getElementById('consentRecords');
-  if (!list) return;
-  const response = await fetch('/api/consents');
-  const records = await response.json();
-  list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.learnerName)}</strong><p style="margin-top:3px;">Guardian: ${escapeWorkspaceText(record.guardianName)} · Internal updates: ${record.internalUpdates ? 'Allowed' : 'Not allowed'} · Marketing: ${record.marketingPhotos ? 'Allowed' : 'Not allowed'}</p><span class="meta">${escapeWorkspaceText(record.capturedAt)}</span></div></div>`).join('') : '<p class="meta">No consent decisions recorded.</p>';
-}
 
-async function loadPickupRecords() {
-  const list = document.getElementById('pickupRecords');
-  if (!list) return;
-  const response = await fetch('/api/pickups');
-  const records = await response.json();
-  list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.action)} · ${escapeWorkspaceText(record.learnerName)}</strong><p style="margin-top:3px;">Verified adult: ${escapeWorkspaceText(record.pickupAdult)} · Recorded by: ${escapeWorkspaceText(record.recordedBy)}</p><span class="meta">${escapeWorkspaceText(record.timestamp)}</span></div></div>`).join('') : '<p class="meta">No handover audit records recorded.</p>';
-}
 
-async function saveWorkspaceRecord(event, module, defaultDetails) {
-  if (event) event.preventDefault();
-  const detailsInput = event?.target?.querySelector('[name="details"]');
-  const details = detailsInput?.value.trim() || defaultDetails;
-  if (!details) return;
-  const response = await fetch(`/api/modules/${module}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: defaultDetails, details, recordedBy: currentUser?.name || currentUser?.username || 'User' }) });
-  if (!response.ok) return alert('Unable to save this record.');
-  if (event) event.target.reset();
-  await loadWorkspaceRecords(module);
-  playDingSound();
-}
 
-async function saveStickyNote(event) {
-  event.preventDefault();
-  const form = event.target;
-  const noteId = form.querySelector('[name="noteId"]')?.value || '';
-  const title = form.querySelector('[name="noteTitle"]')?.value.trim() || '';
-  const details = form.querySelector('[name="details"]')?.value.trim() || '';
-  const colour = form.querySelector('[name="colour"]')?.value || 'yellow';
-  if (!title || !details) return;
-  const response = await fetch(noteId ? `/api/modules/stickyNotes/${encodeURIComponent(noteId)}` : '/api/modules/stickyNotes', { method: noteId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: title, details, colour, recordedBy: currentUser?.name || currentUser?.username || 'User' }) });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    return alert(payload.message || 'Unable to save this sticky note.');
-  }
-  cancelStickyNoteEdit();
-  await loadStickyNotes();
-  playDingSound();
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Keep the form compatible with a previously cached page that used an inline submit handler.
 window.saveStickyNote = saveStickyNote;
 
-function bindStickyNoteForm() {
-  const form = document.getElementById('stickyNoteForm');
-  if (!form || form.dataset.stickySubmitBound === 'true') return;
-  form.addEventListener('submit', saveStickyNote);
-  form.dataset.stickySubmitBound = 'true';
-}
+
 
 bindStickyNoteForm();
 
-async function editStickyNote(id) {
-  const form = document.getElementById('stickyNoteForm');
-  if (!form) return;
-  try {
-    const response = await fetch('/api/modules/stickyNotes');
-    const records = await response.json();
-    const note = Array.isArray(records) ? records.find(record => record.id === id) : null;
-    if (!response.ok || !note) throw new Error('Sticky note not found.');
-    form.querySelector('[name="noteId"]').value = note.id;
-    form.querySelector('[name="noteTitle"]').value = note.type || '';
-    form.querySelector('[name="details"]').value = note.details || '';
-    form.querySelector('[name="colour"]').value = stickyNoteColour(note);
-    document.getElementById('stickyNoteSubmit').textContent = 'Save changes';
-    document.getElementById('cancelStickyNoteEdit').classList.remove('hidden');
-    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    form.querySelector('[name="noteTitle"]').focus();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to open this sticky note.')); }
-}
 
-function cancelStickyNoteEdit() {
-  const form = document.getElementById('stickyNoteForm');
-  if (!form) return;
-  form.reset();
-  form.querySelector('[name="noteId"]').value = '';
-  document.getElementById('stickyNoteSubmit').textContent = 'Add sticky note';
-  document.getElementById('cancelStickyNoteEdit').classList.add('hidden');
-}
 
-async function loadStickyNotes() {
-  const board = document.getElementById('stickyNotesRecords');
-  const canUseStickyNotes = isFullAccessUser() || ['teacher', 'principal'].includes(currentUser?.role);
-  if (!canUseStickyNotes) {
-    document.getElementById('stickyNotesOverlay')?.replaceChildren();
-    document.getElementById('stickyNotesOverlay')?.classList.add('hidden');
-    document.getElementById('stickyNotesLauncher')?.classList.add('hidden');
-    return;
-  }
-  try {
-    const response = await fetch('/api/modules/stickyNotes');
-    const records = await response.json();
-    if (!response.ok) throw new Error('Unable to load notes');
-    if (board) board.innerHTML = records.length ? records.map(record => `<article class="sticky-note sticky-note--${stickyNoteColour(record)}" title="Double-click to open this floating note" ondblclick="openStickyNote('${record.id}')"><div class="sticky-note-actions"><button type="button" class="sticky-note-edit" title="Edit sticky note" aria-label="Edit ${escapeWorkspaceText(record.type)}" onclick="event.stopPropagation();editStickyNote('${record.id}')" ondblclick="event.stopPropagation()">Edit</button><button type="button" class="sticky-note-delete" title="Delete permanently" aria-label="Delete ${escapeWorkspaceText(record.type)} permanently" onclick="event.stopPropagation();deleteStickyNote('${record.id}')" ondblclick="event.stopPropagation()">×</button></div><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.updatedAt ? `Edited ${record.updatedAt}` : record.createdAt || '')}</span></article>`).join('') : '<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">🗒️</span><span><strong>No sticky notes yet</strong><span>Add a staff reminder to begin.</span></span></div>';
-    renderFloatingStickyNotes(records);
-  } catch { if (board) board.textContent = 'Unable to load sticky notes.'; }
-}
 
-function stickyNoteColour(record) {
-  return ['yellow', 'teal', 'blue', 'rose'].includes(record?.colour) ? record.colour : 'yellow';
-}
 
-function stickyNotePositionKey(id) {
-  return `lf_sticky_note_position_${currentUser?.username || 'user'}_${id}`;
-}
 
-function stickyNoteClosedKey(id) {
-  return `lf_sticky_note_closed_${currentUser?.username || 'user'}_${id}`;
-}
 
-function closeStickyNote(id) {
-  localStorage.setItem(stickyNoteClosedKey(id), 'true');
-  loadStickyNotes();
-}
 
-async function deleteStickyNote(id) {
-  if (!confirm('Permanently delete this sticky note? This cannot be undone.')) return;
-  try {
-    const response = await fetch(`/api/modules/stickyNotes/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.message || 'Unable to delete this sticky note.');
-    }
-    localStorage.removeItem(stickyNoteClosedKey(id));
-    localStorage.removeItem(stickyNotePositionKey(id));
-    await loadStickyNotes();
-  } catch (error) { alert(safeUserFacingError(error, 'Unable to delete this sticky note.')); }
-}
 
-async function openStickyNote(id) {
-  localStorage.removeItem(stickyNoteClosedKey(id));
-  await loadStickyNotes();
-  const note = [...document.querySelectorAll('#stickyNotesOverlay [data-note-id]')].find(entry => entry.dataset.noteId === id);
-  if (note) {
-    note.classList.add('is-dragging');
-    window.setTimeout(() => note.classList.remove('is-dragging'), 380);
-  }
-}
 
-function restoreStickyNotes() {
-  document.querySelectorAll('#stickyNotesOverlay [data-note-id]').forEach(note => localStorage.removeItem(stickyNoteClosedKey(note.dataset.noteId)));
-  fetch('/api/modules/stickyNotes').then(response => response.json()).then(records => (Array.isArray(records) ? records : []).forEach(record => localStorage.removeItem(stickyNoteClosedKey(record.id)))).finally(() => loadStickyNotes());
-}
 
-function readStickyNotePosition(id, index) {
-  try {
-    const saved = JSON.parse(localStorage.getItem(stickyNotePositionKey(id)) || 'null');
-    if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) return saved;
-  } catch {}
-  return { left: Math.min(window.innerWidth - 260, 24 + (index % 4) * 34), top: Math.min(window.innerHeight - 210, 112 + (index % 5) * 38) };
-}
 
-function clampStickyNotePosition(note, left, top) {
-  const width = note.offsetWidth || 244;
-  const height = note.offsetHeight || 178;
-  return { left: Math.round(Math.max(10, Math.min(left, window.innerWidth - width - 10))), top: Math.round(Math.max(76, Math.min(top, window.innerHeight - height - 10))) };
-}
 
-function renderFloatingStickyNotes(records) {
-  const overlay = document.getElementById('stickyNotesOverlay');
-  const launcher = document.getElementById('stickyNotesLauncher');
-  if (!overlay) return;
-  if (launcher) launcher.classList.toggle('hidden', !records.length);
-  overlay.replaceChildren();
-  const visibleRecords = records.filter(record => localStorage.getItem(stickyNoteClosedKey(record.id)) !== 'true');
-  overlay.classList.toggle('hidden', !visibleRecords.length);
-  visibleRecords.forEach((record, index) => {
-    const note = document.createElement('article');
-    note.className = `floating-sticky-note floating-sticky-note--${stickyNoteColour(record)}`;
-    note.dataset.noteId = record.id;
-    note.innerHTML = `<div class="floating-sticky-note-handle" aria-label="Drag ${escapeWorkspaceText(record.type || 'sticky note')}" title="Drag to move"><span>Drag note</span><span><button type="button" class="floating-sticky-note-edit" aria-label="Edit ${escapeWorkspaceText(record.type || 'sticky note')}" title="Edit sticky note">Edit</button><button type="button" class="floating-sticky-note-delete" aria-label="Close ${escapeWorkspaceText(record.type || 'sticky note')}" title="Close note (keeps it saved)">×</button></span></div><strong>${escapeWorkspaceText(record.type || 'Reminder')}</strong><p>${escapeWorkspaceText(record.details || '')}</p><span>${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.updatedAt ? `Edited ${record.updatedAt}` : record.createdAt || '')}</span>`;
-    overlay.append(note);
-    const saved = readStickyNotePosition(record.id, index);
-    const position = clampStickyNotePosition(note, saved.left, saved.top);
-    note.style.left = `${position.left}px`;
-    note.style.top = `${position.top}px`;
-    note.querySelector('.floating-sticky-note-handle')?.addEventListener('pointerdown', event => startStickyNoteDrag(event, note));
-    note.querySelector('.floating-sticky-note-edit')?.addEventListener('pointerdown', event => event.stopPropagation());
-    note.querySelector('.floating-sticky-note-edit')?.addEventListener('click', event => { event.stopPropagation(); editStickyNote(record.id); });
-    note.querySelector('.floating-sticky-note-delete')?.addEventListener('pointerdown', event => event.stopPropagation());
-    note.querySelector('.floating-sticky-note-delete')?.addEventListener('click', event => { event.stopPropagation(); closeStickyNote(record.id); });
-  });
-}
 
-function startStickyNoteDrag(event, note) {
-  if (event.button !== undefined && event.button !== 0) return;
-  if (event.target.closest('button')) return;
-  event.preventDefault();
-  const start = { x: event.clientX, y: event.clientY, left: parseFloat(note.style.left) || 10, top: parseFloat(note.style.top) || 76 };
-  note.classList.add('is-dragging');
-  note.setPointerCapture?.(event.pointerId);
-  const move = moveEvent => {
-    const next = clampStickyNotePosition(note, start.left + moveEvent.clientX - start.x, start.top + moveEvent.clientY - start.y);
-    note.style.left = `${next.left}px`;
-    note.style.top = `${next.top}px`;
-  };
-  const finish = finishEvent => {
-    note.classList.remove('is-dragging');
-    note.releasePointerCapture?.(finishEvent.pointerId);
-    localStorage.setItem(stickyNotePositionKey(note.dataset.noteId), JSON.stringify({ left: parseFloat(note.style.left), top: parseFloat(note.style.top) }));
-    note.removeEventListener('pointermove', move);
-    note.removeEventListener('pointerup', finish);
-    note.removeEventListener('pointercancel', finish);
-  };
-  note.addEventListener('pointermove', move);
-  note.addEventListener('pointerup', finish);
-  note.addEventListener('pointercancel', finish);
-}
 
-async function loadWorkspaceRecords(module) {
-  const list = document.getElementById(`${module}Records`);
-  if (!list) return;
-  try {
-    const response = await fetch(`/api/modules/${module}`);
-    const records = await response.json();
-    const emptyIconName = { edit: 'icon-edit', document: 'icon-document', handover: 'icon-handover' }[list.dataset.emptyIcon] || 'icon-document';
-    const emptyIcon = `<svg class="ui-icon" aria-hidden="true"><use href="#${emptyIconName}"></use></svg>`;
-    const emptyTitle = escapeWorkspaceText(list.dataset.emptyTitle || 'No records yet');
-    const emptyText = escapeWorkspaceText(list.dataset.emptyText || 'New records will appear here after they are saved.');
-    list.innerHTML = records.length ? records.map(record => `<div class="item-row"><div><strong>${escapeWorkspaceText(record.type || 'Record')}</strong><p style="margin-top:3px;">${escapeWorkspaceText(record.details)}</p><span class="meta">${escapeWorkspaceText(record.recordedBy || 'User')} · ${escapeWorkspaceText(record.createdAt || '')}</span></div>${isFullAccessUser() ? `<button type="button" class="action-btn btn-red" onclick="deleteWorkspaceRecord('${module}','${record.id}')">Delete</button>` : ''}</div>`).join('') : `<div class="record-empty-state"><span class="record-empty-icon" aria-hidden="true">${emptyIcon}</span><span><strong>${emptyTitle}</strong><span>${emptyText}</span></span></div>`;
-  } catch { list.textContent = 'Unable to load workspace records.'; }
-}
 
-async function deleteWorkspaceRecord(module, id) {
-  if (!confirm('Delete this record?')) return;
-  await fetch(`/api/modules/${module}/${id}`, { method: 'DELETE' });
-  loadWorkspaceRecords(module);
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 document.addEventListener('littlefeet:session-ended', () => { ['companyClientsContent','companyBillingContent'].forEach(id => document.getElementById(id)?.replaceChildren()); });
 

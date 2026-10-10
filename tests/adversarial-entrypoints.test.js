@@ -84,6 +84,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   groupMessages: {}
 }));
 
+fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temp,
   env: {
@@ -677,7 +678,7 @@ const login = async (username, pin, suppliedCookie = '') => {
     assert.equal(studentSearchAfterRejectedImport.data.filter(entry => /^Learner \d+$/.test(entry.studentName || '')).length, 0);
 
     // 14. OAuth source guards: Google state, Yahoo state, and Microsoft state + PKCE must remain present.
-    const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+    const serverSource = require('../scripts/source-layout').readBackendSource(root);
     assert.match(serverSource, /state:\s*true/);
     assert.match(serverSource, /req\.query\.state !== req\.session\.yahooOAuthState/);
     assert.match(serverSource, /req\.query\.state !== req\.session\.microsoftOAuthState/);

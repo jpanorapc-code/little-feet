@@ -35,6 +35,7 @@ fs.copyFileSync(path.join(root, 'lib', 'yahoo-imap.js'), path.join(temporaryDire
 fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temporaryDirectory, 'lib', 'yahoo-smtp.js'));
 fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.stringify({ schools, users, students, learnerAccessCodes: [], schoolBilling: {}, moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {} }));
 
+fs.cpSync(path.join(root, 'lib'), path.join(temporaryDirectory, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['server.js'], { cwd: temporaryDirectory, env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', NODE_ENV: 'test' }, stdio: ['ignore', 'ignore', 'pipe'] });
 let childErrorOutput = '';
 child.stderr.on('data', chunk => { childErrorOutput += chunk.toString(); });

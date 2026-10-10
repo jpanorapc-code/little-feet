@@ -41,7 +41,8 @@ fs.copyFileSync(path.join(root, 'lib', 'yahoo-smtp.js'), path.join(temp, 'lib', 
     schools: [], users: [], students: [], moduleRecords: {}, directMessages: [], chatGroups: [], groupMessages: {}, schoolBilling: {}
   }));
 
-  const child = spawn(process.execPath, ['server.js'], {
+  fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
+const child = spawn(process.execPath, ['server.js'], {
     cwd: temp,
     env: {
       ...process.env,

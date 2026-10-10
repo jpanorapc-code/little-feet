@@ -6,12 +6,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
-const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+const server = require('../scripts/source-layout').readBackendSource(root);
 const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const cinematic = fs.readFileSync(path.join(root, 'assets', 'cinematic.js'), 'utf8');
 const cinematicLoader = fs.readFileSync(path.join(root, 'assets', 'cinematic-loader.js'), 'utf8');
 const styles = fs.readFileSync(path.join(root, 'assets', 'cinematic.css'), 'utf8');
-const backup = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const backup = require('../scripts/source-layout').readFrontendSource(root);
 const swimAction = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'penguin-swim-action.json'), 'utf8'));
 const compactRigEncoded = fs.readFileSync(path.join(root, 'assets', 'models', 'penguin-swim-rig-v2.json.gz.b64'), 'utf8').trim();
 const compactRig = JSON.parse(zlib.gunzipSync(Buffer.from(compactRigEncoded, 'base64')).toString('utf8'));

@@ -50,6 +50,7 @@ const teacher = { username: 'alpha-teacher', pinHash: pinHash('TeacherPass1'), n
 const replicaFile = path.join(temp, 'littlefeet-replica.json');
 fs.writeFileSync(replicaFile, JSON.stringify(snapshot([admin])));
 
+fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['backup-server.js'], {
   cwd: temp,
   env: { ...process.env, PORT: String(port), BACKUP_PORT: '', LF_REPLICA_MODE: '1', NODE_ENV: 'test' },

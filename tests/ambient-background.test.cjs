@@ -54,7 +54,7 @@ async function main() {
     assert.equal((await fetch(origin + file)).status, 404, `Private file exposed: ${file}`);
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
-  assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
+  assert.equal(served, require('../scripts/source-layout').readFrontendSource(root));
   browser = await chromium.launch({ headless: true, ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {}) });
   const summary = [];
   for (const role of roles) {

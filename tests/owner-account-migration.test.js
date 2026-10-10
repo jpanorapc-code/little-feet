@@ -36,7 +36,8 @@ let child;
 let stderr = '';
 const start = async extraEnv => {
   stderr = '';
-  child = spawn(process.execPath, ['server.js'], {
+  fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
+child = spawn(process.execPath, ['server.js'], {
     cwd: temp,
     env: {
       ...process.env,

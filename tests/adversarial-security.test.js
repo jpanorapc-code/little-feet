@@ -46,6 +46,7 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
   chatGroups:[], groupMessages:{}, directMessages:[], parentPayments:[], paymentEvents:[], paymentLedger:[], schoolBilling:{}
 }));
 
+fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temp,
   env: {
@@ -198,7 +199,7 @@ async function login(username,pin) {
     const stored=await request('/api/modules/operations',{method:'POST',cookie:alphaTeacher,origin:sameOrigin,body:{type:'Safety note',details:xssPayload}});
     assert.equal(stored.response.status,200);
     assert.equal(stored.data.record.details,xssPayload);
-    const client=fs.readFileSync(path.join(root,'backup.js'),'utf8');
+    const client=require('../scripts/source-layout').readFrontendSource(root);
     assert.match(client,/escapeWorkspaceText\(record\.details\)/);
 
     // 15. Curriculum mapping cannot be crossed by a forged client.
@@ -222,7 +223,7 @@ async function login(username,pin) {
     assert.doesNotMatch(sw,/cache\.put\([^\n]*api\//i);
 
     // 19. Source-level mass-assignment guard for direct request-body spreads.
-    const server=fs.readFileSync(path.join(root,'server.js'),'utf8');
+    const server=require('../scripts/source-layout').readBackendSource(root);
     assert.doesNotMatch(server,/\.\.\.\s*req\.body/);
     assert.match(server,/camera=\(self\)/);
     assert.match(server,/boundedText/);

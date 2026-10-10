@@ -87,6 +87,7 @@ const validationServer = http.createServer((req, res) => {
   });
 });
 
+fs.cpSync(path.join(root, 'lib'), path.join(temporaryDirectory, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
   env: {

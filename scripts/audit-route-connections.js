@@ -3,6 +3,15 @@ const path = require('path');
 
 function auditRouteConnections(root = path.resolve(__dirname, '..')) {
   const serverFiles = ['server.js', 'finance-automation-server.js', 'school-core-upgrades-server.js', 'advanced-school-operations-server.js'];
+  const walkRoutes = directory => {
+    if (!fs.existsSync(directory)) return;
+    for (const entry of fs.readdirSync(directory, { withFileTypes:true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) walkRoutes(full);
+      else if (entry.name.endsWith('.js')) serverFiles.push(path.relative(root, full));
+    }
+  };
+  walkRoutes(path.join(root, 'lib', 'routes'));
   const routePattern = /app\.(get|post|put|patch|delete)\(\s*(['"])(\/api\/[^'"]+)\2/g;
   const routes = [];
 

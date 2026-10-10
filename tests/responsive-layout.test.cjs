@@ -5,7 +5,7 @@ const path = require('node:path');
 const http = require('node:http');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
-const backupSource = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+const backupSource = require('../scripts/source-layout').readFrontendSource(root);
 const pageSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const workplaceExtendedSource = fs.readFileSync(path.join(root, 'assets', 'workplace-extended.js'), 'utf8');
 assert.match(backupSource, /--portal-sidebar-top/, 'Sidebar runtime offset variable must be maintained');
@@ -48,6 +48,9 @@ const server = http.createServer((req, res) => {
     return [...document.querySelectorAll('.tab-content')].filter(tab => !tab.parentElement.matches('#dashboardSection > .container')).map(tab => tab.id);
   });
   assert.deepEqual(structure, [], 'Every tab must remain inside the shared content container');
+  await page.evaluate(() => { window.registerLittleFeetWorkspace = (_, start) => start(); });
+  await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'assets', 'welcome-clock.js'), 'utf8') });
+  assert.equal(await page.locator('#homeTab .welcome-clock').count(), 1);
   const failures = [];
   let checks = 0;
   for (const [width, height] of sizes) {

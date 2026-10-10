@@ -30,7 +30,8 @@ fs.writeFileSync(path.join(temp, 'littlefeet-replica.json'), JSON.stringify({
 
 let child;
 const start = async () => {
-  child = spawn(process.execPath, ['server.js'], { cwd: temp, env: { ...process.env, PORT: String(port), NODE_ENV: 'test', SESSION_SECRET: 'import-session', LF_FIELD_ENCRYPTION_KEY: 'import-fields' }, stdio: ['ignore', 'ignore', 'inherit'] });
+  fs.cpSync(path.join(root, 'lib'), path.join(temp, 'lib'), { recursive: true });
+child = spawn(process.execPath, ['server.js'], { cwd: temp, env: { ...process.env, PORT: String(port), NODE_ENV: 'test', SESSION_SECRET: 'import-session', LF_FIELD_ENCRYPTION_KEY: 'import-fields' }, stdio: ['ignore', 'ignore', 'inherit'] });
   for (let i = 0; i < 120; i += 1) { try { if ((await fetch(origin + '/api/health')).ok) return; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   throw new Error('Import test server did not start.');
 };

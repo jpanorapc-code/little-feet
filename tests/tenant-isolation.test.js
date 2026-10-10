@@ -45,6 +45,7 @@ fs.writeFileSync(path.join(temporaryDirectory, 'littlefeet-replica.json'), JSON.
   releaseNotes: [{ id: '2026-08-safeguarding', version: '2.8', title: 'Old saved release', summary: 'This stale database value must be replaced by the deployed release catalogue.', publishedAt: '2026-08-28T08:00:00.000Z' }]
 }));
 
+fs.cpSync(path.join(root, 'lib'), path.join(temporaryDirectory, 'lib'), { recursive: true });
 const child = spawn(process.execPath, ['server.js'], {
   cwd: temporaryDirectory,
   env: { ...process.env, PORT: String(port), LF_REPLICA_MODE: '1', LF_TEST_ALLOW_REPLICA_WRITES: '1', NODE_ENV: 'test', LF_PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret', LF_BACKUP_BUCKET: 'configured-but-not-used' },
@@ -103,7 +104,7 @@ const rawRequest = async (route) => {
     assert.equal(keepalive.response.status, 200);
     assert.equal(keepalive.data.status, 'OK');
     assert.equal(Object.prototype.hasOwnProperty.call(keepalive.data, 'database'), false);
-    for (const privatePath of ['/server.js', '/auth-crypto.js', '/package.json', '/littlefeet-replica.json', '/littlefeet.db']) {
+    for (const privatePath of ['/server.js', '/auth-crypto.js', '/lib/routes/auth.js', '/lib/helpers/accounts.js', '/lib/auth/login-verification.js', '/package.json', '/littlefeet-replica.json', '/littlefeet.db']) {
       const privateFile = await rawRequest(privatePath);
       assert.equal(privateFile.response.status, 404);
     }
