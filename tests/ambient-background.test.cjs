@@ -22,7 +22,7 @@ let browser;
 let stderr = '';
 
 async function main() {
-  for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'auth-crypto.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
+  for (const file of ['server.js', 'failover-mode.js', 'finance-automation-server.js', 'school-core-upgrades-server.js', 'advanced-school-operations-server.js', 'auth-crypto.js', 'backup.js', 'index.html', 'logo.png', 'logo-transparent.png', 'little-feet-mascot.jfif']) {
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));
   }
   // Keep the browser fixture aligned with every local server dependency.
@@ -54,7 +54,7 @@ async function main() {
     assert.equal((await fetch(origin + file)).status, 404, `Private file exposed: ${file}`);
   }
   const served = await (await fetch(`${origin}/backup.js`)).text();
-  assert.equal(served, require('../scripts/source-layout').readFrontendSource(root));
+  assert.equal(served, fs.readFileSync(path.join(root, 'backup.js'), 'utf8'));
   browser = await chromium.launch({ headless: true, ...(process.env.LF_BROWSER_CHANNEL ? { channel: process.env.LF_BROWSER_CHANNEL } : {}) });
   const summary = [];
   for (const role of roles) {

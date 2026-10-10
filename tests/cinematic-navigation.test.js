@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
 const server = require('../scripts/source-layout').readBackendSource(root);
-const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const page = require('../scripts/source-layout').readPageSource(root);
 const cinematic = fs.readFileSync(path.join(root, 'assets', 'cinematic.js'), 'utf8');
 const cinematicLoader = fs.readFileSync(path.join(root, 'assets', 'cinematic-loader.js'), 'utf8');
 const styles = fs.readFileSync(path.join(root, 'assets', 'cinematic.css'), 'utf8');

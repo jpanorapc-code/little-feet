@@ -95,6 +95,14 @@ async function loadSchoolProximityMap() {
   container.classList.remove('hidden');
   closeButton?.classList.remove('hidden');
   findButton?.setAttribute('aria-expanded', 'true');
+  container.textContent = 'Loading the live school map…';
+  try {
+    await window.loadLittleFeetMap();
+  } catch (error) {
+    if (requestToken === schoolMapRequestToken) container.textContent = error.message;
+    return;
+  }
+  if (requestToken !== schoolMapRequestToken) return;
   if (!navigator.geolocation) {
     alert('Geolocation is not supported by your browser.');
     return;

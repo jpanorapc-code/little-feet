@@ -48,6 +48,13 @@
       active.pause();
     } else {
       try {
+        // Only the visible, playing background needs a media download. Posters
+        // remain available when motion is paused, reduced or the page is hidden.
+        const source = active.querySelector('source[data-src]');
+        if (source && !source.hasAttribute('src')) {
+          source.src = source.dataset.src;
+          active.load();
+        }
         await active.play();
         active.dataset.playbackState = 'playing';
       } catch (error) {

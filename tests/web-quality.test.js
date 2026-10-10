@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const page = require('../scripts/source-layout').readPageSource(root);
 const server = require('../scripts/source-layout').readBackendSource(root);
 const client = require('../scripts/source-layout').readFrontendSource(root);
 const robots = fs.readFileSync(path.join(root, 'robots.txt'), 'utf8');
@@ -38,14 +38,14 @@ assert.ok(page.includes('<script type="application/ld+json">'));
 assert.equal((page.match(/<h1\b/gi) || []).length, 1, 'The public document should expose one primary H1.');
 assert.match(page, /<h1 role="button" tabindex="0"/);
 assert.match(page, /rel="manifest" href="\/manifest\.webmanifest"/);
-assert.match(page, /ambient-background\.js\?v=20261006-login-cache-v2/);
+assert.match(page, /ambient-background\.js\?v=20261010-media-loading-v1/);
 assert.match(page, /backup\.js\?v=20261010-controlled-split-v2/);
 assert.match(page, /input\[type="checkbox"\],[\s\S]*input\[type="radio"\][\s\S]*width:18px;[\s\S]*max-width:18px;[\s\S]*box-shadow:none;/);
 assert.match(page, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
-assert.match(serviceWorker, /little-feet-shell-v74-sa-clock/);
+assert.match(serviceWorker, /little-feet-shell-v75-assets/);
 assert.doesNotMatch(serviceWorker, /cache\.put\('\/'\s*,/);
 assert.match(serviceWorker, /status: 503/);
-assert.match(serviceWorker, /\/assets\/ambient-background\.js\?v=20261006-login-cache-v2/);
+assert.match(serviceWorker, /\/assets\/ambient-background\.js\?v=20261010-media-loading-v1/);
 assert.match(serviceWorker, /\/backup\.js\?v=20261010-controlled-split-v2/);
 assert.match(serviceWorker, /\/assets\/preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /\/assets\/advanced-school-operations\.js\?v=20261009-stage-navigation-v1/);
@@ -89,7 +89,7 @@ assert.match(client, /const legacyProfileIconMap = Object\.freeze\(/);
 assert.match(client, /function normalizeProfileIcon\(icon\)/);
 assert.match(client, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3#avatar-\$\{selectedIcon\}/);
 assert.match(client, /button\.querySelector\('\.ui-icon, \.profile-avatar-image'\)/);
-assert.match(serviceWorker, /little-feet-shell-v74-sa-clock/);
+assert.match(serviceWorker, /little-feet-shell-v75-assets/);
 assert.match(serviceWorker, /penguin-profile-avatars\.svg\?v=20261004-portraits-v3/);
 assert.match(serviceWorker, /backup\.js\?v=20261010-controlled-split-v2/);
 assert.match(page, /id="executiveHomeOverview" class="card executive-home-overview hidden"/);
@@ -317,9 +317,15 @@ assert.match(page, /onclick="openTermsOfService\(\)">Terms of Service/);
 assert.match(page, /NCF Birth–4/);
 assert.match(page, /CAPS Grade R/);
 
-for (const asset of ['xlsx.js', 'qrcode.js', 'leaflet.js', 'leaflet-markercluster.js']) {
+for (const asset of ['xlsx.js', 'qrcode.js']) {
   assert.match(page, new RegExp('<script src="\\/vendor\\/' + asset.replace('.', '\\.') + '" defer><\\/script>'));
 }
+const mapLoader = fs.readFileSync(path.join(root, 'assets/map-loader.js'), 'utf8');
+assert.match(page, /map-loader\.js\?v=20261010-map-loading-v1/);
+assert.doesNotMatch(page, /<script src="\/vendor\/leaflet/);
+assert.match(mapLoader, /\/vendor\/leaflet\.js/);
+assert.match(mapLoader, /\/vendor\/leaflet-markercluster\.js/);
+assert.match(client, /await window\.loadLittleFeetMap\(\)/);
 
 assert.match(page, /id="appModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"/);
 assert.match(page, /class="modal-close"[^>]*aria-label="Close dialog"/);
@@ -548,7 +554,7 @@ assert.match(page, /id="ambientBackgroundVideo"[\s\S]*little-feet-login-clean\.m
 assert.match(ambientBackground, /littlefeet:session-ready/);
 assert.match(ambientBackground, /littlefeet:session-ended/);
 assert.match(ambientBackground, /document\.body\.classList\.contains\('portal-active'\)/);
-assert.match(serviceWorker, /little-feet-shell-v74-sa-clock/);
+assert.match(serviceWorker, /little-feet-shell-v75-assets/);
 assert.match(serviceWorker, /little-feet-login-clean\.jpg/);
 assert.match(page, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(client, /async function ensureAuthenticatedSession\(\{ force = false \} = \{\}\)/);

@@ -5,7 +5,8 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const server = require('../scripts/source-layout').readBackendSource(root);
 const client = require('../scripts/source-layout').readFrontendSource(root);
-const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const page = require('../scripts/source-layout').readPageSource(root);
+const mapLoader = fs.readFileSync(path.join(root, 'assets/map-loader.js'), 'utf8');
 
 const requiredServerPatterns = [
   /req\.session\.destroy\(/,
@@ -32,9 +33,9 @@ assert.match(server, /worker-src 'self' blob:/);
 assert.match(server, /Vendor integrity check failed/);
 assert.match(server, /sha256-yVBhl8r4CaB1tt7h2g02\+xnacVj\/6KiOewyWxdhiPJk=/);
 assert.match(server, /sha256-20nQCchB9co0qIjJZRGuk2\/Z9VM\+kNiyxNV1lvTlZBo=/);
-assert.match(page, /leaflet@1\.9\.4\/dist\/leaflet\.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"/);
-assert.match(page, /MarkerCluster\.css" integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO\+BR5Csr6Dhqq\+nZs59P0pPKQJkEV"/);
-assert.match(page, /MarkerCluster\.Default\.css" integrity="sha384-wgw\+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS\+Z9Y7nMu8yNjBKYC\+"/);
+assert.match(mapLoader, /leaflet@1\.9\.4\/dist\/leaflet\.css'\s*,\s*'sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H'/);
+assert.match(mapLoader, /MarkerCluster\.css'\s*,\s*'sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO\+BR5Csr6Dhqq\+nZs59P0pPKQJkEV'/);
+assert.match(mapLoader, /MarkerCluster\.Default\.css'\s*,\s*'sha384-wgw\+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS\+Z9Y7nMu8yNjBKYC\+'/);
 assert.match(server, /safeHttpsUrl/);
 assert.match(server, /account\s*!==\s*target/);
 assert.match(server, /\^\[0-9a-f\]\{64\}\$/);

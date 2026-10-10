@@ -1,0 +1,363 @@
+    /* Executive Home: live management summary. Data is rendered from one aggregate API. */
+    .executive-home-overview { margin-bottom:18px; }
+    .executive-home-overview .executive-overview-header {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+    .executive-home-overview .executive-overview-header h2 { margin:0 0 4px; }
+    .executive-home-overview .executive-overview-header .meta { display:block; line-height:1.45; }
+    .executive-kpi-grid {
+      display:grid;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px;
+      margin-bottom:16px;
+    }
+    .executive-kpi {
+      min-width:0;
+      padding:13px 14px;
+      border:1px solid rgba(103,199,216,.22);
+      border-radius:12px;
+      background:rgba(5,25,45,.36);
+    }
+    .executive-kpi span {
+      display:block;
+      color:var(--text-muted);
+      font-size:.72rem;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .executive-kpi strong {
+      display:block;
+      margin-top:6px;
+      color:var(--text-light);
+      font-size:clamp(1.2rem,1.8vw,1.7rem);
+      line-height:1.05;
+      overflow-wrap:anywhere;
+    }
+    .executive-kpi small {
+      display:block;
+      margin-top:5px;
+      color:var(--text-muted);
+      font-size:.72rem;
+      line-height:1.35;
+    }
+    .executive-chart-grid {
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+    }
+    .executive-chart-card {
+      min-width:0;
+      padding:14px;
+      border:1px solid rgba(103,199,216,.20);
+      border-radius:13px;
+      background:rgba(7,29,49,.48);
+    }
+    .executive-chart-card h3 { margin:0; font-size:1rem; }
+    .executive-chart-card > p {
+      margin:4px 0 12px;
+      color:var(--text-muted);
+      font-size:.78rem;
+      line-height:1.4;
+    }
+    .executive-chart-body {
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-height:150px;
+    }
+    .executive-pie {
+      position:relative;
+      flex:0 0 132px;
+      width:132px;
+      height:132px;
+      border-radius:50%;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 8px 22px rgba(0,8,20,.22);
+    }
+    .executive-pie::after {
+      content:"";
+      position:absolute;
+      inset:27px;
+      border-radius:50%;
+      background:rgba(8,31,52,.96);
+      box-shadow:0 0 0 1px rgba(103,199,216,.16);
+    }
+    .executive-pie-center {
+      position:absolute;
+      inset:34px;
+      z-index:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      color:var(--text-light);
+      font-size:.86rem;
+      font-weight:900;
+      line-height:1.15;
+    }
+    .executive-chart-legend {
+      display:grid;
+      gap:6px;
+      min-width:0;
+      flex:1;
+    }
+    .executive-legend-row {
+      display:grid;
+      grid-template-columns:10px minmax(0,1fr) auto;
+      align-items:center;
+      gap:7px;
+      min-width:0;
+      color:var(--text-muted);
+      font-size:.75rem;
+      line-height:1.25;
+    }
+    .executive-legend-swatch {
+      width:9px;
+      height:9px;
+      border-radius:999px;
+    }
+    .executive-legend-row strong {
+      color:var(--text-light);
+      font-size:.75rem;
+      white-space:nowrap;
+    }
+    .executive-chart-empty {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:132px;
+      width:100%;
+      padding:16px;
+      border:1px dashed rgba(103,199,216,.20);
+      border-radius:12px;
+      color:var(--text-muted);
+      font-size:.80rem;
+      text-align:center;
+    }
+    .executive-chart-link {
+      width:100%;
+      margin-top:12px;
+      min-height:36px;
+      padding:7px 10px;
+      font-size:.76rem;
+    }
+    @media (max-width:1180px) {
+      .executive-kpi-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .executive-chart-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media (max-width:680px) {
+      .executive-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .executive-chart-grid { grid-template-columns:1fr; }
+      .executive-chart-body { min-height:138px; }
+      .executive-pie { flex-basis:116px; width:116px; height:116px; }
+      .executive-pie::after { inset:24px; }
+      .executive-pie-center { inset:30px; font-size:.78rem; }
+    }
+
+    /* Home/readability pass: cap long reading lines and keep content comfortably sized. */
+    #homeTab > .portal-welcome-banner,
+    #homeTab > .card,
+    #homeTab > .portal-tour,
+    #homeTab > .cinematic-journey { width:min(100%,1440px); margin-left:auto; margin-right:auto; }
+    #guideTab > .card { width:min(100%,1280px); margin-left:auto; margin-right:auto; }
+    #guideTab .card-header-bar h2 { font-size:clamp(1.2rem,2vw,1.5rem); }
+    #guideTab .card-header-bar h3 { font-size:1.08rem; }
+    .guide-intro, .guide-records-lead { color:var(--text-muted); font-size:.96rem; line-height:1.55; }
+    .guide-intro { margin-bottom:18px; }
+    .guide-records-lead { margin:0 0 14px; }
+    .guide-records-table-wrap { width:100%; overflow:auto; border:1px solid rgba(148,163,184,.16); border-radius:10px; }
+    .guide-records-table { width:100%; border-collapse:collapse; table-layout:fixed; text-align:left; font-size:.91rem; line-height:1.5; }
+    .guide-records-table th, .guide-records-table td { padding:13px 14px; vertical-align:top; overflow-wrap:normal; word-break:normal; }
+    .guide-records-table th { color:#e2e8f0; font-size:.82rem; letter-spacing:.01em; background:rgba(2,8,23,.16); }
+    .guide-records-table th:nth-child(1), .guide-records-table td:nth-child(1) { width:16%; }
+    .guide-records-table th:nth-child(2), .guide-records-table td:nth-child(2) { width:25%; }
+    .guide-records-table th:nth-child(3), .guide-records-table td:nth-child(3) { width:59%; }
+    .guide-records-table .guide-records-alt { background:rgba(45,212,191,.06); }
+    .guide-records-note { margin:12px 0 0 !important; font-size:.82rem; line-height:1.5; }
+    #inspectTab .inspect-log-table { table-layout:auto; min-width:1220px !important; }
+    #inspectTab .inspect-log-table th:nth-child(1), #inspectTab .inspect-log-table td:nth-child(1) { width:160px; }
+    #inspectTab .inspect-log-table th:nth-child(2), #inspectTab .inspect-log-table td:nth-child(2) { width:104px; }
+    #inspectTab .inspect-log-table th:nth-child(3), #inspectTab .inspect-log-table td:nth-child(3) { width:240px; }
+    #inspectTab .inspect-log-table th:nth-child(4), #inspectTab .inspect-log-table td:nth-child(4) { width:190px; }
+    #inspectTab .inspect-log-table th:nth-child(5), #inspectTab .inspect-log-table td:nth-child(5) { width:250px; }
+    #inspectTab .inspect-log-table th:nth-child(6), #inspectTab .inspect-log-table td:nth-child(6) { width:82px; }
+    #inspectTab .inspect-log-table th:nth-child(7), #inspectTab .inspect-log-table td:nth-child(7) { width:100px; }
+    #inspectTab .inspect-log-table th:nth-child(8), #inspectTab .inspect-log-table td:nth-child(8) { width:120px; }
+    #inspectTab .inspect-log-table th:nth-child(9), #inspectTab .inspect-log-table td:nth-child(9) { width:136px; min-width:136px; }
+    #inspectTab .inspect-trace-button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:auto !important;
+      min-width:96px;
+      min-height:40px;
+      padding:8px 14px;
+      font-size:.90rem !important;
+      font-weight:800;
+      line-height:1.15;
+      white-space:nowrap !important;
+      overflow-wrap:normal !important;
+      word-break:keep-all !important;
+    }
+    #inspectTab .inspect-trace-id {
+      display:block;
+      margin-top:7px;
+      font-size:.80rem;
+      line-height:1.35;
+      white-space:nowrap;
+      color:var(--text-muted);
+    }
+    #guideTab .guide-link-card { font-size:.92rem; }
+    #guideTab .guide-link-card p { font-size:.90rem; line-height:1.55; }
+    @media (max-width:760px) {
+      .guide-records-table-wrap { overflow:visible; border:0; }
+      .guide-records-table, .guide-records-table tbody, .guide-records-table tr, .guide-records-table td { display:block; width:100%; }
+      .guide-records-table thead { display:none; }
+      .guide-records-table tr { margin:0 0 12px; border:1px solid var(--border-color); border-radius:10px; overflow:hidden; background:rgba(7,28,47,.52); }
+      .guide-records-table tr.guide-records-alt { background:rgba(13,148,136,.08); }
+      .guide-records-table td { width:100% !important; padding:10px 12px; border:0; font-size:.90rem; }
+      .guide-records-table td::before { content:attr(data-label); display:block; margin-bottom:4px; color:#5eead4; font-size:.69rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    }
+
+    /* Portal panel sizing audit: keep every workspace aligned with the real sidebar
+       state, cap ultra-wide reading widths, and let controls wrap before they clip. */
+    :root {
+      --portal-content-max: 1480px;
+      --portal-panel-gap: clamp(14px, 1.35vw, 24px);
+    }
+    .container > .tab-content.active {
+      width:min(100%, var(--portal-content-max));
+      margin-inline:auto;
+    }
+    .tab-content > .card,
+    .tab-content > .workspace-grid,
+    .tab-content > .workspace-results-grid,
+    .tab-content > .store-grid,
+    .tab-content > .chat-shell,
+    .tab-content > section,
+    .tab-content > form {
+      min-width:0;
+      max-width:100%;
+    }
+    .card,
+    .workspace-card,
+    .workspace-results-panel,
+    .store-item,
+    .chat-shell {
+      width:100%;
+      min-width:0;
+    }
+    .card { padding:clamp(16px, 1.5vw, 24px); }
+    .workspace-card { padding:clamp(14px, 1.2vw, 20px); }
+    .card-header-bar {
+      flex-wrap:wrap;
+      gap:12px;
+    }
+    .card-header-bar > *,
+    form,
+    fieldset,
+    .flex-form-row > * {
+      min-width:0;
+      max-width:100%;
+    }
+    label, .form-label { font-size:clamp(.84rem, .75vw, .9rem); }
+    input, select, textarea { max-width:100%; font-size:clamp(.9rem, .78vw, .98rem); }
+    .card h2 { font-size:clamp(1.08rem, 1.25vw, 1.32rem); }
+
+    /* The content offset follows the sidebar element itself instead of a second
+       dashboard flag, so expanded/collapsed states cannot cover the panels. */
+    @media (min-width:960px) {
+      #dashboardSection > .app-sidebar ~ .container {
+        width:calc(100% - 260px);
+        max-width:none;
+        margin-left:260px;
+        padding-inline:clamp(20px, 2.7vw, 46px);
+      }
+      #dashboardSection > .app-sidebar.is-collapsed ~ .container {
+        width:calc(100% - 76px);
+        margin-left:76px;
+      }
+      #dashboardSection > .app-sidebar ~ footer { margin-left:260px; }
+      #dashboardSection > .app-sidebar.is-collapsed ~ footer { margin-left:76px; }
+    }
+
+    /* Support Desk is intentionally fluid: three columns when there is room,
+       two or one before any field becomes cramped. */
+    #ticketsTab #ticketForm {
+      display:grid;
+      gap:14px;
+    }
+    #ticketsTab #ticketForm > .flex-form-row {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+      gap:14px;
+      align-items:start;
+    }
+    #ticketsTab #ticketForm input,
+    #ticketsTab #ticketForm select,
+    #ticketsTab #ticketForm textarea {
+      margin-bottom:0;
+    }
+    #ticketsTab #ticketMessage { min-height:132px; }
+    .ticket-queue-toolbar {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+    .ticket-queue-toolbar h2 { min-width:0; margin:0; }
+    #ticketDeptFilter {
+      width:min(100%, 280px) !important;
+      min-width:min(100%, 220px);
+      margin:0 !important;
+      padding:8px 10px !important;
+    }
+    #ticketList .item-row > div[style*="display: flex"],
+    #ticketList .item-row > div[style*="display:flex"],
+    #completedTicketList .item-row > div[style*="display: flex"],
+    #completedTicketList .item-row > div[style*="display:flex"] {
+      width:100%;
+      min-width:0;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    #ticketList .item-row > div[style*="display: flex"] > div:first-child,
+    #ticketList .item-row > div[style*="display:flex"] > div:first-child,
+    #completedTicketList .item-row > div[style*="display: flex"] > div:first-child,
+    #completedTicketList .item-row > div[style*="display:flex"] > div:first-child {
+      flex:1 1 320px;
+      min-width:0;
+    }
+
+    @media (max-width:959px) {
+      .container {
+        width:100%;
+        max-width:100%;
+        margin-left:0;
+        padding:clamp(14px, 3vw, 22px);
+      }
+      .container > .tab-content.active { width:100%; }
+    }
+    @media (max-width:640px) {
+      .card,
+      .workspace-card { padding:14px; }
+      #ticketsTab #ticketForm > .flex-form-row { grid-template-columns:minmax(0,1fr); }
+      .ticket-queue-toolbar { align-items:stretch; }
+      #ticketDeptFilter {
+        width:100% !important;
+        min-width:0;
+      }
+      #ticketList .item-row .action-btn,
+      #completedTicketList .item-row .action-btn {
+        width:100%;
+        justify-content:center;
+      }
+    }
+

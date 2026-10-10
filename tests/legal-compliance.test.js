@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const page = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const page = require('../scripts/source-layout').readPageSource(root);
 const server = require('../scripts/source-layout').readBackendSource(root);
 const legal = fs.readFileSync(path.join(root, 'assets', 'legal-notices.js'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');

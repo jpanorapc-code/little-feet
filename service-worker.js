@@ -1,9 +1,12 @@
-const CACHE_NAME = 'little-feet-shell-v74-sa-clock';
+const CACHE_NAME = 'little-feet-shell-v75-assets';
 const SHELL_ASSETS = [
+  '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
+  '/assets/map-loader.js?v=20261010-map-loading-v1',
+  '/assets/styles/portal.css?v=20261010-styles-v1',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
-  '/assets/features/school-directory.js?v=20261010-controlled-split-v2',
+  '/assets/features/school-directory.js?v=20261010-map-loading-v1',
   '/assets/features/utilities.js?v=20261010-controlled-split-v2',
   '/assets/features/authentication.js?v=20261010-controlled-split-v2',
   '/assets/features/navigation.js?v=20261010-controlled-split-v2',
@@ -37,7 +40,7 @@ const SHELL_ASSETS = [
   '/assets/workspace-accessibility.js?v=20261008-repair-v1',
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20261004-portal-portraits-v1',
-  '/assets/ambient-background.js?v=20261006-login-cache-v2',
+  '/assets/ambient-background.js?v=20261010-media-loading-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-clean.jpg',
   '/assets/brand/iceberg-blue-eyes.webp',
@@ -46,7 +49,6 @@ const SHELL_ASSETS = [
   '/logo-transparent.png',
   '/assets/4k/little-feet-aurora-stars-4k.svg',
   '/assets/4k/little-feet-star-glow-mask-4k.svg',
-  '/assets/4k/cinematic-admin-assistant.png',
   '/assets/profile/penguin-profile-avatars.svg?v=20261004-portraits-v3',
   '/backup.js?v=20261010-controlled-split-v2',
   '/assets/mobile-pwa.js?v=20261008-offline-status-v2',
