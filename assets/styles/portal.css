@@ -1662,6 +1662,33 @@
       color:var(--text-light);
     }
 
+
+
+    /* Final interaction polish: geometry, touch behaviour and motion only.
+       No palette or surface-theme changes live in this block. */
+    .tab-content { scroll-margin-top:calc(var(--portal-header-height,68px) + 12px); }
+    .ui-icon { flex-shrink:0; }
+    button:disabled,
+    .action-btn:disabled,
+    button.submit-btn:disabled {
+      cursor:not-allowed;
+      transform:none !important;
+    }
+    @media (hover:none) {
+      .workspace-card:hover,
+      .store-item:hover,
+      .guide-link-card:hover,
+      .action-btn:hover,
+      button.submit-btn:hover {
+        transform:none !important;
+      }
+    }
+    @media (hover:hover) {
+      button:not(:disabled):active,
+      .action-btn:not(:disabled):active {
+        transform:translateY(0) scale(.985);
+      }
+    }
     /* Executive Home: live management summary. Data is rendered from one aggregate API. */
     .executive-home-overview { margin-bottom:18px; }
     .executive-home-overview .executive-overview-header {
@@ -5871,11 +5898,28 @@
       #dashboardSection .nav-quickbar > #navMoreToggle {
         display:none !important;
       }
+
+      /* Windows snapped desktop: pin the whole shell together.
+         Sticky can lose its viewport anchor at these widths because older
+         responsive overflow rules also apply. A fixed header + fixed sidebar
+         makes the attachment deterministic while scrolling. */
+      #dashboardSection > nav {
+        position:fixed !important;
+        top:0 !important;
+        left:0 !important;
+        right:0 !important;
+        width:100% !important;
+        z-index:40 !important;
+      }
       .app-sidebar {
+        position:fixed !important;
+        top:98px !important;
+        bottom:0 !important;
+        height:auto !important;
         width:236px !important;
         transform:none !important;
         transition:none !important;
-        z-index:15 !important;
+        z-index:35 !important;
       }
       #dashboardSection.sidebar-open::after {
         content:none !important;
@@ -5886,6 +5930,7 @@
         width:calc(100% - 236px) !important;
         max-width:none !important;
         margin-left:236px !important;
+        margin-top:98px !important;
         padding:clamp(14px,2.1vw,22px) !important;
       }
       #dashboardSection > .app-sidebar ~ footer,
