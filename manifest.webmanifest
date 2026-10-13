@@ -1,7 +1,7 @@
 {
-  "name": "Little Feet School Management Platform",
+  "name": "Little Feet School Operations Platform",
   "short_name": "Little Feet",
-  "description": "South African school management platform for ECD, primary and secondary education, including communication, attendance, learning records, safeguarding, administration and family engagement.",
+  "description": "South African school operations platform for ECD, primary and secondary education, including communication, attendance, learning records, safeguarding, administration and family engagement.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
