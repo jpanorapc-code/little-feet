@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v78-final-polish';
+const CACHE_NAME = 'little-feet-shell-v79-my-day-office';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
@@ -33,7 +33,7 @@ const SHELL_ASSETS = [
   '/assets/features/records.js?v=20261010-controlled-split-v2',
   '/assets/portal-polish.css?v=20261009-polish-v4',
   '/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1',
-  '/assets/my-day.js?v=20261010-lossless-art-v1',
+  '/assets/my-day.js?v=20261013-office-hero-v1',
   '/assets/dashboard-banners.css?v=20261009-reference-snow-v1',
   '/assets/4k/little-feet-reference-snow-mascot-4k.jpg',
   '/assets/school-navigation.js?v=20261009-stage-navigation-v1',
