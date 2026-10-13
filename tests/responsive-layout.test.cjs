@@ -14,7 +14,7 @@ assert.match(pageSource, /id="lfNotificationStack" class="lf-notification-stack 
 assert.match(pageSource, /workplace-extended\.js\?v=20261009-stage-navigation-v1/, 'Responsive email/header JS must be cache-busted');
 assert.doesNotMatch(pageSource, /\.lf-notification-stack\{top:72px;right:8px;bottom:8px/, 'Legacy floating email offset must stay removed');
 assert.match(workplaceExtendedSource, /stack\.dataset\.notificationReady==='true'/, 'Existing header email dock must be safely initialised instead of recreated');
-const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [930, 520], [959, 900], [960, 900], [1024, 768], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
+const sizes = [[320, 740], [390, 844], [640, 900], [768, 1024], [844, 390], [880, 900], [900, 900], [930, 520], [959, 900], [960, 900], [1024, 768], [1180, 800], [1199, 800], [1200, 800], [1280, 800], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
 let browser;
 const server = http.createServer((req, res) => {
   const file = path.resolve(root, '.' + (req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]));
