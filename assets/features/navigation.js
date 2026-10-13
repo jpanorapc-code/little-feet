@@ -221,6 +221,9 @@ function queuePortalHeaderOffsetSync() {
   });
 }
 
+window.addEventListener('scroll', queuePortalHeaderOffsetSync, { passive: true });
+window.addEventListener('resize', queuePortalHeaderOffsetSync);
+
 function switchTab(tabId, btn) {
   window.saveDashboardDrafts?.();
   window.restoreEducationTools?.(tabId);
