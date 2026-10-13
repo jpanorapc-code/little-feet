@@ -47,3 +47,28 @@
   #homeTab > .portal-welcome-banner .portal-welcome-copy,
   #myDayTab > .my-day-hero p { max-width:100%; }
 }
+
+
+/* My Day has its own office artwork. Keep Home on the shared snow scene. */
+#myDayTab > .my-day-hero {
+  background-color:#071b30 !important;
+  background-image:
+    linear-gradient(90deg,rgba(4,18,34,.97) 0%,rgba(7,29,47,.84) 42%,rgba(7,29,47,.35) 68%,rgba(7,29,47,.12) 100%),
+    url('/assets/4k/my-day-office-mascot.webp') !important;
+  background-size:cover,cover !important;
+  background-position:center,center !important;
+  background-repeat:no-repeat,no-repeat !important;
+}
+#myDayTab > .my-day-hero::before {
+  content:none !important;
+  display:none !important;
+}
+@media(max-width:640px) {
+  #myDayTab > .my-day-hero {
+    background-image:
+      linear-gradient(90deg,rgba(4,18,34,.96),rgba(7,29,47,.82) 58%,rgba(7,29,47,.42)),
+      url('/assets/4k/my-day-office-mascot.webp') !important;
+    background-size:cover,cover !important;
+    background-position:center,center !important;
+  }
+}
