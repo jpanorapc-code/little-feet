@@ -227,7 +227,8 @@ const server = http.createServer((req, res) => {
       failures.push(...result.errors.map(message => `${width}x${height}, collapsed=${collapsed}: ${message}`));
       checks += result.count;
 
-      if (width >= 960 && !collapsed) {
+      const dockedSnappedDesktopScroll = await page.evaluate(() => window.matchMedia('(min-width: 900px) and (max-width: 1199px) and (hover: hover) and (pointer: fine)').matches);
+      if ((width >= 960 || dockedSnappedDesktopScroll) && !collapsed) {
         const before = await page.evaluate(() => {
           const sidebar = document.getElementById('mainNavigation');
           const rect = sidebar.getBoundingClientRect();
