@@ -1079,3 +1079,30 @@
       color:var(--text-light);
     }
 
+
+
+    /* Final interaction polish: geometry, touch behaviour and motion only.
+       No palette or surface-theme changes live in this block. */
+    .tab-content { scroll-margin-top:calc(var(--portal-header-height,68px) + 12px); }
+    .ui-icon { flex-shrink:0; }
+    button:disabled,
+    .action-btn:disabled,
+    button.submit-btn:disabled {
+      cursor:not-allowed;
+      transform:none !important;
+    }
+    @media (hover:none) {
+      .workspace-card:hover,
+      .store-item:hover,
+      .guide-link-card:hover,
+      .action-btn:hover,
+      button.submit-btn:hover {
+        transform:none !important;
+      }
+    }
+    @media (hover:hover) {
+      button:not(:disabled):active,
+      .action-btn:not(:disabled):active {
+        transform:translateY(0) scale(.985);
+      }
+    }
