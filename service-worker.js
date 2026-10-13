@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v76-lossless-art';
+const CACHE_NAME = 'little-feet-shell-v77-safe-polish';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261010-styles-v2',
+  '/assets/styles/portal.css?v=20261013-styles-v3',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
