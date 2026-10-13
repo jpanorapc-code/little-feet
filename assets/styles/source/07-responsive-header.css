@@ -675,7 +675,16 @@
       #dashboardSection .nav-quickbar > #navMoreToggle {
         display:none !important;
       }
+      #dashboardSection > nav {
+        position:sticky !important;
+        top:0 !important;
+        z-index:30 !important;
+      }
       .app-sidebar {
+        position:fixed !important;
+        top:var(--portal-header-height,68px) !important;
+        bottom:0 !important;
+        height:auto !important;
         width:236px !important;
         transform:none !important;
         transition:none !important;
