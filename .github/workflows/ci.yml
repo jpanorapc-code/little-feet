@@ -131,3 +131,13 @@ jobs:
         env:
           LF_BROWSER_CHANNEL: chrome
         run: node tests/ambient-background.test.cjs
+
+      - name: South African welcome clock regression
+        env:
+          LF_BROWSER_CHANNEL: chrome
+        run: node tests/welcome-clock.test.cjs
+
+      - name: Lossless artwork browser verification
+        env:
+          LF_BROWSER_CHANNEL: chrome
+        run: node tests/artwork-browser.test.cjs
