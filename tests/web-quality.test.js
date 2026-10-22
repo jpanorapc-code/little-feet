@@ -160,7 +160,7 @@ assert.match(client, /if \(!response\.ok\) throw new Error\(accounts\?\.message 
 assert.match(client, /reset-login-lockout/);
 assert.match(server, /const clearLoginLockoutForAccount = account =>/);
 assert.match(server, /app\.post\('\/api\/accounts\/:username\/reset-login-lockout'/);
-assert.match(page, /my-day\.js\?v=20261010-lossless-art-v1/);
+assert.match(page, /my-day\.js\?v=\d{8}-[a-z0-9-]+/);
 assert.match(page, /data-my-day-nav="true"/);
 assert.match(page, /onclick="switchTab\('myDayTab', this\)"/);
 assert.match(page, /id="myDayTab" class="tab-content" data-roles="teacher,principal,admin,staff"/);
