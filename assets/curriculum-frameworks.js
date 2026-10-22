@@ -1,6 +1,7 @@
 (() => {
   let sessionGeneration=0;
-  document.addEventListener('littlefeet:session-ended',()=>{sessionGeneration++;document.getElementById('curriculumRecords')?.replaceChildren();document.getElementById('curriculumObservationForm')?.reset();updateCurriculumAreas();});
+  let recordsLoadGeneration=0;
+  document.addEventListener('littlefeet:session-ended',()=>{sessionGeneration++;recordsLoadGeneration++;document.getElementById('curriculumRecords')?.replaceChildren();document.getElementById('curriculumObservationForm')?.reset();updateCurriculumAreas();});
   const FRAMEWORKS = Object.freeze({
     ncf_birth_to_four: Object.freeze({
       label: 'NCF Birth–4',
@@ -91,11 +92,15 @@
     const currentUser = window.getLittleFeetCurrentUser?.();
     if (!list || !currentUser || !(window.isLittleFeetFullAccessUser?.(currentUser) || ['teacher','principal','admin'].includes(currentUser.role))) return;
     const generation=sessionGeneration;
+    const requestGeneration=++recordsLoadGeneration;
+    const key=window.getCurriculumStageContext?.() || '';
+    // Never leave records from another education stage visible while the new stage loads.
+    list.replaceChildren();
     try {
       const response = await fetch('/api/modules/curriculum');
       const data = await response.json();
-      if(generation!==sessionGeneration)return;
-      const key = window.getCurriculumStageContext?.();
+      const activeKey=window.getCurriculumStageContext?.() || '';
+      if(generation!==sessionGeneration || requestGeneration!==recordsLoadGeneration || activeKey!==key)return;
       const records = Array.isArray(data) ? data.filter(record => !key || record.frameworkKey === key || record.framework === FRAMEWORKS[key]?.label) : data;
       if (!response.ok) throw new Error(records.message || 'Unable to load curriculum observations.');
       list.innerHTML = records.length ? records.map(record => {
@@ -110,7 +115,8 @@
         return '<div class="item-row"><div><strong>' + learner + '</strong> <span class="badge-tag info">' + framework + '</span><p style="margin:4px 0;"><strong>' + area + '</strong> · ' + observation + '</p>' + evidence + '<span class="meta">' + safe(record.recordedBy || 'User') + ' · ' + safe(record.createdAt || '') + '</span></div>' + remove + '</div>';
       }).join('') : '<div class="record-empty-state"><span><strong>No framework observations yet</strong><span>Record an NCF or Grade R observation above to start the structured learning timeline.</span></span></div>';
     } catch (error) {
-      if(generation!==sessionGeneration)return;
+      const activeKey=window.getCurriculumStageContext?.() || '';
+      if(generation!==sessionGeneration || requestGeneration!==recordsLoadGeneration || activeKey!==key)return;
       list.textContent = error.message || 'Unable to load curriculum observations.';
     }
   }

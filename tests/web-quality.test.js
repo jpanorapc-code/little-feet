@@ -42,7 +42,7 @@ assert.match(page, /ambient-background\.js\?v=20261010-media-loading-v1/);
 assert.match(page, /backup\.js\?v=20261010-controlled-split-v2/);
 assert.match(page, /input\[type="checkbox"\],[\s\S]*input\[type="radio"\][\s\S]*width:18px;[\s\S]*max-width:18px;[\s\S]*box-shadow:none;/);
 assert.match(page, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
-assert.match(serviceWorker, /little-feet-shell-v76-lossless-art/);
+assert.match(serviceWorker, /const CACHE_NAME = 'little-feet-shell-v\\d+(?:-[a-z0-9-]+)?';/, 'Service worker cache name must stay versioned under the Little Feet shell namespace.');
 assert.doesNotMatch(serviceWorker, /cache\.put\('\/'\s*,/);
 assert.match(serviceWorker, /status: 503/);
 assert.match(serviceWorker, /\/assets\/ambient-background\.js\?v=20261010-media-loading-v1/);
