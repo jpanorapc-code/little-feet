@@ -71,7 +71,7 @@ let browser;
     assert.equal(sloganStyles.color, 'rgb(8, 40, 127)');
     assert.equal(sloganStyles.fill, sloganStyles.color);
     assert.equal(sloganStyles.strokeWidth, '0.5px');
-    assert.equal(sloganStyles.strokeColor, 'rgb(230, 251, 255)');
+    assert.equal(sloganStyles.strokeColor, 'rgb(247, 253, 255)');
     assert.equal(sloganStyles.shadow, 'none', 'Slogan should use the same clean non-embossed treatment as the brand name');
     assert.equal(sloganStyles.animationName, 'none', 'Slogan must not animate');
     assert.equal(sloganStyles.afterContent, 'none', 'Slogan must not have a running neon overlay');
