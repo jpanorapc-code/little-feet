@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v88-login-wordmark-line';
+const CACHE_NAME = 'little-feet-shell-v89-login-wordmark-line';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261022-login-wordmark-line-v4',
+  '/assets/styles/portal.css?v=20261022-login-wordmark-line-v5',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',

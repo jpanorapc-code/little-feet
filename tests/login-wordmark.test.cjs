@@ -74,6 +74,19 @@ let browser;
     assert.equal(sloganStyles.animationName, 'none', 'Slogan must not animate');
     assert.equal(sloganStyles.afterContent, 'none', 'Slogan must not have a running neon overlay');
     assert.equal(sloganStyles.afterAnimationName, 'none', 'Slogan pseudo-element must not animate');
+    const visibleWidths = await page.evaluate(() => {
+      const titleEl = document.querySelector('#authSection .brand-header h1');
+      const sloganEl = document.querySelector('#authSection .brand-header p.slogan span');
+      function textWidth(el) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect().width;
+      }
+      return { title: textWidth(titleEl), slogan: textWidth(sloganEl) };
+    });
+    const widthRatio = visibleWidths.slogan / visibleWidths.title;
+    assert.ok(widthRatio >= .88 && widthRatio <= 1.04,
+      `Slogan should visually fit the brand name width: ${JSON.stringify({ visibleWidths, widthRatio })}`);
     const hide = await page.addStyleTag({ content: '#authSection .brand-header h1::after { opacity:0 !important; }' });
     const base = (await title.screenshot()).toString('base64');
     await hide.evaluate(el => el.remove());

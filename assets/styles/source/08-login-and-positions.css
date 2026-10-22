@@ -218,11 +218,11 @@
       -webkit-text-stroke:1px #e6fbff !important;
 
       font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
-      font-size:clamp(.92rem,1.35vw,1.08rem) !important;
+      font-size:clamp(1rem,3vw,1.35rem) !important;
       font-weight:750 !important;
       font-style:normal !important;
       line-height:1.15 !important;
-      letter-spacing:.075em !important;
+      letter-spacing:clamp(.12em,.55vw,.20em) !important;
       text-transform:uppercase !important;
 
       text-shadow:
