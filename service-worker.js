@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v80-my-day-office-banner';
+const CACHE_NAME = 'little-feet-shell-v81-login-neon';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261013-styles-v4',
+  '/assets/styles/portal.css?v=20261022-login-neon-v1',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
