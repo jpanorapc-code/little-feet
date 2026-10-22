@@ -27,6 +27,7 @@ let browser;
   // that the real application removes once initialization completes.
   await page.locator('#portalLoader').evaluate(el => el.remove());
   const title = page.locator('#authSection .brand-header h1');
+  const slogan = page.locator('#authSection .brand-header p.slogan span');
   for (const [width, height] of [[390, 844], [697, 900], [1440, 1000]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.getAnimations().forEach(a => {
@@ -53,6 +54,26 @@ let browser;
     assert.equal(styles.clip, 'text');
     assert.equal(styles.border, '0px');
     assert.equal(styles.box, 'none');
+
+    const sloganStyles = await slogan.evaluate(el => {
+      const base = getComputedStyle(el), after = getComputedStyle(el, '::after');
+      return {
+        color: base.color,
+        fill: base.webkitTextFillColor,
+        strokeWidth: base.webkitTextStrokeWidth,
+        strokeColor: base.webkitTextStrokeColor,
+        animationName: base.animationName,
+        afterContent: after.content,
+        afterAnimationName: after.animationName
+      };
+    });
+    assert.equal(sloganStyles.color, 'rgb(8, 40, 127)');
+    assert.equal(sloganStyles.fill, sloganStyles.color);
+    assert.equal(sloganStyles.strokeWidth, '1px');
+    assert.equal(sloganStyles.strokeColor, 'rgb(230, 251, 255)');
+    assert.equal(sloganStyles.animationName, 'none', 'Slogan must not animate');
+    assert.equal(sloganStyles.afterContent, 'none', 'Slogan must not have a running neon overlay');
+    assert.equal(sloganStyles.afterAnimationName, 'none', 'Slogan pseudo-element must not animate');
     const hide = await page.addStyleTag({ content: '#authSection .brand-header h1::after { opacity:0 !important; }' });
     const base = (await title.screenshot()).toString('base64');
     await hide.evaluate(el => el.remove());
