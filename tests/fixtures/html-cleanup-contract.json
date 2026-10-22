@@ -1,7 +1,7 @@
 {
   "baseline": "353efac6eafd93706e7c8a5c4ff032d70341286f",
-  "cssSha256": "6f4a52ca47b7f455511093fc7ec701e9443d27918f7f6f69922518159cb43a79",
-  "cssBytes": 288054,
+  "cssSha256": "ca778bde446650ba7e5bd97c1f128cf70e419ce661e5b2707c3432909144a5f0",
+  "cssBytes": 288111,
   "ids": [
     "loginBackgroundVideo",
     "ambientBackgroundVideo",

@@ -99,7 +99,7 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:0 !important;
+      -webkit-text-stroke:1px #e6fbff !important;
 
       border:0 !important;
       outline:0 !important;
@@ -133,6 +133,7 @@
 
       color:transparent;
       -webkit-text-fill-color:transparent;
+      -webkit-text-stroke:0;
       /* Shadows inherit even when the text fill is transparent. Reset them
          before filtering so only the clipped light stripe can cast a glow. */
       text-shadow:none;
@@ -154,7 +155,7 @@
       filter:
         drop-shadow(0 0 1px rgba(125,211,252,.95))
         drop-shadow(0 0 3px rgba(56,189,248,.72));
-      animation:loginWordmarkIceSweep 3.2s linear infinite;
+      animation:loginWordmarkIceSweep 6.4s linear infinite;
     }
 
     @keyframes loginWordmarkIceSweep {

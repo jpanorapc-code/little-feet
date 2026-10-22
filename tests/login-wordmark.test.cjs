@@ -37,12 +37,18 @@ let browser;
       const base = getComputedStyle(el), light = getComputedStyle(el, '::after');
       return { color: base.color, fill: base.webkitTextFillColor, shadow: base.textShadow,
         lightShadow: light.textShadow, padding: base.padding, lightPadding: light.padding,
+        strokeWidth: base.webkitTextStrokeWidth, strokeColor: base.webkitTextStrokeColor,
+        lightStrokeWidth: light.webkitTextStrokeWidth, duration: light.animationDuration,
         clip: light.backgroundClip, border: base.borderWidth, box: base.boxShadow };
     });
     assert.equal(styles.color, 'rgb(8, 40, 127)');
     assert.equal(styles.fill, styles.color);
+    assert.equal(styles.strokeWidth, '1px');
+    assert.equal(styles.strokeColor, 'rgb(230, 251, 255)');
     assert.equal(styles.shadow, 'none');
     assert.equal(styles.lightShadow, 'none', 'No inherited full-word shadow may enter the glow filter');
+    assert.equal(styles.lightStrokeWidth, '0px', 'Moving streak must stay narrow instead of inheriting the static outline');
+    assert.equal(styles.duration, '6.4s', 'Wordmark sweep should be deliberately slower and easier to follow');
     assert.equal(styles.lightPadding, styles.padding, 'Overlay must align on phones too');
     assert.equal(styles.clip, 'text');
     assert.equal(styles.border, '0px');
