@@ -93,25 +93,12 @@
       text-align:center !important;
       text-transform:none !important;
 
-      color:transparent !important;
-      -webkit-text-fill-color:transparent !important;
-      background-image:linear-gradient(
-        110deg,
-        #08287f 0%,
-        #08287f 41%,
-        #38bdf8 46%,
-        #7dd3fc 48%,
-        #e6fbff 50%,
-        #7dd3fc 52%,
-        #38bdf8 54%,
-        #08287f 59%,
-        #08287f 100%
-      ) !important;
-      background-size:260% 100% !important;
-      background-position:130% 50%;
-      background-repeat:no-repeat !important;
-      background-clip:text !important;
-      -webkit-background-clip:text !important;
+      color:#08287f !important;
+      -webkit-text-fill-color:#08287f !important;
+      background:none !important;
+      background-image:none !important;
+      background-clip:border-box !important;
+      -webkit-background-clip:border-box !important;
       -webkit-text-stroke:0 !important;
 
       border:0 !important;
@@ -120,19 +107,67 @@
 
       text-shadow:
         0 -1px 0 #fff, 0 1px 0 #7fbacf, 0 2px 0 #47758f, 0 3px 0 #244762, 0 5px 8px #020c1cc0 !important;
-      animation:loginWordmarkIceSweep 3.2s linear infinite !important;
+      animation:none !important;
       cursor:pointer !important;
     }
 
+    /* Thin ice-light sweep across the letter faces without replacing the navy wordmark. */
+    #authSection .brand-header h1::after {
+      content:"Little Feet Technologies";
+      position:absolute;
+      inset:0;
+      z-index:1;
+      display:block;
+      box-sizing:border-box;
+      padding:0 6px;
+      pointer-events:none;
+
+      font:inherit;
+      font-size:inherit;
+      font-weight:inherit;
+      font-style:inherit;
+      line-height:inherit;
+      letter-spacing:inherit;
+      white-space:inherit;
+      text-align:inherit;
+      text-transform:inherit;
+
+      color:transparent;
+      -webkit-text-fill-color:transparent;
+      background:linear-gradient(
+        110deg,
+        transparent 0%,
+        transparent 47.4%,
+        rgba(56,189,248,.18) 48.3%,
+        #38bdf8 49.1%,
+        #7dd3fc 49.6%,
+        #e6fbff 50%,
+        #7dd3fc 50.4%,
+        #38bdf8 50.9%,
+        rgba(56,189,248,.18) 51.7%,
+        transparent 52.6%,
+        transparent 100%
+      );
+      background-size:320% 100%;
+      background-position:140% 50%;
+      background-repeat:no-repeat;
+      background-clip:text;
+      -webkit-background-clip:text;
+      filter:
+        drop-shadow(0 0 3px rgba(56,189,248,.95))
+        drop-shadow(0 0 7px rgba(125,211,252,.58));
+      animation:loginWordmarkIceSweep 3.2s linear infinite;
+    }
+
     @keyframes loginWordmarkIceSweep {
-      from { background-position:130% 50%; }
-      to { background-position:-130% 50%; }
+      from { background-position:140% 50%; }
+      to { background-position:-140% 50%; }
     }
 
     @media (prefers-reduced-motion:reduce) {
-      #authSection .brand-header h1 {
-        animation:none !important;
-        background-position:50% 50% !important;
+      #authSection .brand-header h1::after {
+        animation:none;
+        background-position:50% 50%;
       }
     }
 
