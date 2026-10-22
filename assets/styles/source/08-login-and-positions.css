@@ -72,7 +72,7 @@
       box-shadow:none !important;
     }
 
-    /* Navy wordmark: restrained icy rim and a short dimensional shadow. */
+    /* Solid navy lettering; only the moving overlay emits light. */
     #authSection .brand-header h1 {
       order:2 !important;
       position:relative !important;
@@ -105,8 +105,7 @@
       outline:0 !important;
       box-shadow:none !important;
 
-      text-shadow:
-        0 -1px 0 #fff, 0 1px 0 #7fbacf, 0 2px 0 #47758f, 0 3px 0 #244762, 0 5px 8px #020c1cc0 !important;
+      text-shadow:none !important;
       animation:none !important;
       cursor:pointer !important;
     }
@@ -119,7 +118,7 @@
       z-index:1;
       display:block;
       box-sizing:border-box;
-      padding:0 6px;
+      padding:inherit;
       pointer-events:none;
 
       font:inherit;
@@ -134,20 +133,21 @@
 
       color:transparent;
       -webkit-text-fill-color:transparent;
+      /* Shadows inherit even when the text fill is transparent. Reset them
+         before filtering so only the clipped light stripe can cast a glow. */
+      text-shadow:none;
       background:linear-gradient(
-        110deg,
-        transparent 0%,
-        transparent 49.35%,
-        #38bdf8 49.68%,
-        #7dd3fc 49.86%,
-        #f4fdff 50%,
-        #7dd3fc 50.14%,
-        #38bdf8 50.32%,
-        transparent 50.65%,
-        transparent 100%
+        90deg,
+        transparent 0 3px,
+        #38bdf8 5px,
+        #7dd3fc 6px,
+        #e6fbff 7px,
+        #7dd3fc 8px,
+        #38bdf8 9px,
+        transparent 11px 14px
       );
-      background-size:500% 100%;
-      background-position:150% 50%;
+      background-size:14px 100%;
+      background-position:0% 50%;
       background-repeat:no-repeat;
       background-clip:text;
       -webkit-background-clip:text;
@@ -158,8 +158,8 @@
     }
 
     @keyframes loginWordmarkIceSweep {
-      from { background-position:150% 50%; }
-      to { background-position:-150% 50%; }
+      from { background-position:0% 50%; }
+      to { background-position:100% 50%; }
     }
 
     @media (prefers-reduced-motion:reduce) {
