@@ -215,7 +215,7 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:1px #e6fbff !important;
+      -webkit-text-stroke:.5px #e6fbff !important;
 
       font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
       font-size:clamp(1rem,3vw,1.35rem) !important;
@@ -225,8 +225,7 @@
       letter-spacing:clamp(.12em,.55vw,.20em) !important;
       text-transform:uppercase !important;
 
-      text-shadow:
-        0 -1px 0 #fff, 0 1px 0 #568aa5, 0 2px 0 #193c60, 0 3px 6px #020c1ce6 !important;
+      text-shadow:none !important;
       animation:none !important;
     }
 

@@ -62,6 +62,7 @@ let browser;
         fill: base.webkitTextFillColor,
         strokeWidth: base.webkitTextStrokeWidth,
         strokeColor: base.webkitTextStrokeColor,
+        shadow: base.textShadow,
         animationName: base.animationName,
         afterContent: after.content,
         afterAnimationName: after.animationName
@@ -69,8 +70,9 @@ let browser;
     });
     assert.equal(sloganStyles.color, 'rgb(8, 40, 127)');
     assert.equal(sloganStyles.fill, sloganStyles.color);
-    assert.equal(sloganStyles.strokeWidth, '1px');
+    assert.equal(sloganStyles.strokeWidth, '0.5px');
     assert.equal(sloganStyles.strokeColor, 'rgb(230, 251, 255)');
+    assert.equal(sloganStyles.shadow, 'none', 'Slogan should use the same clean non-embossed treatment as the brand name');
     assert.equal(sloganStyles.animationName, 'none', 'Slogan must not animate');
     assert.equal(sloganStyles.afterContent, 'none', 'Slogan must not have a running neon overlay');
     assert.equal(sloganStyles.afterAnimationName, 'none', 'Slogan pseudo-element must not animate');
