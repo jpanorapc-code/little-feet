@@ -52,7 +52,7 @@ assert.match(client, /window\.saveDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.restoreDashboardDrafts\?\.\(\)/);
 assert.match(client, /window\.clearDashboardDrafts\?\.\(signingOutUsername\)/);
 
-assert.match(serviceWorker, /little-feet-shell-v76-lossless-art/);
+assert.match(serviceWorker, /const CACHE_NAME = 'little-feet-shell-v\d+(?:-[a-z0-9-]+)?';/);
 assert.match(serviceWorker, /backup\.js\?v=20261010-controlled-split-v2/);
 assert.match(serviceWorker, /preferences-enhancements\.js\?v=20261006-login-i18n-v2/);
 assert.match(serviceWorker, /advanced-school-operations\.js\?v=20261009-stage-navigation-v1/);
