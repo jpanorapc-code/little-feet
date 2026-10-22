@@ -6035,12 +6035,25 @@
       text-align:center !important;
       text-transform:none !important;
 
-      color:#08287f !important;
-      -webkit-text-fill-color:#08287f !important;
-      background:none !important;
-      background-image:none !important;
-      background-clip:border-box !important;
-      -webkit-background-clip:border-box !important;
+      color:transparent !important;
+      -webkit-text-fill-color:transparent !important;
+      background-image:linear-gradient(
+        110deg,
+        #08287f 0%,
+        #08287f 41%,
+        #38bdf8 46%,
+        #7dd3fc 48%,
+        #e6fbff 50%,
+        #7dd3fc 52%,
+        #38bdf8 54%,
+        #08287f 59%,
+        #08287f 100%
+      ) !important;
+      background-size:260% 100% !important;
+      background-position:130% 50%;
+      background-repeat:no-repeat !important;
+      background-clip:text !important;
+      -webkit-background-clip:text !important;
       -webkit-text-stroke:0 !important;
 
       border:0 !important;
@@ -6049,8 +6062,20 @@
 
       text-shadow:
         0 -1px 0 #fff, 0 1px 0 #7fbacf, 0 2px 0 #47758f, 0 3px 0 #244762, 0 5px 8px #020c1cc0 !important;
-      animation:none !important;
+      animation:loginWordmarkIceSweep 3.2s linear infinite !important;
       cursor:pointer !important;
+    }
+
+    @keyframes loginWordmarkIceSweep {
+      from { background-position:130% 50%; }
+      to { background-position:-130% 50%; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      #authSection .brand-header h1 {
+        animation:none !important;
+        background-position:50% 50% !important;
+      }
     }
 
     #authSection .brand-header h1:focus,

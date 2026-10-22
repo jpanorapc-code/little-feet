@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v82-login-neon-source';
+const CACHE_NAME = 'little-feet-shell-v83-login-wordmark-neon';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261022-login-neon-v2',
+  '/assets/styles/portal.css?v=20261022-login-wordmark-neon-v1',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
