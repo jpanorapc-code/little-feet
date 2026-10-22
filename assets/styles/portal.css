@@ -6402,48 +6402,53 @@
       inherits: false;
       initial-value: 0deg;
     }
+
     #authSection > .auth-card {
-      isolation: isolate;
+      isolation:isolate;
     }
+
     #authSection > .auth-card::after {
-      content: "";
-      position: absolute;
-      inset: -2px;
-      z-index: 3;
-      pointer-events: none;
-      border-radius: 24px;
-      padding: 2px;
-      background: conic-gradient(
+      content:"";
+      position:absolute;
+      inset:-2px;
+      z-index:3;
+      pointer-events:none;
+      border-radius:24px;
+      padding:2px;
+      background:conic-gradient(
         from var(--login-neon-angle),
-        transparent 0deg 328deg,
-        rgba(56,189,248,.10) 332deg,
-        rgba(56,189,248,.88) 338deg,
-        #7dd3fc 344deg,
-        #dff7ff 348deg,
-        #7dd3fc 352deg,
-        rgba(56,189,248,.86) 356deg,
+        transparent 0deg 330deg,
+        rgba(56,189,248,.18) 334deg,
+        rgba(56,189,248,.95) 340deg,
+        #7dd3fc 346deg,
+        #e6fbff 350deg,
+        #7dd3fc 354deg,
+        rgba(56,189,248,.92) 358deg,
         transparent 360deg
       );
       -webkit-mask:
         linear-gradient(#000 0 0) content-box,
         linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
+      -webkit-mask-composite:xor;
+      mask-composite:exclude;
       filter:
-        drop-shadow(0 0 4px rgba(56,189,248,.95))
-        drop-shadow(0 0 10px rgba(125,211,252,.60));
-      animation: loginIceOrbit 3.8s linear infinite;
+        drop-shadow(0 0 5px rgba(56,189,248,.95))
+        drop-shadow(0 0 12px rgba(125,211,252,.68));
+      animation:loginIceOrbit 3.2s linear infinite;
     }
+
     @keyframes loginIceOrbit {
-      to { --login-neon-angle: 360deg; }
+      to { --login-neon-angle:360deg; }
     }
-    @media (max-width: 640px) {
-      #authSection > .auth-card::after { border-radius: 20px; }
+
+    @media (max-width:640px) {
+      #authSection > .auth-card::after { border-radius:20px; }
     }
-    @media (prefers-reduced-motion: reduce) {
+
+    @media (prefers-reduced-motion:reduce) {
       #authSection > .auth-card::after {
-        animation: none;
-        --login-neon-angle: 344deg;
+        animation:none;
+        --login-neon-angle:346deg;
       }
     }
 
