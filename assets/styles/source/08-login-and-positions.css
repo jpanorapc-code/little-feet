@@ -111,7 +111,7 @@
       cursor:pointer !important;
     }
 
-    /* Thin ice-light sweep across the letter faces without replacing the navy wordmark. */
+    /* Razor-thin ice line: the navy wordmark beneath never changes colour. */
     #authSection .brand-header h1::after {
       content:"Little Feet Technologies";
       position:absolute;
@@ -137,37 +137,35 @@
       background:linear-gradient(
         110deg,
         transparent 0%,
-        transparent 47.4%,
-        rgba(56,189,248,.18) 48.3%,
-        #38bdf8 49.1%,
-        #7dd3fc 49.6%,
-        #e6fbff 50%,
-        #7dd3fc 50.4%,
-        #38bdf8 50.9%,
-        rgba(56,189,248,.18) 51.7%,
-        transparent 52.6%,
+        transparent 49.35%,
+        #38bdf8 49.68%,
+        #7dd3fc 49.86%,
+        #f4fdff 50%,
+        #7dd3fc 50.14%,
+        #38bdf8 50.32%,
+        transparent 50.65%,
         transparent 100%
       );
-      background-size:320% 100%;
-      background-position:140% 50%;
+      background-size:500% 100%;
+      background-position:150% 50%;
       background-repeat:no-repeat;
       background-clip:text;
       -webkit-background-clip:text;
       filter:
-        drop-shadow(0 0 3px rgba(56,189,248,.95))
-        drop-shadow(0 0 7px rgba(125,211,252,.58));
+        drop-shadow(0 0 1px rgba(125,211,252,.95))
+        drop-shadow(0 0 3px rgba(56,189,248,.72));
       animation:loginWordmarkIceSweep 3.2s linear infinite;
     }
 
     @keyframes loginWordmarkIceSweep {
-      from { background-position:140% 50%; }
-      to { background-position:-140% 50%; }
+      from { background-position:150% 50%; }
+      to { background-position:-150% 50%; }
     }
 
     @media (prefers-reduced-motion:reduce) {
       #authSection .brand-header h1::after {
         animation:none;
-        background-position:50% 50%;
+        opacity:0;
       }
     }
 
