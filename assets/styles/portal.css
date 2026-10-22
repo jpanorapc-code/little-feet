@@ -6134,7 +6134,7 @@
       text-underline-offset:4px !important;
     }
 
-    /* Raised ice lettering without a surrounding panel. */
+    /* Static companion to the navy serif wordmark, with crisp pale letter edges. */
     #authSection .brand-header p.slogan {
       order:3 !important;
       position:relative !important;
@@ -6163,15 +6163,16 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:.5px #f7fdff !important;
+      -webkit-text-stroke:.75px #e6fbff !important;
+      paint-order:stroke fill;
 
-      font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
+      font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
       font-size:clamp(1rem,3vw,1.35rem) !important;
-      font-weight:750 !important;
+      font-weight:800 !important;
       font-style:normal !important;
       line-height:1.15 !important;
-      letter-spacing:clamp(.12em,.55vw,.20em) !important;
-      text-transform:uppercase !important;
+      letter-spacing:.018em !important;
+      text-transform:none !important;
 
       text-shadow:none !important;
       animation:none !important;
@@ -6279,7 +6280,7 @@
 
       #authSection .brand-header p.slogan span {
         font-size:clamp(.76rem,3.35vw,.90rem) !important;
-        letter-spacing:.065em !important;
+        letter-spacing:.018em !important;
       }
 
       #authSection .login-card-tools {

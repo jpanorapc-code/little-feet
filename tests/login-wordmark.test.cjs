@@ -65,13 +65,19 @@ let browser;
         shadow: base.textShadow,
         animationName: base.animationName,
         afterContent: after.content,
-        afterAnimationName: after.animationName
+        afterAnimationName: after.animationName,
+        fontFamily: base.fontFamily,
+        textTransform: base.textTransform,
+        paintOrder: base.paintOrder
       };
     });
     assert.equal(sloganStyles.color, 'rgb(8, 40, 127)');
     assert.equal(sloganStyles.fill, sloganStyles.color);
-    assert.equal(sloganStyles.strokeWidth, '0.5px');
-    assert.equal(sloganStyles.strokeColor, 'rgb(247, 253, 255)');
+    assert.equal(sloganStyles.fontFamily, await title.evaluate(el => getComputedStyle(el).fontFamily));
+    assert.equal(sloganStyles.textTransform, 'none');
+    assert.equal(sloganStyles.paintOrder, 'stroke');
+    assert.equal(sloganStyles.strokeWidth, '0.75px');
+    assert.equal(sloganStyles.strokeColor, 'rgb(230, 251, 255)');
     assert.equal(sloganStyles.shadow, 'none', 'Slogan should use the same clean non-embossed treatment as the brand name');
     assert.equal(sloganStyles.animationName, 'none', 'Slogan must not animate');
     assert.equal(sloganStyles.afterContent, 'none', 'Slogan must not have a running neon overlay');
@@ -87,8 +93,8 @@ let browser;
       return { title: textWidth(titleEl), slogan: textWidth(sloganEl) };
     });
     const widthRatio = visibleWidths.slogan / visibleWidths.title;
-    assert.ok(widthRatio >= .88 && widthRatio <= 1.04,
-      `Slogan should visually fit the brand name width: ${JSON.stringify({ visibleWidths, widthRatio })}`);
+    assert.ok(widthRatio >= .45 && widthRatio <= .95,
+      `Slogan stays subordinate to the name without extending past it: ${JSON.stringify({ visibleWidths, widthRatio })}`);
     const hide = await page.addStyleTag({ content: '#authSection .brand-header h1::after { opacity:0 !important; }' });
     const base = (await title.screenshot()).toString('base64');
     await hide.evaluate(el => el.remove());
@@ -115,29 +121,32 @@ let browser;
           if (Math.max(...[0, 1, 2].map(c => Math.abs(a.data[i + c] - b.data[i + c]))) > 3) {
             minX = Math.min(minX, x); maxX = Math.max(maxX, x); changed++;
             if (b.data[i] > 150 && b.data[i + 1] > 210 && b.data[i + 2] > 220) bright++;
-          } else if (b.data[i] === 8 && b.data[i + 1] === 40 && b.data[i + 2] === 127) navy++;
+          } else if (a.data[i] < 120 && a.data[i + 2] - a.data[i] > 60 && a.data[i + 2] - a.data[i + 1] > 40) navy++; // Include antialiased navy under the deployed letter outline.
         }
         return { minX, maxX, changed, navy, bright };
       }, { base, frame });
       console.log(`${width}px frame ${fraction}: ${JSON.stringify(result)}`);
       if (process.env.LF_WORDMARK_SCREENSHOTS) {
         fs.mkdirSync(process.env.LF_WORDMARK_SCREENSHOTS, { recursive: true });
+        await page.locator('#authSection .brand-header').screenshot({path:path.join(process.env.LF_WORDMARK_SCREENSHOTS, `branding-${width}.png`)});
         await title.screenshot({ path: path.join(process.env.LF_WORDMARK_SCREENSHOTS, `wordmark-${width}-${fraction}.png`) });
       }
       assert.ok(result.changed > 10, `Visible moving light: ${JSON.stringify(result)}`);
       // A narrow core may cross a letter counter or a gap at an individual frame.
       brightPixels += result.bright;
       assert.ok(result.maxX - result.minX <= 28, `Glow stays local: ${JSON.stringify(result)}`);
-      assert.ok(result.navy > 100, 'Unlit letter faces retain solid navy pixels');
+      assert.ok(result.navy > 100, 'Unlit navy letter pixels remain identical to the base frame');
       assert.ok(result.minX > previousX, 'The light travels across the letters');
       previousX = result.minX;
     }
     assert.ok(brightPixels > 0, 'The travelling streak must render a visible pale core');
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#authSection .brand-header h1'), '::after').opacity === '0');
     assert.equal(await title.evaluate(el => getComputedStyle(el, '::after').opacity), '0');
     assert.equal(await title.evaluate(el => getComputedStyle(el).webkitTextFillColor), 'rgb(8, 40, 127)');
     assert.equal(await title.evaluate(el => getComputedStyle(el, '::after').animationName), 'none');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#authSection .brand-header h1'), '::after').animationName === 'loginWordmarkIceSweep');
   }
   console.log('Login wordmark rendered sweep, navy fill, localized glow, mobile alignment and reduced motion passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
