@@ -99,7 +99,7 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:1px #e6fbff !important;
+      -webkit-text-stroke:.5px #e6fbff !important;
 
       border:0 !important;
       outline:0 !important;
@@ -186,7 +186,7 @@
       text-underline-offset:4px !important;
     }
 
-    /* Raised ice lettering without a surrounding panel. */
+    /* Static companion to the navy serif wordmark, with crisp pale letter edges. */
     #authSection .brand-header p.slogan {
       order:3 !important;
       position:relative !important;
@@ -215,15 +215,16 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:.5px #f7fdff !important;
+      -webkit-text-stroke:.4px #e6fbff !important;
+      paint-order:normal;
 
-      font-family:"Segoe UI Variable Text",Aptos,"Segoe UI",Arial,sans-serif !important;
-      font-size:clamp(1rem,3vw,1.35rem) !important;
-      font-weight:750 !important;
+      font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
+      font-size:clamp(1.12rem,3.36vw,1.51rem) !important;
+      font-weight:800 !important;
       font-style:normal !important;
       line-height:1.15 !important;
-      letter-spacing:clamp(.12em,.55vw,.20em) !important;
-      text-transform:uppercase !important;
+      letter-spacing:.018em !important;
+      text-transform:none !important;
 
       text-shadow:none !important;
       animation:none !important;
@@ -330,8 +331,8 @@
       }
 
       #authSection .brand-header p.slogan span {
-        font-size:clamp(.76rem,3.35vw,.90rem) !important;
-        letter-spacing:.065em !important;
+        font-size:clamp(.85rem,3.75vw,1.01rem) !important;
+        letter-spacing:.018em !important;
       }
 
       #authSection .login-card-tools {
@@ -565,6 +566,112 @@
       #authSection > .auth-card::after {
         animation:none;
         --login-neon-angle:346deg;
+      }
+    }
+
+    /* Portal cards: reuse the login card's single icy-blue neon segment around each card rim.
+       Existing card fills, borders, artwork and decorative pseudo-elements stay unchanged. */
+    @property --portal-card-neon-angle {
+      syntax: '<angle>';
+      inherits: false;
+      initial-value: 0deg;
+    }
+
+    :is(
+      .card:not(.auth-card),
+      .workspace-card,
+      .workspace-results-panel,
+      .store-item,
+      .chat-shell,
+      .guide-link-card,
+      .modal-card,
+      .executive-kpi,
+      .executive-chart-card,
+      .portal-welcome-banner,
+      .my-day-hero,
+      .my-day-attention,
+      .my-day-action,
+      .staff-work-card,
+      .parent-contact-card
+    ) {
+      position:relative;
+      isolation:isolate;
+    }
+
+    :is(
+      .card:not(.auth-card),
+      .workspace-results-panel,
+      .store-item,
+      .chat-shell,
+      .guide-link-card,
+      .modal-card,
+      .executive-kpi,
+      .executive-chart-card,
+      .portal-welcome-banner,
+      .my-day-attention,
+      .my-day-action,
+      .staff-work-card,
+      .parent-contact-card
+    )::after,
+    :is(
+      .workspace-card,
+      .my-day-hero
+    )::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      z-index:3;
+      pointer-events:none;
+      border-radius:inherit;
+      padding:2px;
+      background:conic-gradient(
+        from var(--portal-card-neon-angle),
+        transparent 0deg 330deg,
+        rgba(56,189,248,.18) 334deg,
+        rgba(56,189,248,.95) 340deg,
+        #7dd3fc 346deg,
+        #e6fbff 350deg,
+        #7dd3fc 354deg,
+        rgba(56,189,248,.92) 358deg,
+        transparent 360deg
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor;
+      mask-composite:exclude;
+      filter:
+        drop-shadow(0 0 5px rgba(56,189,248,.95))
+        drop-shadow(0 0 12px rgba(125,211,252,.68));
+      animation:portalCardIceOrbit 3.2s linear infinite;
+    }
+
+    @keyframes portalCardIceOrbit {
+      to { --portal-card-neon-angle:360deg; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      :is(
+        .card:not(.auth-card),
+        .workspace-results-panel,
+        .store-item,
+        .chat-shell,
+        .guide-link-card,
+        .modal-card,
+        .executive-kpi,
+        .executive-chart-card,
+        .portal-welcome-banner,
+        .my-day-attention,
+        .my-day-action,
+        .staff-work-card,
+        .parent-contact-card
+      )::after,
+      :is(
+        .workspace-card,
+        .my-day-hero
+      )::before {
+        animation:none;
+        --portal-card-neon-angle:346deg;
       }
     }
 

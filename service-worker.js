@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v91-login-wordmark-line';
+const CACHE_NAME = 'little-feet-shell-v96-portal-card-neon';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261022-login-wordmark-line-v7',
+  '/assets/styles/portal.css?v=20261023-portal-card-neon-v1',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
@@ -43,7 +43,7 @@ const SHELL_ASSETS = [
   '/assets/ambient-background.js?v=20261010-media-loading-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-clean.jpg',
-  '/assets/brand/iceberg-blue-eyes.webp',
+  '/assets/brand/iceberg-navy-penguin.webp',
   '/assets/brand/iceberg-wave-backing.webp',
   '/logo.png',
   '/logo-transparent.png',
