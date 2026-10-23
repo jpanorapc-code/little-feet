@@ -569,3 +569,109 @@
       }
     }
 
+    /* Portal cards: reuse the login card's single icy-blue neon segment around each card rim.
+       Existing card fills, borders, artwork and decorative pseudo-elements stay unchanged. */
+    @property --portal-card-neon-angle {
+      syntax: '<angle>';
+      inherits: false;
+      initial-value: 0deg;
+    }
+
+    :is(
+      .card:not(.auth-card),
+      .workspace-card,
+      .workspace-results-panel,
+      .store-item,
+      .chat-shell,
+      .guide-link-card,
+      .modal-card,
+      .executive-kpi,
+      .executive-chart-card,
+      .portal-welcome-banner,
+      .my-day-hero,
+      .my-day-attention,
+      .my-day-action,
+      .staff-work-card,
+      .parent-contact-card
+    ) {
+      position:relative;
+      isolation:isolate;
+    }
+
+    :is(
+      .card:not(.auth-card),
+      .workspace-results-panel,
+      .store-item,
+      .chat-shell,
+      .guide-link-card,
+      .modal-card,
+      .executive-kpi,
+      .executive-chart-card,
+      .portal-welcome-banner,
+      .my-day-attention,
+      .my-day-action,
+      .staff-work-card,
+      .parent-contact-card
+    )::after,
+    :is(
+      .workspace-card,
+      .my-day-hero
+    )::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      z-index:3;
+      pointer-events:none;
+      border-radius:inherit;
+      padding:2px;
+      background:conic-gradient(
+        from var(--portal-card-neon-angle),
+        transparent 0deg 330deg,
+        rgba(56,189,248,.18) 334deg,
+        rgba(56,189,248,.95) 340deg,
+        #7dd3fc 346deg,
+        #e6fbff 350deg,
+        #7dd3fc 354deg,
+        rgba(56,189,248,.92) 358deg,
+        transparent 360deg
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor;
+      mask-composite:exclude;
+      filter:
+        drop-shadow(0 0 5px rgba(56,189,248,.95))
+        drop-shadow(0 0 12px rgba(125,211,252,.68));
+      animation:portalCardIceOrbit 3.2s linear infinite;
+    }
+
+    @keyframes portalCardIceOrbit {
+      to { --portal-card-neon-angle:360deg; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      :is(
+        .card:not(.auth-card),
+        .workspace-results-panel,
+        .store-item,
+        .chat-shell,
+        .guide-link-card,
+        .modal-card,
+        .executive-kpi,
+        .executive-chart-card,
+        .portal-welcome-banner,
+        .my-day-attention,
+        .my-day-action,
+        .staff-work-card,
+        .parent-contact-card
+      )::after,
+      :is(
+        .workspace-card,
+        .my-day-hero
+      )::before {
+        animation:none;
+        --portal-card-neon-angle:346deg;
+      }
+    }
+
