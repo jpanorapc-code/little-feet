@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const frostSource = fs.readFileSync(path.join(root, 'assets/button-frost.js'), 'utf8');
 assert.match(frostSource, /MOBILE_DPR_CAP = 1\.35/);
-assert.match(frostSource, /MOBILE_FRAME_MS = 32/);
+assert.match(frostSource, /MOBILE_FRAME_MS = 40/);
 assert.match(frostSource, /createScene\(width, height, lowPower\)/);
 
 const server = http.createServer((req, res) => {
@@ -77,7 +77,7 @@ let browser;
   });
   assert.equal(frost.mobile,true);
   assert.equal(frost.cap,1.35);
-  assert.equal(frost.frameMs,32);
+  assert.equal(frost.frameMs,40);
   assert.ok(frost.canvasWidth <= Math.ceil(frost.cssWidth * 1.35) + 1, `Canvas DPR was not capped: ${JSON.stringify(frost)}`);
 
   console.log('Mobile profile keeps frost/neon/icon motion while reducing render cost.');

@@ -19,7 +19,7 @@
   const reducedMotion = window.matchMedia('(prefers-reduced-motion:reduce)');
   const mobileProfile = window.matchMedia('(max-width:820px), (pointer:coarse)');
   const MOBILE_DPR_CAP = 1.35;
-  const MOBILE_FRAME_MS = 32;
+  const MOBILE_FRAME_MS = 40;
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const random = (min, max) => min + Math.random() * (max - min);
