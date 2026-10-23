@@ -675,3 +675,119 @@
       }
     }
 
+    /* Interactive freeze-over: frost crystals grow inward from button edges on pointer hover.
+       The overlay is visual only, so controls remain fully clickable and their normal colours/layout stay intact. */
+    @property --lf-button-frost-depth {
+      syntax: '<percentage>';
+      inherits: false;
+      initial-value: 0%;
+    }
+
+    @media (hover:hover) and (pointer:fine) {
+      :is(
+        button:not(.login-emblem-button):not(:disabled),
+        .action-btn:not(:disabled),
+        .submit-btn:not(:disabled),
+        .nav-btn,
+        .nav-shortcut,
+        .nav-more-toggle,
+        .sidebar-group-toggle,
+        .sidebar-signout
+      ) {
+        position:relative;
+        isolation:isolate;
+      }
+
+      :is(
+        button:not(.login-emblem-button):not(:disabled),
+        .action-btn:not(:disabled),
+        .submit-btn:not(:disabled),
+        .nav-btn,
+        .nav-shortcut,
+        .nav-more-toggle,
+        .sidebar-group-toggle,
+        .sidebar-signout
+      )::before {
+        content:"";
+        position:absolute;
+        inset:0;
+        z-index:4;
+        pointer-events:none;
+        border-radius:inherit;
+        --lf-button-frost-depth:0%;
+        opacity:0;
+        border:1px solid rgba(230,251,255,0);
+        background:
+          repeating-conic-gradient(
+            from 14deg at 8% 4%,
+            rgba(255,255,255,.96) 0deg 1.8deg,
+            rgba(186,230,253,.78) 1.8deg 3.6deg,
+            transparent 3.6deg 13deg
+          ) 0 0 / 42px 32px,
+          repeating-conic-gradient(
+            from 194deg at 92% 96%,
+            rgba(230,251,255,.92) 0deg 1.6deg,
+            rgba(125,211,252,.72) 1.6deg 3.2deg,
+            transparent 3.2deg 12deg
+          ) 100% 100% / 38px 30px,
+          radial-gradient(circle at 8% 15%, rgba(255,255,255,.86), transparent 30%),
+          radial-gradient(circle at 92% 82%, rgba(186,230,253,.78), transparent 34%),
+          linear-gradient(115deg, rgba(230,251,255,.78), rgba(125,211,252,.52) 48%, rgba(255,255,255,.72));
+        -webkit-mask:
+          linear-gradient(#000 0 0) top / 100% var(--lf-button-frost-depth) no-repeat,
+          linear-gradient(#000 0 0) bottom / 100% var(--lf-button-frost-depth) no-repeat,
+          linear-gradient(#000 0 0) left / var(--lf-button-frost-depth) 100% no-repeat,
+          linear-gradient(#000 0 0) right / var(--lf-button-frost-depth) 100% no-repeat;
+        mask:
+          linear-gradient(#000 0 0) top / 100% var(--lf-button-frost-depth) no-repeat,
+          linear-gradient(#000 0 0) bottom / 100% var(--lf-button-frost-depth) no-repeat,
+          linear-gradient(#000 0 0) left / var(--lf-button-frost-depth) 100% no-repeat,
+          linear-gradient(#000 0 0) right / var(--lf-button-frost-depth) 100% no-repeat;
+        box-shadow:
+          inset 0 0 7px rgba(230,251,255,.66),
+          inset 0 0 15px rgba(56,189,248,.32);
+        mix-blend-mode:screen;
+        transition:
+          --lf-button-frost-depth .58s cubic-bezier(.12,.72,.18,1),
+          opacity .18s ease,
+          border-color .30s ease;
+      }
+
+      :is(
+        button:not(.login-emblem-button):not(:disabled),
+        .action-btn:not(:disabled),
+        .submit-btn:not(:disabled),
+        .nav-btn,
+        .nav-shortcut,
+        .nav-more-toggle,
+        .sidebar-group-toggle,
+        .sidebar-signout
+      ):hover::before {
+        --lf-button-frost-depth:58%;
+        opacity:.88;
+        border-color:rgba(230,251,255,.78);
+        animation:littleFeetButtonFrostGlint 1.7s ease-in-out .58s infinite alternate;
+      }
+
+      @keyframes littleFeetButtonFrostGlint {
+        from { background-position:0 0,100% 100%,0 0,100% 100%,0 0; filter:brightness(1); }
+        to { background-position:8px 4px,calc(100% - 7px) calc(100% - 4px),2px 0,calc(100% - 2px) 100%,0 0; filter:brightness(1.14); }
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      :is(
+        button:not(.login-emblem-button):not(:disabled),
+        .action-btn:not(:disabled),
+        .submit-btn:not(:disabled),
+        .nav-btn,
+        .nav-shortcut,
+        .nav-more-toggle,
+        .sidebar-group-toggle,
+        .sidebar-signout
+      )::before {
+        transition:none !important;
+        animation:none !important;
+      }
+    }
+
