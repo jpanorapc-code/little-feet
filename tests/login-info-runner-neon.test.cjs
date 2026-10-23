@@ -1,4 +1,4 @@
-// Verify the login information ticker keeps its text/fades while gaining six moving neon streaks.
+// Verify the login information ticker uses one continuous solid icy glow line.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -7,9 +7,9 @@ const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'assets/styles/source/05-light-and-dark.css'), 'utf8');
-assert.match(source, /loginInfoRunnerNeonLines/);
-assert.match(source, /steps\(270,end\)/);
-assert.match(source, /260px 2px,[\s\S]*190px 1px,[\s\S]*130px 2px,[\s\S]*235px 2px,[\s\S]*170px 1px,[\s\S]*115px 2px/);
+assert.doesNotMatch(source, /loginInfoRunnerNeonLines/, 'Old moving multi-line runner must be removed');
+assert.match(source, /border-top:2px solid #bff7ff/);
+assert.match(source, /0 -3px 12px rgba\(125,211,252,.72\)/);
 
 const server = http.createServer((req,res)=>{
   const pathname=req.url.split('?')[0]==='/'?'/index.html':req.url.split('?')[0];
@@ -39,17 +39,18 @@ let browser;
     const s=getComputedStyle(el);
     return {
       animationName:s.animationName,
-      animationDuration:s.animationDuration,
-      backgroundImage:s.backgroundImage,
-      backgroundSize:s.backgroundSize,
-      height:s.height
+      borderTopWidth:s.borderTopWidth,
+      borderTopStyle:s.borderTopStyle,
+      borderTopColor:s.borderTopColor,
+      boxShadow:s.boxShadow,
+      backgroundImage:s.backgroundImage
     };
   });
-  assert.equal(style.animationName,'loginInfoRunnerNeonLines');
-  assert.equal(style.animationDuration,'10.8s');
-  assert.ok((style.backgroundImage.match(/linear-gradient/g)||[]).length>=7,'Expected six neon gradients plus the base banner gradient');
-  assert.match(style.backgroundSize,/260px 2px/);
-  assert.match(style.backgroundSize,/115px 2px/);
+  assert.equal(style.animationName,'none','Banner glow itself must be solid and non-moving');
+  assert.equal(style.borderTopWidth,'2px');
+  assert.equal(style.borderTopStyle,'solid');
+  assert.match(style.boxShadow,/rgb\(125, 211, 252\)/);
+  assert.equal((style.backgroundImage.match(/linear-gradient/g)||[]).length,1,'Banner should keep only its base background gradient');
 
   const fades=await runner.evaluate(el=>({
     before:getComputedStyle(el,'::before').backgroundImage,
@@ -58,18 +59,10 @@ let browser;
   }));
   assert.match(fades.before,/linear-gradient/i,'Left fade must remain intact');
   assert.match(fades.after,/linear-gradient/i,'Right fade must remain intact');
-  assert.equal(fades.track,'loginInfoRunner','Ticker text must keep its original scrolling animation');
+  assert.equal(fades.track,'loginInfoRunner','Ticker text must keep scrolling');
   assert.equal(await runner.innerText(),beforeText,'Ticker wording must not change');
 
-  await page.setViewportSize({width:390,height:844});
-  const mobileTiming=await runner.evaluate(el=>getComputedStyle(el).animationTimingFunction);
-  assert.match(mobileTiming,/steps\(270/,'Mobile neon should use 25 FPS-equivalent stepping');
-
-  await page.emulateMedia({reducedMotion:'reduce'});
-  const reduced=await runner.evaluate(el=>getComputedStyle(el).animationName);
-  assert.equal(reduced,'none');
-
-  console.log('Login info runner has six independent icy streaks while preserving ticker text, fades and reduced-motion behavior.');
+  console.log('Login info runner uses one continuous solid icy glow line while ticker motion and fades remain intact.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   if(browser) await browser.close();
   await new Promise(resolve=>server.close(resolve));
