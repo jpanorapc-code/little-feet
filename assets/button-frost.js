@@ -17,6 +17,9 @@
   const active = new WeakMap();
   const finePointer = window.matchMedia('(hover:hover) and (pointer:fine)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion:reduce)');
+  const mobileProfile = window.matchMedia('(max-width:820px), (pointer:coarse)');
+  const MOBILE_DPR_CAP = 1.35;
+  const MOBILE_FRAME_MS = 32;
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const random = (min, max) => min + Math.random() * (max - min);
@@ -65,23 +68,30 @@
     }
   }
 
-  function createScene(width, height) {
+  function createScene(width, height, lowPower = false) {
     const scene = { segments:[], specks:[], haze:[] };
     const edgeY = Math.min(28, Math.max(11, height * .40));
     const edgeX = Math.min(16, Math.max(5, width * .048));
-    const topCount = clamp(Math.round(width / 18), 12, 38);
-    const bottomCount = clamp(Math.round(width / 17), 12, 40);
-    const sideCount = clamp(Math.round(height / 19), 2, 4);
+    const topCount = lowPower
+      ? clamp(Math.round(width / 29), 8, 24)
+      : clamp(Math.round(width / 18), 12, 38);
+    const bottomCount = lowPower
+      ? clamp(Math.round(width / 28), 8, 25)
+      : clamp(Math.round(width / 17), 12, 40);
+    const sideCount = lowPower
+      ? clamp(Math.round(height / 24), 2, 3)
+      : clamp(Math.round(height / 19), 2, 4);
+    const fernDepth = lowPower ? 2 : 3;
 
     for (let index = 0; index < topCount; index += 1) {
       const x = ((index + random(.05, .95)) / topCount) * width;
       addFern(scene, x, random(0, 1.5), Math.PI / 2 + random(-.72, .72),
-        random(edgeY * .62, edgeY), random(0, .44), 3);
+        random(edgeY * .62, edgeY), random(0, .44), fernDepth);
     }
     for (let index = 0; index < bottomCount; index += 1) {
       const x = ((index + random(.05, .95)) / bottomCount) * width;
       addFern(scene, x, height - random(0, 1.5), -Math.PI / 2 + random(-.72, .72),
-        random(edgeY * .60, edgeY), random(.03, .50), 3);
+        random(edgeY * .60, edgeY), random(.03, .50), fernDepth);
     }
 
     // Sparse side islands only. Never draw a full-height side strip.
@@ -89,15 +99,17 @@
       const y = ((index + random(.15, .85)) / sideCount) * height;
       if (Math.random() < .64) {
         addFern(scene, random(0, 1), y, random(-.58, .58),
-          random(edgeX * .52, edgeX), random(.18, .66), 3);
+          random(edgeX * .52, edgeX), random(.18, .66), fernDepth);
       }
       if (Math.random() < .58) {
         addFern(scene, width - random(0, 1), y + random(-5, 5), Math.PI + random(-.58, .58),
-          random(edgeX * .42, edgeX * .92), random(.24, .74), 3);
+          random(edgeX * .42, edgeX * .92), random(.24, .74), fernDepth);
       }
     }
 
-    const speckCount = clamp(Math.round(width * .82), 120, 420);
+    const speckCount = lowPower
+      ? clamp(Math.round(width * .48), 70, 240)
+      : clamp(Math.round(width * .82), 120, 420);
     for (let index = 0; index < speckCount; index += 1) {
       const edge = Math.random();
       let x;
@@ -117,7 +129,9 @@
       });
     }
 
-    const hazeCount = clamp(Math.round(width / 22), 12, 42);
+    const hazeCount = lowPower
+      ? clamp(Math.round(width / 36), 8, 24)
+      : clamp(Math.round(width / 22), 12, 42);
     for (let index = 0; index < hazeCount; index += 1) {
       const top = Math.random() < .5;
       scene.haze.push({
@@ -141,6 +155,12 @@
       state.alive = false;
       return;
     }
+
+    if (state.lowPower && state.lastFrameAt && (now - state.lastFrameAt) < MOBILE_FRAME_MS) {
+      state.raf = requestAnimationFrame(time => drawFrame(state, time));
+      return;
+    }
+    state.lastFrameAt = now;
 
     const elapsed = now - startedAt;
     const progress = clamp(elapsed / FREEZE_MS, 0, 1);
@@ -172,7 +192,9 @@
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.shadowColor = 'rgba(125,211,252,.58)';
-    ctx.shadowBlur = Math.min(3.4, Math.max(1.2, height * .055));
+    ctx.shadowBlur = state.lowPower
+      ? Math.min(2.2, Math.max(.9, height * .038))
+      : Math.min(3.4, Math.max(1.2, height * .055));
 
     for (const segment of scene.segments) {
       const local = ease((progress - segment.start) / Math.max(.035, segment.end - segment.start));
@@ -253,7 +275,9 @@
     canvas.className = 'lf-button-frost-canvas';
     canvas.setAttribute('aria-hidden', 'true');
 
-    const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const lowPower = mobileProfile.matches;
+    const dprCap = lowPower ? MOBILE_DPR_CAP : 2;
+    const dpr = Math.min(dprCap, Math.max(1, window.devicePixelRatio || 1));
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
     canvas.width = Math.max(1, Math.round(width * dpr));
@@ -267,7 +291,9 @@
 
     const state = {
       button, canvas, ctx, width, height,
-      scene:createScene(width, height),
+      scene:createScene(width, height, lowPower),
+      lowPower,
+      lastFrameAt:0,
       startedAt:performance.now(),
       raf:0,
       alive:true
@@ -297,5 +323,12 @@
     });
   });
 
-  window.__littleFeetButtonFrost = { start, stop, selector:SELECTOR };
+  window.__littleFeetButtonFrost = {
+    start,
+    stop,
+    selector:SELECTOR,
+    mobileProfile,
+    mobileDprCap:MOBILE_DPR_CAP,
+    mobileFrameMs:MOBILE_FRAME_MS
+  };
 })();

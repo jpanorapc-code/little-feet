@@ -139,6 +139,9 @@ jobs:
       - name: Button freeze hover regression
         run: node tests/button-freeze.test.cjs
 
+      - name: Mobile animation performance regression
+        run: node tests/mobile-animation-performance.test.cjs
+
       - name: Ambient background interaction regression
         env:
           LF_BROWSER_CHANNEL: chrome

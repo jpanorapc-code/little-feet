@@ -241,6 +241,18 @@
       0%,100% { transform:translateY(0) scale(1); }
       50% { transform:translateY(-1.5px) scale(1.055); }
     }
+
+    @media (max-width:820px), (pointer:coarse) {
+      .ui-icon {
+        animation-name:littleFeetIconFloatMobile;
+        animation-duration:4.2s;
+        will-change:auto;
+      }
+      @keyframes littleFeetIconFloatMobile {
+        0%,100% { transform:translateY(0) scale(1); }
+        50% { transform:translateY(-.75px) scale(1.025); }
+      }
+    }
     @media (prefers-reduced-motion:reduce) {
       .ui-icon { animation:none !important; transform:none !important; will-change:auto; }
     }
@@ -6603,6 +6615,35 @@
 
     @keyframes portalCardIceOrbit {
       to { --portal-card-neon-angle:360deg; }
+    }
+
+
+    @media (max-width:820px), (pointer:coarse) {
+      :is(
+        .card:not(.auth-card),
+        .workspace-results-panel,
+        .store-item,
+        .chat-shell,
+        .guide-link-card,
+        .modal-card,
+        .executive-kpi,
+        .executive-chart-card,
+        .portal-welcome-banner,
+        .my-day-attention,
+        .my-day-action,
+        .staff-work-card,
+        .parent-contact-card
+      )::after,
+      :is(
+        .workspace-card,
+        .my-day-hero
+      )::before {
+        animation-duration:6.4s;
+        animation-timing-function:steps(36,end);
+        filter:
+          drop-shadow(0 0 3px rgba(56,189,248,.78))
+          drop-shadow(0 0 7px rgba(125,211,252,.46));
+      }
     }
 
     @media (prefers-reduced-motion:reduce) {

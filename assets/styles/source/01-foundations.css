@@ -241,6 +241,18 @@
       0%,100% { transform:translateY(0) scale(1); }
       50% { transform:translateY(-1.5px) scale(1.055); }
     }
+
+    @media (max-width:820px), (pointer:coarse) {
+      .ui-icon {
+        animation-name:littleFeetIconFloatMobile;
+        animation-duration:4.2s;
+        will-change:auto;
+      }
+      @keyframes littleFeetIconFloatMobile {
+        0%,100% { transform:translateY(0) scale(1); }
+        50% { transform:translateY(-.75px) scale(1.025); }
+      }
+    }
     @media (prefers-reduced-motion:reduce) {
       .ui-icon { animation:none !important; transform:none !important; will-change:auto; }
     }
