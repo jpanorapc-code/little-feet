@@ -42,22 +42,28 @@ let browser;
     const s=getComputedStyle(el,'::before');
     return {
       opacity:s.opacity,
-      depth:s.getPropertyValue('--lf-button-frost-depth').trim(),
+      frostY:s.getPropertyValue('--lf-button-frost-y').trim(),
+      frostX:s.getPropertyValue('--lf-button-frost-x').trim(),
       pointerEvents:s.pointerEvents,
-      mask:s.maskImage || s.webkitMaskImage
+      mask:s.maskImage || s.webkitMaskImage,
+      background:s.backgroundImage
     };
   });
   assert.equal(before.pointerEvents,'none');
-  assert.ok(before.depth === '0%' || before.depth === '0%');
+  assert.equal(before.frostY,'0%');
+  assert.equal(before.frostX,'0%');
   assert.match(before.mask,/linear-gradient/i);
+  assert.match(before.background,/button-frost-crystals\.svg/i);
 
   await button.hover();
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(1750);
   const frozen = await button.evaluate(el => {
     const s=getComputedStyle(el,'::before');
     return {
       opacity:Number.parseFloat(s.opacity),
-      depth:s.getPropertyValue('--lf-button-frost-depth').trim(),
+      frostY:s.getPropertyValue('--lf-button-frost-y').trim(),
+      frostX:s.getPropertyValue('--lf-button-frost-x').trim(),
+      transitionDuration:s.transitionDuration,
       animationName:s.animationName,
       background:s.backgroundImage,
       borderColor:s.borderTopColor,
@@ -67,9 +73,11 @@ let browser;
   const afterBox = await button.boundingBox();
 
   assert.ok(frozen.opacity > .75, `Frozen overlay should be clearly visible: ${JSON.stringify(frozen)}`);
-  assert.equal(frozen.depth,'58%');
-  assert.equal(frozen.animationName,'littleFeetButtonFrostGlint');
-  assert.match(frozen.background,/repeating-conic-gradient/i);
+  assert.equal(frozen.frostY,'24%');
+  assert.equal(frozen.frostX,'11%');
+  assert.match(frozen.transitionDuration,/1\.6s/,'Freeze growth should be deliberately slower');
+  assert.equal(frozen.animationName,'none','Frozen state should settle instead of continuously flashing');
+  assert.match(frozen.background,/button-frost-crystals\.svg/i);
   assert.equal(frozen.pointerEvents,'none');
   assert.deepEqual(afterBox,beforeBox,'Freeze overlay must not change button geometry');
 
@@ -80,13 +88,18 @@ let browser;
   assert.equal(clicks,1,'Frozen button must remain clickable');
 
   await page.mouse.move(900,700);
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(1750);
   const thawed=await button.evaluate(el => {
     const s=getComputedStyle(el,'::before');
-    return {opacity:Number.parseFloat(s.opacity),depth:s.getPropertyValue('--lf-button-frost-depth').trim()};
+    return {
+      opacity:Number.parseFloat(s.opacity),
+      frostY:s.getPropertyValue('--lf-button-frost-y').trim(),
+      frostX:s.getPropertyValue('--lf-button-frost-x').trim()
+    };
   });
   assert.ok(thawed.opacity < .05, `Frost should thaw after hover: ${JSON.stringify(thawed)}`);
-  assert.equal(thawed.depth,'0%');
+  assert.equal(thawed.frostY,'0%');
+  assert.equal(thawed.frostX,'0%');
 
   console.log('Button freeze hover grows inward, stays clickable, preserves geometry and thaws cleanly.');
 })().catch(error => {
