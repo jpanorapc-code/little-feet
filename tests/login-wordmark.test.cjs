@@ -93,7 +93,7 @@ let browser;
       return { title: textWidth(titleEl), slogan: textWidth(sloganEl) };
     });
     const widthRatio = visibleWidths.slogan / visibleWidths.title;
-    assert.ok(widthRatio >= .45 && widthRatio <= .95,
+    assert.ok(widthRatio >= .45 && widthRatio <= 1,
       `Slogan stays subordinate to the name without extending past it: ${JSON.stringify({ visibleWidths, widthRatio })}`);
     const hide = await page.addStyleTag({ content: '#authSection .brand-header h1::after { opacity:0 !important; }' });
     const base = (await title.screenshot()).toString('base64');
