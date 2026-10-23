@@ -4425,6 +4425,7 @@
       -webkit-backdrop-filter:blur(18px) saturate(118%);
       color:#d9f7f4;
       pointer-events:none;
+      animation:loginInfoRunnerGlowPulse 2.8s ease-in-out infinite;
     }
     .login-info-runner::before,
     .login-info-runner::after {
@@ -4478,6 +4479,33 @@
       to { transform:translate3d(-50%,0,0); }
     }
 
+    @keyframes loginInfoRunnerGlowPulse {
+      0%,100% {
+        border-top-color:#9eefff;
+        box-shadow:
+          0 -10px 26px rgba(0,0,0,.24),
+          0 -1px 4px rgba(230,251,255,.72),
+          0 -3px 9px rgba(125,211,252,.52),
+          0 -5px 15px rgba(56,189,248,.26),
+          inset 0 1px 0 rgba(255,255,255,.08);
+      }
+      50% {
+        border-top-color:#f2fdff;
+        box-shadow:
+          0 -10px 26px rgba(0,0,0,.24),
+          0 -1px 7px rgba(247,253,255,1),
+          0 -4px 16px rgba(125,211,252,.88),
+          0 -7px 27px rgba(56,189,248,.52),
+          inset 0 1px 0 rgba(255,255,255,.12);
+      }
+    }
+
+    @media (max-width:820px), (pointer:coarse) {
+      .login-info-runner {
+        animation-timing-function:steps(70,end);
+      }
+    }
+
     @media (max-width:640px) {
       #authSection {
         padding-bottom:max(76px, calc(58px + env(safe-area-inset-bottom))) !important;
@@ -4512,6 +4540,9 @@
       .login-info-runner-group { font-size:.68rem; }
     }
     @media (prefers-reduced-motion: reduce) {
+      .login-info-runner {
+        animation:none;
+      }
       .login-info-runner-track {
         width:100%;
         min-width:0;

@@ -46,11 +46,16 @@ let browser;
       backgroundImage:s.backgroundImage
     };
   });
-  assert.equal(style.animationName,'none','Banner glow itself must be solid and non-moving');
+  assert.equal(style.animationName,'loginInfoRunnerGlowPulse','Solid glow line should pulse in place');
+  assert.equal(style.animationDuration,'2.8s');
   assert.equal(style.borderTopWidth,'2px');
   assert.equal(style.borderTopStyle,'solid');
   assert.match(style.boxShadow,/rgb\(125, 211, 252\)/);
   assert.equal((style.backgroundImage.match(/linear-gradient/g)||[]).length,1,'Banner should keep only its base background gradient');
+
+  await page.setViewportSize({width:390,height:844});
+  const mobileTiming=await runner.evaluate(el=>getComputedStyle(el).animationTimingFunction);
+  assert.match(mobileTiming,/steps\\(70/,'Mobile pulse should be stepped at roughly 25 FPS');
 
   const fades=await runner.evaluate(el=>({
     before:getComputedStyle(el,'::before').backgroundImage,
@@ -62,7 +67,11 @@ let browser;
   assert.equal(fades.track,'loginInfoRunner','Ticker text must keep scrolling');
   assert.equal(await runner.innerText(),beforeText,'Ticker wording must not change');
 
-  console.log('Login info runner uses one continuous solid icy glow line while ticker motion and fades remain intact.');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const reduced=await runner.evaluate(el=>getComputedStyle(el).animationName);
+  assert.equal(reduced,'none');
+
+  console.log('Login info runner uses one continuous pulsing icy glow line while ticker motion and fades remain intact.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   if(browser) await browser.close();
   await new Promise(resolve=>server.close(resolve));
