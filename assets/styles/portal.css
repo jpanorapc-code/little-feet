@@ -6167,7 +6167,7 @@
       paint-order:normal;
 
       font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
-      font-size:clamp(1rem,3vw,1.35rem) !important;
+      font-size:clamp(1.12rem,3.36vw,1.51rem) !important;
       font-weight:800 !important;
       font-style:normal !important;
       line-height:1.15 !important;
@@ -6279,7 +6279,7 @@
       }
 
       #authSection .brand-header p.slogan span {
-        font-size:clamp(.76rem,3.35vw,.90rem) !important;
+        font-size:clamp(.85rem,3.75vw,1.01rem) !important;
         letter-spacing:.018em !important;
       }
 
