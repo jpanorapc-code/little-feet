@@ -216,6 +216,21 @@
     }
     ctx.restore();
 
+    // Keep the centre of every button genuinely clear, including buttons whose label is a raw text node.
+    // Frost remains dense on the rim, but cannot paint across the readable label zone.
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    const clearX = width * .11;
+    const clearY = height * .20;
+    const clearW = width * .78;
+    const clearH = height * .60;
+    const radius = Math.min(clearH * .34, 12);
+    ctx.beginPath();
+    ctx.roundRect(clearX, clearY, clearW, clearH, radius);
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.fill();
+    ctx.restore();
+
     state.raf = requestAnimationFrame(time => drawFrame(state, time));
   }
 

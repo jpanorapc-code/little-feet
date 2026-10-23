@@ -33,9 +33,14 @@ let browser;
   await page.route('https://**', route => route.abort());
   await page.goto(`http://127.0.0.1:${server.address().port}`, { waitUntil:'load' });
   await page.locator('#portalLoader').evaluate(el => el.remove());
-  await page.addScriptTag({ url:'/assets/button-frost.js?v=20261023-v5-frost-v2' });
+  await page.addScriptTag({ url:'/assets/button-frost.js?v=20261023-v5-frost-v3' });
 
   // Login page must remain structurally and visually untouched by frost host rules.
+  const authCard = page.locator('#authSection > .auth-card');
+  const authCardBefore = await authCard.evaluate(el => {
+    const s=getComputedStyle(el);
+    return { overflow:s.overflow, isolation:s.isolation, position:s.position };
+  });
   const loginButton = page.locator('#authSection .submit-btn');
   const loginBefore = await loginButton.evaluate(el => {
     const s=getComputedStyle(el);
@@ -49,6 +54,11 @@ let browser;
     return { overflow:s.overflow, isolation:s.isolation, position:s.position };
   });
   assert.deepEqual(loginAfter, loginBefore, 'Login button styling must remain unchanged');
+  const authCardAfter = await authCard.evaluate(el => {
+    const s=getComputedStyle(el);
+    return { overflow:s.overflow, isolation:s.isolation, position:s.position };
+  });
+  assert.deepEqual(authCardAfter, authCardBefore, 'Login card styling must remain unchanged');
 
   // Create a visible dashboard fixture because dashboard is hidden before authentication in this test shell.
   await page.evaluate(() => {
@@ -91,7 +101,7 @@ let browser;
     return {edgeRatio:edge/edgeTotal,centerRatio:center/centerTotal,rightRatio:right/rightTotal};
   });
   assert.ok(snapshot.edgeRatio>.065,`Frost should be visibly dense around edges: ${JSON.stringify(snapshot)}`);
-  assert.ok(snapshot.centerRatio<snapshot.edgeRatio*.16,`Center must remain protected for label readability: ${JSON.stringify(snapshot)}`);
+  assert.ok(snapshot.centerRatio<.01,`Center must be explicitly cleared for label readability: ${JSON.stringify(snapshot)}`);
   assert.ok(snapshot.rightRatio<.58,`Right edge must remain broken rather than becoming a solid slab: ${JSON.stringify(snapshot)}`);
   assert.deepEqual(await button.boundingBox(),beforeBox,'Frost must not change button geometry');
 

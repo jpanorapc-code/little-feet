@@ -709,6 +709,11 @@
       #dashboardSection .lf-button-frost-canvas.is-thawing {
         opacity:0;
       }
+
+      #dashboardSection .lf-frost-host > :not(.lf-button-frost-canvas) {
+        position:relative;
+        z-index:2;
+      }
     }
 
     @media (prefers-reduced-motion:reduce) {
