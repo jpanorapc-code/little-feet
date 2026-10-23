@@ -165,8 +165,8 @@
 
     @media (prefers-reduced-motion:reduce) {
       #authSection .brand-header h1::after {
-        animation:none;
-        opacity:0;
+        animation:none !important;
+        opacity:0 !important;
       }
     }
 
