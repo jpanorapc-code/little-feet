@@ -2,17 +2,17 @@
   'use strict';
 
   const SELECTOR = [
-    'button:not(.login-emblem-button):not(:disabled)',
-    '.action-btn:not(:disabled)',
-    '.submit-btn:not(:disabled)',
-    '.nav-btn',
-    '.nav-shortcut',
-    '.nav-more-toggle',
-    '.sidebar-group-toggle',
-    '.sidebar-signout'
+    '#dashboardSection button:not(:disabled)',
+    '#dashboardSection .action-btn:not(:disabled)',
+    '#dashboardSection .submit-btn:not(:disabled)',
+    '#dashboardSection .nav-btn',
+    '#dashboardSection .nav-shortcut',
+    '#dashboardSection .nav-more-toggle',
+    '#dashboardSection .sidebar-group-toggle',
+    '#dashboardSection .sidebar-signout'
   ].join(',');
 
-  const FREEZE_MS = 3000;
+  const FREEZE_MS = 3200;
   const THAW_MS = 520;
   const active = new WeakMap();
   const finePointer = window.matchMedia('(hover:hover) and (pointer:fine)');
@@ -28,8 +28,8 @@
     const mainEnd = start + random(.13, .25);
     scene.segments.push({
       x1:x, y1:y, x2:mainEndX, y2:mainEndY,
-      start, end:mainEnd, width:random(.55, 1.12),
-      alpha:random(.42, .82), phase:random(0, Math.PI * 2), speed:random(1.4, 3.2)
+      start, end:mainEnd, width:random(.82, 1.65),
+      alpha:random(.58, .95), phase:random(0, Math.PI * 2), speed:random(1.4, 3.2)
     });
 
     if (depth <= 1) return;
@@ -46,8 +46,8 @@
         const endY = branchY + Math.sin(branchAngle) * branchLength;
         scene.segments.push({
           x1:branchX, y1:branchY, x2:endX, y2:endY,
-          start:delay, end:delay + random(.08, .18), width:random(.42, .82),
-          alpha:random(.34, .72), phase:random(0, Math.PI * 2), speed:random(1.8, 3.8)
+          start:delay, end:delay + random(.08, .18), width:random(.56, 1.08),
+          alpha:random(.46, .86), phase:random(0, Math.PI * 2), speed:random(1.8, 3.8)
         });
         if (depth > 2 && Math.random() < .42) {
           const subStart = delay + random(.02, .08);
@@ -57,8 +57,8 @@
             x1:endX, y1:endY,
             x2:endX + Math.cos(subAngle) * subLength,
             y2:endY + Math.sin(subAngle) * subLength,
-            start:subStart, end:subStart + random(.07, .14), width:random(.34, .62),
-            alpha:random(.28, .58), phase:random(0, Math.PI * 2), speed:random(2.0, 4.2)
+            start:subStart, end:subStart + random(.07, .14), width:random(.44, .82),
+            alpha:random(.36, .70), phase:random(0, Math.PI * 2), speed:random(2.0, 4.2)
           });
         }
       }
@@ -67,37 +67,37 @@
 
   function createScene(width, height) {
     const scene = { segments:[], specks:[], haze:[] };
-    const edgeY = Math.min(20, Math.max(7, height * .26));
-    const edgeX = Math.min(14, Math.max(4, width * .045));
-    const topCount = clamp(Math.round(width / 27), 8, 26);
-    const bottomCount = clamp(Math.round(width / 29), 8, 24);
-    const sideCount = clamp(Math.round(height / 18), 2, 5);
+    const edgeY = Math.min(28, Math.max(11, height * .40));
+    const edgeX = Math.min(16, Math.max(5, width * .048));
+    const topCount = clamp(Math.round(width / 18), 12, 38);
+    const bottomCount = clamp(Math.round(width / 17), 12, 40);
+    const sideCount = clamp(Math.round(height / 19), 2, 4);
 
     for (let index = 0; index < topCount; index += 1) {
       const x = ((index + random(.05, .95)) / topCount) * width;
       addFern(scene, x, random(0, 1.5), Math.PI / 2 + random(-.72, .72),
-        random(edgeY * .52, edgeY), random(0, .48), 3);
+        random(edgeY * .62, edgeY), random(0, .44), 3);
     }
     for (let index = 0; index < bottomCount; index += 1) {
       const x = ((index + random(.05, .95)) / bottomCount) * width;
       addFern(scene, x, height - random(0, 1.5), -Math.PI / 2 + random(-.72, .72),
-        random(edgeY * .50, edgeY), random(.04, .56), 3);
+        random(edgeY * .60, edgeY), random(.03, .50), 3);
     }
 
     // Sparse side islands only. Never draw a full-height side strip.
     for (let index = 0; index < sideCount; index += 1) {
       const y = ((index + random(.15, .85)) / sideCount) * height;
-      if (Math.random() < .78) {
+      if (Math.random() < .64) {
         addFern(scene, random(0, 1), y, random(-.58, .58),
           random(edgeX * .52, edgeX), random(.18, .66), 3);
       }
-      if (Math.random() < .72) {
+      if (Math.random() < .58) {
         addFern(scene, width - random(0, 1), y + random(-5, 5), Math.PI + random(-.58, .58),
           random(edgeX * .42, edgeX * .92), random(.24, .74), 3);
       }
     }
 
-    const speckCount = clamp(Math.round(width * .46), 70, 260);
+    const speckCount = clamp(Math.round(width * .82), 120, 420);
     for (let index = 0; index < speckCount; index += 1) {
       const edge = Math.random();
       let x;
@@ -112,21 +112,21 @@
         x = width - Math.min(edgeX, -Math.log(Math.max(.001, Math.random())) * 1.8); y = random(0, height);
       }
       scene.specks.push({
-        x, y, radius:random(.35, 1.35), start:random(.04, .84),
-        alpha:random(.25, .70), phase:random(0, Math.PI * 2), speed:random(1.2, 3.8)
+        x, y, radius:random(.42, 1.65), start:random(.02, .76),
+        alpha:random(.34, .82), phase:random(0, Math.PI * 2), speed:random(1.2, 3.8)
       });
     }
 
-    const hazeCount = clamp(Math.round(width / 34), 8, 28);
+    const hazeCount = clamp(Math.round(width / 22), 12, 42);
     for (let index = 0; index < hazeCount; index += 1) {
       const top = Math.random() < .5;
       scene.haze.push({
         x:random(0, width),
         y:top ? random(0, 3) : height - random(0, 3),
-        rx:random(7, 22),
+        rx:random(10, 30),
         ry:random(2.5, Math.max(4, edgeY * .42)),
         start:random(.05, .72),
-        alpha:random(.035, .11),
+        alpha:random(.055, .16),
         phase:random(0, Math.PI * 2)
       });
     }

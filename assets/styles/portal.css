@@ -6630,11 +6630,10 @@
       }
     }
 
-    /* V5 button frost: one live canvas grows broken, detailed frost blooms around the rim.
-       The canvas sits behind real button content so labels/icons stay untouched and readable. */
+    /* V5 button frost is dashboard-only. Login/auth controls are intentionally untouched. */
     @media (hover:hover) and (pointer:fine) {
-      :is(
-        button:not(.login-emblem-button):not(:disabled),
+      #dashboardSection :is(
+        button:not(:disabled),
         .action-btn:not(:disabled),
         .submit-btn:not(:disabled),
         .nav-btn,
@@ -6648,26 +6647,26 @@
         overflow:hidden;
       }
 
-      .lf-button-frost-canvas {
+      #dashboardSection .lf-button-frost-canvas {
         position:absolute;
         inset:0;
         width:100%;
         height:100%;
-        z-index:-1;
+        z-index:1;
         display:block;
         pointer-events:none;
         border-radius:inherit;
         opacity:1;
         mix-blend-mode:screen;
-        transition:opacity .48s ease;
+        transition:opacity .52s ease;
       }
 
-      .lf-button-frost-canvas.is-thawing {
+      #dashboardSection .lf-button-frost-canvas.is-thawing {
         opacity:0;
       }
     }
 
     @media (prefers-reduced-motion:reduce) {
-      .lf-button-frost-canvas { display:none !important; }
+      #dashboardSection .lf-button-frost-canvas { display:none !important; }
     }
 

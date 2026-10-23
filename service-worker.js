@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v100-button-freeze-v5';
+const CACHE_NAME = 'little-feet-shell-v101-button-freeze-v5';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261023-button-freeze-v3',
+  '/assets/styles/portal.css?v=20261023-button-freeze-v4',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',
@@ -41,7 +41,7 @@ const SHELL_ASSETS = [
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20261004-portal-portraits-v1',
   '/assets/ambient-background.js?v=20261010-media-loading-v1',
-  '/assets/button-frost.js?v=20261023-v5-frost-v1',
+  '/assets/button-frost.js?v=20261023-v5-frost-v2',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-clean.jpg',
   '/assets/brand/iceberg-navy-penguin.webp',
