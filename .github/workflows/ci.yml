@@ -130,6 +130,9 @@ jobs:
       - name: Login wordmark neon regression
         run: node tests/login-wordmark.test.cjs
 
+      - name: Login info runner neon regression
+        run: node tests/login-info-runner-neon.test.cjs
+
       - name: Portal card neon regression
         run: node tests/portal-card-neon.test.cjs
 

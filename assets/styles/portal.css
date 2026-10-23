@@ -4402,6 +4402,7 @@
 
     /* Login information runner: fixed to the login viewport only. */
     .login-info-runner {
+      --login-runner-base:linear-gradient(155deg,#08287f,#061d5b);
       position:fixed;
       z-index:12;
       left:0;
@@ -4413,12 +4414,40 @@
       align-items:center;
       padding:8px 0 max(8px, env(safe-area-inset-bottom));
       border-top:1px solid rgba(94,234,212,.24);
-      background:linear-gradient(155deg,#08287f,#061d5b);
-      box-shadow:0 -10px 26px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05);
+      background:
+        linear-gradient(90deg,transparent 0%,rgba(56,189,248,.18) 15%,#7dd3fc 42%,#e6fbff 50%,#7dd3fc 58%,rgba(56,189,248,.16) 85%,transparent 100%) no-repeat,
+        linear-gradient(90deg,transparent 0%,rgba(56,189,248,.14) 18%,#7dd3fc 44%,#f7fdff 50%,#7dd3fc 56%,rgba(56,189,248,.12) 82%,transparent 100%) no-repeat,
+        linear-gradient(90deg,transparent 0%,rgba(56,189,248,.10) 20%,#7dd3fc 46%,#e6fbff 50%,#7dd3fc 54%,rgba(56,189,248,.10) 80%,transparent 100%) no-repeat,
+        linear-gradient(90deg,transparent 0%,rgba(56,189,248,.16) 15%,#7dd3fc 42%,#e6fbff 50%,#7dd3fc 58%,rgba(56,189,248,.14) 85%,transparent 100%) no-repeat,
+        linear-gradient(90deg,transparent 0%,rgba(56,189,248,.12) 18%,#7dd3fc 44%,#f7fdff 50%,#7dd3fc 56%,rgba(56,189,248,.11) 82%,transparent 100%) no-repeat,
+        linear-gradient(90deg,transparent 0%,rgba(56,189,248,.09) 20%,#7dd3fc 46%,#e6fbff 50%,#7dd3fc 54%,rgba(56,189,248,.09) 80%,transparent 100%) no-repeat,
+        var(--login-runner-base);
+      background-size:
+        260px 2px,
+        190px 1px,
+        130px 2px,
+        235px 2px,
+        170px 1px,
+        115px 2px,
+        100% 100%;
+      background-position:
+        -300px 0,
+        -680px 1px,
+        -980px 0,
+        calc(100% + 260px) 100%,
+        calc(100% + 640px) calc(100% - 1px),
+        calc(100% + 940px) 100%,
+        0 0;
+      box-shadow:
+        0 -10px 26px rgba(0,0,0,.24),
+        inset 0 1px 0 rgba(255,255,255,.05),
+        inset 0 2px 8px rgba(56,189,248,.06),
+        inset 0 -2px 8px rgba(125,211,252,.05);
       backdrop-filter:blur(18px) saturate(118%);
       -webkit-backdrop-filter:blur(18px) saturate(118%);
       color:#d9f7f4;
       pointer-events:none;
+      animation:loginInfoRunnerNeonLines 10.8s linear infinite;
     }
     .login-info-runner::before,
     .login-info-runner::after {
@@ -4471,6 +4500,35 @@
       from { transform:translate3d(0,0,0); }
       to { transform:translate3d(-50%,0,0); }
     }
+
+    @keyframes loginInfoRunnerNeonLines {
+      from {
+        background-position:
+          -300px 0,
+          -680px 1px,
+          -980px 0,
+          calc(100% + 260px) 100%,
+          calc(100% + 640px) calc(100% - 1px),
+          calc(100% + 940px) 100%,
+          0 0;
+      }
+      to {
+        background-position:
+          calc(100% + 520px) 0,
+          calc(100% + 980px) 1px,
+          calc(100% + 1380px) 0,
+          -520px 100%,
+          -930px calc(100% - 1px),
+          -1280px 100%,
+          0 0;
+      }
+    }
+
+    @media (max-width:820px), (pointer:coarse) {
+      .login-info-runner {
+        animation-timing-function:steps(270,end);
+      }
+    }
     @media (max-width:640px) {
       #authSection {
         padding-bottom:max(76px, calc(58px + env(safe-area-inset-bottom))) !important;
@@ -4505,6 +4563,17 @@
       .login-info-runner-group { font-size:.68rem; }
     }
     @media (prefers-reduced-motion: reduce) {
+      .login-info-runner {
+        animation:none;
+        background-position:
+          12% 0,
+          48% 1px,
+          78% 0,
+          84% 100%,
+          54% calc(100% - 1px),
+          22% 100%,
+          0 0;
+      }
       .login-info-runner-track {
         width:100%;
         min-width:0;
@@ -4525,7 +4594,7 @@
       .login-info-runner-dot { padding:0 5px; }
     }
     body.light-mode .login-info-runner {
-      background:linear-gradient(155deg,#08287f,#061d5b);
+      --login-runner-base:linear-gradient(155deg,#08287f,#061d5b);
       border-top-color:rgba(88,214,205,.30);
       color:#f1fbfc;
     }
