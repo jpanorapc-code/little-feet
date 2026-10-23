@@ -99,7 +99,7 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:1px #e6fbff !important;
+      -webkit-text-stroke:.5px #e6fbff !important;
 
       border:0 !important;
       outline:0 !important;
@@ -215,7 +215,7 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:1px #e6fbff !important;
+      -webkit-text-stroke:.4px #e6fbff !important;
       paint-order:normal;
 
       font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
