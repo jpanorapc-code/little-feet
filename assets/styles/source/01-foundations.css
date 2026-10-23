@@ -236,7 +236,14 @@
     .nav-brand img { height: 46px; width: 46px; background: #ffffff; padding: 2px; border:1px solid rgba(94,234,212,.86); border-radius:10px; filter: drop-shadow(0 0 8px rgba(45,212,191,.62)); object-fit: contain; }
     .nav-brand .site-name { display:inline-block; min-width:0; color:transparent; background:linear-gradient(105deg,#ffffff 8%,#c8fff7 44%,#5eead4 70%,#ffffff 96%); background-size:180% auto; -webkit-background-clip:text; background-clip:text; font-family:Georgia, 'Times New Roman', serif; font-size:clamp(1.08rem,1.42vw,1.48rem); font-weight:800; letter-spacing:.018em; line-height:1.05; white-space:nowrap; text-shadow:0 1px 12px rgba(94,234,212,.28); animation:siteNameShimmer 8s ease-in-out infinite; }
     @keyframes siteNameShimmer { 50% { background-position:100% center; } }
-    .ui-icon { width:1.22em; height:1.22em; flex:0 0 auto; display:inline-block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.22em; }
+    .ui-icon { width:1.22em; height:1.22em; flex:0 0 auto; display:inline-block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.22em; transform-box:fill-box; transform-origin:center; animation:littleFeetIconFloat 2.8s ease-in-out infinite; will-change:transform; }
+    @keyframes littleFeetIconFloat {
+      0%,100% { transform:translateY(0) scale(1); }
+      50% { transform:translateY(-1.5px) scale(1.055); }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .ui-icon { animation:none !important; transform:none !important; will-change:auto; }
+    }
     .ui-icon--fill { fill:currentColor; stroke:none; }
     .icon-label { display:inline-flex; align-items:center; gap:7px; }
     .nav-user-panel .action-btn, .nav-shortcut, .nav-more-toggle { display:inline-flex; align-items:center; justify-content:center; gap:7px; }

@@ -1,8 +1,8 @@
-const CACHE_NAME = 'little-feet-shell-v96-portal-card-neon';
+const CACHE_NAME = 'little-feet-shell-v97-animated-icons';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
-  '/assets/styles/portal.css?v=20261023-portal-card-neon-v1',
+  '/assets/styles/portal.css?v=20261023-animated-icons-v1',
   '/assets/welcome-clock.js?v=20261010-sa-clock-v1',
   '/assets/welcome-clock.css?v=20261010-sa-clock-v1',
   '/assets/features/audio.js?v=20261010-controlled-split-v2',

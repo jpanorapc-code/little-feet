@@ -133,6 +133,9 @@ jobs:
       - name: Portal card neon regression
         run: node tests/portal-card-neon.test.cjs
 
+      - name: Portal icon animation regression
+        run: node tests/icon-animation.test.cjs
+
       - name: Ambient background interaction regression
         env:
           LF_BROWSER_CHANNEL: chrome
