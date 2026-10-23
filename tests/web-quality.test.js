@@ -418,7 +418,7 @@ assert.match(page, /\.modal-overlay \{[\s\S]*safe-area-inset-top[\s\S]*safe-area
 assert.match(page, /\.app-sidebar \{[\s\S]*max-width:calc\(100vw/);
 assert.match(page, /cinematic\.css\?v=20261002-cinematic-v15/);
 assert.ok(page.includes('class="login-emblem-button" type="button" onclick="goToMainMenu()"'));
-assert.ok(page.includes('assets/brand/iceberg-blue-eyes.webp'));
+assert.ok(page.includes('assets/brand/iceberg-navy-penguin.webp'));
 assert.ok(page.includes('class="penguin-wave"'));
 assert.ok(page.includes('>Little Feet Technologies</h1>'));
 assert.ok(page.includes('Every Little Step Matters</span>'));

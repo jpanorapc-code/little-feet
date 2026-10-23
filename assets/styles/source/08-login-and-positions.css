@@ -215,8 +215,8 @@
       background-image:none !important;
       background-clip:border-box !important;
       -webkit-background-clip:border-box !important;
-      -webkit-text-stroke:.75px #e6fbff !important;
-      paint-order:stroke fill;
+      -webkit-text-stroke:1px #e6fbff !important;
+      paint-order:normal;
 
       font-family:'Palatino Linotype','Book Antiqua',Georgia,serif !important;
       font-size:clamp(1rem,3vw,1.35rem) !important;
