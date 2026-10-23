@@ -1,0 +1,286 @@
+(() => {
+  'use strict';
+
+  const SELECTOR = [
+    'button:not(.login-emblem-button):not(:disabled)',
+    '.action-btn:not(:disabled)',
+    '.submit-btn:not(:disabled)',
+    '.nav-btn',
+    '.nav-shortcut',
+    '.nav-more-toggle',
+    '.sidebar-group-toggle',
+    '.sidebar-signout'
+  ].join(',');
+
+  const FREEZE_MS = 3000;
+  const THAW_MS = 520;
+  const active = new WeakMap();
+  const finePointer = window.matchMedia('(hover:hover) and (pointer:fine)');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion:reduce)');
+
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const random = (min, max) => min + Math.random() * (max - min);
+  const ease = value => 1 - Math.pow(1 - clamp(value, 0, 1), 3);
+
+  function addFern(scene, x, y, angle, length, start, depth = 3) {
+    const mainEndX = x + Math.cos(angle) * length;
+    const mainEndY = y + Math.sin(angle) * length;
+    const mainEnd = start + random(.13, .25);
+    scene.segments.push({
+      x1:x, y1:y, x2:mainEndX, y2:mainEndY,
+      start, end:mainEnd, width:random(.55, 1.12),
+      alpha:random(.42, .82), phase:random(0, Math.PI * 2), speed:random(1.4, 3.2)
+    });
+
+    if (depth <= 1) return;
+    const pairs = 2 + Math.floor(Math.random() * 3);
+    for (let index = 1; index <= pairs; index += 1) {
+      const t = index / (pairs + 1);
+      const branchX = x + (mainEndX - x) * t;
+      const branchY = y + (mainEndY - y) * t;
+      const branchLength = length * random(.19, .34) * (1 - t * .22);
+      for (const side of [-1, 1]) {
+        const branchAngle = angle + side * random(.58, .98);
+        const delay = start + t * random(.08, .20) + random(.01, .08);
+        const endX = branchX + Math.cos(branchAngle) * branchLength;
+        const endY = branchY + Math.sin(branchAngle) * branchLength;
+        scene.segments.push({
+          x1:branchX, y1:branchY, x2:endX, y2:endY,
+          start:delay, end:delay + random(.08, .18), width:random(.42, .82),
+          alpha:random(.34, .72), phase:random(0, Math.PI * 2), speed:random(1.8, 3.8)
+        });
+        if (depth > 2 && Math.random() < .42) {
+          const subStart = delay + random(.02, .08);
+          const subAngle = branchAngle + side * random(.45, .74);
+          const subLength = branchLength * random(.32, .50);
+          scene.segments.push({
+            x1:endX, y1:endY,
+            x2:endX + Math.cos(subAngle) * subLength,
+            y2:endY + Math.sin(subAngle) * subLength,
+            start:subStart, end:subStart + random(.07, .14), width:random(.34, .62),
+            alpha:random(.28, .58), phase:random(0, Math.PI * 2), speed:random(2.0, 4.2)
+          });
+        }
+      }
+    }
+  }
+
+  function createScene(width, height) {
+    const scene = { segments:[], specks:[], haze:[] };
+    const edgeY = Math.min(20, Math.max(7, height * .26));
+    const edgeX = Math.min(14, Math.max(4, width * .045));
+    const topCount = clamp(Math.round(width / 27), 8, 26);
+    const bottomCount = clamp(Math.round(width / 29), 8, 24);
+    const sideCount = clamp(Math.round(height / 18), 2, 5);
+
+    for (let index = 0; index < topCount; index += 1) {
+      const x = ((index + random(.05, .95)) / topCount) * width;
+      addFern(scene, x, random(0, 1.5), Math.PI / 2 + random(-.72, .72),
+        random(edgeY * .52, edgeY), random(0, .48), 3);
+    }
+    for (let index = 0; index < bottomCount; index += 1) {
+      const x = ((index + random(.05, .95)) / bottomCount) * width;
+      addFern(scene, x, height - random(0, 1.5), -Math.PI / 2 + random(-.72, .72),
+        random(edgeY * .50, edgeY), random(.04, .56), 3);
+    }
+
+    // Sparse side islands only. Never draw a full-height side strip.
+    for (let index = 0; index < sideCount; index += 1) {
+      const y = ((index + random(.15, .85)) / sideCount) * height;
+      if (Math.random() < .78) {
+        addFern(scene, random(0, 1), y, random(-.58, .58),
+          random(edgeX * .52, edgeX), random(.18, .66), 3);
+      }
+      if (Math.random() < .72) {
+        addFern(scene, width - random(0, 1), y + random(-5, 5), Math.PI + random(-.58, .58),
+          random(edgeX * .42, edgeX * .92), random(.24, .74), 3);
+      }
+    }
+
+    const speckCount = clamp(Math.round(width * .46), 70, 260);
+    for (let index = 0; index < speckCount; index += 1) {
+      const edge = Math.random();
+      let x;
+      let y;
+      if (edge < .43) {
+        x = random(0, width); y = Math.min(edgeY, -Math.log(Math.max(.001, Math.random())) * 2.6);
+      } else if (edge < .86) {
+        x = random(0, width); y = height - Math.min(edgeY, -Math.log(Math.max(.001, Math.random())) * 2.6);
+      } else if (edge < .93) {
+        x = Math.min(edgeX, -Math.log(Math.max(.001, Math.random())) * 1.8); y = random(0, height);
+      } else {
+        x = width - Math.min(edgeX, -Math.log(Math.max(.001, Math.random())) * 1.8); y = random(0, height);
+      }
+      scene.specks.push({
+        x, y, radius:random(.35, 1.35), start:random(.04, .84),
+        alpha:random(.25, .70), phase:random(0, Math.PI * 2), speed:random(1.2, 3.8)
+      });
+    }
+
+    const hazeCount = clamp(Math.round(width / 34), 8, 28);
+    for (let index = 0; index < hazeCount; index += 1) {
+      const top = Math.random() < .5;
+      scene.haze.push({
+        x:random(0, width),
+        y:top ? random(0, 3) : height - random(0, 3),
+        rx:random(7, 22),
+        ry:random(2.5, Math.max(4, edgeY * .42)),
+        start:random(.05, .72),
+        alpha:random(.035, .11),
+        phase:random(0, Math.PI * 2)
+      });
+    }
+
+    return scene;
+  }
+
+  function drawFrame(state, now) {
+    if (!state.alive) return;
+    const { button, canvas, ctx, width, height, scene, startedAt } = state;
+    if (!button.isConnected || !canvas.isConnected) {
+      state.alive = false;
+      return;
+    }
+
+    const elapsed = now - startedAt;
+    const progress = clamp(elapsed / FREEZE_MS, 0, 1);
+    const shimmerTime = elapsed / 1000;
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    for (const patch of scene.haze) {
+      const local = ease((progress - patch.start) / .22);
+      if (local <= 0) continue;
+      const pulse = .86 + Math.sin(shimmerTime * 1.5 + patch.phase) * .10;
+      const gradient = ctx.createRadialGradient(
+        patch.x, patch.y, 0,
+        patch.x, patch.y, patch.rx
+      );
+      gradient.addColorStop(0, `rgba(230,251,255,${patch.alpha * local * pulse})`);
+      gradient.addColorStop(.55, `rgba(125,211,252,${patch.alpha * .62 * local})`);
+      gradient.addColorStop(1, 'rgba(125,211,252,0)');
+      ctx.save();
+      ctx.scale(1, patch.ry / patch.rx);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(patch.x, patch.y * (patch.rx / patch.ry), patch.rx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(125,211,252,.58)';
+    ctx.shadowBlur = Math.min(3.4, Math.max(1.2, height * .055));
+
+    for (const segment of scene.segments) {
+      const local = ease((progress - segment.start) / Math.max(.035, segment.end - segment.start));
+      if (local <= 0) continue;
+      const dx = segment.x2 - segment.x1;
+      const dy = segment.y2 - segment.y1;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const nx = -dy / length;
+      const ny = dx / length;
+      const jitter = progress >= 1 ? Math.sin(shimmerTime * segment.speed + segment.phase) * .34 : 0;
+      const endX = segment.x1 + dx * local + nx * jitter;
+      const endY = segment.y1 + dy * local + ny * jitter;
+      const pulse = progress >= 1 ? .90 + Math.sin(shimmerTime * segment.speed + segment.phase) * .10 : 1;
+
+      ctx.strokeStyle = `rgba(230,251,255,${segment.alpha * pulse})`;
+      ctx.lineWidth = segment.width;
+      ctx.beginPath();
+      ctx.moveTo(segment.x1 + nx * jitter * .4, segment.y1 + ny * jitter * .4);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      if (segment.width > .72) {
+        ctx.strokeStyle = `rgba(125,211,252,${segment.alpha * .28})`;
+        ctx.lineWidth = segment.width * 2.15;
+        ctx.beginPath();
+        ctx.moveTo(segment.x1, segment.y1);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      }
+    }
+
+    ctx.shadowBlur = 0;
+    for (const speck of scene.specks) {
+      const local = ease((progress - speck.start) / .16);
+      if (local <= 0) continue;
+      const pulse = .78 + Math.sin(shimmerTime * speck.speed + speck.phase) * .20;
+      ctx.fillStyle = `rgba(230,251,255,${speck.alpha * local * pulse})`;
+      ctx.beginPath();
+      ctx.arc(speck.x, speck.y, speck.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    state.raf = requestAnimationFrame(time => drawFrame(state, time));
+  }
+
+  function stop(button) {
+    const state = active.get(button);
+    if (!state) return;
+    active.delete(button);
+    state.alive = false;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.canvas.classList.add('is-thawing');
+    window.setTimeout(() => state.canvas.remove(), THAW_MS);
+  }
+
+  function start(button) {
+    if (!finePointer.matches || reducedMotion.matches || active.has(button)) return;
+    const rect = button.getBoundingClientRect();
+    if (rect.width < 12 || rect.height < 12) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'lf-button-frost-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+
+    const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    const ctx = canvas.getContext('2d', { alpha:true });
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    button.classList.add('lf-frost-host');
+    button.insertBefore(canvas, button.firstChild);
+
+    const state = {
+      button, canvas, ctx, width, height,
+      scene:createScene(width, height),
+      startedAt:performance.now(),
+      raf:0,
+      alive:true
+    };
+    active.set(button, state);
+    state.raf = requestAnimationFrame(time => drawFrame(state, time));
+  }
+
+  document.addEventListener('pointerover', event => {
+    const button = event.target.closest?.(SELECTOR);
+    if (!button || button.contains(event.relatedTarget)) return;
+    start(button);
+  }, { passive:true });
+
+  document.addEventListener('pointerout', event => {
+    const button = event.target.closest?.(SELECTOR);
+    if (!button || button.contains(event.relatedTarget)) return;
+    stop(button);
+  }, { passive:true });
+
+  reducedMotion.addEventListener?.('change', event => {
+    if (!event.matches) return;
+    document.querySelectorAll('.lf-button-frost-canvas').forEach(canvas => {
+      const button = canvas.parentElement;
+      if (button) stop(button);
+      else canvas.remove();
+    });
+  });
+
+  window.__littleFeetButtonFrost = { start, stop, selector:SELECTOR };
+})();
