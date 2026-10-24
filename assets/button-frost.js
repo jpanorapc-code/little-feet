@@ -14,7 +14,7 @@
 
   const FREEZE_MS = 3200;
   const THAW_MS = 520;
-  const active = new WeakMap();
+  const active = new Map();
   const finePointer = window.matchMedia('(hover:hover) and (pointer:fine)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion:reduce)');
   const mobileProfile = window.matchMedia('(max-width:820px), (pointer:coarse)');
@@ -151,12 +151,12 @@
   function drawFrame(state, now) {
     if (!state.alive) return;
     const { button, canvas, ctx, width, height, scene, startedAt } = state;
-    if (!button.isConnected || !canvas.isConnected) {
-      state.alive = false;
+    if (!button.isConnected || !canvas.isConnected || document.hidden) {
+      stop(button);
       return;
     }
 
-    if (state.lowPower && state.lastFrameAt && (now - state.lastFrameAt) < MOBILE_FRAME_MS) {
+    if (state.lastFrameAt && (now - state.lastFrameAt) < (state.lowPower ? MOBILE_FRAME_MS : 1000 / 30)) {
       state.raf = requestAnimationFrame(time => drawFrame(state, time));
       return;
     }
@@ -253,7 +253,8 @@
     ctx.fill();
     ctx.restore();
 
-    state.raf = requestAnimationFrame(time => drawFrame(state, time));
+    // Preserve the finished frost raster without an endless paint loop.
+    state.raf = progress < 1 ? requestAnimationFrame(time => drawFrame(state, time)) : 0;
   }
 
   function stop(button) {
@@ -267,7 +268,7 @@
   }
 
   function start(button) {
-    if (!finePointer.matches || reducedMotion.matches || active.has(button)) return;
+    if (document.hidden || !finePointer.matches || reducedMotion.matches || active.has(button)) return;
     const rect = button.getBoundingClientRect();
     if (rect.width < 12 || rect.height < 12) return;
 
@@ -313,6 +314,14 @@
     if (!button || button.contains(event.relatedTarget)) return;
     stop(button);
   }, { passive:true });
+
+  const stopAll = () => [...active.keys()].forEach(stop);
+  new MutationObserver(records => {
+    if (!records.some(record => record.removedNodes.length)) return;
+    for (const button of active.keys()) if (!button.isConnected) stop(button);
+  }).observe(document.body, { childList:true, subtree:true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); });
+  document.addEventListener('scroll', stopAll, { capture:true, passive:true });
 
   reducedMotion.addEventListener?.('change', event => {
     if (!event.matches) return;

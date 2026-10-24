@@ -66,7 +66,8 @@ let browser;
   await page.waitForSelector('#mobileFrostButton > .lf-button-frost-canvas');
   const frost=await button.locator('.lf-button-frost-canvas').evaluate((canvas)=>{
     const host=window.__littleFeetButtonFrost;
-    const cssWidth=canvas.getBoundingClientRect().width;
+    // The backing raster uses the host border box, not the inset canvas content box.
+    const cssWidth=canvas.parentElement.getBoundingClientRect().width;
     return {
       canvasWidth:canvas.width,
       cssWidth,

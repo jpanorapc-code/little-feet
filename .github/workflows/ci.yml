@@ -145,6 +145,9 @@ jobs:
       - name: Mobile animation performance regression
         run: node tests/mobile-animation-performance.test.cjs
 
+      - name: Animation lifecycle performance regression
+        run: node tests/animation-lifecycle.test.cjs
+
       - name: Ambient background interaction regression
         env:
           LF_BROWSER_CHANNEL: chrome

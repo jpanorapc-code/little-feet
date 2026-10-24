@@ -47,9 +47,13 @@ let browser;
     assert.notEqual(icon.height, '0px');
   }
 
+  await page.locator('#dashboardSection').evaluate(el => { el.classList.remove('hidden'); el.style.display='block'; });
   const chevron = page.locator('.sidebar-chevron').first();
+  await chevron.evaluate(el => el.closest('[data-nav-group]').classList.remove('is-collapsed'));
+  await page.waitForTimeout(250);
   const before = await chevron.evaluate(el => getComputedStyle(el).transform);
   await chevron.locator('xpath=..').evaluate(button => button.closest('[data-nav-group]')?.classList.add('is-collapsed'));
+  await page.waitForTimeout(250);
   const after = await chevron.evaluate(el => getComputedStyle(el).transform);
   assert.notEqual(before, after, 'Sidebar chevron rotation must remain independent of icon animation');
 

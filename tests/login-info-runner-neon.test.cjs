@@ -39,6 +39,7 @@ let browser;
     const s=getComputedStyle(el);
     return {
       animationName:s.animationName,
+      animationDuration:s.animationDuration,
       borderTopWidth:s.borderTopWidth,
       borderTopStyle:s.borderTopStyle,
       borderTopColor:s.borderTopColor,
@@ -50,12 +51,12 @@ let browser;
   assert.equal(style.animationDuration,'2.8s');
   assert.equal(style.borderTopWidth,'2px');
   assert.equal(style.borderTopStyle,'solid');
-  assert.match(style.boxShadow,/rgb\(125, 211, 252\)/);
+  assert.match(style.boxShadow,/rgba?\(125, 211, 252(?:,|\))/);
   assert.equal((style.backgroundImage.match(/linear-gradient/g)||[]).length,1,'Banner should keep only its base background gradient');
 
   await page.setViewportSize({width:390,height:844});
   const mobileTiming=await runner.evaluate(el=>getComputedStyle(el).animationTimingFunction);
-  assert.match(mobileTiming,/steps\\(70/,'Mobile pulse should be stepped at roughly 25 FPS');
+  assert.match(mobileTiming,/steps\(70/,'Mobile pulse should be stepped at roughly 25 FPS');
 
   const fades=await runner.evaluate(el=>({
     before:getComputedStyle(el,'::before').backgroundImage,

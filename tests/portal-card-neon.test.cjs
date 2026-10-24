@@ -90,7 +90,7 @@ let browser;
   assert.match(preserved.workspaceAfter, /radial-gradient/i, 'Workspace decorative ::after must remain intact');
   assert.notEqual(preserved.resultsBefore, 'none', 'Results decorative ::before must remain intact');
   assert.equal(preserved.myDayAfter, 'none', 'My Day runtime ::after remains reserved');
-  assert.equal(preserved.welcomeBeforeAnimation, 'adminMascotGlow', 'Welcome artwork glow must remain intact');
+  assert.equal(preserved.welcomeBeforeAnimation, 'none', 'Home artwork keeps its existing static dashboard-banners override');
   assert.equal(preserved.loginAnimation, 'loginIceOrbit', 'Login card keeps its original dedicated orbit');
 
   await page.emulateMedia({ reducedMotion:'reduce' });

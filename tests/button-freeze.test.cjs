@@ -41,7 +41,7 @@ let browser;
     const s=getComputedStyle(el);
     return { overflow:s.overflow, isolation:s.isolation, position:s.position };
   });
-  const loginButton = page.locator('#authSection .submit-btn');
+  const loginButton = page.locator('#loginForm .submit-btn');
   const loginBefore = await loginButton.evaluate(el => {
     const s=getComputedStyle(el);
     return { overflow:s.overflow, isolation:s.isolation, position:s.position };
@@ -72,8 +72,10 @@ let browser;
   });
 
   const button=page.locator('#freezeButton');
-  const beforeBox=await button.boundingBox();
   await button.hover();
+  // Compare the same hover state; the existing button lifts on hover.
+  await page.waitForTimeout(350);
+  const beforeBox=await button.boundingBox();
   await page.waitForSelector('#freezeButton > .lf-button-frost-canvas');
   const canvasStyle=await button.locator('.lf-button-frost-canvas').evaluate(el=>{
     const s=getComputedStyle(el);

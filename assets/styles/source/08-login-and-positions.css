@@ -643,7 +643,7 @@
       filter:
         drop-shadow(0 0 5px rgba(56,189,248,.95))
         drop-shadow(0 0 12px rgba(125,211,252,.68));
-      animation:portalCardIceOrbit 3.2s linear infinite;
+      animation:portalCardIceOrbit 3.2s steps(64, end) infinite;
     }
 
     @keyframes portalCardIceOrbit {
@@ -749,3 +749,13 @@
       #dashboardSection .lf-button-frost-canvas { display:none !important; }
     }
 
+
+/* Avoid decorative painting off screen, in background tabs and during scrolling. */
+:is(.ui-icon, .brand-header img, .brand-header .slogan, .nav-brand .site-name, .login-info-runner, .login-info-runner-track)[data-lf-motion="paused"],
+[data-lf-motion="paused"]::before,
+[data-lf-motion="paused"]::after,
+html.lf-motion-idle :is(.ui-icon, .brand-header img, .brand-header .slogan, .nav-brand .site-name, .login-info-runner, .login-info-runner-track)[data-lf-motion],
+html.lf-motion-idle [data-lf-motion]::before,
+html.lf-motion-idle [data-lf-motion]::after {
+  animation-play-state:paused !important;
+}
