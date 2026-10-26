@@ -36,11 +36,36 @@
     const title = book?.querySelector('.lf-story-heading');
     const copy = book?.querySelector('.lf-story-copy');
     const count = book?.querySelector('.lf-story-page-count');
+    const cover = book?.querySelector('.lf-story-cover');
+    const close = book?.querySelector('.lf-story-close');
     const back = book?.querySelector('.lf-story-arrow-left');
     const next = book?.querySelector('.lf-story-arrow-right');
-    if (!book || !spread || !image || !title || !copy || !count || !back || !next) return;
+    if (!book || !spread || !image || !title || !copy || !count || !cover || !close || !back || !next) return;
 
     let pageIndex = 0;
+    let isOpen = false;
+    let isAnimating = false;
+    const motionOff = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const openBook = () => {
+      if (isOpen || isAnimating) return;
+      isOpen = true;
+      if (motionOff) { book.classList.add('is-open'); return; }
+      isAnimating = true;
+      book.classList.add('is-opening');
+      window.setTimeout(() => { book.classList.remove('is-opening'); book.classList.add('is-open'); isAnimating = false; }, 820);
+    };
+    const closeBook = () => {
+      if (!isOpen || isAnimating) return;
+      isOpen = false;
+      if (motionOff) { book.classList.remove('is-open'); return; }
+      isAnimating = true;
+      book.classList.remove('is-open');
+      book.classList.add('is-closing');
+      window.setTimeout(() => { book.classList.remove('is-closing'); isAnimating = false; cover.focus(); }, 820);
+    };
+    cover.addEventListener('click', openBook);
+    close.addEventListener('click', closeBook);
     const render = direction => {
       const page = pages[pageIndex];
       spread.classList.remove('is-turning');
@@ -60,6 +85,8 @@
     back.addEventListener('click', () => { if (pageIndex > 0) { pageIndex -= 1; render('back'); } });
     next.addEventListener('click', () => { if (pageIndex < pages.length - 1) { pageIndex += 1; render('forward'); } });
     book.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && isOpen) { closeBook(); return; }
+      if (!isOpen || isAnimating) return;
       if (event.key === 'ArrowLeft' && pageIndex > 0) { pageIndex -= 1; render('back'); back.focus(); }
       if (event.key === 'ArrowRight' && pageIndex < pages.length - 1) { pageIndex += 1; render('forward'); next.focus(); }
     });
