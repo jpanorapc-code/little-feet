@@ -42,7 +42,7 @@ function restartPortalTour() {
 
 function setupPortalTour() {
   const tour = document.getElementById('portalTour');
-  if (!tour) return;
+  if (!tour || tour.querySelector('.lf-storybook')) return;
   restartPortalTour();
   tour.addEventListener('mouseenter', () => { if (portalTourTimer) window.clearInterval(portalTourTimer); });
   tour.addEventListener('mouseleave', restartPortalTour);
