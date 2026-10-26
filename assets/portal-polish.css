@@ -252,38 +252,23 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
 @media(max-width:640px) { #executiveHomeOverview { padding:17px; } }
 @media(prefers-reduced-motion:reduce) { #mainNavigation button { transition:none !important; } }
 
-/* Little Feet origin story: an illustrated book inside the Home carousel. */
+/* Little Feet origin story: 25 illustrated pages in an aged book. */
 #portalTour .lf-story-slide { display:block; background:#101b2b; }
-#portalTour .lf-storybook { position:absolute; inset:0; overflow:hidden; display:flex; align-items:flex-end; justify-content:center; min-height:350px; padding:24px 66px 42px; background:#1b2430 url('/assets/4k/little-feet-storybook.webp') center 48%/cover no-repeat; }
-#portalTour .lf-storybook::before { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg,rgba(14,20,30,.02) 35%,rgba(19,19,18,.1) 55%,rgba(13,18,25,.38)); }
-#portalTour .lf-story-spread { position:relative; z-index:1; display:grid; grid-template-columns:1fr 1fr; gap:0; width:min(100%,980px); min-height:118px; border:1px solid rgba(111,69,30,.42); border-radius:5px 5px 12px 12px; overflow:hidden; background:rgba(250,239,211,.95); box-shadow:0 12px 30px rgba(0,0,0,.34),inset 0 0 24px rgba(118,78,39,.12); color:#182d48; }
-#portalTour .lf-story-page { min-width:0; padding:15px clamp(14px,2.4vw,28px) 14px; }
-#portalTour .lf-story-page-left { border-right:1px solid rgba(101,74,43,.32); }
-#portalTour .lf-story-page-right { position:relative; }
-#portalTour .lf-story-kicker { display:block; margin-bottom:5px; color:#986d35; font-size:.66rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
-#portalTour .lf-story-heading { margin:0 0 6px; color:#102b50; font:700 clamp(1rem,2vw,1.3rem)/1.12 Georgia,serif; }
-#portalTour .lf-story-copy { margin:0; max-width:58ch; color:#34465b; font:500 clamp(.75rem,1.25vw,.9rem)/1.42 Georgia,serif; }
-#portalTour .lf-story-page-count { position:absolute; right:14px; top:10px; color:#866d4b; font-size:.65rem; font-weight:700; }
+#portalTour .lf-storybook { position:absolute; inset:0; overflow:hidden; display:flex; align-items:center; justify-content:center; min-height:350px; padding:20px 66px 42px; background:#151a22 url('/assets/4k/little-feet-storybook.webp') center/cover no-repeat; }
+#portalTour .lf-storybook::before { content:""; position:absolute; inset:0; pointer-events:none; background:rgba(14,20,30,.25); }
+#portalTour .lf-story-spread { position:relative; z-index:1; width:min(100%,980px); height:min(68vh,440px); min-height:280px; overflow:hidden; border:5px solid #9b743c; border-radius:8px; background:#16233a; box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 0 0 2px #e4c98a; color:#182d48; }
+#portalTour .lf-story-illustration { width:100%; height:100%; display:block; object-fit:cover; }
+#portalTour .lf-story-caption { position:absolute; left:0; right:0; bottom:0; padding:32px clamp(16px,4vw,38px) 22px; background:linear-gradient(180deg,transparent,rgba(11,17,25,.94) 37%); color:#fff3d7; }
+#portalTour .lf-story-kicker { display:block; margin-bottom:5px; color:#e8c77c; font-size:.66rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+#portalTour .lf-story-heading { margin:0 0 5px; color:#fff0cb; font:700 clamp(1.1rem,2vw,1.5rem)/1.12 Georgia,serif; text-shadow:0 2px 7px #111; }
+#portalTour .lf-story-copy { margin:0; max-width:60ch; color:#fff8e9; font:500 clamp(.78rem,1.25vw,.95rem)/1.4 Georgia,serif; text-shadow:0 1px 4px #111; }
+#portalTour .lf-story-page-count { position:absolute; z-index:2; right:14px; top:12px; padding:6px 9px; border:1px solid rgba(255,239,204,.55); border-radius:4px; background:rgba(29,27,24,.65); color:#fff2d3; font:700 .68rem Georgia,serif; }
 #portalTour .lf-story-arrow { position:absolute; z-index:2; top:50%; width:42px; height:58px; transform:translateY(-50%); display:grid; place-items:center; border:1px solid rgba(255,255,255,.72); border-radius:12px; background:rgba(7,25,48,.82); color:#f4f0df; font-size:2rem; line-height:1; cursor:pointer; box-shadow:0 5px 18px rgba(0,0,0,.3); transition:background .18s ease,transform .18s ease,border-color .18s ease; }
-#portalTour .lf-story-arrow-left { left:14px; }
-#portalTour .lf-story-arrow-right { right:14px; }
+#portalTour .lf-story-arrow-left { left:14px; } #portalTour .lf-story-arrow-right { right:14px; }
 #portalTour .lf-story-arrow:hover:not(:disabled),#portalTour .lf-story-arrow:focus-visible { background:#123b68; border-color:#a5edf0; transform:translateY(-50%) scale(1.05); }
-#portalTour .lf-story-arrow:focus-visible { outline:2px solid #b8f3f4; outline-offset:3px; }
-#portalTour .lf-story-arrow:disabled { opacity:.38; cursor:default; box-shadow:none; }
+#portalTour .lf-story-arrow:focus-visible { outline:2px solid #b8f3f4; outline-offset:3px; } #portalTour .lf-story-arrow:disabled { opacity:.38; cursor:default; box-shadow:none; }
 #portalTour .lf-story-hint { position:absolute; z-index:1; right:70px; bottom:12px; color:#fff6df; font-size:.68rem; text-shadow:0 1px 5px #101a28; }
-#portalTour .lf-story-spread.is-turning .lf-story-page { animation:lfStoryPageTurn .38s ease both; }
-@keyframes lfStoryPageTurn { 0%{opacity:.35;transform:rotateY(-12deg)} 100%{opacity:1;transform:rotateY(0)} }
-body.light-mode #portalTour .lf-storybook::before { background:linear-gradient(180deg,transparent 36%,rgba(13,18,25,.34)); }
-@media(max-width:640px) {
- #portalTour .lf-storybook { min-height:380px; padding:20px 44px 43px; background-position:48% center; }
- #portalTour .lf-story-spread { min-height:154px; }
- #portalTour .lf-story-page { padding:13px 11px; }
- #portalTour .lf-story-kicker { font-size:.57rem; letter-spacing:.08em; }
- #portalTour .lf-story-heading { font-size:1rem; }
- #portalTour .lf-story-copy { font-size:.74rem; line-height:1.35; }
- #portalTour .lf-story-arrow { width:34px; height:48px; }
- #portalTour .lf-story-arrow-left { left:5px; }
- #portalTour .lf-story-arrow-right { right:5px; }
- #portalTour .lf-story-hint { right:48px; bottom:13px; font-size:.6rem; }
-}
-@media(prefers-reduced-motion:reduce) { #portalTour .lf-story-arrow { transition:none; } #portalTour .lf-story-spread.is-turning .lf-story-page { animation:none; } }
+#portalTour .lf-story-spread.is-turning { animation:lfStoryPageTurn .35s ease both; }
+@keyframes lfStoryPageTurn { 0%{opacity:.55;transform:rotateY(-8deg)} 100%{opacity:1;transform:rotateY(0)} }
+@media(max-width:640px) { #portalTour .lf-storybook { min-height:380px; padding:18px 44px 43px; } #portalTour .lf-story-spread { height:320px; min-height:250px; } #portalTour .lf-story-caption { padding:30px 14px 15px; } #portalTour .lf-story-heading { font-size:1.05rem; } #portalTour .lf-story-copy { font-size:.75rem; } #portalTour .lf-story-arrow { width:34px; height:48px; } #portalTour .lf-story-arrow-left { left:5px; } #portalTour .lf-story-arrow-right { right:5px; } #portalTour .lf-story-hint { right:48px; bottom:13px; font-size:.6rem; } }
+@media(prefers-reduced-motion:reduce) { #portalTour .lf-story-arrow { transition:none; } #portalTour .lf-story-spread.is-turning { animation:none; } }
