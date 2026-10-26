@@ -30,7 +30,7 @@
   <script defer src="/assets/ambient-background.js?v=20261010-media-loading-v1"></script>
   <link rel="stylesheet" href="/assets/dashboard-banners.css?v=20261013-my-day-office-v2">
   <link rel="stylesheet" href="/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1">
-  <link rel="stylesheet" href="/assets/portal-polish.css?v=20261009-polish-v4">
+  <link rel="stylesheet" href="/assets/portal-polish.css?v=20261026-little-feet-storybook-v1">
   <link rel="stylesheet" href="/assets/welcome-clock.css?v=20261010-sa-clock-v1">
 </head>
 <body>
@@ -446,9 +446,16 @@
         <section id="updatesBoard" class="card hidden" style="margin-bottom:18px;"></section>
 
         <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
-          <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-platform-operations.webp" alt="Professional school operations workspace with planning dashboards">
-            <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected operations</span><h2>One platform for the whole school day.</h2><p>Coordinate communication, learning, attendance, finance, staff work, facilities and family engagement from role-aware workspaces.</p><div class="portal-tour-fact"><strong>Designed for focus:</strong> Each role sees the tools and records needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
+          <article class="portal-tour-slide is-active lf-story-slide" aria-label="Little Feet origin story">
+            <section class="lf-storybook" aria-label="The story of the penguin who built Little Feet">
+              <div class="lf-story-spread" role="group" aria-live="polite" aria-atomic="true">
+                <div class="lf-story-page lf-story-page-left"><span class="lf-story-kicker">The story of Little Feet</span><h2 class="lf-story-heading">A penguin with a big idea</h2><p class="lf-story-copy">At the top of the world, villages sat far apart. One little penguin dreamed of bringing them together.</p></div>
+                <div class="lf-story-page lf-story-page-right"><span class="lf-story-page-count">Page 1 of 4</span><h3 class="lf-story-heading">He kept building</h3><p class="lf-story-copy">He made one invention after another. They wobbled, sputtered, and sometimes fell apart.</p></div>
+              </div>
+              <button class="lf-story-arrow lf-story-arrow-left" type="button" aria-label="Turn back one page" disabled>‹</button>
+              <button class="lf-story-arrow lf-story-arrow-right" type="button" aria-label="Turn forward one page">›</button>
+              <span class="lf-story-hint" aria-hidden="true">Turn the pages to read the story</span>
+            </section>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 2 of 4">
             <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-secure-administration.webp" alt="Secure school administration workspace with records and compliance tools">
@@ -1689,6 +1696,7 @@
   <script src="/assets/features/utilities.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/authentication.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/navigation.js?v=20261010-controlled-split-v2" defer></script>
+  <script src="/assets/little-feet-story.js?v=20261026-north-pole-story-v1" defer></script>
   <script src="/assets/features/form-bindings.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/diagnostics.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/notices.js?v=20261010-controlled-split-v2" defer></script>
