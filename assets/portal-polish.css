@@ -254,7 +254,7 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
 
 /* Little Feet origin story: 25 illustrated pages in an aged book. */
 #portalTour .lf-story-slide { display:block; background:#101b2b; }
-#portalTour .lf-storybook { position:absolute; inset:0; overflow:hidden; display:flex; align-items:center; justify-content:center; min-height:350px; padding:20px 66px 42px; background:#151a22 url('/assets/4k/little-feet-storybook.webp') center/cover no-repeat; }
+#portalTour .lf-storybook { position:absolute; inset:0; overflow:hidden; display:flex; align-items:center; justify-content:center; min-height:350px; padding:20px 66px 42px; background:#151a22 url('/assets/4k/little-feet-north-pole-night.webp') center/cover no-repeat; }
 #portalTour .lf-storybook::before { content:""; position:absolute; inset:0; pointer-events:none; background:rgba(14,20,30,.25); }
 #portalTour .lf-story-spread { position:relative; z-index:1; width:min(100%,980px); height:min(68vh,440px); min-height:280px; overflow:hidden; border:5px solid #9b743c; border-radius:8px; background:#16233a; box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 0 0 2px #e4c98a; color:#182d48; }
 #portalTour .lf-story-illustration { width:100%; height:100%; display:block; object-fit:cover; }
