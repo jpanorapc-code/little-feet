@@ -31,7 +31,7 @@
   <script defer src="/assets/button-frost.js?v=20261023-mobile-animation-tune-v1"></script>
   <link rel="stylesheet" href="/assets/dashboard-banners.css?v=20261013-my-day-office-v2">
   <link rel="stylesheet" href="/assets/sidebar-layout.css?v=20261009-neat-sidebar-v1">
-  <link rel="stylesheet" href="/assets/portal-polish.css?v=20261009-polish-v4">
+  <link rel="stylesheet" href="/assets/portal-polish.css?v=20261026-connected-storybook-v1">
   <link rel="stylesheet" href="/assets/welcome-clock.css?v=20261010-sa-clock-v1">
 </head>
 <body>
@@ -446,10 +446,24 @@
         </section>
         <section id="updatesBoard" class="card hidden" style="margin-bottom:18px;"></section>
 
-        <section id="portalTour" class="portal-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
-          <article class="portal-tour-slide is-active" aria-label="Slide 1 of 4">
-            <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-platform-operations.webp" alt="Professional school operations workspace with planning dashboards">
-            <div class="portal-tour-copy"><span class="portal-tour-kicker">Connected operations</span><h2>One platform for the whole school day.</h2><p>Coordinate communication, learning, attendance, finance, staff work, facilities and family engagement from role-aware workspaces.</p><div class="portal-tour-fact"><strong>Designed for focus:</strong> Each role sees the tools and records needed for its school responsibilities.</div><div class="portal-tour-actions"><button type="button" onclick="openWorkspace('guideTab')">Explore the guide</button></div></div>
+        <section id="portalTour" class="portal-tour lf-story-tour" aria-label="Explore Little Feet portal features" aria-roledescription="carousel">
+          <article class="portal-tour-slide is-active lf-story-slide" aria-label="Slide 1 of 4: The Story of Little Feet">
+            <section class="lf-storybook" aria-label="The 25-page Little Feet storybook">
+              <div class="lf-story-spread" role="group" aria-live="polite" aria-atomic="true">
+                <div class="lf-story-page lf-story-page-art"><img class="lf-story-illustration" src="/assets/4k/little-feet-pages/page-01.webp" alt="The penguin sleeps in his dark bedroom beneath a moonlit window" decoding="async"></div>
+                <div class="lf-story-page lf-story-page-text"><span class="lf-story-kicker">The story of Little Feet</span><span class="lf-story-page-count">Page 1 of 25</span><h2 class="lf-story-heading">A quiet night</h2><p class="lf-story-copy">In a little room beneath the northern lights, the young penguin slept soundly.</p></div>
+                <div class="lf-story-turn" aria-hidden="true"></div>
+              </div>
+              <button class="lf-story-cover" type="button" aria-label="Open The Story of Little Feet">
+                <span class="lf-story-cover-border" aria-hidden="true"></span><span class="lf-story-cover-flourish" aria-hidden="true">❧　✦　❧</span>
+                <span class="lf-story-cover-title">The Story<br>of Little Feet</span>
+                <span class="lf-story-cover-medallion"><img src="/assets/4k/little-feet-pages/page-25.webp" alt="" aria-hidden="true"></span>
+                <span class="lf-story-cover-subtitle">A North Pole tale of ideas, courage &amp; connection</span><span class="lf-story-cover-open">Open the book <span aria-hidden="true">›</span></span>
+              </button>
+              <button class="lf-story-arrow lf-story-arrow-left" type="button" aria-label="Turn back one page" disabled>‹</button><button class="lf-story-arrow lf-story-arrow-right" type="button" aria-label="Turn forward one page">›</button>
+              <button class="lf-story-close" type="button" aria-label="Close the book and return to the cover">Close book</button>
+              <span class="lf-story-cover-hint" aria-hidden="true">Open the cover to begin</span><span class="lf-story-hint" aria-hidden="true">Turn the pages to read the story</span>
+            </section>
           </article>
           <article class="portal-tour-slide" aria-label="Slide 2 of 4">
             <img class="portal-tour-image" loading="lazy" decoding="async" data-src="assets/4k/tour-secure-administration.webp" alt="Secure school administration workspace with records and compliance tools">
@@ -1690,6 +1704,7 @@
   <script src="/assets/features/utilities.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/authentication.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/navigation.js?v=20261010-controlled-split-v2" defer></script>
+  <script src="/assets/little-feet-story.js?v=20261026-connected-storybook-v1" defer></script>
   <script src="/assets/features/form-bindings.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/diagnostics.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/notices.js?v=20261010-controlled-split-v2" defer></script>
