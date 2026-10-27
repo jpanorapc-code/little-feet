@@ -67,9 +67,9 @@
       window.setTimeout(() => { book.classList.remove('is-closing'); busy = false; cover.focus(); }, 760);
     }
     function render(direction) {
-      const priorTitle = title.textContent;
-      const priorCopy = copy.textContent;
-      const priorCount = count.textContent;
+      const priorSpread = spread.cloneNode(true);
+      priorSpread.querySelector('.lf-story-turn')?.remove();
+      priorSpread.className = 'lf-story-turn-snapshot';
       image.src = `/assets/4k/little-feet-pages/page-${String(pageIndex + 1).padStart(2, '0')}.webp?v=20261027-parchment-art-v1`;
       image.alt = `Illustration for page ${pageIndex + 1}: ${pages[pageIndex][0]}`;
       title.textContent = pages[pageIndex][0];
@@ -84,10 +84,7 @@
       leaf.innerHTML = '<span class="lf-story-turn-back" aria-hidden="true"></span>';
       const old = document.createElement('div');
       old.className = 'lf-story-turn-front';
-      const h = document.createElement('strong'); h.textContent = priorTitle;
-      const p = document.createElement('span'); p.textContent = priorCopy;
-      const n = document.createElement('small'); n.textContent = priorCount;
-      old.append(n, h, p); leaf.append(old); turn.replaceChildren(leaf);
+      old.append(priorSpread); leaf.append(old); turn.replaceChildren(leaf);
       requestAnimationFrame(() => leaf.classList.add('is-turning'));
       busy = true; back.disabled = true; next.disabled = true;
       window.setTimeout(() => { turn.replaceChildren(); busy = false; back.disabled = pageIndex === 0; next.disabled = pageIndex === pages.length - 1; }, 760);

@@ -367,3 +367,62 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
 @media(max-width:640px) {
  #portalTour .lf-story-cover-title { left:8%; right:8%; font-size:clamp(1.05rem,4.5vw,1.6rem); }
 }
+
+/* A continuous illustrated spread with a calligraphic parchment caption. */
+#portalTour .lf-story-slide.is-active { position:relative; min-height:500px; }
+#portalTour .lf-storybook { position:relative; inset:auto; min-height:500px; box-sizing:border-box; }
+#portalTour .lf-story-spread { flex-shrink:0; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto; height:auto; min-height:0; }
+#portalTour .lf-story-page-art { display:block; border:0; background:#e8d2ab; }
+#portalTour .lf-story-illustration { width:100%; height:auto; aspect-ratio:1842/854; padding:0; object-fit:contain; }
+#portalTour .lf-story-page-text { padding:14px 32px 28px; border-top:3px double #b18a4e; text-align:center; box-shadow:inset 0 3px 15px #8d632e21; }
+#portalTour .lf-story-kicker { display:none; }
+#portalTour .lf-story-heading { margin:0 0 7px; font:italic 700 clamp(1.2rem,2.3vw,1.75rem)/1.12 'Palatino Linotype','Book Antiqua',Georgia,serif; letter-spacing:.02em; color:#4e321b; text-wrap:balance; }
+#portalTour .lf-story-copy { max-width:74ch; margin:0 auto; font:italic 500 clamp(.9rem,1.4vw,1.05rem)/1.5 'Palatino Linotype','Book Antiqua',Georgia,serif; color:#4e3a24; text-wrap:pretty; }
+#portalTour .lf-story-copy::first-letter { font-size:1.5em; font-weight:700; color:#936329; line-height:0; }
+#portalTour .lf-story-page-count { position:absolute; top:auto; right:18px; bottom:7px; margin:0; font:italic .65rem Georgia,serif; letter-spacing:.04em; }
+#portalTour .lf-story-page-text::before { content:''; right:14px; left:14px; bottom:5px; height:1px; background:linear-gradient(90deg,transparent,#ae86454d,transparent); }
+#portalTour .lf-story-spread::after { content:''; left:50%; top:0; width:14px; height:100%; transform:translateX(-50%); background:linear-gradient(90deg,transparent,#4a2e151c,transparent); }
+#portalTour .lf-story-cover { top:calc(50% - 17px); width:min(calc(100% - 132px),980px); height:calc(100% - 74px); }
+#portalTour .lf-story-turn { left:50%; top:0; bottom:0; width:50%; }
+#portalTour .lf-story-turn-front { display:block; padding:0; overflow:hidden; }
+#portalTour .lf-story-turn-snapshot { position:absolute; top:0; right:0; width:200%; height:100%; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto; background:#f0e3c4; }
+#portalTour .backward .lf-story-turn-snapshot { right:auto; left:0; }
+@media(max-width:640px) {
+ #portalTour .lf-story-cover { width:calc(100% - 88px); height:430px; top:50%; }
+ #portalTour .lf-story-page-text { padding:13px 13px 28px; }
+ #portalTour .lf-story-heading { font-size:1.1rem; }
+ #portalTour .lf-story-copy { font-size:.82rem; line-height:1.5; }
+ #portalTour .lf-story-page-count { position:absolute; bottom:8px; right:12px; font-size:.6rem; }
+}
+#portalTour .lf-story-heading::before,#portalTour .lf-story-heading::after { content:''; display:inline-block; width:30px; height:4px; margin:0 13px; border-top:1px solid #aa7d3c; border-bottom:1px solid #aa7d3c; vertical-align:middle; transform:skew(-25deg); }
+@media(max-width:640px) { #portalTour .lf-story-heading::before,#portalTour .lf-story-heading::after { display:none; } }
+
+/* Leather binding, raised paper leaves and a recessed stitched gutter. */
+#portalTour .lf-storybook { perspective:1800px; padding-bottom:68px; }
+#portalTour .lf-story-spread {
+ overflow:visible; border:14px solid #654328; border-color:#957049 #3d291a #422b19 #87603c;
+ border-radius:10px 15px 16px 9px; padding:5px; background:#684626;
+ transform:rotateX(5deg); transform-origin:center bottom;
+ box-shadow:inset 0 0 0 2px #b08b56,0 2px 0 #ecdbb7,0 4px 0 #775535,0 6px 0 #e6d4ab,0 8px 0 #8a6a44,0 10px 0 #dac398,0 13px 0 #412b1b,0 17px 0 #291c12,0 28px 32px #0009,14px 16px 28px #0005;
+}
+#portalTour .lf-story-page-art { border-radius:3px 6px 0 0; overflow:hidden; box-shadow:inset 0 0 18px #3c260c66; }
+#portalTour .lf-story-page-text { border-radius:0 0 6px 3px; background:radial-gradient(ellipse at 4% 80%,#a4773e35,transparent 45%),radial-gradient(ellipse at 95% 10%,#8a5c2529,transparent 42%),repeating-linear-gradient(2deg,#75502808 0 1px,transparent 1px 4px),linear-gradient(90deg,#d5bb87,#f2e3bf 12%,#ead5a8 47%,#c6a873 50%,#ecdbb5 53%,#f3e4bf 88%,#d5b983); border-top-color:#9c723c; box-shadow:inset 0 -8px 15px #79501e1c,inset 0 2px 7px #805b2f38; }
+#portalTour .lf-story-spread::before { inset:5px; border:1px solid #72502f88; border-radius:3px 6px 6px 3px; box-shadow:inset 8px 0 15px #2b180b33,inset -8px 0 15px #2b180b33,inset 0 0 3px 2px #d7b57666; }
+#portalTour .lf-story-spread::after { left:50%; top:5px; bottom:5px; height:auto; width:42px; background:linear-gradient(90deg,transparent,#2b170b12 20%,#22140a44 44%,#160c0880 49%,#e5c68e8c 52%,#6c462f24 64%,transparent); border-radius:40%; }
+#portalTour .lf-story-cover {
+ border:7px solid #604024; border-color:#a17a47 #3c2818 #382215 #896037; border-radius:10px 16px 16px 9px;
+ background:radial-gradient(ellipse at 20% 25%,#7e573033,transparent 50%),repeating-linear-gradient(22deg,#e3bd7608 0 1px,#120a050a 1px 3px),linear-gradient(100deg,#1c140f 0%,#54361f 4%,#67462c 7%,#392619 12%,#49301f 88%,#2b1c12 100%);
+ box-shadow:inset 10px 0 16px #0e070b88,inset -3px 0 7px #c7954838,inset 0 0 0 2px #b18c52,0 3px 0 #ccb58b,0 5px 0 #806343,0 7px 0 #dbc69f,0 9px 0 #836748,0 13px 0 #291b11,0 24px 36px #000b;
+}
+#portalTour .lf-story-cover-border { inset:13px; border:3px double #b7955a; box-shadow:inset 0 0 0 4px #1f140d55,0 0 0 2px #21160d77; }
+#portalTour .lf-story-cover-title { color:#dcc08a; text-shadow:0 1px 0 #160c05,-1px -1px 0 #1b1009,0 2px 1px #1a0e0a,0 -1px 0 #e2c48d55; letter-spacing:.035em; }
+#portalTour .lf-story-cover-medallion { border-color:#bc9857; border-radius:45%; filter:sepia(.16); box-shadow:0 1px 0 #edcf8a77,inset 0 0 10px #261207,0 4px 10px #170d09aa,0 0 0 5px #2b1d12; }
+#portalTour .lf-story-cover-open { background:#2c1d13d9; border-color:#a37e45; color:#ecd4a1; }
+@media(max-width:640px) {
+ #portalTour .lf-story-spread { border-width:8px; padding:3px; transform:rotateX(3deg); }
+ #portalTour .lf-story-spread::before { inset:3px; }
+ #portalTour .lf-story-spread::after { top:3px; bottom:3px; width:24px; }
+ #portalTour .lf-story-cover { border-width:5px; }
+}
+#portalTour .lf-story-cover-flourish { top:28px; width:78px; height:8px; border-top:1px solid #ba975c; border-bottom:1px solid #ba975c; font-size:0; }
+#portalTour .lf-story-cover-flourish::before { content:''; position:absolute; width:8px; height:8px; left:34px; top:-1px; transform:rotate(45deg); background:#ba975c; box-shadow:0 1px 2px #130c08; }
