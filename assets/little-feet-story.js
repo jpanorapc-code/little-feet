@@ -51,6 +51,7 @@
     function openBook() {
       if (opened || busy) return;
       opened = true;
+      if (typeof portalTourTimer !== 'undefined') window.clearInterval(portalTourTimer);
       if (reducedMotion) { book.classList.add('is-open'); return; }
       busy = true;
       book.classList.add('is-opening');
@@ -77,6 +78,7 @@
       back.disabled = pageIndex === 0;
       next.disabled = pageIndex === pages.length - 1;
       if (!direction || reducedMotion) return;
+      turn.classList.toggle('is-backward', direction === 'backward');
       const leaf = document.createElement('div');
       leaf.className = `lf-story-turn-leaf ${direction}`;
       leaf.innerHTML = '<span class="lf-story-turn-back" aria-hidden="true"></span>';
@@ -98,6 +100,8 @@
       render(delta > 0 ? 'forward' : 'backward');
     }
 
+    book.closest('#portalTour').addEventListener('mouseleave', event => { if (opened) event.stopImmediatePropagation(); }, true);
+    book.closest('#portalTour').addEventListener('focusout', event => { if (opened) event.stopImmediatePropagation(); }, true);
     cover.addEventListener('click', openBook);
     close.addEventListener('click', closeBook);
     back.addEventListener('click', () => move(-1));

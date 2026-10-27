@@ -349,3 +349,21 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
 #dashboardSection #portalTour .lf-storybook button { position:absolute; }
 #dashboardSection #portalTour .lf-story-cover.lf-frost-host > :not(.lf-button-frost-canvas) { position:absolute; }
 #portalTour .lf-story-hint { visibility:hidden; opacity:0; }
+/* Keep navigation aligned at the first/last page and reserve the page header. */
+#dashboardSection #portalTour .lf-story-arrow:disabled { transform:translateY(-50%) !important; }
+#dashboardSection #portalTour .lf-story-close { top:8px; right:14px; }
+#portalTour .lf-story-turn.is-backward { left:0; }
+@media(max-width:640px) {
+ #portalTour .lf-story-cover { width:calc(100% - 88px); }
+}
+@media(max-width:640px) {
+ #portalTour .lf-story-cover-hint,#portalTour .lf-story-hint,#portalTour .lf-story-kicker { display:none; }
+ #portalTour .lf-story-page-count { position:static; display:block; margin-bottom:8px; text-align:right; }
+}
+@media(max-width:640px) {
+ #portalTour .lf-story-page-text { padding:12px 14px; }
+ #portalTour .lf-story-copy { font-size:.74rem; }
+}
+@media(max-width:640px) {
+ #portalTour .lf-story-cover-title { left:8%; right:8%; font-size:clamp(1.05rem,4.5vw,1.6rem); }
+}
