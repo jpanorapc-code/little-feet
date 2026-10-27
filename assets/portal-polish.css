@@ -344,3 +344,8 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
  #portalTour .lf-story-turn { left:0; top:55%; bottom:0; width:100%; }
  #portalTour .lf-story-close { top:calc((100% - 430px)/2 + 12px); right:calc((100% - min(100%,980px))/2 + 12px); }
 }
+
+/* Keep story controls positioned inside the book despite dashboard button styling. */
+#dashboardSection #portalTour .lf-storybook button { position:absolute; }
+#dashboardSection #portalTour .lf-story-cover.lf-frost-host > :not(.lf-button-frost-canvas) { position:absolute; }
+#portalTour .lf-story-hint { visibility:hidden; opacity:0; }
