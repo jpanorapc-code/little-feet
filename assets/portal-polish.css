@@ -429,3 +429,20 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
 #portalTour .lf-story-start { z-index:6; top:8px; left:14px; padding:6px 10px; border:1px solid #b7955a; border-radius:4px; background:#2c1d13e6; color:#f0dbac; font:700 .68rem Georgia,serif; cursor:pointer; opacity:0; visibility:hidden; pointer-events:none; }
 #portalTour .lf-storybook.is-open .lf-story-start { opacity:1; visibility:visible; pointer-events:auto; }
 #portalTour .lf-story-start:disabled { opacity:.5; cursor:default; }
+/* Illustrated lost-fable leatherwork, with live accessible cover lettering. */
+#portalTour .lf-story-cover { background:#261b13 url('/assets/4k/little-feet-lost-fable-cover.webp') center/100% 100% no-repeat; }
+#portalTour .lf-story-cover-border,#portalTour .lf-story-cover-medallion { display:none; }
+#portalTour .lf-story-cover-title { top:14%; left:17%; right:17%; font-size:clamp(1.6rem,3.7vw,2.7rem); color:#f1d99f; }
+#portalTour .lf-story-cover-subtitle { top:75%; left:18%; right:18%; color:#f0dcb4; text-shadow:0 2px 4px #100a05,0 0 10px #100a05; }
+#portalTour .lf-story-cover-open { bottom:7%; box-shadow:0 2px 6px #130a08aa,inset 0 1px 0 #cfab6255; }
+@media(max-width:640px) {
+ #portalTour .lf-story-cover { background-image:url('/assets/4k/little-feet-lost-fable-cover-mobile.webp'); }
+ #portalTour .lf-story-cover-title { top:15%; left:12%; right:12%; font-size:clamp(1.05rem,4.5vw,1.6rem); }
+ #portalTour .lf-story-cover-subtitle { top:75%; left:12%; right:12%; font-size:.65rem; }
+}
+#portalTour .lf-story-cover-title { top:8%; font-size:clamp(1.6rem,3.5vw,2.35rem); }
+#portalTour .lf-story-cover-subtitle { top:80%; }
+@media(max-width:640px) {
+ #portalTour .lf-story-cover-title { top:15%; font-size:clamp(1.05rem,4.5vw,1.6rem); }
+ #portalTour .lf-story-cover-subtitle { top:75%; }
+}
