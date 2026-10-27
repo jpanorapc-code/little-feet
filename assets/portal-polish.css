@@ -426,3 +426,6 @@ body.light-mode #executiveHomeOverview .executive-chart-empty { background:#edf4
 }
 #portalTour .lf-story-cover-flourish { top:28px; width:78px; height:8px; border-top:1px solid #ba975c; border-bottom:1px solid #ba975c; font-size:0; }
 #portalTour .lf-story-cover-flourish::before { content:''; position:absolute; width:8px; height:8px; left:34px; top:-1px; transform:rotate(45deg); background:#ba975c; box-shadow:0 1px 2px #130c08; }
+#portalTour .lf-story-start { z-index:6; top:8px; left:14px; padding:6px 10px; border:1px solid #b7955a; border-radius:4px; background:#2c1d13e6; color:#f0dbac; font:700 .68rem Georgia,serif; cursor:pointer; opacity:0; visibility:hidden; pointer-events:none; }
+#portalTour .lf-storybook.is-open .lf-story-start { opacity:1; visibility:visible; pointer-events:auto; }
+#portalTour .lf-story-start:disabled { opacity:.5; cursor:default; }

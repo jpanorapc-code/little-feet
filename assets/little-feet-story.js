@@ -38,10 +38,11 @@
     const count = book?.querySelector('.lf-story-page-count');
     const cover = book?.querySelector('.lf-story-cover');
     const close = book?.querySelector('.lf-story-close');
+    const start = book?.querySelector('.lf-story-start');
     const back = book?.querySelector('.lf-story-arrow-left');
     const next = book?.querySelector('.lf-story-arrow-right');
     const turn = book?.querySelector('.lf-story-turn');
-    if (!book || !spread || !image || !title || !copy || !count || !cover || !close || !back || !next || !turn) return;
+    if (!book || !spread || !image || !title || !copy || !count || !cover || !close || !start || !back || !next || !turn) return;
 
     let pageIndex = 0;
     let opened = false;
@@ -76,6 +77,7 @@
       copy.textContent = pages[pageIndex][1];
       count.textContent = `Page ${pageIndex + 1} of ${pages.length}`;
       back.disabled = pageIndex === 0;
+      start.disabled = pageIndex === 0;
       next.disabled = pageIndex === pages.length - 1;
       if (!direction || reducedMotion) return;
       turn.classList.toggle('is-backward', direction === 'backward');
@@ -86,8 +88,8 @@
       old.className = 'lf-story-turn-front';
       old.append(priorSpread); leaf.append(old); turn.replaceChildren(leaf);
       requestAnimationFrame(() => leaf.classList.add('is-turning'));
-      busy = true; back.disabled = true; next.disabled = true;
-      window.setTimeout(() => { turn.replaceChildren(); busy = false; back.disabled = pageIndex === 0; next.disabled = pageIndex === pages.length - 1; }, 760);
+      busy = true; back.disabled = true; next.disabled = true; start.disabled = true;
+      window.setTimeout(() => { turn.replaceChildren(); busy = false; back.disabled = pageIndex === 0; next.disabled = pageIndex === pages.length - 1; start.disabled = pageIndex === 0; }, 760);
     }
     function move(delta) {
       if (!opened || busy) return;
@@ -97,15 +99,23 @@
       render(delta > 0 ? 'forward' : 'backward');
     }
 
+    function returnToStart() {
+      if (!opened || busy || pageIndex === 0) return;
+      pageIndex = 0;
+      render('backward');
+    }
+
     book.closest('#portalTour').addEventListener('mouseleave', event => { if (opened) event.stopImmediatePropagation(); }, true);
     book.closest('#portalTour').addEventListener('focusout', event => { if (opened) event.stopImmediatePropagation(); }, true);
     cover.addEventListener('click', openBook);
     close.addEventListener('click', closeBook);
+    start.addEventListener('click', returnToStart);
     back.addEventListener('click', () => move(-1));
     next.addEventListener('click', () => move(1));
     book.addEventListener('keydown', event => {
       if (event.key === 'Escape' && opened) { closeBook(); return; }
       if (!opened || busy) return;
+      if (event.key === 'Home') { event.preventDefault(); returnToStart(); }
       if (event.key === 'ArrowLeft') { event.preventDefault(); move(-1); }
       if (event.key === 'ArrowRight') { event.preventDefault(); move(1); }
     });
