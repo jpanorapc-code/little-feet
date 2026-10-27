@@ -70,7 +70,7 @@
       const priorTitle = title.textContent;
       const priorCopy = copy.textContent;
       const priorCount = count.textContent;
-      image.src = `/assets/4k/little-feet-pages/page-${String(pageIndex + 1).padStart(2, '0')}.webp`;
+      image.src = `/assets/4k/little-feet-pages/page-${String(pageIndex + 1).padStart(2, '0')}.webp?v=20261027-parchment-art-v1`;
       image.alt = `Illustration for page ${pageIndex + 1}: ${pages[pageIndex][0]}`;
       title.textContent = pages[pageIndex][0];
       copy.textContent = pages[pageIndex][1];
