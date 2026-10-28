@@ -25,7 +25,7 @@
   <!-- Map libraries load when the live school map is opened. -->
   <script src="/assets/map-loader.js?v=20261010-map-loading-v1" defer></script>
   <script src="/assets/tour-image-loader.js?v=20261010-tour-loading-v1" defer></script>
-  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261028-mascot-idle-v1">
+  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261028-living-idle-v3">
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261010-media-loading-v1"></script>
   <script defer src="/assets/button-frost.js?v=20261023-mobile-animation-tune-v1"></script>
@@ -125,9 +125,9 @@
 <clipPath id="penguinHeadClip"><path d="M720 579 Q712 550 725 515 L725 481 L735 440 Q760 410 801 401 L824 390 L847 402 Q912 395 943 448 L959 492 L959 550 Q956 580 922 591 Q838 618 756 586 Z"/></clipPath>
 <mask id="penguinSceneMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1672" height="941"><rect width="1672" height="941" fill="white"/><use href="#penguinOutline" fill="black" stroke="black" stroke-width="3"/></mask>
 <mask id="penguinBodyMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1672" height="941"><rect width="1672" height="941" fill="white"/><path d="M720 579 Q712 550 725 515 L725 481 L735 440 Q760 410 801 401 L824 390 L847 402 Q912 395 943 448 L959 492 L959 550 Q956 580 922 591 Q838 618 756 586 Z" fill="black"/><path d="M934 610 L946 570 L981 531 Q1003 508 1025 522 Q1040 541 1021 583 L961 638 Z" fill="black" stroke="black" stroke-width="2"/></mask>
-<clipPath id="penguinEyeWindows"><ellipse cx="795" cy="506" rx="24" ry="27"/><ellipse cx="895" cy="501" rx="23" ry="27"/></clipPath>
-<clipPath id="penguinIrises"><ellipse cx="798" cy="509" rx="17" ry="21"/><ellipse cx="895" cy="502" rx="17" ry="21"/></clipPath>
-<radialGradient id="penguinEyeWhite"><stop stop-color="#fffefa"/><stop offset=".8" stop-color="#eeeae3"/><stop offset="1" stop-color="#a6a4a1"/></radialGradient>
+<clipPath id="penguinLeftLidClip"><ellipse cx="795" cy="506" rx="23" ry="26"/></clipPath>
+<clipPath id="penguinRightLidClip"><ellipse cx="895" cy="501" rx="22" ry="26"/></clipPath>
+<linearGradient id="penguinLidFur" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c5bfb8"/><stop offset=".35" stop-color="#eee4d6"/><stop offset="1" stop-color="#f6ecdc"/></linearGradient>
 <clipPath id="penguinArm"><path d="M934 610 L946 570 L981 531 Q1003 508 1025 522 Q1040 541 1021 583 L961 638 Z"/></clipPath>
 <clipPath id="penguinArmBacking"><path d="M932 608 L942 565 L978 523 Q1005 500 1032 516 Q1047 543 1027 588 L962 641 Z"/></clipPath>
 <mask id="loginIceSurfaceMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1672" height="941"><rect width="1672" height="941" fill="white"/><ellipse cx="835" cy="420" rx="340" ry="335" fill="black"/><path d="M1115 478 Q1210 470 1210 545 Q1210 621 1108 653 L1088 620 L1090 500 Z" fill="black"/><path d="M679 624 Q660 709 700 778 Q709 810 754 821 L958 821 Q1004 807 1009 764 L1019 640 Z" fill="black"/></mask>
@@ -135,17 +135,16 @@
 <image href="assets/brand/iceberg-idle-backing.webp" width="1672" height="941"/>
 <image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" mask="url(#penguinSceneMask)"/>
 <g class="login-ice-glow" mask="url(#loginIceSurfaceMask)" aria-hidden="true"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" filter="url(#loginIceRadiance)"/></g>
-<g class="penguin-idle-breathe">
+<g class="penguin-idle-sway"><g class="penguin-idle-breathe">
 <g clip-path="url(#penguinIdleClip)" mask="url(#penguinBodyMask)"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941"/></g>
-<g class="penguin-idle-head">
+<g class="penguin-idle-head-follow"><g class="penguin-idle-head">
 <image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" clip-path="url(#penguinHeadClip)"/>
-<g clip-path="url(#penguinEyeWindows)">
-<ellipse cx="795" cy="506" rx="24" ry="27" fill="url(#penguinEyeWhite)"/><ellipse cx="895" cy="501" rx="23" ry="27" fill="url(#penguinEyeWhite)"/>
-<g class="penguin-idle-blink"><g class="penguin-idle-gaze"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" clip-path="url(#penguinIrises)"/></g></g>
-<path class="penguin-idle-lids" d="M771 506 Q795 516 819 506 M872 501 Q895 511 918 501" fill="none" stroke="#263047" stroke-width="3" stroke-linecap="round"/>
+<!-- Keep the original painted eyes intact. Only the eyelids move during a blink. -->
+<g clip-path="url(#penguinLeftLidClip)"><g class="penguin-idle-lid penguin-idle-lid-left"><path d="M768 477 H822 V529 Q795 539 768 529 Z" fill="url(#penguinLidFur)"/><path d="M773 508 Q795 518 817 508" fill="none" stroke="#5c626a" stroke-width="2" stroke-linecap="round"/></g></g>
+<g clip-path="url(#penguinRightLidClip)"><g class="penguin-idle-lid penguin-idle-lid-right"><path d="M869 472 H921 V524 Q895 534 869 524 Z" fill="url(#penguinLidFur)"/><path d="M874 503 Q895 513 916 503" fill="none" stroke="#5c626a" stroke-width="2" stroke-linecap="round"/></g></g>
 </g></g>
 <g class="penguin-wave"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
-</g>
+</g></g>
 </svg></button></div>
 <h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
         <p class="slogan"><span data-lf-i18n="tagline">Every Little Step Matters</span></p>
