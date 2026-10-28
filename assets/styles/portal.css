@@ -6762,9 +6762,9 @@ body.portal-active #authSection .login-ice-glow { animation-play-state:paused; }
 @media(prefers-reduced-motion:reduce) { #authSection .login-ice-glow { animation:none; opacity:.14; will-change:auto; } }
 
 /* Continuous rig interpolation: no stepped sprite frames or duplicate mascot. */
-#authSection .penguin-idle-breathe { transform-origin:850px 792px; animation:penguinIdleBreath 3.8s ease-in-out infinite; }
+#authSection .penguin-idle-breathe { transform-origin:850px 792px; animation:penguinIdleBreath 4.6s ease-in-out infinite; }
 #authSection .penguin-idle-head { transform-origin:843px 584px; animation:penguinIdleNod 13s ease-in-out infinite; }
-@keyframes penguinIdleBreath { 0%,100% { transform:scale(1); } 45% { transform:translateY(-1px) scale(1.018,1.03); } 65% { transform:scale(1.012,1.02); } }
+@keyframes penguinIdleBreath { 0%,100% { transform:scale(1); } 45% { transform:scale(1.004,1.009); } 65% { transform:scale(1.002,1.005); } }
 @keyframes penguinIdleNod { 0%,37%,63%,100% { transform:translateY(0) rotate(0deg); } 44%,56% { transform:translateY(5px) rotate(1.5deg); } }
 body.portal-active #authSection :is(.penguin-idle-breathe,.penguin-idle-head,.penguin-idle-lid,.penguin-wave) { animation-play-state:paused; }
 @media(prefers-reduced-motion:reduce) { #authSection :is(.penguin-idle-breathe,.penguin-idle-head,.penguin-idle-lid) { animation:none; } }
@@ -6779,8 +6779,8 @@ body.portal-active #authSection .penguin-idle-lid { animation-play-state:paused;
 
 /* Weight shifts around the planted feet; the head settles after each breath. */
 #authSection .penguin-idle-sway { transform-origin:845px 784px; animation:penguinIdleSway 8.6s ease-in-out infinite; }
-#authSection .penguin-idle-head-follow { transform-origin:843px 584px; animation:penguinIdleFollow 3.8s ease-in-out infinite; }
+#authSection .penguin-idle-head-follow { transform-origin:843px 584px; animation:penguinIdleFollow 4.6s ease-in-out infinite; }
 @keyframes penguinIdleSway { 0%,100% { transform:rotate(-.65deg); } 48% { transform:rotate(.8deg); } }
-@keyframes penguinIdleFollow { 0%,100% { transform:translateY(1px) rotate(.2deg); } 54% { transform:translateY(-2px) rotate(-.35deg); } }
+@keyframes penguinIdleFollow { 0%,100% { transform:translateY(.3px) rotate(.1deg); } 54% { transform:translateY(-.6px) rotate(-.1deg); } }
 body.portal-active #authSection :is(.penguin-idle-sway,.penguin-idle-head-follow) { animation-play-state:paused; }
 @media(prefers-reduced-motion:reduce) { #authSection :is(.penguin-idle-sway,.penguin-idle-head-follow) { animation:none; } }
