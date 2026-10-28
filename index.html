@@ -25,7 +25,7 @@
   <!-- Map libraries load when the live school map is opened. -->
   <script src="/assets/map-loader.js?v=20261010-map-loading-v1" defer></script>
   <script src="/assets/tour-image-loader.js?v=20261010-tour-loading-v1" defer></script>
-  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261023-runner-solid-glow-v2">
+  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261028-ice-surface-pulse-v1">
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261010-media-loading-v1"></script>
   <script defer src="/assets/button-frost.js?v=20261023-mobile-animation-tune-v1"></script>
@@ -121,8 +121,11 @@
 <button class="login-emblem-button" type="button" onclick="goToMainMenu()" title="Open main menu" aria-label="Little Feet mascot — open main menu">
 <svg class="login-iceberg-emblem" viewBox="0 0 1672 941" aria-hidden="true">
 <defs><clipPath id="penguinArm"><path d="M934 610 L946 570 L981 531 Q1003 508 1025 522 Q1040 541 1021 583 L961 638 Z"/></clipPath>
-<clipPath id="penguinArmBacking"><path d="M932 608 L942 565 L978 523 Q1005 500 1032 516 Q1047 543 1027 588 L962 641 Z"/></clipPath></defs>
+<clipPath id="penguinArmBacking"><path d="M932 608 L942 565 L978 523 Q1005 500 1032 516 Q1047 543 1027 588 L962 641 Z"/></clipPath>
+<mask id="loginIceSurfaceMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1672" height="941"><rect width="1672" height="941" fill="white"/><ellipse cx="835" cy="420" rx="340" ry="335" fill="black"/><path d="M1115 478 Q1210 470 1210 545 Q1210 621 1108 653 L1088 620 L1090 500 Z" fill="black"/><path d="M679 624 Q660 709 700 778 Q709 810 754 821 L958 821 Q1004 807 1009 764 L1019 640 Z" fill="black"/></mask>
+<filter id="loginIceRadiance" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".55 .1 .1 0 .13 .05 .8 .1 0 .18 0 .1 .9 0 .25 0 0 0 1 0"/></filter></defs>
 <image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941"/>
+<g class="login-ice-glow" mask="url(#loginIceSurfaceMask)" aria-hidden="true"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" filter="url(#loginIceRadiance)"/></g>
 <image href="assets/brand/iceberg-wave-backing.webp" width="1672" height="941" clip-path="url(#penguinArmBacking)"/>
 <g class="penguin-wave"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
 </svg></button></div>

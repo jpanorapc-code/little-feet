@@ -749,3 +749,9 @@
       #dashboardSection .lf-button-frost-canvas { display:none !important; }
     }
 
+
+/* Pulse light through the ice surfaces; the SVG mask protects the logo and mascot. */
+#authSection .login-ice-glow { opacity:.06; mix-blend-mode:screen; pointer-events:none; animation:loginIceSurfacePulse 4.8s steps(60,end) infinite; will-change:opacity; }
+@keyframes loginIceSurfacePulse { 0%,100% { opacity:.06; } 50% { opacity:.64; } }
+body.portal-active #authSection .login-ice-glow { animation-play-state:paused; }
+@media(prefers-reduced-motion:reduce) { #authSection .login-ice-glow { animation:none; opacity:.14; will-change:auto; } }
