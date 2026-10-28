@@ -6760,3 +6760,17 @@
 @keyframes loginIceSurfacePulse { 0%,100% { opacity:.06; } 50% { opacity:.64; } }
 body.portal-active #authSection .login-ice-glow { animation-play-state:paused; }
 @media(prefers-reduced-motion:reduce) { #authSection .login-ice-glow { animation:none; opacity:.14; will-change:auto; } }
+
+/* Continuous rig interpolation: no stepped sprite frames or duplicate mascot. */
+#authSection .penguin-idle-breathe { transform-origin:850px 792px; animation:penguinIdleBreath 3.8s ease-in-out infinite; }
+#authSection .penguin-idle-head { transform-origin:843px 584px; animation:penguinIdleNod 13s ease-in-out infinite; }
+#authSection .penguin-idle-gaze { animation:penguinIdleGaze 13s ease-in-out infinite; }
+#authSection .penguin-idle-blink { transform-origin:845px 504px; animation:penguinIdleBlink 9.7s linear infinite; }
+#authSection .penguin-idle-lids { opacity:0; animation:penguinIdleLids 9.7s linear infinite; }
+@keyframes penguinIdleBreath { 0%,100% { transform:scale(1); } 50% { transform:scale(1.012,1.018); } }
+@keyframes penguinIdleNod { 0%,37%,63%,100% { transform:translateY(0) rotate(0deg); } 44%,56% { transform:translateY(5px) rotate(1.5deg); } }
+@keyframes penguinIdleGaze { 0%,37%,63%,100% { transform:translate(0,0); } 44%,56% { transform:translate(1px,8px); } }
+@keyframes penguinIdleBlink { 0%,27%,29.6%,70%,72.6%,76%,78.6%,100% { transform:scaleY(1); } 28.2%,28.5%,71.2%,71.5%,77.2%,77.5% { transform:scaleY(.035); } }
+@keyframes penguinIdleLids { 0%,27.6%,29.2%,70.6%,72.2%,76.6%,78.2%,100% { opacity:0; } 28.2%,28.5%,71.2%,71.5%,77.2%,77.5% { opacity:1; } }
+body.portal-active #authSection :is(.penguin-idle-breathe,.penguin-idle-head,.penguin-idle-gaze,.penguin-idle-blink,.penguin-idle-lids,.penguin-wave) { animation-play-state:paused; }
+@media(prefers-reduced-motion:reduce) { #authSection :is(.penguin-idle-breathe,.penguin-idle-head,.penguin-idle-gaze,.penguin-idle-blink,.penguin-idle-lids) { animation:none; } }
