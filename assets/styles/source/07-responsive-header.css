@@ -134,7 +134,7 @@
         grid-column:2;
         grid-row:1;
         display:grid !important;
-        grid-template-columns:minmax(190px,1fr) repeat(3,max-content) !important;
+        grid-template-columns:minmax(190px,1fr) repeat(4,max-content) !important;
         align-items:center;
         gap:6px !important;
         width:100%;
@@ -670,7 +670,7 @@
        at the same width keep the slide-over drawer. */
     @media (min-width:900px) and (max-width:1199px) and (hover:hover) and (pointer:fine) {
       #dashboardSection .nav-quickbar {
-        grid-template-columns:minmax(0,1fr) repeat(3,76px) !important;
+        grid-template-columns:minmax(0,1fr) repeat(4,76px) !important;
       }
       #dashboardSection .nav-quickbar > #navMoreToggle {
         display:none !important;
