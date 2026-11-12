@@ -15,6 +15,7 @@
   const FREEZE_MS = 3200;
   const THAW_MS = 520;
   const active = new WeakMap();
+  const activeStates = new Set();
   const finePointer = window.matchMedia('(hover:hover) and (pointer:fine)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion:reduce)');
   const mobileProfile = window.matchMedia('(max-width:820px), (pointer:coarse)');
@@ -150,6 +151,7 @@
 
   function drawFrame(state, now) {
     if (!state.alive) return;
+    if (state.pausedAt) return;
     const { button, canvas, ctx, width, height, scene, startedAt } = state;
     if (!button.isConnected || !canvas.isConnected) {
       state.alive = false;
@@ -260,6 +262,7 @@
     const state = active.get(button);
     if (!state) return;
     active.delete(button);
+    activeStates.delete(state);
     state.alive = false;
     if (state.raf) cancelAnimationFrame(state.raf);
     state.canvas.classList.add('is-thawing');
@@ -267,7 +270,7 @@
   }
 
   function start(button) {
-    if (!finePointer.matches || reducedMotion.matches || active.has(button)) return;
+    if (!finePointer.matches || reducedMotion.matches || active.has(button) || document.documentElement.classList.contains("lf-animations-paused")) return;
     const rect = button.getBoundingClientRect();
     if (rect.width < 12 || rect.height < 12) return;
 
@@ -299,6 +302,7 @@
       alive:true
     };
     active.set(button, state);
+    activeStates.add(state);
     state.raf = requestAnimationFrame(time => drawFrame(state, time));
   }
 
@@ -323,9 +327,32 @@
     });
   });
 
+  function pauseAll() {
+    const now = performance.now();
+    activeStates.forEach(state => {
+      if (!state.alive || state.pausedAt) return;
+      state.pausedAt = now;
+      if (state.raf) cancelAnimationFrame(state.raf);
+      state.raf = 0;
+    });
+  }
+
+  function resumeAll() {
+    const now = performance.now();
+    activeStates.forEach(state => {
+      if (!state.alive || !state.pausedAt) return;
+      state.startedAt += now - state.pausedAt;
+      state.pausedAt = 0;
+      state.lastFrameAt = 0;
+      state.raf = requestAnimationFrame(time => drawFrame(state, time));
+    });
+  }
+
   window.__littleFeetButtonFrost = {
     start,
     stop,
+    pauseAll,
+    resumeAll,
     selector:SELECTOR,
     mobileProfile,
     mobileDprCap:MOBILE_DPR_CAP,
