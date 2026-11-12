@@ -35,9 +35,9 @@
   <link rel="stylesheet" href="/assets/welcome-clock.css?v=20261010-sa-clock-v1">
   <style id="lf-animation-control-style">
     html.lf-animations-paused,
-    html.lf-animations-paused *,
-    html.lf-animations-paused *::before,
-    html.lf-animations-paused *::after {
+    html.lf-animations-paused *:not(.welcome-clock):not(.welcome-clock *),
+    html.lf-animations-paused *:not(.welcome-clock):not(.welcome-clock *)::before,
+    html.lf-animations-paused *:not(.welcome-clock):not(.welcome-clock *)::after {
       animation-play-state: paused !important;
     }
     /* Keep workspace switching functional while motion is paused.
@@ -1755,7 +1755,7 @@
         const shouldPause = !root.classList.contains('lf-animations-paused');
         if (shouldPause) {
           root.classList.add('lf-animations-paused');
-          pausedAnimations = document.getAnimations({ subtree:true }).filter(animation => animation.playState === 'running');
+          pausedAnimations = document.getAnimations({ subtree:true }).filter(animation => animation.playState === 'running' && !animation.effect?.target?.closest?.('.welcome-clock'));
           pausedAnimations.forEach(animation => animation.pause());
           pausedVideos = Array.from(document.querySelectorAll('video')).filter(video => !video.paused);
           pausedVideos.forEach(video => video.pause());
