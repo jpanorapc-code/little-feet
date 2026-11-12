@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v106-runner-solid-glow-pulse';
+const CACHE_NAME = 'little-feet-shell-v107-global-motion-pause';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
@@ -40,8 +40,8 @@ const SHELL_ASSETS = [
   '/assets/workspace-accessibility.js?v=20261013-polish-v2',
   '/manifest.webmanifest',
   '/assets/ambient-background.css?v=20261004-portal-portraits-v1',
-  '/assets/ambient-background.js?v=20261010-media-loading-v1',
-  '/assets/button-frost.js?v=20261023-mobile-animation-tune-v1',
+  '/assets/ambient-background.js?v=20261113-global-motion-pause-v1',
+  '/assets/button-frost.js?v=20261113-global-motion-pause-v1',
   '/assets/video/little-feet-ambient-poster.jpg',
   '/assets/video/little-feet-login-clean.jpg',
   '/assets/brand/iceberg-navy-penguin.webp',
