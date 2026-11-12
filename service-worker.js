@@ -1,4 +1,4 @@
-const CACHE_NAME = 'little-feet-shell-v107-policy-consent';
+const CACHE_NAME = 'little-feet-shell-v108-policy-storage';
 const SHELL_ASSETS = [
   '/assets/tour-image-loader.js?v=20261010-tour-loading-v1',
   '/assets/map-loader.js?v=20261010-map-loading-v1',
@@ -56,7 +56,7 @@ const SHELL_ASSETS = [
   '/assets/education-stages.js?v=20260925-stages-v2',
   '/assets/curriculum-frameworks.js?v=20261009-stage-navigation-v1',
   '/assets/preferences-enhancements.js?v=20261006-login-i18n-v2',
-  '/assets/legal-notices.js?v=20261112-refund-cookie-optout-v1',
+  '/assets/legal-notices.js?v=20261112-policy-storage-v2',
   '/assets/legal-preferences.js?v=20261112-cookie-notice-v1',
   '/assets/finance-automation.js?v=20261008-session-repair-v1',
   '/assets/school-core-upgrades.js?v=20261009-stage-navigation-v1',
