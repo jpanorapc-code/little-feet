@@ -8,15 +8,36 @@
     date: 'Date', file: 'Supporting document'
   };
   const readable = value => String(value || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ').trim();
+  let generatedLabelId = 0;
   function labelControls(root) {
     const controls = [...root.querySelectorAll('input,select,textarea')];
     if (root.matches?.('input,select,textarea')) controls.unshift(root);
     for (const control of controls) {
-      if (['hidden', 'button', 'submit', 'reset'].includes(control.type)
-        || control.labels?.length || control.hasAttribute('aria-label')
-        || control.hasAttribute('aria-labelledby') || control.title) continue;
-      const label = names[control.id] || names[control.name] || control.placeholder || readable(control.name);
-      if (label) control.setAttribute('aria-label', label);
+      if (control.type === 'hidden' || control.closest('label') || control.closest('[aria-hidden="true"]')) continue;
+      if (control.labels?.length) continue;
+
+      const labelText = names[control.id] || names[control.name]
+        || control.getAttribute('aria-label')
+        || control.getAttribute('placeholder')
+        || readable(control.name)
+        || readable(control.id)
+        || ({ checkbox: 'Checkbox', radio: 'Option', date: 'Date', time: 'Time', color: 'Colour', file: 'File upload', number: 'Number' }[control.type])
+        || 'Input field';
+
+      if (!control.id || document.querySelectorAll('#' + CSS.escape(control.id)).length > 1) {
+        let candidate;
+        do {
+          candidate = 'lf-a11y-control-' + (++generatedLabelId);
+        } while (document.getElementById(candidate));
+        control.id = candidate;
+      }
+
+      const label = document.createElement('label');
+      label.className = 'sr-only';
+      label.htmlFor = control.id;
+      label.textContent = labelText;
+      control.parentNode.insertBefore(label, control);
+      if (!control.hasAttribute('aria-label')) control.setAttribute('aria-label', labelText);
     }
   }
   const loadingText = /^Loading(?:\s|…|\.\.\.)/i;

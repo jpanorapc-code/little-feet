@@ -26,7 +26,7 @@
   <!-- Map libraries load when the live school map is opened. -->
   <script src="/assets/map-loader.js?v=20261010-map-loading-v1" defer></script>
   <script src="/assets/tour-image-loader.js?v=20261010-tour-loading-v1" defer></script>
-  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261023-runner-solid-glow-v2">
+  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261113-accessibility-contrast-v1">
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261113-global-motion-pause-v1"></script>
   <script defer src="/assets/button-frost.js?v=20261113-global-motion-pause-v1"></script>
@@ -977,7 +977,7 @@
                 </select>
               </div>
               <div id="meetingTicketFields" class="meeting-ticket-fields hidden" style="flex:2;">
-                <label>Requested meeting</label>
+                <span class="form-label">Requested meeting</span>
                 <div class="flex-form-row">
                   <input id="ticketMeetingDate" type="date" aria-label="Meeting date">
                   <input id="ticketMeetingTime" type="time" aria-label="Meeting time">
@@ -1673,13 +1673,13 @@
         <div>
           <p id="footerSchoolName" style="color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Little Feet™ School Portal</p>
           <div class="footer-links">
-            <a href="#privacy-safeguarding" onclick="event.preventDefault(); openPopiaPrivacyNotice()">Privacy &amp; POPIA</a>
-            <a href="#terms-of-service" onclick="event.preventDefault(); openTermsOfService()">Terms of Service</a>
+            <button type="button" class="footer-link-action" onclick="event.preventDefault(); openPopiaPrivacyNotice()">Privacy &amp; POPIA</button>
+            <button type="button" class="footer-link-action" onclick="event.preventDefault(); openTermsOfService()">Terms of Service</button>
             <a href="/paia.html" target="_blank" rel="noopener">PAIA Manual</a>
-            <a href="#copyright-content" onclick="event.preventDefault(); openCopyrightContentPolicy()">Copyright, Trade Marks &amp; IP</a>
-            <a href="#guideTab" onclick="event.preventDefault(); openWorkspace('guideTab')">Help &amp; Guide</a>
-            <a href="#settingsTab" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</a>
-            <a href="#donate" onclick="event.preventDefault(); openDonationModal()">Donate</a>
+            <button type="button" class="footer-link-action" onclick="event.preventDefault(); openCopyrightContentPolicy()">Copyright, Trade Marks &amp; IP</button>
+            <button type="button" class="footer-link-action" onclick="event.preventDefault(); openWorkspace('guideTab')">Help &amp; Guide</button>
+            <button type="button" class="footer-link-action" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</button>
+            <button type="button" class="footer-link-action" onclick="event.preventDefault(); openDonationModal()">Donate</button>
           </div>
           <p style="margin-top:6px;font-size:.74rem;color:#cbd5e1;">© 2026 Little Feet Technologies (Pty) Ltd. All rights reserved. · Registration No. 2026/775509/07 · South Africa · Official site: <a href="https://littlefeet.co.za/" style="color:#e6fffb;font-weight:700;text-decoration:underline;text-underline-offset:2px;">littlefeet.co.za</a></p>
         </div>
@@ -1698,7 +1698,7 @@
     <button type="button" class="wallpaper-exit" onclick="event.stopPropagation(); exitWallpaperMode()">Exit wallpaper</button>
   </section>
 
-  <script src="/assets/workspace-accessibility.js?v=20261013-polish-v2" defer></script>
+  <script src="/assets/workspace-accessibility.js?v=20261113-real-form-labels-v1" defer></script>
   <script src="/assets/education-stages.js?v=20260925-stages-v2" defer></script>
   <script src="/assets/features/audio.js?v=20261010-controlled-split-v2" defer></script>
   <script src="/assets/features/school-directory.js?v=20261010-map-loading-v1" defer></script>

@@ -6,7 +6,7 @@
       --bg-dark: #0a1118;
       --panel-bg: #132b45;
       --text-dark: #f1f5f9;
-      --text-muted: #94a3b8;
+      --text-muted: #cbd5e1;
       --border-color: #1e3a5f;
       --input-bg: #0f2338;
       --input-text: #ffffff;
@@ -21,7 +21,7 @@
       --bg-dark: #f1f5f9;
       --panel-bg: #ffffff;
       --text-dark: #0f172a;
-      --text-muted: #475569;
+      --text-muted: #29485a;
       --border-color: #cbd5e1;
       --input-bg: #f8fafc;
       --input-text: #0f172a;
@@ -6754,3 +6754,25 @@
       #dashboardSection .lf-button-frost-canvas { display:none !important; }
     }
 
+
+/* Accessibility: keep footer actions keyboard-operable and readable. */
+.footer-links .footer-link-action {
+  display:inline;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  line-height:inherit;
+  text-align:left;
+  text-decoration:underline;
+  text-underline-offset:3px;
+  cursor:pointer;
+}
+.footer-links .footer-link-action:hover,
+.footer-links .footer-link-action:focus-visible { color:#ffffff; }
+.footer-links .footer-link-action:focus-visible {
+  outline:2px solid #5eead4;
+  outline-offset:3px;
+  border-radius:2px;
+}
