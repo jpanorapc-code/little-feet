@@ -297,7 +297,7 @@
         <button type="button" class="nav-shortcut" data-mobile-label="Home" onclick="openWorkspace('homeTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></button>
         <button type="button" class="nav-shortcut" data-mobile-label="Search" onclick="openGlobalSearch()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><span>Search</span></button>
         <button type="button" class="nav-shortcut" data-mobile-label="Help" onclick="openWorkspace('ticketsTab')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-help"></use></svg><span>Get help</span></button>
-        <button type="button" id="motionToggle" class="nav-shortcut" data-mobile-label="Motion" aria-pressed="false" onclick="togglePortalAnimations()"><span>Pause animations</span></button>
+        <button type="button" id="motionToggle" class="nav-shortcut" data-mobile-label="Motion" aria-pressed="false" onclick="togglePortalAnimations()"><span>Pause motion</span></button>
         <button type="button" id="navMoreToggle" class="nav-more-toggle" data-mobile-label="Menu" onclick="toggleNavigation()" aria-expanded="false" aria-controls="mainNavigation"><svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg><span>Menu</span></button>
       </div>
 
@@ -1756,7 +1756,7 @@
           pausedVideos.forEach(video => video.pause());
           window.__littleFeetButtonFrost?.pauseAll?.();
           button?.setAttribute('aria-pressed', 'true');
-          if (button) button.querySelector('span').textContent = 'Resume animations';
+          if (button) button.querySelector('span').textContent = 'Resume motion';
         } else {
           root.classList.remove('lf-animations-paused');
           pausedAnimations.forEach(animation => { try { animation.play(); } catch (_) {} });
@@ -1765,7 +1765,7 @@
           pausedVideos = [];
           window.__littleFeetButtonFrost?.resumeAll?.();
           button?.setAttribute('aria-pressed', 'false');
-          if (button) button.querySelector('span').textContent = 'Pause animations';
+          if (button) button.querySelector('span').textContent = 'Pause motion';
         }
       };
     })();
