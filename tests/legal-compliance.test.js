@@ -15,9 +15,9 @@ assert.match(page, /About Little Feet/);
 assert.match(page, /Privacy &amp; POPIA/);
 assert.match(page, /I confirm I am authorised to create this account and have read and accept/);
 assert.match(page, /class="legal-inline-link"/);
-assert.match(page, /assets\/legal-notices\.js\?v=20261002-about-v1/);
+assert.match(page, /assets\/legal-notices\.js\?v=20261112-refund-cookie-optout-v1/);
 
-assert.match(server, /LITTLE_FEET_PRIVACY_VERSION = 'POPIA-2026-09-v6'/);
+assert.match(server, /LITTLE_FEET_PRIVACY_VERSION = 'POPIA-2026-11-v7'/);
 assert.match(server, /LITTLE_FEET_TERMS_VERSION = 'TOS-ZA-2026-09-v5'/);
 assert.match(server, /termsAcceptedAt: new Date\(\)\.toISOString\(\)/);
 assert.match(server, /privacyAcceptedAt: new Date\(\)\.toISOString\(\)/);
@@ -59,6 +59,17 @@ assert.match(legal, /Nothing in these Terms excludes or limits rights or remedie
 assert.match(legal, /inforegulator\.org\.za/);
 assert.match(page, /openCopyrightContentPolicy\(\)/);
 assert.match(page, /Copyright, Trade Marks &amp; IP/);
+assert.match(page, /Refund Policy/);
+assert.match(page, /Cookie Policy/);
+assert.match(page, /Cookie Settings/);
+assert.match(page, /Unsubscribe from marketing/);
+assert.match(page, /id="lfCookieConsent"/);
+assert.match(legal, /30-day money-back guarantee/);
+assert.match(legal, /one week of integration/);
+assert.match(legal, /14-day live trial/);
+assert.match(legal, /36 months/);
+assert.match(legal, /Find schools near me/);
+assert.match(legal, /OpenStreetMap Overpass/);
 assert.match(legal, /Little Feet™/);
 assert.match(legal, /Christiaan@littleFeet\.co\.za/);
 assert.match(legal, /062 943 2244/);
@@ -74,6 +85,7 @@ assert.match(legal, /building a legacy for my son/i);
 assert.match(legal, /Every Little Step Matters/);
 assert.match(legal, /One school\. One connected platform\./);
 assert.match(legal, /function openAboutLittleFeet\(\)/);
-assert.match(sw, /assets\/legal-notices\.js\?v=20261002-about-v1/);
+assert.match(sw, /assets\/legal-notices\.js\?v=20261112-refund-cookie-optout-v1/);
+assert.match(sw, /assets\/legal-preferences\.js\?v=20261112-cookie-notice-v1/);
 
 console.log('South African legal notice regression test passed.');

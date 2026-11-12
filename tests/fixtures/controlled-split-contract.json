@@ -263,6 +263,7 @@
     "POST /api/learner-groups/:id/members",
     "POST /api/login",
     "POST /api/maintenance",
+    "POST /api/marketing/unsubscribe",
     "POST /api/meals/dietary",
     "POST /api/meals/plans",
     "POST /api/modules/:module",
