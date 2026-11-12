@@ -40,6 +40,11 @@
     html.lf-animations-paused *::after {
       animation-play-state: paused !important;
     }
+    /* Keep workspace switching functional while motion is paused.
+       A paused tab-reveal animation can otherwise leave a newly opened tab invisible. */
+    html.lf-animations-paused .tab-content.active {
+      animation: none !important;
+    }
   </style>
 </head>
 <body>
