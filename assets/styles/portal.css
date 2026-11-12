@@ -6776,3 +6776,30 @@
   outline-offset:3px;
   border-radius:2px;
 }
+
+/* WAVE contrast fixes: preserve the badge artwork while keeping text readable in both themes. */
+body.light-mode #badgesTab > [data-roles] {
+  background:#0f2b48 !important;
+  color:#f8fafc !important;
+}
+#badgesTab > [data-roles] label,
+#badgesTab > [data-roles] h2,
+#badgesTab > [data-roles] .form-label {
+  color:#f8fafc !important;
+}
+#badgesTab > [data-roles] input,
+#badgesTab > [data-roles] textarea {
+  color:#ffffff !important;
+}
+#badgesTab > [data-roles] input::placeholder,
+#badgesTab > [data-roles] textarea::placeholder {
+  color:#cbd5e1 !important;
+  opacity:1;
+}
+/* Emergency dispatch is a high-risk action and needs strong white-on-red contrast. */
+#broadcastForm button[type="submit"] {
+  background:#991b1b !important;
+  background-image:none !important;
+  color:#ffffff !important;
+  border:1px solid #fecaca !important;
+}
