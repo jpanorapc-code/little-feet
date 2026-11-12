@@ -1106,3 +1106,9 @@
         transform:translateY(0) scale(.985);
       }
     }
+
+/* Footer text must remain readable when the portal is in light mode. */
+body.light-mode footer p, body.light-mode #footerSchoolName { color:#29485a !important; }
+body.light-mode .footer-links .footer-link-action { color:#0c4a6e !important; }
+body.light-mode footer a { color:#075985 !important; }
+body.light-mode .footer-links .footer-link-action:hover, body.light-mode .footer-links .footer-link-action:focus-visible, body.light-mode footer a:hover, body.light-mode footer a:focus-visible { color:#082f49 !important; }

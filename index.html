@@ -285,7 +285,7 @@
   <!-- Main Dashboard -->
   <div id="dashboardSection" class="hidden" role="main">
     <nav>
-      <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
+      <div class="nav-brand" role="button" tabindex="0" aria-label="Return to Little Feet home" onkeydown="if(event.keyCode===13||event.keyCode===32){event.preventDefault();goToMainMenu();}" onclick="goToMainMenu()" title="Return to Home Page">
         <img src="little-feet-mascot.jfif" loading="lazy" decoding="async" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
         <div>
           <span class="site-name">Little Feet Technologies</span>
@@ -1690,7 +1690,7 @@
     </footer>
   </div>
 
-  <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet northern lights wallpaper" onclick="exitWallpaperMode()">
+  <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet northern lights wallpaper">
     <div class="wallpaper-aurora-sky" aria-hidden="true"></div>
     <img id="wallpaperImage" alt="Custom Little Feet wallpaper" loading="lazy" decoding="async">
     <div class="wallpaper-overlay-copy"><h2>Little Feet</h2><p>Taking a quiet moment under the northern lights. Wallpaper music is playing. Click, touch, or press any key to return.</p></div>
