@@ -25,7 +25,7 @@
   <!-- Map libraries load when the live school map is opened. -->
   <script src="/assets/map-loader.js?v=20261010-map-loading-v1" defer></script>
   <script src="/assets/tour-image-loader.js?v=20261010-tour-loading-v1" defer></script>
-  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261028-cursor-eyes-v4">
+  <link rel="stylesheet" href="/assets/styles/portal.css?v=20261112-cookie-banner-v1">
   <link rel="stylesheet" href="/assets/ambient-background.css?v=20261004-portal-portraits-v1">
   <script defer src="/assets/ambient-background.js?v=20261010-media-loading-v1"></script>
   <script defer src="/assets/button-frost.js?v=20261023-mobile-animation-tune-v1"></script>
@@ -233,6 +233,12 @@
           <button type="button" class="legal-inline-link" onclick="openPopiaPrivacyNotice()" data-lf-i18n="privacyLink">Privacy &amp; POPIA</button>
           <span aria-hidden="true">•</span>
           <button type="button" class="legal-inline-link" onclick="openTermsOfService()" data-lf-i18n="termsLink">Terms</button>
+          <span aria-hidden="true">•</span>
+          <button type="button" class="legal-inline-link" onclick="openRefundPolicy()">Refund Policy</button>
+          <span aria-hidden="true">•</span>
+          <button type="button" class="legal-inline-link" onclick="openCookiePolicy()">Cookie Policy</button>
+          <span aria-hidden="true">•</span>
+          <button type="button" class="legal-inline-link" onclick="openMarketingUnsubscribe()">Unsubscribe</button>
           <span aria-hidden="true">•</span>
           <button type="button" class="legal-inline-link" onclick="openAboutLittleFeet()" data-lf-i18n="aboutLittleFeet">About Little Feet</button>
         </div>
@@ -1699,8 +1705,12 @@
           <div class="footer-links">
             <a href="#privacy-safeguarding" onclick="event.preventDefault(); openPopiaPrivacyNotice()">Privacy &amp; POPIA</a>
             <a href="#terms-of-service" onclick="event.preventDefault(); openTermsOfService()">Terms of Service</a>
+            <a href="#refund-policy" onclick="event.preventDefault(); openRefundPolicy()">Refund Policy</a>
+            <a href="#cookie-policy" onclick="event.preventDefault(); openCookiePolicy()">Cookie Policy</a>
+            <a href="#cookie-settings" onclick="event.preventDefault(); openCookieSettings()">Cookie Settings</a>
             <a href="/paia.html" target="_blank" rel="noopener">PAIA Manual</a>
             <a href="#copyright-content" onclick="event.preventDefault(); openCopyrightContentPolicy()">Copyright, Trade Marks &amp; IP</a>
+            <a href="#marketing-unsubscribe" onclick="event.preventDefault(); openMarketingUnsubscribe()">Unsubscribe from marketing</a>
             <a href="#guideTab" onclick="event.preventDefault(); openWorkspace('guideTab')">Help &amp; Guide</a>
             <a href="#settingsTab" onclick="event.preventDefault(); openWorkspace('settingsTab')">Settings</a>
             <a href="#donate" onclick="event.preventDefault(); openDonationModal()">Donate</a>
@@ -1713,6 +1723,17 @@
       </div>
     </footer>
   </div>
+
+  <aside id="lfCookieConsent" class="lf-cookie-consent hidden" role="region" aria-label="Cookie and location notice" aria-live="polite">
+    <div class="lf-cookie-consent-copy">
+      <strong>Cookies and location</strong>
+      <p>Little Feet uses an essential sign-in cookie. It does not currently use analytics or advertising cookies. Device location is requested only when you choose a nearby-school or safety-area feature and approve your browser’s location prompt.</p>
+    </div>
+    <div class="lf-cookie-consent-actions">
+      <button id="lfCookieAcknowledge" type="button" class="action-btn btn-blue">Continue with essential cookies</button>
+      <button type="button" class="legal-inline-link" onclick="openCookiePolicy()">Read Cookie Policy</button>
+    </div>
+  </aside>
 
   <section id="wallpaperOverlay" class="wallpaper-overlay" aria-hidden="true" aria-label="Little Feet northern lights wallpaper" onclick="exitWallpaperMode()">
     <div class="wallpaper-aurora-sky" aria-hidden="true"></div>
@@ -1766,7 +1787,8 @@
   <script src="/assets/purchase-requests.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/workplace-extended.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/preferences-enhancements.js?v=20261006-login-i18n-v2" defer></script>
-  <script src="/assets/legal-notices.js?v=20261002-about-v1" defer></script>
+  <script src="/assets/legal-notices.js?v=20261112-refund-cookie-optout-v1" defer></script>
+  <script src="/assets/legal-preferences.js?v=20261112-cookie-notice-v1" defer></script>
   <script src="/assets/curriculum-frameworks.js?v=20261009-stage-navigation-v1" defer></script>
   <script src="/assets/finance-automation.js?v=20261008-session-repair-v1" defer></script>
   <script src="/assets/school-core-upgrades.js?v=20261009-stage-navigation-v1" defer></script>

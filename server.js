@@ -1,4 +1,5 @@
 const authRoutes = require('./lib/routes/auth');
+const marketingPreferencesRoutes = require('./lib/routes/marketing-preferences');
 const healthRoutes = require('./lib/routes/health');
 const diagnosticsRoutes = require('./lib/routes/diagnostics');
 const companyRoutes = require('./lib/routes/company');
@@ -1049,6 +1050,7 @@ const db = {
   gradeRSkillAssessments: [],
   dsdIncidents: [],
   communicationCampaigns: [],
+  marketingOptOuts: [],
   attendanceAutomationSettings: [],
   eldaSkillCatalogue: [],
   eldaAssessments: [],
@@ -1210,6 +1212,7 @@ app.use((req, res, next) => {
 const DUPLICATE_POST_EXEMPT_PATHS = new Set([
   '/api/login',
   '/api/auth/logout',
+  '/api/marketing/unsubscribe',
   '/api/email/inbound/resend',
   '/api/email/mailbox/sync',
   '/api/payments/webhook',
@@ -1854,6 +1857,7 @@ healthRoutes.registerReadyRoutes(app, routeContext);
 
 // Public self-registration is intentionally limited to school-facing roles.
 authRoutes.registerSignupRoutes(app, routeContext);
+marketingPreferencesRoutes.registerMarketingUnsubscribeRoutes(app, routeContext);
 
 const safeAccount = accountsHelpers.safeAccount;
 const getSessionAccount = accountsHelpers.getSessionAccount;

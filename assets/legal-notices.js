@@ -1,7 +1,9 @@
 (() => {
-  const PRIVACY_VERSION = 'POPIA-2026-09-v6';
+  const PRIVACY_VERSION = 'POPIA-2026-11-v7';
   const TERMS_VERSION = 'TOS-ZA-2026-09-v5';
   const IP_VERSION = 'IP-ZA-2026-09-v1';
+  const REFUND_VERSION = 'REFUND-ZA-2026-11-v1';
+  const COOKIE_VERSION = 'COOKIE-ZA-2026-11-v1';
 
   const section = (title, body) =>
     '<section style="margin:0 0 16px;"><h3 style="margin:0 0 7px;font-size:1rem;">' + title + '</h3><div style="color:var(--text-muted);line-height:1.65;font-size:.88rem;">' + body + '</div></section>';
@@ -53,7 +55,7 @@
       section('11. PAIA and records access',
         '<p>The Promotion of Access to Information Act 2 of 2000 (PAIA) applies to access to records held by public and private bodies. A private body must maintain the section 51 PAIA manual required by law and make it available in the required manner. Little Feet Technologies (Pty) Ltd maintains its section 51 PAIA Manual with the company’s verified legal identity, Information Officer details, record categories and access information. The current manual is available at <a href="/paia.html" target="_blank" rel="noopener">littlefeet.co.za/paia.html</a>.</p>'),
       section('12. Direct marketing and automated decisions',
-        '<p>Unsolicited electronic direct marketing must comply with POPIA and other applicable South African consumer and electronic-communications rules. Little Feet must not be used to make a solely automated admission, disciplinary, safeguarding or developmental decision that has legal or substantial effects on a person without the protections required by law.</p>'),
+        '<p>Unsolicited electronic direct marketing must comply with POPIA and other applicable South African consumer and electronic-communications rules. You can opt out of Little Feet marketing email using the “Unsubscribe from marketing” link in the portal footer. Little Feet records the opt-out using a one-way email hash and the date so the address can remain suppressed. Service, account-security, billing and school-operational messages are not marketing. Little Feet must not be used to make a solely automated admission, disciplinary, safeguarding or developmental decision that has legal or substantial effects on a person without the protections required by law.</p>'),
       section('13. Information Regulator',
         '<p>The South African Information Regulator is the independent regulator responsible for POPIA and PAIA. Current complaint forms, PAIA forms and contact channels are available at <a href="https://inforegulator.org.za/" target="_blank" rel="noopener">inforegulator.org.za</a>.</p>'),
       '<p class="meta" style="margin-top:14px;">This platform notice supports compliance but does not replace the school’s own privacy notice, the responsible party’s section 51 PAIA manual, retention schedule, operator agreements, Information Officer duties, security incident process or professional legal review.</p>',
@@ -204,6 +206,82 @@
     window.openModal?.('Terms of Service · South Africa', termsMarkup());
   }
 
+  function refundPolicyMarkup() {
+    return [
+      '<div style="font-size:.9rem;line-height:1.55;">',
+      '<p class="meta" style="margin:0 0 14px;">Version ' + REFUND_VERSION + ' · South Africa · Little Feet school subscriptions</p>',
+      section('1. Integration, trial and subscription',
+        '<p>Little Feet’s usual school launch begins with <strong>one week of integration</strong>, to bring in the school-approved learner, family and class data and review roles and consent records. This is followed by a <strong>14-day live trial</strong> using the school’s real workflows. At the end of the trial, the school may choose whether to activate a paid subscription; normal school access pauses until one is activated.</p><p style="margin-top:8px;">If the school proceeds, its subscription is for <strong>36 months</strong> where that term is stated in its signed quotation, order form or service agreement and permitted by applicable law. That document sets the agreed subscription start date, fees and any separately priced work. A visit to this page or use of a trial does not by itself create a paid agreement. The term and cancellation provisions remain subject to applicable South African law, including the Consumer Protection Act’s fixed-term rules where it applies.</p>'),
+      section('2. 30-day money-back guarantee',
+        '<p>Little Feet provides a <strong>30-day money-back guarantee</strong> on a new paid school subscription. The 30 calendar days begin on the paid subscription start date recorded in the school’s signed quotation or agreement. If the school asks for a refund within that period, Little Feet will refund the subscription payments it has received for the covered subscription.</p>'),
+      section('3. How to request a refund',
+        '<p>Email <a href="mailto:Christiaan@littlefeet.co.za">Christiaan@littlefeet.co.za</a> within the 30-day period. Include the school’s exact name and the quotation, agreement or payment reference so the request can be matched to the right subscription. Little Feet will confirm receipt and arrange the refund promptly using the payment details available for that transaction, subject to any statutory deadline that applies.</p>'),
+      section('4. Other cancellation and refund rights',
+        '<p>This guarantee is an additional promise and does not remove any cancellation, cooling-off, refund or other right that applies under South African law. After the guarantee period, the signed school agreement and any applicable statutory rights govern cancellation and amounts due. If a signed document gives the school a more favourable refund term, that more favourable term applies.</p>'),
+      '<p class="meta" style="margin-top:14px;">Questions: <a href="mailto:Christiaan@littlefeet.co.za">Christiaan@littlefeet.co.za</a> · 062 943 2244</p>',
+      '</div>'
+    ].join('');
+  }
+
+  function cookiePolicyMarkup() {
+    return [
+      '<div style="font-size:.9rem;line-height:1.55;">',
+      '<p class="meta" style="margin:0 0 14px;">Version ' + COOKIE_VERSION + ' · South Africa · Browser storage and location</p>',
+      section('1. Cookies Little Feet uses',
+        '<p>The portal uses an essential, first-party sign-in cookie named <code>littlefeet.sid</code> to keep an authenticated session working. It is HTTP-only, uses SameSite=Lax, is marked Secure in production and has a rolling one-hour lifetime. It is not used for advertising. The app does not currently set analytics or advertising cookies or load third-party advertising pixels.</p>'),
+      section('2. Browser storage',
+        '<p>Little Feet also uses browser local storage and session storage for settings and interface preferences, the last-used sign-in name and selected learner view, temporary form drafts and diagnostic state, and features that last only for the current browser session. A safety location filter is kept in session storage for the current tab. These are browser storage mechanisms rather than cookies. The cookie notice remembers that it was acknowledged in local storage. Clearing browser storage can remove these preferences, drafts or temporary state.</p>'),
+      section('3. Location features and your choice',
+        '<p>Little Feet does use device location when you choose a location-based feature. The school finder requests your location only after you choose “Find schools near me”; if you allow it in your browser, Little Feet uses the coordinates to centre the map and search for schools within the selected radius. Little Feet keeps the nearby-search result in a temporary in-memory cache keyed by location rounded to three decimal places for up to 30 minutes. The nearby search sends a bounding-box query to public OpenStreetMap Overpass services, and the map loads Leaflet styles from unpkg and tiles from OpenStreetMap tile servers. Those providers receive the information needed to answer the map request, such as the requested map area and normal network request data.</p><p style="margin-top:8px;">Safety features can also request location after you choose to enable location filtering or set an area-alert location. A location-filter point is kept in session storage for the current browser tab; a location attached to a safety alert is saved with that alert so the alert can reach the intended area. Little Feet does not request device location automatically. Your browser or device asks for location permission, and you can deny or revoke that permission in its settings. Location is not an advertising cookie.</p>'),
+      section('4. Your cookie and location controls',
+        '<p>The banner lets you acknowledge the essential-cookie notice. The portal currently has no optional analytics or advertising cookies to accept or reject. Use your browser controls to clear cookies or browser storage, and your browser or device location settings to block or revoke location access. Blocking the essential sign-in cookie can prevent sign-in from working; denying location access leaves the location feature unavailable while other portal features continue to work.</p>'),
+      section('5. Changes and contact',
+        '<p>If Little Feet adds a non-essential cookie, analytics or advertising tracker, this policy and the consent choices will be updated before it is used. For questions, contact <a href="mailto:Christiaan@littlefeet.co.za">Christiaan@littlefeet.co.za</a>.</p>'),
+      '<p class="meta" style="margin-top:14px;">See the <a href="#privacy-safeguarding" onclick="event.preventDefault(); openPopiaPrivacyNotice()">Privacy &amp; POPIA Notice</a> for broader information about personal information handling.</p>',
+      '</div>'
+    ].join('');
+  }
+
+  function openRefundPolicy() {
+    window.openModal?.('Refund Policy · 30-day money-back guarantee', refundPolicyMarkup());
+  }
+
+  function openCookiePolicy() {
+    window.openModal?.('Cookie & Browser Storage Policy', cookiePolicyMarkup());
+  }
+
+  function openMarketingUnsubscribe() {
+    window.openModal?.('Unsubscribe from Little Feet marketing', '<div style="font-size:.9rem;line-height:1.55;"><p>Enter the email address you want removed from Little Feet direct-marketing email. This does not stop required account, security, billing or school-operational messages.</p><form id="lfMarketingUnsubscribeForm"><label for="lfMarketingUnsubscribeEmail">Email address</label><input id="lfMarketingUnsubscribeEmail" name="email" type="email" maxlength="254" autocomplete="email" required style="width:100%;margin:6px 0 12px;"><p id="lfMarketingUnsubscribeStatus" role="status" aria-live="polite"></p><button type="submit" class="submit-btn">Unsubscribe</button></form></div>');
+    const form = document.getElementById('lfMarketingUnsubscribeForm');
+    if (!form || form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = form.querySelector('[type="submit"]');
+      const status = document.getElementById('lfMarketingUnsubscribeStatus');
+      const email = String(new FormData(form).get('email') || '').trim();
+      button.disabled = true;
+      status.textContent = 'Saving your preference…';
+      try {
+        const response = await fetch('/api/marketing/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || 'Your request could not be saved. Please try again.');
+        form.innerHTML = '<p role="status" aria-live="polite"><strong>Your opt-out has been recorded.</strong> Little Feet will keep this address off its direct-marketing list.</p>';
+      } catch (error) {
+        status.textContent = error.message || 'Your request could not be saved. Please try again.';
+        button.disabled = false;
+      }
+    });
+  }
+
+  function openCookieSettings() {
+    window.showLittleFeetCookieNotice?.();
+  }
+
   function openCopyrightContentPolicy() {
     window.openModal?.('Copyright, Trade Marks & Intellectual Property', copyrightPolicyMarkup());
   }
@@ -215,6 +293,10 @@
     openAboutLittleFeet,
     openPopiaPrivacyNotice,
     openTermsOfService,
-    openCopyrightContentPolicy
+    openCopyrightContentPolicy,
+    openRefundPolicy,
+    openCookiePolicy,
+    openMarketingUnsubscribe,
+    openCookieSettings
   });
 })();
