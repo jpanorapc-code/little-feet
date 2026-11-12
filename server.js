@@ -684,6 +684,8 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  // Allow OAuth popup flows while isolating the top-level browsing context.
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
@@ -703,7 +705,7 @@ app.use((req, res, next) => {
     "upgrade-insecure-requests",
     "block-all-mixed-content"
   ].join('; '));
-  if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (isProduction) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   if (req.path.startsWith('/api/') && !['/api/health', '/api/ready', '/api/nearby-schools'].includes(req.path)) {
     res.setHeader('Cache-Control', 'no-store, private');
   }
@@ -858,7 +860,7 @@ const staticFileOptions = {
   setHeaders: (res, filePath) => {
     if (/\.html$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
     else if (/\.(?:js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    else if (/\.(?:png|jpe?g|webp|gif|svg|ico|mp3|wav|woff2?)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    else if (/\.(?:png|jpe?g|webp|gif|svg|ico|mp3|mp4|wav|woff2?)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     else res.setHeader('Cache-Control', 'public, max-age=86400');
   }
 };
@@ -975,7 +977,7 @@ app.get('/vendor/:asset', async (req, res, next) => {
       browserVendorCache.set(req.params.asset, script);
     }
     res.type('application/javascript');
-    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.send(script);
   } catch (error) {
     error.status = 502;

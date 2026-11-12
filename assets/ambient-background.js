@@ -7,8 +7,13 @@
   const videos = [loginVideo, portalVideo].filter(Boolean);
   const preference = 'lf_background_paused';
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  let userPaused = false;
-  try { userPaused = localStorage.getItem(preference) === 'true'; } catch {}
+  // Avoid downloading the large background video on a first visit.
+  // Users who previously chose "Play background" keep that preference.
+  let userPaused = true;
+  try {
+    const savedPreference = localStorage.getItem(preference);
+    if (savedPreference === 'false') userPaused = false;
+  } catch {}
 
   videos.forEach(video => {
     video.muted = true;

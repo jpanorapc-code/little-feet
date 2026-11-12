@@ -177,6 +177,29 @@
       box-shadow:none !important;
     }
 
+    #authSection .brand-header h1 > button {
+      display:block;
+      width:100%;
+      margin:0;
+      padding:0;
+      border:0;
+      background:transparent;
+      color:inherit;
+      -webkit-text-fill-color:inherit;
+      -webkit-text-stroke:inherit;
+      font:inherit;
+      letter-spacing:inherit;
+      line-height:inherit;
+      text-align:inherit;
+      cursor:pointer;
+    }
+
+    #authSection .brand-header h1 > button:focus-visible {
+      outline:2px solid #5eead4 !important;
+      outline-offset:5px !important;
+      border-radius:3px;
+    }
+
     #authSection .brand-header h1:focus-visible {
       border:0 !important;
       outline:0 !important;

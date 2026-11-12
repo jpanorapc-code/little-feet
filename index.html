@@ -9,13 +9,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Feet">
   <!-- Public standby routing is emitted from server-only runtime configuration. -->
-  <script src="/runtime-config.js"></script>
+  <script src="/runtime-config.js" defer></script>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <meta name="description" content="Little Feet by Little Feet Technologies (Pty) Ltd is a South African school operations platform for ECD, primary and secondary schools, covering communication, learning, attendance, finance, staff workflows, safeguarding and family engagement.">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="canonical" href="https://littlefeet.co.za/">
   <title>Little Feet | School Operations Platform</title>
-  <link rel="icon" type="image/png" href="/logo.png">\n  <link rel="preload" as="image" href="/assets/video/little-feet-login-clean.jpg" fetchpriority="high">
+  <link rel="icon" type="image/png" href="/logo.png">\n  <link rel="preload" as="image" href="/assets/brand/iceberg-navy-penguin.webp" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/video/little-feet-login-clean.jpg" fetchpriority="low">
   <link rel="apple-touch-icon" href="/logo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://littlefeet.co.za/#organization","name":"Little Feet Technologies (Pty) Ltd","alternateName":"Little Feet","url":"https://littlefeet.co.za/","logo":"https://littlefeet.co.za/logo.png","description":"South African company operating the Little Feet school operations platform for ECD, primary and secondary school environments."},{"@type":"SoftwareApplication","@id":"https://littlefeet.co.za/#software","name":"Little Feet","alternateName":"Little Feet School Operations Platform","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"https://littlefeet.co.za/","publisher":{"@id":"https://littlefeet.co.za/#organization"},"description":"School operations platform for ECD, primary and secondary schools covering communication, learning, attendance, finance, staff workflows, safeguarding and family engagement."}]}</script>
@@ -50,7 +51,7 @@
 <body>
   <div class="ambient-background" aria-hidden="true">
     <video id="loginBackgroundVideo" class="login-background-video" muted loop playsinline preload="none" poster="/assets/video/little-feet-login-clean.jpg" tabindex="-1">
-      <source data-src="/assets/video/little-feet-login-clean.mp4" type="video/mp4">
+      <source data-src="/assets/video/little-feet-login-clean.mp4?v=20261113-background-video-v1" type="video/mp4">
     </video>
     <video id="ambientBackgroundVideo" class="portal-background-video" muted loop playsinline preload="none" poster="/assets/video/little-feet-login-clean.jpg" tabindex="-1">
       <source data-src="/assets/video/little-feet-login-clean.mp4" type="video/mp4">
@@ -110,7 +111,7 @@
 
   <div id="portalLoader" role="status" aria-live="polite" aria-label="Little Feet is loading">
     <div class="walking-loader">
-      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/little-feet-mascot-hq.optimized.png" alt=""><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg></div>
+      <div class="walking-loader-mark" aria-hidden="true"><img src="assets/4k/my-day-office-mascot.webp" alt="Little Feet mascot" width="58" height="58" decoding="async"><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg><svg class="ui-icon loader-step"><use href="#icon-heart-star"></use></svg></div>
       <p>Little Feet is getting ready</p>
     </div>
   </div>
@@ -127,7 +128,7 @@
   <button id="stickyNotesLauncher" class="hidden" type="button" onclick="restoreStickyNotes()" aria-label="Reopen closed sticky notes"><svg class="ui-icon" aria-hidden="true"><use href="#icon-document"></use></svg><span>Notes</span></button>
 
   <!-- Auth Screen -->
-  <div id="authSection">
+  <div id="authSection" role="main">
     <div class="card auth-card">
       <div class="brand-header">
         <div class="mascot-stage">
@@ -139,7 +140,7 @@
 <image href="assets/brand/iceberg-wave-backing.webp" width="1672" height="941" clip-path="url(#penguinArmBacking)"/>
 <g class="penguin-wave"><image href="assets/brand/iceberg-navy-penguin.webp" width="1672" height="941" clip-path="url(#penguinArm)"/></g>
 </svg></button></div>
-<h1 role="button" tabindex="0" onclick="goToMainMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToMainMenu();}" title="Click to go to Main Menu" aria-label="Little Feet Technologies — open main menu">Little Feet Technologies</h1>
+<h1><button type="button" onclick="goToMainMenu()" title="Open Main Menu" aria-label="Open Little Feet main menu">Little Feet Technologies</button></h1>
         <p class="slogan"><span data-lf-i18n="tagline">Every Little Step Matters</span></p>
       </div>
       <div class="login-card-tools">
@@ -282,7 +283,7 @@
   </div>
 
   <!-- Main Dashboard -->
-  <div id="dashboardSection" class="hidden">
+  <div id="dashboardSection" class="hidden" role="main">
     <nav>
       <div class="nav-brand" onclick="goToMainMenu()" title="Return to Home Page">
         <img src="little-feet-mascot.jfif" loading="lazy" decoding="async" alt="Little Feet mascot logo" onclick="handleMascotLegacyTap(event)" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%230d9488\'><path d=\'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\'/></svg>'">
