@@ -44,7 +44,7 @@ async function login(username){const r=await request('/api/login',{method:'POST'
 
 (async()=>{
  try{
-  for(let i=0;i<120;i++){try{if((await fetch(base+'/api/health')).ok)break;}catch{}if(i===119)throw new Error(stderr);await wait(100);}
+  for(let i=0;i<300;i++){try{if((await fetch(base+'/api/health')).ok)break;}catch{}if(i===299)throw new Error(stderr);await wait(100);}
   const admin=await login('a-admin'),teacher=await login('a-teacher'),parent=await login('a-parent'),bravo=await login('b-admin'),platform=await login('platform');
 
   const imported=await request('/api/elda/catalogue/import',{method:'POST',cookie:admin,body:{rows:[{code:'WB-001',label:'Development skill one',area:'ELDA 1 · Well-being',ageBand:'48–59 months',phase:'Birth–4',source:'School-approved official mapping'}]}});

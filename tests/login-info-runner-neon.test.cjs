@@ -55,7 +55,7 @@ let browser;
 
   await page.setViewportSize({width:390,height:844});
   const mobileTiming=await runner.evaluate(el=>getComputedStyle(el).animationTimingFunction);
-  assert.match(mobileTiming,/steps\\(70/,'Mobile pulse should be stepped at roughly 25 FPS');
+  assert.match(mobileTiming,/steps\(70/,'Mobile pulse should be stepped at roughly 25 FPS');
 
   const fades=await runner.evaluate(el=>({
     before:getComputedStyle(el,'::before').backgroundImage,

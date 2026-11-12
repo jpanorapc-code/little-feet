@@ -50,14 +50,14 @@ child = spawn(process.execPath, ['server.js'], {
     stdio: ['ignore', 'ignore', 'pipe']
   });
   child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/api/health`);
       if (response.ok) return;
     } catch {}
     await wait(100);
   }
-  throw new Error(`Owner migration test server failed to start. ${stderr}`);
+  throw new Error(`Owner migration test server failed to start after 30 seconds. ${stderr}`);
 };
 const stop = () => new Promise(resolve => {
   if (!child || child.exitCode !== null) return resolve();

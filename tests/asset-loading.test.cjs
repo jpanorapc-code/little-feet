@@ -176,7 +176,7 @@ let child, browser, errors = '';
       const keys = await caches.keys();
       const shell = await caches.open(keys.find(key => key.startsWith('little-feet-shell-')));
       const urls = (await shell.keys()).map(request => new URL(request.url).pathname);
-      return { urls, styles: Boolean(await shell.match('/assets/styles/portal.css?v=20261010-styles-v2')) };
+      return { urls, styles: Boolean(await shell.match('/assets/styles/portal.css?v=20261112-cookie-banner-v1')) };
     });
     assert.ok(cache.styles, 'Extracted stylesheet must be installed with the actual service worker');
     assert.ok(!cache.urls.some(url => /^\/(?:api|auth)\//.test(url) || url === '/' || url.endsWith('.html')), 'Private requests and HTML remain uncached');
@@ -185,7 +185,7 @@ let child, browser, errors = '';
     // service-worker network context online, which would not test a real outage.
     await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
     await context.setOffline(true);
-    const offlineCss = await page.evaluate(async () => (await fetch('/assets/styles/portal.css?v=20261010-styles-v2')).status);
+    const offlineCss = await page.evaluate(async () => (await fetch('/assets/styles/portal.css?v=20261112-cookie-banner-v1')).status);
     assert.equal(offlineCss, 200, 'Installed styles remain available offline');
     const offlinePage = await page.goto(origin, { waitUntil: 'domcontentloaded' });
     assert.equal(offlinePage.status(), 503, 'Offline navigation must not replay any authenticated page');
