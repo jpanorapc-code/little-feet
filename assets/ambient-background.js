@@ -44,7 +44,7 @@
     }
     if (!active) return render();
 
-    if (userPaused || reducedMotion.matches || document.hidden) {
+    if (userPaused || reducedMotion.matches || document.hidden || document.documentElement.classList.contains("lf-animations-paused")) {
       active.pause();
     } else {
       try {
